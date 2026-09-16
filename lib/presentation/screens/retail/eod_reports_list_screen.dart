@@ -282,6 +282,12 @@ class _EODReportsListScreenState extends State<EODReportsListScreen> {
         report.cashReconciliation.reconciliationStatus == 'Overage';
 
     return Card(
+      // Explicit white + no surface tint. Material 3 tints a Card's
+      // default surface by elevation, and main.dart sets no colorScheme,
+      // so an untinted Card picked up M3's default lavender at
+      // elevation 2 while every neighbouring surface stayed white.
+      color: AppColors.white,
+      surfaceTintColor: Colors.transparent,
       margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
       elevation: 2,
       shape: RoundedRectangleBorder(

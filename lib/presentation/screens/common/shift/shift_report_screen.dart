@@ -11,7 +11,15 @@ import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
-import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_app_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_body.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_card.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_date_range_row.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_empty_state.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_export_button.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_filter_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_summary_card.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_summary_row.dart';
 import 'package:billberrylite/domain/services/common/report_export_service.dart';
 
 class ShiftReportScreen extends StatefulWidget {
@@ -66,52 +74,6 @@ class _ShiftReportScreenState extends State<ShiftReportScreen> {
   }
 
   // ── Date helpers ──────────────────────────────────────────────────────────
-
-  Future<void> _pickCustomFrom() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _customFrom ?? DateTime.now(),
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
-      builder: (ctx, child) => Theme(
-        data: Theme.of(ctx).copyWith(
-          colorScheme: ColorScheme.light(
-            primary: AppColors.primary,
-            onPrimary: Colors.white,
-            surface: Colors.white,
-          ),
-        ),
-        child: child!,
-      ),
-    );
-    if (picked != null) {
-      setState(() => _customFrom = picked);
-      shiftStore.setFilter('Custom', start: _customFrom, end: _customTo);
-    }
-  }
-
-  Future<void> _pickCustomTo() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _customTo ?? DateTime.now(),
-      firstDate: _customFrom ?? DateTime(2020),
-      lastDate: DateTime.now(),
-      builder: (ctx, child) => Theme(
-        data: Theme.of(ctx).copyWith(
-          colorScheme: ColorScheme.light(
-            primary: AppColors.primary,
-            onPrimary: Colors.white,
-            surface: Colors.white,
-          ),
-        ),
-        child: child!,
-      ),
-    );
-    if (picked != null) {
-      setState(() => _customTo = picked);
-      shiftStore.setFilter('Custom', start: _customFrom, end: _customTo);
-    }
-  }
 
   // ── Day grouping ──────────────────────────────────────────────────────────
 
@@ -202,109 +164,84 @@ class _ShiftReportScreenState extends State<ShiftReportScreen> {
   Widget build(BuildContext context) {
     final currency = CurrencyHelper.currentSymbol;
 
-    return Scaffold(
-      backgroundColor: AppColors.surfaceLight,
-      appBar: buildPrimaryAppBar(
-        titleWidget: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Shift Report',
-              style: GoogleFonts.poppins(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-                fontSize: AppResponsive.headingFontSize(context),
-              ),
-            ),
-            Observer(
-              builder: (_) {
-                final openCount = shiftStore.shifts
-                    .where((s) => s.isOpen)
-                    .length;
-                return Text(
-                  openCount > 0
-                      ? '$openCount shift${openCount > 1 ? 's' : ''} currently active'
-                      : 'No active shifts',
-                  style: GoogleFonts.poppins(
-                    color: Colors.white70,
-                    fontSize: AppResponsive.smallFontSize(context),
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.file_download_outlined),
-            onPressed: () => _doExport(context),
-          ),
-        ],
-      ),
-      // Search/filter rows are plain Padding, not full-bleed strips, so the
-      // whole body caps together. The Scaffold background still spans.
-      body: AppResponsive.constrainedContent(
-        context: context,
-        maxWidth: AppResponsive.maxFormWidth(context),
-        alignment: Alignment.topCenter,
-        child: Column(
-          children: [
-            _buildSearchBar(context),
-            _buildFilterChips(context),
-            Observer(
-              builder: (_) {
-                if (shiftStore.filterPeriod == 'Custom') {
-                  return _buildCustomDateRow(context);
-                }
-                return const SizedBox.shrink();
-              },
-            ),
-            Expanded(
-              child: Observer(
-                builder: (_) {
-                  if (shiftStore.isLoading) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  final filtered = shiftStore.filteredShifts;
-                  final closed = filtered.where((s) => !s.isOpen).toList();
-                  final open = filtered.where((s) => s.isOpen).toList();
+    // Observer wraps the whole Scaffold so the app-bar subtitle stays reactive
+    // now that reportAppBar takes a plain String rather than a widget.
+    return Observer(
+      builder: (_) {
+        final openCount = shiftStore.shifts.where((s) => s.isOpen).length;
 
-                  return Column(
-                    children: [
-                      _buildSummaryBar(context, currency, closed, open),
-                      Expanded(
-                        child: filtered.isEmpty
-                            ? _buildEmptyState(context)
-                            : _buildGroupedList(
-                                context,
-                                currency,
-                                open,
-                                closed,
-                                _cachedExpenses,
-                              ),
-                      ),
-                    ],
-                  );
+        return Scaffold(
+          backgroundColor: AppColors.surfaceLight,
+          appBar: reportAppBar(
+            title: 'Shift Report',
+            subtitle: openCount > 0
+                ? '$openCount shift${openCount > 1 ? 's' : ''} currently active'
+                : 'No active shifts',
+          ),
+          body: Column(
+            children: [
+              _buildSearchBar(context),
+              // Generic ReportFilterBar over this screen's OWN periods — the
+              // kit's documented path for a report whose periods aren't the
+              // standard five (same as dailyclosing / voidOrderReport). 'All'
+              // and the operational week/month are preserved exactly.
+              ReportFilterBar<String>(
+                options: _periods,
+                selected: shiftStore.filterPeriod,
+                onSelected: (p) {
+                  if (p != 'Custom') {
+                    setState(() {
+                      _customFrom = null;
+                      _customTo = null;
+                    });
+                  }
+                  shiftStore.setFilter(p);
                 },
               ),
-            ),
-          ],
-        ),
+              if (shiftStore.filterPeriod == 'Custom')
+                _buildCustomDateRow(context),
+              AppResponsive.verticalSpace(context, size: SpacingSize.small),
+              Expanded(child: _buildContent(context, currency)),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildContent(BuildContext context, String currency) {
+    if (shiftStore.isLoading) return const ReportLoading();
+
+    final filtered = shiftStore.filteredShifts;
+    if (filtered.isEmpty) return _buildEmptyState(context);
+
+    final closed = filtered.where((s) => !s.isOpen).toList();
+    final open = filtered.where((s) => s.isOpen).toList();
+
+    return ReportBody(
+      child: Column(
+        children: [
+          _buildSummaryCards(context, currency, closed, open),
+          AppResponsive.verticalSpace(context),
+          ReportExportButton(onPressed: () => _doExport(context)),
+          AppResponsive.verticalSpace(context),
+          _buildGroupedList(context, currency, open, closed, _cachedExpenses),
+        ],
       ),
     );
   }
 
   // ── Search bar ────────────────────────────────────────────────────────────
 
+  /// White band matching [ReportFilterBar]'s, so search + periods read as one
+  /// header block instead of two floating strips on the grey background.
   Widget _buildSearchBar(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        AppResponsive.largeSpacing(context),
-        AppResponsive.mediumSpacing(context),
-        AppResponsive.largeSpacing(context),
-        0,
-      ),
+    return Container(
+      width: double.infinity,
+      color: AppColors.white,
+      padding: AppResponsive.horizontalPadding(
+        context,
+      ).copyWith(top: 12, bottom: 0),
       child: AppTextField(
         controller: _searchController,
         hint: 'Search staff name...',
@@ -329,194 +266,64 @@ class _ShiftReportScreenState extends State<ShiftReportScreen> {
     );
   }
 
-  // ── Filter chips ──────────────────────────────────────────────────────────
+  // ── Filter periods ────────────────────────────────────────────────────────
 
-  static const _periods = ['All', 'Today', 'Week', 'Month', 'Custom'];
-
-  Widget _buildFilterChips(BuildContext context) {
-    return Observer(
-      builder: (_) {
-        final active = shiftStore.filterPeriod;
-        return Padding(
-          padding: EdgeInsets.symmetric(
-            vertical: AppResponsive.mediumSpacing(context),
-            horizontal: AppResponsive.largeSpacing(context),
-          ),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: _periods.map((p) {
-                final isSelected = active == p;
-                return Padding(
-                  padding: EdgeInsets.only(
-                    right: AppResponsive.smallSpacing(context),
-                  ),
-                  child: GestureDetector(
-                    onTap: () {
-                      if (p != 'Custom') {
-                        setState(() {
-                          _customFrom = null;
-                          _customTo = null;
-                        });
-                      }
-                      shiftStore.setFilter(p);
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      padding: EdgeInsets.symmetric(
-                        horizontal: AppResponsive.largeSpacing(context),
-                        vertical: AppResponsive.smallSpacing(context),
-                      ),
-                      decoration: BoxDecoration(
-                        color: isSelected ? AppColors.primary : AppColors.white,
-                        borderRadius: BorderRadius.circular(
-                          AppResponsive.borderRadius(context),
-                        ),
-                        border: Border.all(
-                          color: isSelected
-                              ? AppColors.primary
-                              : AppColors.divider,
-                        ),
-                        boxShadow: isSelected
-                            ? [
-                                BoxShadow(
-                                  color: AppColors.primary.withValues(
-                                    alpha: 0.25,
-                                  ),
-                                  blurRadius: 6,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ]
-                            : [],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (p == 'Custom')
-                            Padding(
-                              padding: const EdgeInsets.only(right: 4),
-                              child: Icon(
-                                Icons.date_range,
-                                size: AppResponsive.smallIconSize(context),
-                                color: isSelected
-                                    ? Colors.white
-                                    : AppColors.textSecondary,
-                              ),
-                            ),
-                          Text(
-                            p,
-                            style: GoogleFonts.poppins(
-                              fontSize: AppResponsive.smallFontSize(context),
-                              fontWeight: isSelected
-                                  ? FontWeight.w600
-                                  : FontWeight.w500,
-                              color: isSelected
-                                  ? Colors.white
-                                  : AppColors.textPrimary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-        );
-      },
-    );
-  }
+  /// Operational periods, not reporting periods — 'All' and a rolling
+  /// week/month are what a shift ledger is read by, so this screen keeps them
+  /// and feeds the generic bar rather than adopting ReportPeriodFilterBar.
+  static const _periods = [
+    ReportFilterOption(
+      value: 'All',
+      label: 'All',
+      icon: Icons.list_alt_rounded,
+    ),
+    ReportFilterOption(
+      value: 'Today',
+      label: 'Today',
+      icon: Icons.today_rounded,
+    ),
+    ReportFilterOption(
+      value: 'Week',
+      label: 'Week',
+      icon: Icons.view_week_rounded,
+    ),
+    ReportFilterOption(
+      value: 'Month',
+      label: 'Month',
+      icon: Icons.calendar_month_rounded,
+    ),
+    ReportFilterOption(
+      value: 'Custom',
+      label: 'Custom',
+      icon: Icons.date_range,
+    ),
+  ];
 
   // ── Custom date row ───────────────────────────────────────────────────────
 
+  /// Shared kit control — same From/To pair the cash-drawer ledger uses, so the
+  /// three operational reports can't drift apart again.
   Widget _buildCustomDateRow(BuildContext context) {
-    final fmt = DateFormat('dd MMM yyyy');
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        AppResponsive.largeSpacing(context),
-        0,
-        AppResponsive.largeSpacing(context),
-        AppResponsive.mediumSpacing(context),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _datePicker(
-              context: context,
-              label: 'From',
-              value: _customFrom != null ? fmt.format(_customFrom!) : null,
-              onTap: _pickCustomFrom,
-            ),
-          ),
-          SizedBox(width: AppResponsive.mediumSpacing(context)),
-          Expanded(
-            child: _datePicker(
-              context: context,
-              label: 'To',
-              value: _customTo != null ? fmt.format(_customTo!) : null,
-              onTap: _pickCustomTo,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _datePicker({
-    required BuildContext context,
-    required String label,
-    required String? value,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.symmetric(
-          horizontal: AppResponsive.mediumSpacing(context),
-          vertical: AppResponsive.smallSpacing(context) + 2,
-        ),
-        decoration: BoxDecoration(
-          color: AppColors.white,
-          border: Border.all(
-            color: value != null ? AppColors.primary : AppColors.divider,
-            width: value != null ? 1.5 : 1,
-          ),
-          borderRadius: BorderRadius.circular(
-            AppResponsive.borderRadius(context),
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              Icons.calendar_today,
-              size: AppResponsive.smallIconSize(context),
-              color: value != null
-                  ? AppColors.primary
-                  : AppColors.textSecondary,
-            ),
-            SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                value ?? label,
-                style: GoogleFonts.poppins(
-                  fontSize: AppResponsive.smallFontSize(context),
-                  color: value != null
-                      ? AppColors.textPrimary
-                      : AppColors.textSecondary,
-                  fontWeight: value != null ? FontWeight.w500 : FontWeight.w400,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+    return ReportDateRangeRow(
+      from: _customFrom,
+      to: _customTo,
+      padding: AppResponsive.horizontalPadding(
+        context,
+      ).copyWith(top: 0, bottom: 12),
+      onFromPicked: (d) {
+        setState(() => _customFrom = d);
+        shiftStore.setFilter('Custom', start: _customFrom, end: _customTo);
+      },
+      onToPicked: (d) {
+        setState(() => _customTo = d);
+        shiftStore.setFilter('Custom', start: _customFrom, end: _customTo);
+      },
     );
   }
 
   // ── Summary bar ───────────────────────────────────────────────────────────
 
-  Widget _buildSummaryBar(
+  Widget _buildSummaryCards(
     BuildContext context,
     String currency,
     List<ShiftModel> closed,
@@ -537,77 +344,43 @@ class _ShiftReportScreenState extends State<ShiftReportScreen> {
       (s, sh) => s + sh.duration.inMinutes,
     );
 
-    return Container(
-      margin: EdgeInsets.fromLTRB(
-        AppResponsive.largeSpacing(context),
-        0,
-        AppResponsive.largeSpacing(context),
-        AppResponsive.mediumSpacing(context),
-      ),
-      padding: EdgeInsets.all(AppResponsive.largeSpacing(context)),
-      decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.07),
-        borderRadius: BorderRadius.circular(
-          AppResponsive.borderRadius(context),
-        ),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.15)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _summaryTile(
-            context,
-            '${allForSummary.length}',
-            'Shifts',
-            Icons.badge_outlined,
-          ),
-          _summaryTile(context, '$totalOrders', 'Orders', Icons.receipt_long),
-          // FIX 3: Use DecimalSettings for consistent currency formatting.
-          _summaryTile(
-            context,
-            '$currency${DecimalSettings.formatAmount(totalSales)}',
-            'Sales',
-            Icons.attach_money,
-          ),
-          _summaryTile(
-            context,
-            '${totalMins ~/ 60}h ${totalMins.remainder(60)}m',
-            'Hours',
-            Icons.timer_outlined,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _summaryTile(
-    BuildContext context,
-    String value,
-    String label,
-    IconData icon,
-  ) {
+    // Two rows of two, as in totalsales/refunddetails — four cards abreast
+    // leaves each ~78px on a 360px phone and ellipsises every title.
     return Column(
       children: [
-        Icon(
-          icon,
-          color: AppColors.primary,
-          size: AppResponsive.iconSize(context),
+        ReportSummaryRow(
+          cards: [
+            ReportSummaryCard(
+              title: 'Shifts',
+              value: '${allForSummary.length}',
+              icon: Icons.badge_outlined,
+              color: AppColors.primary,
+            ),
+            ReportSummaryCard(
+              title: 'Orders',
+              value: '$totalOrders',
+              icon: Icons.receipt_long,
+              color: Colors.blue,
+            ),
+          ],
         ),
-        SizedBox(height: 4),
-        Text(
-          value,
-          style: GoogleFonts.poppins(
-            fontWeight: FontWeight.w700,
-            fontSize: AppResponsive.bodyFontSize(context),
-            color: AppColors.textPrimary,
-          ),
-        ),
-        Text(
-          label,
-          style: GoogleFonts.poppins(
-            fontSize: AppResponsive.captionFontSize(context),
-            color: AppColors.textSecondary,
-          ),
+        AppResponsive.verticalSpace(context),
+        ReportSummaryRow(
+          cards: [
+            // FIX 3: Use DecimalSettings for consistent currency formatting.
+            ReportSummaryCard(
+              title: 'Sales',
+              value: '$currency${DecimalSettings.formatAmount(totalSales)}',
+              icon: Icons.attach_money,
+              color: AppColors.success,
+            ),
+            ReportSummaryCard(
+              title: 'Hours',
+              value: '${totalMins ~/ 60}h ${totalMins.remainder(60)}m',
+              icon: Icons.timer_outlined,
+              color: Colors.orange,
+            ),
+          ],
         ),
       ],
     );
@@ -624,10 +397,9 @@ class _ShiftReportScreenState extends State<ShiftReportScreen> {
   ) {
     final grouped = _groupByDay([...open, ...closed]);
 
-    return ListView(
-      padding: EdgeInsets.symmetric(
-        horizontal: AppResponsive.largeSpacing(context),
-      ),
+    // A plain Column, not a ListView: ReportBody already scrolls and supplies
+    // the padding + width cap, so a nested scrollable would fight it.
+    return Column(
       children: [
         for (final entry in grouped.entries) ...[
           _dayHeader(context, entry.key, entry.value),
@@ -719,25 +491,10 @@ class _ShiftReportScreenState extends State<ShiftReportScreen> {
         ? 'No shifts in selected range'
         : 'No shifts yet';
 
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.schedule,
-            size: AppResponsive.largeIconSize(context) * 1.5,
-            color: Colors.grey.shade300,
-          ),
-          SizedBox(height: AppResponsive.mediumSpacing(context)),
-          Text(
-            msg,
-            style: GoogleFonts.poppins(
-              fontSize: AppResponsive.bodyFontSize(context),
-              color: AppColors.textSecondary,
-            ),
-          ),
-        ],
-      ),
+    return ReportEmptyState(
+      icon: Icons.schedule,
+      title: 'No Shifts',
+      message: msg,
     );
   }
 }

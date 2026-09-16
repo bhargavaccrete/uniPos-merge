@@ -85,7 +85,7 @@ class _ExpenseScreenState extends State<ExpenseScreen> {
             // they do not stretch to ~700px each on a laptop.
             child: AppResponsive.constrainedContent(
               context: context,
-              maxWidth: AppResponsive.maxFormWidth(context),
+              maxWidth: AppResponsive.maxContentWidth(context),
               heightFactor: 1,
               child: Row(
                 children: [

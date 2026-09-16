@@ -23,6 +23,20 @@ class BusinessDetailsRepository {
   // tax-registration question. Prefer TaxFeature.enabled at call sites.
   bool get isTaxEnabled => get()?.taxEnabled ?? true;
 
+  // The one post-setup writer for tax registration. Sets the legal flag and
+  // the behavioural flag together, exactly as onboarding's Yes/No question
+  // does — no screen exposes them separately yet.
+  Future<void> saveTaxRegistration(bool registered) async {
+    final current = get();
+    if (current == null) return;
+    await save(
+      current.copyWith(
+        isRegisteredForTax: registered,
+        taxEnabled: registered,
+      ),
+    );
+  }
+
   // READ - check exists
   bool exists() {
     return _box.containsKey(_key);

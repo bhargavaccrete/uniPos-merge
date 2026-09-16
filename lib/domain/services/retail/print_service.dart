@@ -14,10 +14,12 @@ import 'package:file_selector/file_selector.dart';
 import 'package:billberrylite/domain/services/retail/receipt_pdf_service.dart';
 import 'package:billberrylite/domain/services/restaurant/esc_pos_image.dart';
 import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
+import 'package:billberrylite/core/config/tax_id_rule.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/core/config/tax_feature.dart';
 import 'package:billberrylite/domain/services/restaurant/esc_pos_receipt_builder.dart';
+import 'package:billberrylite/domain/services/common/windows_spooler/windows_pdf_output.dart';
 
 import '../../../data/models/common/customer_model_125.dart';
 import '../../../data/models/retail/hive_model/sale_item_model_204.dart';
@@ -32,6 +34,14 @@ enum ReceiptFormat {
 
 /// Service for handling all print operations
 class PrintService {
+  /// Sends a rendered PDF to a Windows print queue. Defaults to the real
+  /// Windows printing API; tests inject a fake so the routing can be verified
+  /// without a printer.
+  final WindowsPdfSender _windowsPdfSender;
+
+  PrintService({WindowsPdfSender? windowsPdfSender})
+      : _windowsPdfSender = windowsPdfSender ?? platformWindowsPdfSend;
+
   final LabelPdfService _labelPdfService = const LabelPdfService();
 
   final ReceiptPdfService _receiptPdfService = ReceiptPdfService();
@@ -98,8 +108,8 @@ class PrintService {
       storeAddress: storeAddress,
       storePhone: storePhone,
       storeEmail: storeEmail,
-      gstNumber: gstNumber,
-      taxEnabled: TaxFeature.enabled,
+      gstNumber: TaxIdRule.numberForRecord(sale.storeGstNumber, gstNumber),
+      taxEnabled: TaxFeature.forRecord(sale.taxEnabled),
       orderType: orderType,
       tableNo: tableNo,
       kotNumber: kotNumber,
@@ -136,6 +146,38 @@ class PrintService {
   }
 
   /// Show print preview dialog
+  /// Print the thermal receipt to a Windows PDF/document printer.
+  ///
+  /// Uses the SAME `generateThermalReceipt` output as every other path — the
+  /// receipt layout is untouched. The difference is only the last hop: a
+  /// rendered PDF goes to the Windows printing API instead of ESC/POS bytes
+  /// going to the spooler, because a PDF writer cannot read control codes.
+  ///
+  /// The page size handed to Windows is measured from the generated document,
+  /// never the authoring format's `double.infinity` height.
+  Future<bool> printThermalPdfToWindowsQueue({
+    required ReceiptData data,
+    required String queueName,
+    required int paperWidth,
+    String jobName = 'Receipt',
+  }) async {
+    try {
+      final pdf = await _receiptPdfService.generateThermalReceipt(data,
+          paperWidth: paperWidth);
+      final bytes = await pdf.save();
+      final format = thermalPageFormatOf(pdf, paperWidth);
+      return await _windowsPdfSender(
+        queueName: queueName,
+        pdfBytes: bytes,
+        format: format,
+        jobName: jobName,
+      );
+    } catch (e, s) {
+      debugPrint('[WIN-PDF] queue="$queueName" failed: $e\n$s');
+      return false;
+    }
+  }
+
   /// Rasterize an already-built thermal [ReceiptData] (bill OR KOT) to a complete
   /// ESC/POS ticket, so a DIRECT print looks identical to the PDF. Reused by both
   /// the bill path (below) and the KOT path. Null on any failure → caller falls
@@ -204,8 +246,8 @@ class PrintService {
         storeAddress: storeAddress,
         storePhone: storePhone,
         storeEmail: storeEmail,
-        gstNumber: gstNumber,
-        taxEnabled: TaxFeature.enabled,
+        gstNumber: TaxIdRule.numberForRecord(sale.storeGstNumber, gstNumber),
+        taxEnabled: TaxFeature.forRecord(sale.taxEnabled),
         orderType: orderType,
         tableNo: tableNo,
         kotNumbers: kotNumbers,
@@ -299,8 +341,8 @@ class PrintService {
         storeAddress: storeAddress,
         storePhone: storePhone,
         storeEmail: storeEmail,
-        gstNumber: gstNumber,
-        taxEnabled: TaxFeature.enabled,
+        gstNumber: TaxIdRule.numberForRecord(sale.storeGstNumber, gstNumber),
+        taxEnabled: TaxFeature.forRecord(sale.taxEnabled),
         orderType: orderType,
         tableNo: tableNo,
         kotNumber: kotNumber,
@@ -358,6 +400,14 @@ class PrintService {
           ),
           body: PdfPreview(
             build: (pageFormat) async => pdf.save(),
+            // Without these the print button is silent in every outcome: the
+            // plugin's Windows path returns false for a cancelled OR a failed
+            // Print Setup dialog, and PdfPreview simply skips onPrinted. A
+            // cancel should stay quiet, but a real error must not.
+            onPrinted: (_) =>
+                NotificationService.instance.showSuccess('Sent to printer'),
+            onPrintError: (_, error) => NotificationService.instance
+                .showError('Could not print: $error'),
             canChangePageFormat: false,
             canChangeOrientation: false,
             canDebug: false,
@@ -409,8 +459,8 @@ class PrintService {
       storeAddress: storeAddress,
       storePhone: storePhone,
       storeEmail: storeEmail,
-      gstNumber: gstNumber,
-      taxEnabled: TaxFeature.enabled,
+      gstNumber: TaxIdRule.numberForRecord(sale.storeGstNumber, gstNumber),
+      taxEnabled: TaxFeature.forRecord(sale.taxEnabled),
       orderType: orderType,
       tableNo: tableNo,
       kotNumber: kotNumber,
@@ -488,8 +538,8 @@ class PrintService {
       storeAddress: storeAddress,
       storePhone: storePhone,
       storeEmail: storeEmail,
-      gstNumber: gstNumber,
-      taxEnabled: TaxFeature.enabled,
+      gstNumber: TaxIdRule.numberForRecord(sale.storeGstNumber, gstNumber),
+      taxEnabled: TaxFeature.forRecord(sale.taxEnabled),
       billNumber: billNumber,
       logoBytes: logoBytes,
       itemTotal: itemTotal,
@@ -624,6 +674,14 @@ class PrintService {
           ),
           body: PdfPreview(
             build: (pageFormat) async => pdf.save(),
+            // Without these the print button is silent in every outcome: the
+            // plugin's Windows path returns false for a cancelled OR a failed
+            // Print Setup dialog, and PdfPreview simply skips onPrinted. A
+            // cancel should stay quiet, but a real error must not.
+            onPrinted: (_) =>
+                NotificationService.instance.showSuccess('Sent to printer'),
+            onPrintError: (_, error) => NotificationService.instance
+                .showError('Could not print: $error'),
             canChangePageFormat: false,
             canChangeOrientation: false,
             canDebug: false,
@@ -712,8 +770,8 @@ class PrintService {
                     storeAddress: storeAddress,
                     storePhone: storePhone,
                     storeEmail: storeEmail,
-                    gstNumber: gstNumber,
-                    taxEnabled: TaxFeature.enabled,
+                    gstNumber: TaxIdRule.numberForRecord(sale.storeGstNumber, gstNumber),
+                    taxEnabled: TaxFeature.forRecord(sale.taxEnabled),
                     orderType: orderType,
                     billNumber: billNumber,
                     kotNumbers: kotNumbers,
@@ -770,7 +828,7 @@ class PrintService {
                   storeAddress: storeAddress,
                   storePhone: storePhone,
                   storeEmail: storeEmail,
-                  gstNumber: gstNumber,
+                  gstNumber: TaxIdRule.numberForRecord(sale.storeGstNumber, gstNumber),
                   orderType: orderType,
                   billNumber: billNumber,
                   kotNumbers: kotNumbers,
@@ -802,7 +860,7 @@ class PrintService {
                   storeAddress: storeAddress,
                   storePhone: storePhone,
                   storeEmail: storeEmail,
-                  gstNumber: gstNumber,
+                  gstNumber: TaxIdRule.numberForRecord(sale.storeGstNumber, gstNumber),
                   orderType: orderType,
                   billNumber: billNumber,
                   kotNumbers: kotNumbers,
@@ -833,7 +891,7 @@ class PrintService {
                   storeAddress: storeAddress,
                   storePhone: storePhone,
                   storeEmail: storeEmail,
-                  gstNumber: gstNumber,
+                  gstNumber: TaxIdRule.numberForRecord(sale.storeGstNumber, gstNumber),
                   billNumber: billNumber,
                   itemTotal: itemTotal, // Pass item total
                   paymentBreakdown: paymentBreakdown, // Pass split payment breakdown
@@ -862,7 +920,7 @@ class PrintService {
                   storeAddress: storeAddress,
                   storePhone: storePhone,
                   storeEmail: storeEmail,
-                  gstNumber: gstNumber,
+                  gstNumber: TaxIdRule.numberForRecord(sale.storeGstNumber, gstNumber),
                   billNumber: billNumber,
                   itemTotal: itemTotal, // Pass item total
                   paymentBreakdown: paymentBreakdown, // Pass split payment breakdown

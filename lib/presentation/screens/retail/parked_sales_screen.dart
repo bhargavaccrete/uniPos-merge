@@ -11,8 +11,7 @@ import 'package:billberrylite/presentation/widget/componets/common/row_action_bu
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
-import 'package:billberrylite/util/common/currency_helper.dart';
-import 'package:billberrylite/util/common/decimal_settings.dart';
+import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
 import '../../../core/di/service_locator.dart';
 
 /// House card elevation — same soft lift [ReportCard]/[ReportSummaryCard] use.
@@ -33,13 +32,6 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
     super.initState();
     holdSaleStore.loadHoldSales();
   }
-
-  /// Money string honouring the store's currency + decimal-precision settings.
-  String _money(double amount) => CurrencyHelper.formatAmountWithSymbol(
-    amount,
-    CurrencyHelper.currentSymbol,
-    decimalPlaces: DecimalSettings.precision,
-  );
 
   String _formatDate(String isoDate) {
     final date = DateTime.parse(isoDate);
@@ -143,7 +135,7 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
                       SizedBox(height: AppResponsive.smallSpacing(context)),
                       _buildDetailRow(
                         'Subtotal',
-                        _money(holdSale.subtotal),
+                        formatMoney(holdSale.subtotal),
                         emphasis: true,
                       ),
                     ],
@@ -235,7 +227,7 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '@ ${_money(item.price)}',
+                  '@ ${formatMoney(item.price)}',
                   style: GoogleFonts.poppins(
                     fontSize: AppResponsive.captionFontSize(context),
                     color: AppColors.textSecondary,
@@ -246,7 +238,7 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
           ),
           SizedBox(width: AppResponsive.smallSpacing(context)),
           Text(
-            _money(item.total),
+            formatMoney(item.total),
             style: GoogleFonts.poppins(
               fontSize: AppResponsive.bodyFontSize(context),
               fontWeight: FontWeight.w700,
@@ -292,48 +284,44 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(title: 'Parked Sales'),
-      // Currency/precision changes rebuild every money label on this screen.
-      body: ValueListenableBuilder<String>(
-        valueListenable: CurrencyHelper.currencyNotifier,
-        builder: (context, _, _) => ValueListenableBuilder<int>(
-          valueListenable: DecimalSettings.precisionNotifier,
-          builder: (context, _, _) => Observer(
-            builder: (context) {
-              if (holdSaleStore.isLoading) {
-                return const Center(
-                  child: CircularProgressIndicator(color: AppColors.primary),
-                );
-              }
-
-              if (holdSaleStore.holdSaleCount == 0) {
-                return const AppEmptyState(
-                  icon: Icons.pause_circle_outline,
-                  title: 'No parked sales',
-                  message:
-                      'Sales you hold from the billing screen will appear here.',
-                );
-              }
-
-              return Column(
-                children: [
-                  // NOT inside the cap: the band is a background element
-                  // continuing the AppBar, and the AppBar is full-bleed.
-                  // Capping it put ~260px of grey either side of it at 1920px,
-                  // so the primary band floated under a full-width AppBar. It
-                  // caps its own CONTENT instead — see _buildSummaryCard.
-                  _buildSummaryCard(context),
-                  Expanded(
-                    child: AppResponsive.constrainedContent(
-                      context: context,
-                      alignment: Alignment.topCenter,
-                      maxWidth: AppResponsive.maxContentWidth(context),
-                      child: _buildHoldSalesList(),
-                    ),
-                  ),
-                ],
+      // MoneyScope: currency/precision changes rebuild every money label.
+      body: MoneyScope(
+        child: Observer(
+          builder: (context) {
+            if (holdSaleStore.isLoading) {
+              return const Center(
+                child: CircularProgressIndicator(color: AppColors.primary),
               );
-            },
-          ),
+            }
+
+            if (holdSaleStore.holdSaleCount == 0) {
+              return const AppEmptyState(
+                icon: Icons.pause_circle_outline,
+                title: 'No parked sales',
+                message:
+                    'Sales you hold from the billing screen will appear here.',
+              );
+            }
+
+            return Column(
+              children: [
+                // NOT inside the cap: the band is a background element
+                // continuing the AppBar, and the AppBar is full-bleed.
+                // Capping it put ~260px of grey either side of it at 1920px,
+                // so the primary band floated under a full-width AppBar. It
+                // caps its own CONTENT instead — see _buildSummaryCard.
+                _buildSummaryCard(context),
+                Expanded(
+                  child: AppResponsive.constrainedContent(
+                    context: context,
+                    alignment: Alignment.topCenter,
+                    maxWidth: AppResponsive.maxContentWidth(context),
+                    child: _buildHoldSalesList(),
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -410,7 +398,7 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
                       ),
                       const SizedBox(height: 3),
                       Text(
-                        _money(holdSaleStore.totalHoldSalesValue),
+                        formatMoney(holdSaleStore.totalHoldSalesValue),
                         style: GoogleFonts.poppins(
                           fontSize: AppResponsive.subheadingFontSize(context),
                           fontWeight: FontWeight.w700,
@@ -529,7 +517,7 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
                     Padding(
                       padding: const EdgeInsets.only(top: 2, right: 6),
                       child: Text(
-                        _money(holdSale.subtotal),
+                        formatMoney(holdSale.subtotal),
                         maxLines: 1,
                         style: GoogleFonts.poppins(
                           fontSize: AppResponsive.subheadingFontSize(context),

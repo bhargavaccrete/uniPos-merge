@@ -37,65 +37,74 @@ class _PrintersettingState extends State<Printersetting> {
         actions: [
           TextButton.icon(
             onPressed: () => Navigator.pushNamed(
-                context, RouteNames.restaurantPrinterCustomization),
+              context,
+              RouteNames.restaurantPrinterCustomization,
+            ),
             icon: const Icon(Icons.tune, size: 20, color: Colors.white),
-            label: Text('Customize',
-                style: GoogleFonts.poppins(fontSize: 13, color: Colors.white)),
+            label: Text(
+              'Customize',
+              style: GoogleFonts.poppins(fontSize: 13, color: Colors.white),
+            ),
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── Printer slots ──
-            PrinterSlotCard(
-              title: 'Billing Printer',
-              subtitle: 'Bills & reports',
-              icon: Icons.receipt_long,
-              role: 'receipt',
-              onAddPrinter: _openAddPrinter,
-            ),
-            PrinterSlotCard(
-              title: 'Kitchen Printer',
-              subtitle: 'KOT (always thermal)',
-              icon: Icons.restaurant_menu,
-              role: 'kot',
-              onAddPrinter: _openAddPrinter,
-            ),
-            const SizedBox(height: 20),
-
-            // ── Bill format ──
-            _sectionHeader('Bill Format'),
-            const SizedBox(height: 8),
-            ValueListenableBuilder<String>(
-              valueListenable: PrintSettings.billFormatNotifier,
-              builder: (_, fmt, _) => Column(
-                children: [
-                  _billFormatOption(
-                    label: 'Thermal',
-                    note: 'Recommended · 80mm receipt',
-                    value: 'thermal',
-                    current: fmt,
-                  ),
-                  _billFormatOption(
-                    label: 'A4',
-                    note: 'Full-page invoice',
-                    value: 'a4',
-                    current: fmt,
-                  ),
-                ],
+      body: AppResponsive.constrainedContent(
+        context: context,
+        maxWidth: AppResponsive.maxContentWidth(context),
+        alignment: Alignment.topCenter,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Printer slots ──
+              PrinterSlotCard(
+                title: 'Billing Printer',
+                subtitle: 'Bills & reports',
+                icon: Icons.receipt_long,
+                role: 'receipt',
+                onAddPrinter: _openAddPrinter,
               ),
-            ),
-            const SizedBox(height: 20),
+              PrinterSlotCard(
+                title: 'Kitchen Printer',
+                subtitle: 'KOT (always thermal)',
+                icon: Icons.restaurant_menu,
+                role: 'kot',
+                onAddPrinter: _openAddPrinter,
+              ),
+              const SizedBox(height: 20),
 
-            // ── Behavior explainer ──
-            ValueListenableBuilder<String>(
-              valueListenable: PrintSettings.billFormatNotifier,
-              builder: (_, fmt, _) => _behaviorCard(fmt == 'a4'),
-            ),
-          ],
+              // ── Bill format ──
+              _sectionHeader('Bill Format'),
+              const SizedBox(height: 8),
+              ValueListenableBuilder<String>(
+                valueListenable: PrintSettings.billFormatNotifier,
+                builder: (_, fmt, _) => Column(
+                  children: [
+                    _billFormatOption(
+                      label: 'Thermal',
+                      note: 'Recommended · 80mm receipt',
+                      value: 'thermal',
+                      current: fmt,
+                    ),
+                    _billFormatOption(
+                      label: 'A4',
+                      note: 'Full-page invoice',
+                      value: 'a4',
+                      current: fmt,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // ── Behavior explainer ──
+              ValueListenableBuilder<String>(
+                valueListenable: PrintSettings.billFormatNotifier,
+                builder: (_, fmt, _) => _behaviorCard(fmt == 'a4'),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -103,8 +112,10 @@ class _PrintersettingState extends State<Printersetting> {
 
   /// Restaurant keeps its entitlement-guarded named route for Add Printer.
   void _openAddPrinter() {
-    Navigator.pushNamed(context, RouteNames.restaurantAddPrinter)
-        .then((_) => printerStore.loadSavedPrinters());
+    Navigator.pushNamed(
+      context,
+      RouteNames.restaurantAddPrinter,
+    ).then((_) => printerStore.loadSavedPrinters());
   }
 
   // ── Bill format option ─────────────────────────────────────────────────────
@@ -130,20 +141,30 @@ class _PrintersettingState extends State<Printersetting> {
         ),
         child: Row(
           children: [
-            Icon(selected ? Icons.radio_button_checked : Icons.radio_button_off,
-                color: selected ? AppColors.primary : AppColors.textSecondary,
-                size: 20),
+            Icon(
+              selected ? Icons.radio_button_checked : Icons.radio_button_off,
+              color: selected ? AppColors.primary : AppColors.textSecondary,
+              size: 20,
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(label,
-                      style: GoogleFonts.poppins(
-                          fontSize: 14, fontWeight: FontWeight.w600)),
-                  Text(note,
-                      style: GoogleFonts.poppins(
-                          fontSize: 11, color: AppColors.textSecondary)),
+                  Text(
+                    label,
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    note,
+                    style: GoogleFonts.poppins(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -170,16 +191,25 @@ class _PrintersettingState extends State<Printersetting> {
             children: [
               Icon(Icons.info_outline, size: 16, color: AppColors.info),
               const SizedBox(width: 6),
-              Text('Behavior',
-                  style: GoogleFonts.poppins(
-                      fontSize: 13, fontWeight: FontWeight.w600)),
+              Text(
+                'Behavior',
+                style: GoogleFonts.poppins(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 8),
-          _behaviorRow('Billing',
-              isA4 ? 'A4 invoice (always)' : 'Printer → Thermal PDF fallback'),
+          _behaviorRow(
+            'Billing',
+            isA4 ? 'A4 invoice (always)' : 'Printer → Thermal PDF fallback',
+          ),
           const SizedBox(height: 4),
-          _behaviorRow('Kitchen', 'Printer → Thermal PDF fallback (KOT never A4)'),
+          _behaviorRow(
+            'Kitchen',
+            'Printer → Thermal PDF fallback (KOT never A4)',
+          ),
         ],
       ),
     );
@@ -191,11 +221,13 @@ class _PrintersettingState extends State<Printersetting> {
         style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textPrimary),
         children: [
           TextSpan(
-              text: '$label:  ',
-              style: const TextStyle(fontWeight: FontWeight.w600)),
+            text: '$label:  ',
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
           TextSpan(
-              text: value,
-              style: TextStyle(color: AppColors.textSecondary)),
+            text: value,
+            style: TextStyle(color: AppColors.textSecondary),
+          ),
         ],
       ),
     );
@@ -208,14 +240,16 @@ class _PrintersettingState extends State<Printersetting> {
           width: 4,
           height: 18,
           decoration: BoxDecoration(
-              color: AppColors.primary, borderRadius: BorderRadius.circular(2)),
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(2),
+          ),
         ),
         const SizedBox(width: 8),
-        Text(title,
-            style:
-                GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600)),
+        Text(
+          title,
+          style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600),
+        ),
       ],
     );
   }
-
 }

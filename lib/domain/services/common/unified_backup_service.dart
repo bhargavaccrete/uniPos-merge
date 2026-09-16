@@ -196,6 +196,19 @@ class UnifiedBackupService {
     }
   }
 
+  /// Folder that [exportToDownloads] writes to. Android keeps the public
+  /// Download folder; desktop uses the OS Downloads folder (a hardcoded
+  /// `/storage/...` path on Windows silently resolves to `<drive>:\storage\...`).
+  static Future<String> downloadsBackupPath() async {
+    if (kIsWeb) return '';
+    if (Platform.isAndroid) return '/storage/emulated/0/Download';
+    if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
+      final downloads = await getDownloadsDirectory();
+      if (downloads != null) return downloads.path;
+    }
+    return (await getApplicationDocumentsDirectory()).path;
+  }
+
   /// ---------------------------
   /// ✅ EXPORT TO DOWNLOADS (AUTO-SAVE)
   /// ---------------------------
@@ -1660,7 +1673,7 @@ class UnifiedBackupService {
       File outputFile;
 
       if (saveToDownloads) {
-        final downloadsPath = '/storage/emulated/0/Download';
+        final downloadsPath = await downloadsBackupPath();
         final downloadsDir = Directory(downloadsPath);
         if (!downloadsDir.existsSync()) {
           downloadsDir.createSync(recursive: true);

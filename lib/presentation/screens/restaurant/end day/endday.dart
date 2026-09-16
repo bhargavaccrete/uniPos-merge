@@ -16,6 +16,7 @@ import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/presentation/widget/componets/common/dialog_dispose_scope.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/core/config/tax_feature.dart';
 import 'package:billberrylite/core/constants/hive_box_names.dart';
 import 'package:billberrylite/data/models/common/attendance_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/eodmodel_317.dart';
@@ -618,6 +619,10 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
       kotBoundaries: o.kotBoundaries,
       billNumber: billNumber,
       isTaxInclusive: o.isTaxInclusive,
+      taxEnabled: TaxFeature.enabled,
+      storeGstNumber: await StoreSettingsService().gstNumberSnapshot(),
+      roundOffStep: AppSettings.roundOffStepForRecord,
+      discountOnItems: AppSettings.discountOnItems,
       shiftId: RestaurantSession.currentShiftId,
       sessionId: o.sessionId,
       orderStatus: 'COMPLETED',
@@ -661,6 +666,10 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
       sessionId: sessionId ?? o.sessionId,
       voidedBy: 'EOD by $staff',
       voidReason: reason,
+      taxEnabled: TaxFeature.enabled,
+      storeGstNumber: await StoreSettingsService().gstNumberSnapshot(),
+      roundOffStep: AppSettings.roundOffStepForRecord,
+      discountOnItems: AppSettings.discountOnItems,
     );
     await pastOrderStore.addOrder(voidRecord);
     if (o.status == 'Processing') {
@@ -2859,7 +2868,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
         padding: EdgeInsets.all(AppResponsive.largeSpacing(context)),
         child: AppResponsive.constrainedContent(
           context: context,
-          maxWidth: AppResponsive.maxFormWidth(context),
+          maxWidth: AppResponsive.maxContentWidth(context),
           alignment: Alignment.topCenter,
           heightFactor: 1,
           child: Column(

@@ -174,6 +174,47 @@ abstract class _ProductStore with Store {
     }
   }
 
+  /// Bulk tax assignment (retail Tax Settings → Apply to products).
+  ///
+  /// Writes the pair the product form writes — [taxId] plus the cached rate —
+  /// on the product AND each of its variants. The cart prefers a variant's own
+  /// rate, so updating only the product would leave variants on the old one.
+  /// Returns how many products were updated.
+  Future<int> applyTaxToProducts(
+    Iterable<String> productIds, {
+    required String taxId,
+    required double rate,
+  }) async {
+    var updated = 0;
+    for (final id in productIds) {
+      final product = getProductById(id);
+      if (product == null) continue;
+      await updateProduct(product.copyWith(taxId: taxId, gstRate: rate));
+      // Copied first: updateVariant rewrites the list variantsFor reads from.
+      for (final v in List.of(variantsFor(id))) {
+        await updateVariant(v.copyWith(taxId: taxId, taxRate: rate));
+      }
+      updated++;
+    }
+    return updated;
+  }
+
+  /// Removes any named tax from the products and their variants; they then
+  /// bill at the default GST rate from Tax Settings.
+  Future<int> clearTaxFromProducts(Iterable<String> productIds) async {
+    var updated = 0;
+    for (final id in productIds) {
+      final product = getProductById(id);
+      if (product == null) continue;
+      await updateProduct(product.copyWith(clearTax: true));
+      for (final v in List.of(variantsFor(id))) {
+        await updateVariant(v.copyWith(clearTax: true));
+      }
+      updated++;
+    }
+    return updated;
+  }
+
   @action
   Future<void> deleteProduct(String productId) async {
     // Delete from database (also deletes variants)

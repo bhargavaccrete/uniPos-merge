@@ -255,7 +255,7 @@ class _RestaurantPurchaseReturnDetailScreenState
   }
 
   Widget _capped(BuildContext context, Widget child) {
-    final maxWidth = AppResponsive.maxCardWidth(context);
+    final maxWidth = AppResponsive.maxFormWidth(context);
     // Mobile is uncapped — returning early keeps two widgets out of the tree.
     if (maxWidth == double.infinity) return child;
     return AppResponsive.constrainedContent(

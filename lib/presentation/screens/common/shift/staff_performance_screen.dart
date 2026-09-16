@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:intl/intl.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/data/models/common/shift_model.dart';
 import 'package:billberrylite/data/models/common/shift_txn.dart';
@@ -9,7 +8,15 @@ import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
-import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_app_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_body.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_card.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_date_range_row.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_empty_state.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_export_button.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_filter_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_summary_card.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_summary_row.dart';
 import 'package:billberrylite/domain/services/common/report_export_service.dart';
 
 // ── Computed data class ───────────────────────────────────────────────────────
@@ -373,50 +380,6 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
 
   // ── Date pickers ─────────────────────────────────────────────────────────
 
-  Future<void> _pickFrom() async {
-    final p = await showDatePicker(
-      context: context,
-      initialDate: _customFrom ?? DateTime.now(),
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
-      builder: (ctx, child) => Theme(
-        data: Theme.of(ctx).copyWith(
-          colorScheme: const ColorScheme.light(
-            primary: AppColors.primary,
-            onPrimary: Colors.white,
-          ),
-        ),
-        child: child!,
-      ),
-    );
-    if (p != null) {
-      setState(() => _customFrom = p);
-      _compute();
-    }
-  }
-
-  Future<void> _pickTo() async {
-    final p = await showDatePicker(
-      context: context,
-      initialDate: _customTo ?? DateTime.now(),
-      firstDate: _customFrom ?? DateTime(2020),
-      lastDate: DateTime.now(),
-      builder: (ctx, child) => Theme(
-        data: Theme.of(ctx).copyWith(
-          colorScheme: const ColorScheme.light(
-            primary: AppColors.primary,
-            onPrimary: Colors.white,
-          ),
-        ),
-        child: child!,
-      ),
-    );
-    if (p != null) {
-      setState(() => _customTo = p);
-      _compute();
-    }
-  }
-
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   Color _avatarColor(String name) {
@@ -461,232 +424,128 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      appBar: buildPrimaryAppBar(
-        titleWidget: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Staff Performance',
-              style: GoogleFonts.poppins(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-                fontSize: AppResponsive.headingFontSize(context),
-              ),
-            ),
-            Text(
-              '${_perfList.length} staff member${_perfList.length != 1 ? 's' : ''}',
-              style: GoogleFonts.poppins(
-                color: Colors.white70,
-                fontSize: AppResponsive.smallFontSize(context),
-              ),
-            ),
-          ],
-        ),
+      appBar: reportAppBar(
+        title: 'Staff Performance',
+        subtitle:
+            '${_perfList.length} staff member${_perfList.length != 1 ? 's' : ''}',
+        // Export moved to the shared full-width button; refresh stays here as a
+        // genuinely screen-specific control.
         actions: [
-          IconButton(
-            icon: const Icon(Icons.file_download_outlined),
-            onPressed: () => _doExport(context),
-          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () => _load(forceReload: true),
           ),
         ],
       ),
-      // Filter/sort rows are plain Padding, not full-bleed strips, so the
-      // whole body caps together. The Scaffold background still spans.
-      body: AppResponsive.constrainedContent(
-        context: context,
-        maxWidth: AppResponsive.maxFormWidth(context),
-        alignment: Alignment.topCenter,
-        child: Column(
-          children: [
-            _buildFilterRow(context),
-            if (_filterPeriod == 'Custom') _buildCustomDateRow(context),
-            _buildSortRow(context),
-            Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _perfList.isEmpty
-                  ? _buildEmpty(context)
-                  : _buildBody(context, currency),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ── Filter chips ───────────────────────────────────────────────────────────
-
-  static const _periods = ['All', 'Today', 'Week', 'Month', 'Custom'];
-
-  Widget _buildFilterRow(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        AppResponsive.largeSpacing(context),
-        AppResponsive.mediumSpacing(context),
-        AppResponsive.largeSpacing(context),
-        0,
-      ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: _periods.map((p) {
-            final isSelected = _filterPeriod == p;
-            return Padding(
-              padding: EdgeInsets.only(
-                right: AppResponsive.smallSpacing(context),
-              ),
-              child: GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _filterPeriod = p;
-                    if (p != 'Custom') {
-                      _customFrom = null;
-                      _customTo = null;
-                    }
-                  });
-                  _compute();
-                },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  padding: EdgeInsets.symmetric(
-                    horizontal: AppResponsive.largeSpacing(context),
-                    vertical: AppResponsive.smallSpacing(context),
-                  ),
-                  decoration: BoxDecoration(
-                    color: isSelected ? AppColors.primary : AppColors.white,
-                    borderRadius: BorderRadius.circular(
-                      AppResponsive.borderRadius(context),
-                    ),
-                    border: Border.all(
-                      color: isSelected ? AppColors.primary : AppColors.divider,
-                    ),
-                    boxShadow: isSelected
-                        ? [
-                            BoxShadow(
-                              color: AppColors.primary.withValues(alpha: 0.25),
-                              blurRadius: 6,
-                              offset: const Offset(0, 2),
-                            ),
-                          ]
-                        : [],
-                  ),
-                  child: Text(
-                    p,
-                    style: GoogleFonts.poppins(
-                      fontSize: AppResponsive.smallFontSize(context),
-                      fontWeight: isSelected
-                          ? FontWeight.w600
-                          : FontWeight.w500,
-                      color: isSelected ? Colors.white : AppColors.textPrimary,
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      ),
-    );
-  }
-
-  // ── Custom date row ───────────────────────────────────────────────────────
-
-  Widget _buildCustomDateRow(BuildContext context) {
-    final fmt = DateFormat('dd MMM yyyy');
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        AppResponsive.largeSpacing(context),
-        AppResponsive.smallSpacing(context),
-        AppResponsive.largeSpacing(context),
-        0,
-      ),
-      child: Row(
+      body: Column(
         children: [
-          Expanded(
-            child: _datePicker(
-              context,
-              'From',
-              _customFrom != null ? fmt.format(_customFrom!) : null,
-              _pickFrom,
-            ),
+          // Generic ReportFilterBar over this screen's OWN periods — the kit's
+          // documented path for a report whose periods aren't the standard
+          // five. 'All' and the operational week/month are preserved exactly.
+          ReportFilterBar<String>(
+            options: _periods,
+            selected: _filterPeriod,
+            onSelected: (p) {
+              setState(() {
+                _filterPeriod = p;
+                if (p != 'Custom') {
+                  _customFrom = null;
+                  _customTo = null;
+                }
+              });
+              _compute();
+            },
           ),
-          SizedBox(width: AppResponsive.mediumSpacing(context)),
-          Expanded(
-            child: _datePicker(
-              context,
-              'To',
-              _customTo != null ? fmt.format(_customTo!) : null,
-              _pickTo,
-            ),
-          ),
+          if (_filterPeriod == 'Custom') _buildCustomDateRow(context),
+          _buildSortRow(context),
+          AppResponsive.verticalSpace(context, size: SpacingSize.small),
+          Expanded(child: _buildContent(context, currency)),
         ],
       ),
     );
   }
 
-  Widget _datePicker(
-    BuildContext context,
-    String label,
-    String? value,
-    VoidCallback onTap,
-  ) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.symmetric(
-          horizontal: AppResponsive.mediumSpacing(context),
-          vertical: AppResponsive.smallSpacing(context) + 2,
-        ),
-        decoration: BoxDecoration(
-          color: AppColors.white,
-          border: Border.all(
-            color: value != null ? AppColors.primary : AppColors.divider,
-            width: value != null ? 1.5 : 1,
-          ),
-          borderRadius: BorderRadius.circular(
-            AppResponsive.borderRadius(context),
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              Icons.calendar_today,
-              size: AppResponsive.smallIconSize(context),
-              color: value != null
-                  ? AppColors.primary
-                  : AppColors.textSecondary,
-            ),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                value ?? label,
-                style: GoogleFonts.poppins(
-                  fontSize: AppResponsive.smallFontSize(context),
-                  color: value != null
-                      ? AppColors.textPrimary
-                      : AppColors.textSecondary,
-                  fontWeight: value != null ? FontWeight.w500 : FontWeight.w400,
-                ),
-              ),
-            ),
-          ],
-        ),
+  Widget _buildContent(BuildContext context, String currency) {
+    if (_isLoading) return const ReportLoading();
+    if (_perfList.isEmpty) return _buildEmpty(context);
+
+    return ReportBody(
+      child: Column(
+        children: [
+          _buildSummaryCards(context, currency),
+          AppResponsive.verticalSpace(context),
+          ReportExportButton(onPressed: () => _doExport(context)),
+          AppResponsive.verticalSpace(context),
+          _buildLeaderboard(currency),
+        ],
       ),
+    );
+  }
+
+  // ── Filter periods ─────────────────────────────────────────────────────────
+
+  /// Operational periods, not reporting periods — a staff leaderboard is read
+  /// by 'All' and a rolling week/month, so this screen keeps its own set and
+  /// feeds the generic bar rather than adopting ReportPeriodFilterBar.
+  static const _periods = [
+    ReportFilterOption(
+      value: 'All',
+      label: 'All',
+      icon: Icons.list_alt_rounded,
+    ),
+    ReportFilterOption(
+      value: 'Today',
+      label: 'Today',
+      icon: Icons.today_rounded,
+    ),
+    ReportFilterOption(
+      value: 'Week',
+      label: 'Week',
+      icon: Icons.view_week_rounded,
+    ),
+    ReportFilterOption(
+      value: 'Month',
+      label: 'Month',
+      icon: Icons.calendar_month_rounded,
+    ),
+    ReportFilterOption(
+      value: 'Custom',
+      label: 'Custom',
+      icon: Icons.date_range,
+    ),
+  ];
+
+  // ── Custom date row ───────────────────────────────────────────────────────
+
+  /// Shared kit control — same From/To pair the cash-drawer ledger uses, so the
+  /// three operational reports can't drift apart again.
+  Widget _buildCustomDateRow(BuildContext context) {
+    return ReportDateRangeRow(
+      from: _customFrom,
+      to: _customTo,
+      padding: AppResponsive.horizontalPadding(
+        context,
+      ).copyWith(top: 0, bottom: 12),
+      onFromPicked: (d) {
+        setState(() => _customFrom = d);
+        _compute();
+      },
+      onToPicked: (d) {
+        setState(() => _customTo = d);
+        _compute();
+      },
     );
   }
 
   // ── Sort row ──────────────────────────────────────────────────────────────
 
   Widget _buildSortRow(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.symmetric(
-        horizontal: AppResponsive.largeSpacing(context),
-        vertical: AppResponsive.mediumSpacing(context),
-      ),
+    return Container(
+      width: double.infinity,
+      color: AppColors.white,
+      padding: AppResponsive.horizontalPadding(
+        context,
+      ).copyWith(top: 0, bottom: 12),
       child: Row(
         children: [
           Text(
@@ -722,7 +581,9 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
                     color: isActive
                         ? AppColors.primary.withValues(alpha: 0.1)
                         : Colors.transparent,
-                    borderRadius: BorderRadius.circular(20),
+                    // Radius 10 like every other report control — these were
+                    // pills, which the project's button rule disallows.
+                    borderRadius: BorderRadius.circular(10),
                     border: Border.all(
                       color: isActive ? AppColors.primary : AppColors.divider,
                     ),
@@ -763,124 +624,64 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
 
   // ── Body ──────────────────────────────────────────────────────────────────
 
-  Widget _buildBody(BuildContext context, String currency) {
+  /// Team totals. Two rows of two, as in totalsales/refunddetails — four cards
+  /// abreast leaves each ~78px on a 360px phone and ellipsises every title.
+  Widget _buildSummaryCards(BuildContext context, String currency) {
     return Column(
       children: [
-        // ── Team summary bar ──────────────────────────────────────────────────
-        Padding(
-          padding: EdgeInsets.fromLTRB(
-            AppResponsive.largeSpacing(context),
-            0,
-            AppResponsive.largeSpacing(context),
-            AppResponsive.mediumSpacing(context),
-          ),
-          child: Container(
-            padding: EdgeInsets.all(AppResponsive.largeSpacing(context)),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [AppColors.primary, const Color(0xFF1565C0)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(
-                AppResponsive.borderRadius(context),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.3),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+        ReportSummaryRow(
+          cards: [
+            ReportSummaryCard(
+              title: 'Staff',
+              value: '${_perfList.length}',
+              icon: Icons.people_outline,
+              color: AppColors.primary,
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _summaryTile(
-                  context,
-                  '${_perfList.length}',
-                  'Staff',
-                  Icons.people_outline,
-                  Colors.white,
-                ),
-                _summaryTile(
-                  context,
-                  '$_totalShifts',
-                  'Shifts',
-                  Icons.badge_outlined,
-                  Colors.white,
-                ),
-                _summaryTile(
-                  context,
-                  '$_totalOrders',
-                  'Orders',
-                  Icons.receipt_long,
-                  Colors.white,
-                ),
-                _summaryTile(
-                  context,
-                  '$currency${DecimalSettings.formatAmount(_totalRevenue)}',
-                  'Revenue',
-                  Icons.attach_money,
-                  Colors.white,
-                ),
-              ],
+            ReportSummaryCard(
+              title: 'Shifts',
+              value: '$_totalShifts',
+              icon: Icons.badge_outlined,
+              color: Colors.blue,
             ),
-          ),
+          ],
         ),
-
-        // ── Staff leaderboard ──────────────────────────────────────────────────
-        Expanded(
-          child: ListView.builder(
-            padding: EdgeInsets.symmetric(
-              horizontal: AppResponsive.largeSpacing(context),
+        AppResponsive.verticalSpace(context),
+        ReportSummaryRow(
+          cards: [
+            ReportSummaryCard(
+              title: 'Orders',
+              value: '$_totalOrders',
+              icon: Icons.receipt_long,
+              color: Colors.orange,
             ),
-            itemCount: _perfList.length,
-            itemBuilder: (context, index) => _StaffCard(
-              _perfList[index],
+            ReportSummaryCard(
+              title: 'Revenue',
+              value: '$currency${DecimalSettings.formatAmount(_totalRevenue)}',
+              icon: Icons.attach_money,
+              color: AppColors.success,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// A plain Column, not a ListView: ReportBody already scrolls and supplies
+  /// the padding + width cap, so a nested scrollable would fight it.
+  Widget _buildLeaderboard(String currency) {
+    return Column(
+      children: _perfList
+          .map(
+            (perf) => _StaffCard(
+              perf,
               currency,
               _avatarColor,
               _initials,
               _rankColor,
               _rankIcon,
             ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _summaryTile(
-    BuildContext context,
-    String value,
-    String label,
-    IconData icon,
-    Color color,
-  ) {
-    return Column(
-      children: [
-        Icon(
-          icon,
-          color: color.withValues(alpha: 0.8),
-          size: AppResponsive.iconSize(context),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: GoogleFonts.poppins(
-            fontWeight: FontWeight.w700,
-            fontSize: AppResponsive.bodyFontSize(context),
-            color: color,
-          ),
-        ),
-        Text(
-          label,
-          style: GoogleFonts.poppins(
-            fontSize: AppResponsive.captionFontSize(context),
-            color: color.withValues(alpha: 0.8),
-          ),
-        ),
-      ],
+          )
+          .toList(),
     );
   }
 
@@ -897,35 +698,10 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
         ? 'No shifts in selected range'
         : 'No shift data available yet';
 
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.bar_chart,
-            size: AppResponsive.largeIconSize(context) * 1.5,
-            color: Colors.grey.shade300,
-          ),
-          SizedBox(height: AppResponsive.mediumSpacing(context)),
-          Text(
-            msg,
-            textAlign: TextAlign.center,
-            style: GoogleFonts.poppins(
-              fontSize: AppResponsive.bodyFontSize(context),
-              color: AppColors.textSecondary,
-            ),
-          ),
-          SizedBox(height: AppResponsive.smallSpacing(context)),
-          Text(
-            'Shifts appear here once staff members log out',
-            textAlign: TextAlign.center,
-            style: GoogleFonts.poppins(
-              fontSize: AppResponsive.smallFontSize(context),
-              color: AppColors.textSecondary.withValues(alpha: 0.6),
-            ),
-          ),
-        ],
-      ),
+    return ReportEmptyState(
+      icon: Icons.bar_chart,
+      title: msg,
+      message: 'Shifts appear here once staff members log out',
     );
   }
 }

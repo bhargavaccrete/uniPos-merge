@@ -233,176 +233,185 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
           SizedBox(width: 8),
         ],
       ),
-      body: Column(
-        children: [
-          // Search Bar & Add Button Section
-          Container(
-            color: AppColors.white,
-            padding: AppResponsive.padding(context),
-            child: Column(
-              children: [
-                AppTextField(
-                  controller: _searchController,
-                  hint: 'Search by name or phone...',
-                  icon: Icons.search_rounded,
-                  onChanged: (v) {
-                    _searchCustomers(v);
-                    setState(() {});
-                  },
-                  suffixIcon: _searchController.text.isNotEmpty
-                      ? IconButton(
-                          icon: const Icon(Icons.clear, size: 20),
-                          onPressed: () {
-                            _searchController.clear();
-                            _searchCustomers('');
-                            setState(() {});
-                          },
-                        )
-                      : null,
-                ),
-                SizedBox(height: AppResponsive.mediumSpacing(context)),
-                SizedBox(
-                  width: double.infinity,
-                  height: AppResponsive.buttonHeight(context),
-                  child: ElevatedButton.icon(
-                    onPressed: _navigateToAddCustomer,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+      body: AppResponsive.constrainedContent(
+        context: context,
+        maxWidth: AppResponsive.maxContentWidth(context),
+        alignment: Alignment.topCenter,
+        child: Column(
+          children: [
+            // Search Bar & Add Button Section
+            Container(
+              color: AppColors.white,
+              padding: AppResponsive.padding(context),
+              child: Column(
+                children: [
+                  AppTextField(
+                    controller: _searchController,
+                    hint: 'Search by name or phone...',
+                    icon: Icons.search_rounded,
+                    onChanged: (v) {
+                      _searchCustomers(v);
+                      setState(() {});
+                    },
+                    suffixIcon: _searchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, size: 20),
+                            onPressed: () {
+                              _searchController.clear();
+                              _searchCustomers('');
+                              setState(() {});
+                            },
+                          )
+                        : null,
+                  ),
+                  SizedBox(height: AppResponsive.mediumSpacing(context)),
+                  SizedBox(
+                    width: double.infinity,
+                    height: AppResponsive.buttonHeight(context),
+                    child: ElevatedButton.icon(
+                      onPressed: _navigateToAddCustomer,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
-                    ),
-                    icon: Icon(
-                      Icons.person_add_rounded,
-                      size: AppResponsive.iconSize(context),
-                    ),
-                    label: Text(
-                      'Add New Customer',
-                      style: GoogleFonts.poppins(
-                        fontSize: AppResponsive.buttonFontSize(context),
-                        fontWeight: FontWeight.w600,
+                      icon: Icon(
+                        Icons.person_add_rounded,
+                        size: AppResponsive.iconSize(context),
+                      ),
+                      label: Text(
+                        'Add New Customer',
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.buttonFontSize(context),
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
 
-          // Stats Row
-          Observer(
-            builder: (context) {
-              final customers = customerStore.customers;
-              if (customers.isEmpty) return const SizedBox.shrink();
-
-              final totalVisits = customers.fold(
-                0,
-                (sum, c) => sum + c.totalVisites,
-              );
-              final totalPoints = customers.fold(
-                0,
-                (sum, c) => sum + c.loyaltyPoints,
-              );
-
-              return Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: AppResponsive.largeSpacing(context),
-                  vertical: AppResponsive.smallSpacing(context),
-                ),
-                child: Row(
-                  children: [
-                    _buildStatChip(
-                      '${customers.length} customers',
-                      Icons.people_rounded,
-                      Colors.blue,
-                    ),
-                    SizedBox(width: 8),
-                    _buildStatChip(
-                      '$totalVisits visits',
-                      Icons.calendar_today_rounded,
-                      Colors.green,
-                    ),
-                    SizedBox(width: 8),
-                    _buildStatChip(
-                      '$totalPoints pts',
-                      Icons.stars_rounded,
-                      Colors.orange,
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-
-          // Customer List
-          Expanded(
-            child: Observer(
+            // Stats Row
+            Observer(
               builder: (context) {
-                if (customerStore.isLoading) {
-                  return Center(
-                    child: CircularProgressIndicator(color: AppColors.primary),
-                  );
-                }
+                final customers = customerStore.customers;
+                if (customers.isEmpty) return const SizedBox.shrink();
 
-                final filteredCustomers = _getSortedCustomers(
-                  customerStore.filteredCustomers,
+                final totalVisits = customers.fold(
+                  0,
+                  (sum, c) => sum + c.totalVisites,
+                );
+                final totalPoints = customers.fold(
+                  0,
+                  (sum, c) => sum + c.loyaltyPoints,
                 );
 
-                if (filteredCustomers.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.people_outline_rounded,
-                          size: AppResponsive.getValue(
-                            context,
-                            mobile: 64.0,
-                            tablet: 80.0,
-                            desktop: 96.0,
-                          ),
-                          color: AppColors.textSecondary,
-                        ),
-                        SizedBox(height: AppResponsive.largeSpacing(context)),
-                        Text(
-                          _searchController.text.isEmpty
-                              ? 'No customers yet'
-                              : 'No customers found',
-                          style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.subheadingFontSize(context),
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                        if (_searchController.text.isEmpty) ...[
-                          SizedBox(height: 8),
-                          Text(
-                            'Add your first customer to get started',
-                            style: GoogleFonts.poppins(
-                              fontSize: AppResponsive.smallFontSize(context),
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  );
-                }
-
-                return ListView.builder(
-                  itemCount: filteredCustomers.length,
-                  padding: AppResponsive.padding(context),
-                  itemBuilder: (context, index) {
-                    final customer = filteredCustomers[index];
-                    return _buildCustomerCard(customer);
-                  },
+                return Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: AppResponsive.largeSpacing(context),
+                    vertical: AppResponsive.smallSpacing(context),
+                  ),
+                  child: Row(
+                    children: [
+                      _buildStatChip(
+                        '${customers.length} customers',
+                        Icons.people_rounded,
+                        Colors.blue,
+                      ),
+                      SizedBox(width: 8),
+                      _buildStatChip(
+                        '$totalVisits visits',
+                        Icons.calendar_today_rounded,
+                        Colors.green,
+                      ),
+                      SizedBox(width: 8),
+                      _buildStatChip(
+                        '$totalPoints pts',
+                        Icons.stars_rounded,
+                        Colors.orange,
+                      ),
+                    ],
+                  ),
                 );
               },
             ),
-          ),
-        ],
+
+            // Customer List
+            Expanded(
+              child: Observer(
+                builder: (context) {
+                  if (customerStore.isLoading) {
+                    return Center(
+                      child: CircularProgressIndicator(
+                        color: AppColors.primary,
+                      ),
+                    );
+                  }
+
+                  final filteredCustomers = _getSortedCustomers(
+                    customerStore.filteredCustomers,
+                  );
+
+                  if (filteredCustomers.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.people_outline_rounded,
+                            size: AppResponsive.getValue(
+                              context,
+                              mobile: 64.0,
+                              tablet: 80.0,
+                              desktop: 96.0,
+                            ),
+                            color: AppColors.textSecondary,
+                          ),
+                          SizedBox(height: AppResponsive.largeSpacing(context)),
+                          Text(
+                            _searchController.text.isEmpty
+                                ? 'No customers yet'
+                                : 'No customers found',
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.subheadingFontSize(
+                                context,
+                              ),
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          if (_searchController.text.isEmpty) ...[
+                            SizedBox(height: 8),
+                            Text(
+                              'Add your first customer to get started',
+                              style: GoogleFonts.poppins(
+                                fontSize: AppResponsive.smallFontSize(context),
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    );
+                  }
+
+                  return ListView.builder(
+                    itemCount: filteredCustomers.length,
+                    padding: AppResponsive.padding(context),
+                    itemBuilder: (context, index) {
+                      final customer = filteredCustomers[index];
+                      return _buildCustomerCard(customer);
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

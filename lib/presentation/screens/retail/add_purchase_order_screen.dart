@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/core/config/tax_id_rule.dart';
 import 'package:billberrylite/util/common/quantity_format.dart';
 import 'package:flutter/services.dart';
 import 'package:billberrylite/core/config/phone_rule.dart';
@@ -331,8 +332,8 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
                 SizedBox(height: AppResponsive.mediumSpacing(context)),
                 AppTextField(
                   controller: gstController,
-                  label: 'GST Number',
-                  hint: 'e.g. 22AAAAA0000A1Z5',
+                  label: TaxIdRule.label,
+                  hint: TaxIdRule.hint,
                   icon: Icons.badge_outlined,
                   textCapitalization: TextCapitalization.characters,
                 ),
@@ -1236,7 +1237,9 @@ class _AddPOItemDialogState extends State<_AddPOItemDialog> {
                 padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
                 decoration: BoxDecoration(
                   color: AppColors.surfaceMedium,
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(
+                    AppResponsive.borderRadius(context),
+                  ),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,

@@ -282,7 +282,7 @@ class _SupplierPaymentDialogState extends State<_SupplierPaymentDialog> {
   Widget _modeChip(String label, bool selected) {
     return InkWell(
       onTap: () => setState(() => _mode = label),
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
       child: Container(
         padding: EdgeInsets.symmetric(
           horizontal: AppResponsive.mediumSpacing(context),
@@ -292,7 +292,9 @@ class _SupplierPaymentDialogState extends State<_SupplierPaymentDialog> {
           color: selected
               ? AppColors.primary.withValues(alpha: 0.08)
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(
+            AppResponsive.borderRadius(context),
+          ),
           border: Border.all(
             color: selected ? AppColors.primary : AppColors.divider,
             width: selected ? 1.5 : 1,

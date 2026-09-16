@@ -624,56 +624,61 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
   }
 
   Widget _buildBody() {
-    return SingleChildScrollView(
-      padding: EdgeInsets.all(
-        AppResponsive.getValue(
-          context,
-          mobile: 20.0,
-          tablet: 24.0,
-          desktop: 28.0,
+    return AppResponsive.constrainedContent(
+      context: context,
+      maxWidth: AppResponsive.maxFormWidth(context),
+      alignment: Alignment.topCenter,
+      child: SingleChildScrollView(
+        padding: EdgeInsets.all(
+          AppResponsive.getValue(
+            context,
+            mobile: 20.0,
+            tablet: 24.0,
+            desktop: 28.0,
+          ),
         ),
-      ),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildBulkImportCard(),
-            SizedBox(height: AppResponsive.largeSpacing(context)),
-            _buildSectionHeader('Basic Information', Icons.info_outline),
-            SizedBox(height: AppResponsive.largeSpacing(context)),
-            _buildBasicInfoSection(),
-            SizedBox(height: AppResponsive.extraLargeSpacing(context)),
-            _buildSectionHeader('Item Type', Icons.restaurant),
-            SizedBox(height: AppResponsive.largeSpacing(context)),
-            _buildItemTypeSection(),
-            SizedBox(height: AppResponsive.extraLargeSpacing(context)),
-            _buildSectionHeader('Selling Method', Icons.scale),
-            SizedBox(height: AppResponsive.largeSpacing(context)),
-            _buildSellingMethodSection(),
-            SizedBox(height: AppResponsive.extraLargeSpacing(context)),
-            // Stock module — only when `inventory` is in the plan.
-            if (PlanEnforce.allows(EntKeys.inventory)) ...[
-              _buildSectionHeader(
-                'Inventory Management',
-                Icons.inventory_2_outlined,
-              ),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildBulkImportCard(),
               SizedBox(height: AppResponsive.largeSpacing(context)),
-              _buildInventorySection(),
+              _buildSectionHeader('Basic Information', Icons.info_outline),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
+              _buildBasicInfoSection(),
               SizedBox(height: AppResponsive.extraLargeSpacing(context)),
-            ],
-            _buildSectionHeader('Tax Selection', Icons.receipt_long),
-            SizedBox(height: AppResponsive.largeSpacing(context)),
-            _buildTaxSection(),
-            SizedBox(height: AppResponsive.extraLargeSpacing(context)),
-            _buildSectionHeader('Additional Options', Icons.extension),
-            SizedBox(height: AppResponsive.largeSpacing(context)),
-            _buildAdditionalOptionsSection(),
-            if (_totalItemsInDatabase > 0) ...[
+              _buildSectionHeader('Item Type', Icons.restaurant),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
+              _buildItemTypeSection(),
               SizedBox(height: AppResponsive.extraLargeSpacing(context)),
-              _buildViewItemsBanner(),
+              _buildSectionHeader('Selling Method', Icons.scale),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
+              _buildSellingMethodSection(),
+              SizedBox(height: AppResponsive.extraLargeSpacing(context)),
+              // Stock module — only when `inventory` is in the plan.
+              if (PlanEnforce.allows(EntKeys.inventory)) ...[
+                _buildSectionHeader(
+                  'Inventory Management',
+                  Icons.inventory_2_outlined,
+                ),
+                SizedBox(height: AppResponsive.largeSpacing(context)),
+                _buildInventorySection(),
+                SizedBox(height: AppResponsive.extraLargeSpacing(context)),
+              ],
+              _buildSectionHeader('Tax Selection', Icons.receipt_long),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
+              _buildTaxSection(),
+              SizedBox(height: AppResponsive.extraLargeSpacing(context)),
+              _buildSectionHeader('Additional Options', Icons.extension),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
+              _buildAdditionalOptionsSection(),
+              if (_totalItemsInDatabase > 0) ...[
+                SizedBox(height: AppResponsive.extraLargeSpacing(context)),
+                _buildViewItemsBanner(),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

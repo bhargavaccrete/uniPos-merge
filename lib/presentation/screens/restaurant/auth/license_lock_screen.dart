@@ -70,49 +70,77 @@ class _LicenseLockScreenState extends State<LicenseLockScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isTablet = !AppResponsive.isMobile(context);
-    final pad = isTablet ? 40.0 : 24.0;
+    // Same ladders as license_key_entry_screen — these two are the same screen
+    // in two states ("activate a key" / "your key expired, activate a new
+    // one"), so they share the padding, badge and card widths.
+    final pad = AppResponsive.getValue(
+      context,
+      mobile: 24.0,
+      tablet: 32.0,
+      desktop: 40.0,
+    );
 
     return PopScope(
       canPop: false, // cannot back out of the lock screen
       child: Scaffold(
         backgroundColor: AppColors.surfaceLight,
         body: SafeArea(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.all(pad),
-            child: Center(
+          // minHeight from the measured box, not MediaQuery: inside SafeArea
+          // the viewport is shorter than the screen, so screen-height minus
+          // padding always overshot and the "centred" column never was. Same
+          // fix already applied in license_key_entry_screen.
+          child: LayoutBuilder(
+            builder: (context, constraints) => SingleChildScrollView(
+              padding: EdgeInsets.all(pad),
               child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: isTablet ? 480 : double.infinity,
-                  minHeight: MediaQuery.of(context).size.height - pad * 2,
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _lockIcon(),
-                    SizedBox(height: AppResponsive.largeSpacing(context)),
-                    _headline(isTablet),
-                    SizedBox(height: AppResponsive.smallSpacing(context)),
-                    _subtext(isTablet),
-                    if (_isDeactivated) ...[
-                      SizedBox(height: AppResponsive.mediumSpacing(context)),
-                      _deactivatedBanner(isTablet),
-                    ],
-                    if (_isExpired) ...[
-                      SizedBox(height: AppResponsive.mediumSpacing(context)),
-                      _expiredInfoCard(isTablet),
-                    ],
-                    // For expired / deactivated licenses, contacting support is
-                    // the primary path — surface it above the key field.
-                    if (!_isNotActivated) ...[
-                      SizedBox(height: AppResponsive.largeSpacing(context)),
-                      _contactButton(isTablet),
-                    ],
-                    SizedBox(height: AppResponsive.largeSpacing(context)),
-                    _keyInputCard(isTablet),
-                    SizedBox(height: AppResponsive.largeSpacing(context)),
-                    _supportNote(isTablet),
-                  ],
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      // Not maxFormWidth: that is double.infinity on mobile and
+                      // 600 on tablet, which is wider than this centred card
+                      // wants. Matches the sibling activation screen.
+                      maxWidth: AppResponsive.getValue(
+                        context,
+                        mobile: double.infinity,
+                        tablet: 480.0,
+                        desktop: 540.0,
+                      ),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _lockIcon(),
+                        SizedBox(height: AppResponsive.largeSpacing(context)),
+                        _headline(),
+                        SizedBox(height: AppResponsive.smallSpacing(context)),
+                        _subtext(),
+                        if (_isDeactivated) ...[
+                          SizedBox(
+                            height: AppResponsive.mediumSpacing(context),
+                          ),
+                          _deactivatedBanner(),
+                        ],
+                        if (_isExpired) ...[
+                          SizedBox(
+                            height: AppResponsive.mediumSpacing(context),
+                          ),
+                          _expiredInfoCard(),
+                        ],
+                        // For expired / deactivated licenses, contacting
+                        // support is the primary path — surface it above the
+                        // key field.
+                        if (!_isNotActivated) ...[
+                          SizedBox(height: AppResponsive.largeSpacing(context)),
+                          _contactButton(),
+                        ],
+                        SizedBox(height: AppResponsive.largeSpacing(context)),
+                        _keyInputCard(),
+                        SizedBox(height: AppResponsive.largeSpacing(context)),
+                        _supportNote(),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -122,10 +150,18 @@ class _LicenseLockScreenState extends State<LicenseLockScreen> {
     );
   }
 
+  /// Badge diameter — same ladder as license_key_entry_screen.
+  static double _badge(BuildContext context) => AppResponsive.getValue(
+    context,
+    mobile: 80.0,
+    tablet: 88.0,
+    desktop: 100.0,
+  );
+
   Widget _lockIcon() {
     return Container(
-      width: 96,
-      height: 96,
+      width: _badge(context),
+      height: _badge(context),
       decoration: BoxDecoration(
         color: AppColors.danger.withValues(alpha: 0.1),
         shape: BoxShape.circle,
@@ -136,13 +172,13 @@ class _LicenseLockScreenState extends State<LicenseLockScreen> {
             : _isExpired
             ? Icons.lock_clock_rounded
             : Icons.lock_outline_rounded,
-        size: 48,
+        size: AppResponsive.largeIconSize(context),
         color: AppColors.danger,
       ),
     );
   }
 
-  Widget _headline(bool isTablet) {
+  Widget _headline() {
     return Text(
       _isDeactivated
           ? 'License Deactivated'
@@ -163,7 +199,7 @@ class _LicenseLockScreenState extends State<LicenseLockScreen> {
     );
   }
 
-  Widget _subtext(bool isTablet) {
+  Widget _subtext() {
     final String msg;
     if (_isDeactivated) {
       msg =
@@ -185,13 +221,15 @@ class _LicenseLockScreenState extends State<LicenseLockScreen> {
     );
   }
 
-  Widget _expiredInfoCard(bool isTablet) {
+  Widget _expiredInfoCard() {
     final info = _store.licenseInfo!;
     return Container(
-      padding: EdgeInsets.all(isTablet ? 18 : 14),
+      padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
         color: AppColors.warning.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: AppColors.warning.withValues(alpha: 0.4)),
       ),
       child: Column(
@@ -209,7 +247,12 @@ class _LicenseLockScreenState extends State<LicenseLockScreen> {
               DateFormat('dd MMM yyyy').format(info.expiryDate!),
               AppColors.danger,
             ),
-          _infoRow(Icons.key_rounded, 'Key', info.maskedKey, Colors.grey),
+          _infoRow(
+            Icons.key_rounded,
+            'Key',
+            info.maskedKey,
+            AppColors.textSecondary,
+          ),
         ],
       ),
     );
@@ -220,7 +263,7 @@ class _LicenseLockScreenState extends State<LicenseLockScreen> {
       padding: const EdgeInsets.symmetric(vertical: 5),
       child: Row(
         children: [
-          Icon(icon, size: 16, color: color),
+          Icon(icon, size: AppResponsive.smallIconSize(context), color: color),
           const SizedBox(width: 10),
           Text(
             '$label: ',
@@ -244,12 +287,14 @@ class _LicenseLockScreenState extends State<LicenseLockScreen> {
     );
   }
 
-  Widget _deactivatedBanner(bool isTablet) {
+  Widget _deactivatedBanner() {
     return Container(
-      padding: EdgeInsets.all(isTablet ? 18 : 14),
+      padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
         color: AppColors.danger.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: AppColors.danger.withValues(alpha: 0.4)),
       ),
       child: Row(
@@ -257,7 +302,7 @@ class _LicenseLockScreenState extends State<LicenseLockScreen> {
         children: [
           Icon(
             Icons.report_gmailerrorred_rounded,
-            size: 20,
+            size: AppResponsive.iconSize(context),
             color: AppColors.danger,
           ),
           const SizedBox(width: 10),
@@ -277,10 +322,10 @@ class _LicenseLockScreenState extends State<LicenseLockScreen> {
     );
   }
 
-  Widget _contactButton(bool isTablet) {
+  Widget _contactButton() {
     return SizedBox(
       width: double.infinity,
-      height: isTablet ? 54 : 50,
+      height: AppResponsive.buttonHeight(context),
       child: ElevatedButton.icon(
         onPressed: _loading ? null : _contactSupport,
         icon: Icon(Icons.support_agent_rounded, color: Colors.white),
@@ -296,19 +341,21 @@ class _LicenseLockScreenState extends State<LicenseLockScreen> {
           backgroundColor: AppColors.primary,
           elevation: 0,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(10),
           ),
         ),
       ),
     );
   }
 
-  Widget _keyInputCard(bool isTablet) {
+  Widget _keyInputCard() {
     return Container(
-      padding: EdgeInsets.all(isTablet ? 20 : 16),
+      padding: AppResponsive.cardPadding(context),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: AppColors.divider),
         boxShadow: [
           BoxShadow(
@@ -331,7 +378,7 @@ class _LicenseLockScreenState extends State<LicenseLockScreen> {
                 ),
                 child: Icon(
                   Icons.key_rounded,
-                  size: isTablet ? 22 : 18,
+                  size: AppResponsive.smallIconSize(context),
                   color: AppColors.primary,
                 ),
               ),
@@ -361,7 +408,7 @@ class _LicenseLockScreenState extends State<LicenseLockScreen> {
               children: [
                 Icon(
                   Icons.error_outline_rounded,
-                  size: 14,
+                  size: AppResponsive.smallIconSize(context),
                   color: AppColors.danger,
                 ),
                 const SizedBox(width: 6),
@@ -380,7 +427,7 @@ class _LicenseLockScreenState extends State<LicenseLockScreen> {
           const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
-            height: isTablet ? 54 : 50,
+            height: AppResponsive.buttonHeight(context),
             child: ElevatedButton(
               onPressed: _loading ? null : _activate,
               style: ElevatedButton.styleFrom(
@@ -390,7 +437,7 @@ class _LicenseLockScreenState extends State<LicenseLockScreen> {
                 ),
                 elevation: 0,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(10),
                 ),
               ),
               child: _loading
@@ -417,7 +464,7 @@ class _LicenseLockScreenState extends State<LicenseLockScreen> {
     );
   }
 
-  Widget _supportNote(bool isTablet) {
+  Widget _supportNote() {
     return Text(
       'Each license key is valid for one device only.\nContact your administrator for a new key.',
       style: GoogleFonts.poppins(

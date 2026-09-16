@@ -126,6 +126,18 @@ class PastOrderModel extends HiveObject{
   @HiveField(34)
   final double? serviceCharge; // Computed service/delivery charge amount at settlement time
 
+  @HiveField(36)
+  final bool? taxEnabled; // Tax on/off when settled; null on older records → TaxFeature.forRecord
+
+  @HiveField(37)
+  final String? storeGstNumber; // Store GSTIN when settled; '' = none, null = older record → live
+
+  @HiveField(38)
+  final double? roundOffStep; // Round-off step when settled (0 = off); null = older record → live
+
+  @HiveField(39)
+  final bool? discountOnItems; // Discount-on-items setting when settled; null = older record → live
+
   PastOrderModel({
     required this.id,
     required this.customerName,
@@ -165,6 +177,10 @@ class PastOrderModel extends HiveObject{
     this.refundedBy,
     this.customerId,
     this.serviceCharge,
+    this.taxEnabled,
+    this.storeGstNumber,
+    this.roundOffStep,
+    this.discountOnItems,
   }) : assert(kotNumbers.isNotEmpty, 'Order must have at least one KOT number'),
         assert(kotBoundaries.isNotEmpty, 'Order must have at least one KOT boundary'),
         assert(kotNumbers.length == kotBoundaries.length, 'KOT numbers and boundaries must match');
@@ -214,6 +230,10 @@ class PastOrderModel extends HiveObject{
     String? refundedBy,
     String? customerId,
     double? serviceCharge,
+    bool? taxEnabled,
+    String? storeGstNumber,
+    double? roundOffStep,
+    bool? discountOnItems,
   }) {
     return PastOrderModel(
       id: id ?? this.id,
@@ -252,6 +272,10 @@ class PastOrderModel extends HiveObject{
       refundedBy: refundedBy ?? this.refundedBy,
       customerId: customerId ?? this.customerId,
       serviceCharge: serviceCharge ?? this.serviceCharge,
+      taxEnabled: taxEnabled ?? this.taxEnabled,
+      storeGstNumber: storeGstNumber ?? this.storeGstNumber,
+      roundOffStep: roundOffStep ?? this.roundOffStep,
+      discountOnItems: discountOnItems ?? this.discountOnItems,
     );
   }
 
@@ -334,7 +358,12 @@ class PastOrderModel extends HiveObject{
       'voidedBy': voidedBy,
       'voidReason': voidReason,
       'refundedBy': refundedBy,
+      'customerId': customerId,
       'serviceCharge': serviceCharge,
+      'taxEnabled': taxEnabled,
+      'storeGstNumber': storeGstNumber,
+      'roundOffStep': roundOffStep,
+      'discountOnItems': discountOnItems,
     };
   }
 
@@ -375,7 +404,12 @@ class PastOrderModel extends HiveObject{
       voidedBy: map['voidedBy'] as String?,
       voidReason: map['voidReason'] as String?,
       refundedBy: map['refundedBy'] as String?,
+      customerId: map['customerId'] as String?,
       serviceCharge: map['serviceCharge'] != null ? (map['serviceCharge'] as num).toDouble() : null,
+      taxEnabled: map['taxEnabled'] as bool?,
+      storeGstNumber: map['storeGstNumber'] as String?,
+      roundOffStep: (map['roundOffStep'] as num?)?.toDouble(),
+      discountOnItems: map['discountOnItems'] as bool?,
     );
   }
 

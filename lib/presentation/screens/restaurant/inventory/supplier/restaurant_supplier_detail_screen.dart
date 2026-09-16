@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/core/config/tax_id_rule.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:billberrylite/core/di/service_locator.dart';
@@ -309,7 +310,11 @@ class _RestaurantSupplierDetailScreenState
       if ((s.address ?? '').isNotEmpty)
         (icon: Icons.location_on_outlined, label: 'Address', value: s.address!),
       if ((s.gstNumber ?? '').isNotEmpty)
-        (icon: Icons.receipt_long_outlined, label: 'GST', value: s.gstNumber!),
+        (
+          icon: Icons.receipt_long_outlined,
+          label: TaxIdRule.printLabel,
+          value: s.gstNumber!,
+        ),
     ];
 
     return _card(

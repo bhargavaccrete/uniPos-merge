@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:billberrylite/domain/store/restaurant/restaurant_supplier_store.dart';
 import 'package:billberrylite/data/models/restaurant/db/itemmodel_302.dart';
 
 import 'package:billberrylite/core/di/service_locator.dart';
@@ -194,7 +193,7 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen> {
                 Expanded(
                   child: AppResponsive.constrainedContent(
                     context: context,
-                    maxWidth: AppResponsive.maxFormWidth(context),
+                    maxWidth: AppResponsive.maxContentWidth(context),
                     alignment: Alignment.topCenter,
                     child: pos.isEmpty
                         ? AppEmptyState(

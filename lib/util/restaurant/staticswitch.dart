@@ -213,6 +213,11 @@ class AppSettings {
   // static bool get showDefaultItemImage => values["Item Default Image"] ?? false;
   static bool get roundOff => values["Round Off"] ?? true;
 
+  /// The round-off step in force right now, 0 when rounding is off. Stamped on
+  /// a settled order so a reprint rounds the way the bill was rounded.
+  static double get roundOffStepForRecord =>
+      roundOff ? (double.tryParse(selectedRoundOffValue) ?? 0) : 0;
+
   static bool get visualKeyboard => values["Visual Keyboard"] ?? false;
   static bool get shiftHandover => values["Shift Handover"] ?? true;
 

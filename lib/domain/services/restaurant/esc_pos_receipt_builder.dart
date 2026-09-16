@@ -8,6 +8,7 @@ import 'package:billberrylite/core/plan/plan_enforcement.dart';
 import 'package:billberrylite/core/plan/mode_keys.dart';
 import 'package:billberrylite/core/config/app_config.dart';
 import 'package:billberrylite/core/config/tax_label_rule.dart';
+import 'package:billberrylite/core/config/tax_id_rule.dart';
 import 'package:billberrylite/domain/services/restaurant/tax_breakdown.dart';
 import 'package:billberrylite/core/di/service_locator.dart' show taxStore;
 // describeAttributeMap only — NOT the store, which is retail-only and would
@@ -270,7 +271,9 @@ class EscPosReceiptBuilder {
     if (receiptData.taxEnabled &&
         receiptData.gstNumber != null &&
         receiptData.gstNumber!.isNotEmpty) {
-      bytes.addAll(_text('GSTIN: ${receiptData.gstNumber}'));
+      bytes.addAll(
+        _text('${TaxIdRule.printLabel}: ${receiptData.gstNumber}'),
+      );
     }
     // Food licence (FSSAI in India) — read live rather than threaded through
     // ReceiptData: it is a standing business identifier, not a per-order value.

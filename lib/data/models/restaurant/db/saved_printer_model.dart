@@ -12,7 +12,11 @@ class SavedPrinterModel extends HiveObject {
   final String name;
 
   @HiveField(2)
-  final String type; // 'bluetooth' | 'wifi' | 'usb' | 'windows'
+  // 'bluetooth' | 'wifi' | 'usb' | 'windows' | 'windows_pdf'
+  // 'windows'     → RAW ESC/POS through the Windows spooler (thermal printers)
+  // 'windows_pdf' → rendered receipt PDF through the Windows printing API
+  //                 (doPDF, Microsoft Print to PDF, document printers)
+  final String type;
 
   @HiveField(3)
   // MAC for BT, "IP:port" for WiFi, "vendorId:productId" for USB, and the
@@ -47,8 +51,13 @@ class SavedPrinterModel extends HiveObject {
   bool get isWifi => type == 'wifi';
   bool get isUsb => type == 'usb';
 
-  /// Printed through the Windows print spooler rather than direct to hardware.
+  /// RAW ESC/POS through the Windows print spooler — a real thermal printer.
   bool get isWindows => type == 'windows';
+
+  /// A Windows PDF/document printer. Receives a RENDERED receipt PDF, never
+  /// ESC/POS: control codes are meaningless to a PDF writer, which discards
+  /// them while every layer still reports success.
+  bool get isWindowsPdf => type == 'windows_pdf';
 
   bool get isKotPrinter => role == 'kot' || role == 'both';
   bool get isReceiptPrinter => role == 'receipt' || role == 'both';

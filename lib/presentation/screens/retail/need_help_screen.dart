@@ -40,45 +40,50 @@ class RetailNeedHelpScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(title: 'Need Help?', centerTitle: true),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(16, 16, 16, 28),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _heroBanner(context),
-            SizedBox(height: AppResponsive.largeSpacing(context)),
+      body: AppResponsive.constrainedContent(
+        context: context,
+        maxWidth: AppResponsive.maxContentWidth(context),
+        alignment: Alignment.topCenter,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _heroBanner(context),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
 
-            _sectionTitle(context, 'Contact Us'),
-            SizedBox(height: AppResponsive.mediumSpacing(context)),
-            _contactCard(
-              context: context,
-              icon: Icons.call_rounded,
-              color: AppColors.success,
-              title: 'Call Support',
-              value: _phone,
-              onTap: () =>
-                  _launch(context, Uri.parse('tel:${_digits(_phone)}')),
-            ),
-            SizedBox(height: AppResponsive.mediumSpacing(context)),
-            _contactCard(
-              context: context,
-              icon: Icons.mail_rounded,
-              color: AppColors.orange,
-              title: 'Email Us',
-              value: _email,
-              onTap: () => _launch(
-                context,
-                Uri.parse(
-                  'mailto:$_email?subject=${Uri.encodeComponent('Bill Berry Lite Support')}',
+              _sectionTitle(context, 'Contact Us'),
+              SizedBox(height: AppResponsive.mediumSpacing(context)),
+              _contactCard(
+                context: context,
+                icon: Icons.call_rounded,
+                color: AppColors.success,
+                title: 'Call Support',
+                value: _phone,
+                onTap: () =>
+                    _launch(context, Uri.parse('tel:${_digits(_phone)}')),
+              ),
+              SizedBox(height: AppResponsive.mediumSpacing(context)),
+              _contactCard(
+                context: context,
+                icon: Icons.mail_rounded,
+                color: AppColors.orange,
+                title: 'Email Us',
+                value: _email,
+                onTap: () => _launch(
+                  context,
+                  Uri.parse(
+                    'mailto:$_email?subject=${Uri.encodeComponent('Bill Berry Lite Support')}',
+                  ),
                 ),
               ),
-            ),
 
-            SizedBox(height: 28),
-            _sectionTitle(context, 'Frequently Asked'),
-            SizedBox(height: AppResponsive.mediumSpacing(context)),
-            ..._faqs.map((f) => _faqTile(context, f)),
-          ],
+              SizedBox(height: 28),
+              _sectionTitle(context, 'Frequently Asked'),
+              SizedBox(height: AppResponsive.mediumSpacing(context)),
+              ..._faqs.map((f) => _faqTile(context, f)),
+            ],
+          ),
         ),
       ),
     );

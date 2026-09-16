@@ -9,6 +9,7 @@ import 'package:billberrylite/presentation/widget/componets/common/dialog_dispos
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/core/plan/plan_guard.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_empty_state.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:uuid/uuid.dart';
@@ -245,115 +246,96 @@ class _ManageStaffScreenState extends State<ManageStaffScreen> {
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(title: 'Staff Management'),
-      body: Column(
-        children: [
-          // Search & Add Button Section
-          Container(
-            color: Colors.white,
-            padding: AppResponsive.padding(context),
-            child: Column(
-              children: [
-                // Search Bar
-                AppTextField(
-                  controller: searchController,
-                  hint: 'Search staff…',
-                  icon: Icons.search_rounded,
-                  onChanged: _searchStaff,
-                ),
-                SizedBox(height: AppResponsive.mediumSpacing(context)),
-                // Add Staff Button
-                SizedBox(
-                  width: double.infinity,
-                  height: AppResponsive.buttonHeight(context),
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      selectedrole = StaffRoles.unselected;
-                      _clear();
-                      _showAddStaffDialog(context);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+      body: AppResponsive.constrainedContent(
+        context: context,
+        maxWidth: AppResponsive.maxContentWidth(context),
+        alignment: Alignment.topCenter,
+        child: Column(
+          children: [
+            // Search & Add Button Section
+            Container(
+              color: Colors.white,
+              padding: AppResponsive.padding(context),
+              child: Column(
+                children: [
+                  // Search Bar
+                  AppTextField(
+                    controller: searchController,
+                    hint: 'Search staff…',
+                    icon: Icons.search_rounded,
+                    onChanged: _searchStaff,
+                  ),
+                  SizedBox(height: AppResponsive.mediumSpacing(context)),
+                  // Add Staff Button
+                  SizedBox(
+                    width: double.infinity,
+                    height: AppResponsive.buttonHeight(context),
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        selectedrole = StaffRoles.unselected;
+                        _clear();
+                        _showAddStaffDialog(context);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
-                    ),
-                    icon: Icon(
-                      Icons.person_add_rounded,
-                      size: AppResponsive.iconSize(context),
-                    ),
-                    label: Text(
-                      'Add New Staff',
-                      style: GoogleFonts.poppins(
-                        fontSize: AppResponsive.buttonFontSize(context),
-                        fontWeight: FontWeight.w600,
+                      icon: Icon(
+                        Icons.person_add_rounded,
+                        size: AppResponsive.iconSize(context),
+                      ),
+                      label: Text(
+                        'Add New Staff',
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.buttonFontSize(context),
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
 
-          // Staff List
-          Expanded(
-            child: Observer(
-              builder: (_) {
-                final filteredStaff = _getFilteredStaff();
+            // Staff List
+            Expanded(
+              child: Observer(
+                builder: (_) {
+                  final filteredStaff = _getFilteredStaff();
 
-                if (staffStore.isLoading) {
-                  return Center(child: CircularProgressIndicator());
-                }
+                  if (staffStore.isLoading) {
+                    return Center(child: CircularProgressIndicator());
+                  }
 
-                if (filteredStaff.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.people_outline,
-                          size: 64,
-                          color: AppColors.divider,
-                        ),
-                        SizedBox(height: 16),
-                        Text(
-                          searchQuery.isEmpty
-                              ? 'No staff members yet'
-                              : 'No staff found',
-                          style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.subheadingFontSize(context),
-                            color: AppColors.textSecondary,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        if (searchQuery.isEmpty) ...[
-                          SizedBox(height: 8),
-                          Text(
-                            'Add your first staff member',
-                            style: GoogleFonts.poppins(
-                              fontSize: AppResponsive.smallFontSize(context),
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
+                  if (filteredStaff.isEmpty) {
+                    return AppEmptyState(
+                      icon: Icons.people_outline,
+                      title: searchQuery.isEmpty
+                          ? 'No staff members yet'
+                          : 'No staff found',
+                      message: searchQuery.isEmpty
+                          ? 'Add your first staff member'
+                          : null,
+                    );
+                  }
+
+                  return ListView.builder(
+                    padding: AppResponsive.padding(context),
+                    itemCount: filteredStaff.length,
+                    itemBuilder: (context, index) {
+                      final staff = filteredStaff[index];
+                      return _buildStaffCard(context, staff);
+                    },
                   );
-                }
-
-                return ListView.builder(
-                  padding: AppResponsive.padding(context),
-                  itemCount: filteredStaff.length,
-                  itemBuilder: (context, index) {
-                    final staff = filteredStaff[index];
-                    return _buildStaffCard(context, staff);
-                  },
-                );
-              },
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -406,10 +388,10 @@ class _ManageStaffScreenState extends State<ManageStaffScreen> {
                 ? AppColors.surfaceMedium
                 : AppColors.white,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.divider.withOpacity(0.5)),
+            border: Border.all(color: AppColors.divider.withValues(alpha: 0.5)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.03),
+                color: Colors.black.withValues(alpha: 0.03),
                 blurRadius: 8,
                 offset: Offset(0, 2),
               ),

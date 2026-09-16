@@ -14,21 +14,19 @@ import 'package:billberrylite/presentation/widget/componets/common/primary_app_b
 import 'package:billberrylite/presentation/widget/componets/common/gradient_hero_header.dart';
 import '../manage menu/tab/edit_item.dart';
 
-/// Content cap for the recipe grid.
-///
-/// Wider than `maxFormWidth` (800) because this is a card grid: at 800 four
-/// columns give 177px cards. At 1100 they land at ~252px, which also matches
-/// what an uncapped 1024 screen already shows — so `gridColumns` stays correct
-/// and only the widest screens change.
-const double _kRecipesMaxWidth = 1100.0;
-
-/// Horizontal inset that centres the grid inside [_kRecipesMaxWidth].
+/// Horizontal inset that centres the grid inside the shared page shell.
 ///
 /// A `SliverGrid` cannot be wrapped in a box widget, so the cap is expressed
-/// as padding rather than a `ConstrainedBox`.
+/// as padding rather than a `ConstrainedBox` — but the WIDTH is the shared
+/// `maxContentWidth`, not a local constant. This used to be its own
+/// `_kRecipesMaxWidth = 1100`, the same fourth width value that was removed
+/// from `manage_Inventory`. maxContentWidth is `double.infinity` on mobile, so
+/// `overflow` goes negative there and the base padding is returned unchanged.
 double _recipesSidePad(BuildContext context) {
   final base = AppResponsive.padding(context).left;
-  final overflow = AppResponsive.screenWidth(context) - _kRecipesMaxWidth;
+  final overflow =
+      AppResponsive.screenWidth(context) -
+      AppResponsive.maxContentWidth(context);
   return overflow > 0 ? base + overflow / 2 : base;
 }
 

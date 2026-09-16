@@ -1799,13 +1799,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
           SizedBox(height: AppResponsive.smallSpacing(context)),
           DropdownButtonFormField<String>(
             initialValue: kItemUnits.contains(_unit) ? _unit : 'kg',
-            decoration: InputDecoration(
-              labelText: 'Unit',
-              isDense: true,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
+            // _pickerDecoration, like the Tax Rate picker below. A bare
+            // InputDecoration with isDense made this sit SHORTER than the
+            // AppTextFields stacked around it and floated its label into the
+            // top border — the exact case _pickerDecoration documents.
+            decoration: _pickerDecoration('Unit'),
             // Reuses restaurant's canonical list so the two sides can never
             // drift apart on what a unit is called.
             items: kItemUnits
@@ -2051,7 +2049,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
               color: isSelected ? AppColors.primary : AppColors.divider,
             ),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
+              // Radius 10, not a 20 pill — the project's button/chip rule.
+              borderRadius: BorderRadius.circular(10),
             ),
           );
         },
@@ -2589,11 +2588,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
     return Container(
       padding: AppResponsive.cardPadding(context),
       decoration: BoxDecoration(
-        color: AppColors.warning.withOpacity(0.10),
+        color: AppColors.warning.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(
           AppResponsive.smallBorderRadius(context),
         ),
-        border: Border.all(color: AppColors.warning.withOpacity(0.35)),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.35)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2839,7 +2838,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
       padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
         color: isSelected
-            ? AppColors.warning.withOpacity(0.10)
+            ? AppColors.warning.withValues(alpha: 0.10)
             : AppColors.white,
         borderRadius: BorderRadius.circular(
           AppResponsive.smallBorderRadius(context),

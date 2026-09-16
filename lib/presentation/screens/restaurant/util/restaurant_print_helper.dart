@@ -10,6 +10,7 @@ import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart'
 import 'package:billberrylite/domain/services/retail/print_service.dart';
 import 'package:billberrylite/domain/services/retail/receipt_pdf_service.dart';
 import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
+import 'package:billberrylite/core/config/tax_id_rule.dart';
 import 'package:billberrylite/domain/services/restaurant/cart_calculation_service.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/core/config/app_config.dart';
@@ -268,6 +269,8 @@ class RestaurantPrintHelper {
     required CartCalculationService calculations,
     int? billNumber, // Bill number for completed orders (from pastOrderModel)
     int loyaltyPointsDiscount = 0, // Points redeemed (reduces grand total)
+    bool? taxEnabled, // Stamp from a saved bill; null = live flag (open orders)
+    String? storeGstNumber, // Stamp from a saved bill; null = live GSTIN
   }) async {
     try {
       final storeSettings = StoreSettingsService();
@@ -277,7 +280,10 @@ class RestaurantPrintHelper {
       final storeAddress = await storeSettings.getFormattedAddress();
       final storePhone = await storeSettings.getStorePhone();
       final storeEmail = await storeSettings.getStoreEmail();
-      final storeGst = await storeSettings.getGSTNumber();
+      final storeGst = TaxIdRule.numberForRecord(
+        storeGstNumber,
+        await storeSettings.getGSTNumber(),
+      );
 
       // 2. Group identical items together (same product, variant, extras, choices)
       Map<String, CartItem> groupedItems = {};
@@ -318,7 +324,11 @@ class RestaurantPrintHelper {
         // In tax-inclusive mode: item.price already includes tax (show as-is)
         // In tax-exclusive mode: item.price includes tax, extract base for display
         double displayPrice = item.price;
-        if (!AppSettings.isTaxInclusive && item.taxRate != null && item.taxRate! > 0) {
+        // The order's own stored mode, so a reprint after the setting changes
+        // still shows the prices the bill was made with.
+        final bool orderInclusive =
+            order.isTaxInclusive ?? AppSettings.isTaxInclusive;
+        if (!orderInclusive && item.taxRate != null && item.taxRate! > 0) {
           // Tax Exclusive: Extract base price from gross price for display
           displayPrice = item.price / (1 + item.taxRate!);
         }
@@ -400,6 +410,7 @@ class RestaurantPrintHelper {
           qty: item.quantity.toDouble(),
           discountAmount: 0, // Item level discount not typically stored in restaurant cart
           gstRate: itemTaxRate,
+          isTaxInclusive: order.isTaxInclusive,
           // Note: total field in create() is calculated
         );
       }).toList();
@@ -448,6 +459,7 @@ class RestaurantPrintHelper {
         totalTaxableAmount: calculations.subtotal - calculations.discountAmount,
         totalGstAmount: calculations.totalGST,
         grandTotal: calculations.grandTotal, // net (points folded into the calc's GST base)
+        taxEnabled: TaxFeature.forRecord(taxEnabled),
         paymentType: paymentType,
         isReturn: false,
       );
@@ -512,7 +524,7 @@ class RestaurantPrintHelper {
         storePhone: storePhone,
         storeEmail: storeEmail,
         gstNumber: storeGst,
-        taxEnabled: TaxFeature.enabled,
+        taxEnabled: TaxFeature.forRecord(taxEnabled),
         // Restaurant-specific fields
         orderType: order.orderType,
         tableNo: order.tableNo,
@@ -557,6 +569,29 @@ class RestaurantPrintHelper {
       // A4 → always print an A4 invoice, ignoring any thermal billing printer.
       if (PrintSettings.isBillFormatA4) {
         await printPdf(ReceiptFormat.a4Invoice);
+        return;
+      }
+
+      // Windows PDF/document printer → send the RENDERED receipt through the
+      // Windows printing API. ESC/POS never goes here: a PDF writer discards
+      // control codes while every layer reports success, so a RAW send would
+      // silently lose the bill. Same receipt, same paper width — only the last
+      // hop differs. Falls through to the preview if the queue rejects it.
+      if (billingPrinter != null && billingPrinter.isWindowsPdf) {
+        final sent = await printService.printThermalPdfToWindowsQueue(
+          data: receiptData,
+          queueName: billingPrinter.address,
+          paperWidth: billingPrinter.paperSize,
+          jobName: 'Receipt_${saleModel.displayNumber}',
+        );
+        if (sent) {
+          NotificationService.instance
+              .showSuccess('Bill sent to ${billingPrinter.name}');
+          return;
+        }
+        NotificationService.instance
+            .showWarning('Could not print to ${billingPrinter.name}');
+        await printPdf(ReceiptFormat.thermal);
         return;
       }
 
@@ -724,6 +759,9 @@ class RestaurantPrintHelper {
         isDeliveryOrder: true,
         deliveryCharge: pastOrder.serviceCharge ?? 0,
         isTaxInclusive: pastOrder.isTaxInclusive,
+        taxEnabled: pastOrder.taxEnabled,
+        discountOnItems: pastOrder.discountOnItems,
+        roundOffStep: pastOrder.roundOffStep,
         // Fold redeemed points back into the taxable base so the reprint's GST
         // matches the original bill (post-redemption).
         loyaltyRedemption: (pastOrder.loyaltyPointsUsed ?? 0).toDouble(),
@@ -735,6 +773,8 @@ class RestaurantPrintHelper {
         calculations: calculations,
         billNumber: pastOrder.billNumber,
         loyaltyPointsDiscount: pastOrder.loyaltyPointsUsed ?? 0,
+        taxEnabled: pastOrder.taxEnabled,
+        storeGstNumber: pastOrder.storeGstNumber,
       );
     } catch (e) {
       debugPrint('Error reprinting past order: $e');

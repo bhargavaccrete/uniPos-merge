@@ -13,6 +13,7 @@ import '../../../../widget/componets/common/report_summary_card.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/common/report_app_bar.dart';
 import 'package:billberrylite/presentation/widget/componets/common/report_body.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_date_range_card.dart';
 import 'package:billberrylite/presentation/widget/componets/common/report_card.dart';
 import 'package:billberrylite/presentation/widget/componets/common/report_empty_state.dart';
 import 'package:billberrylite/presentation/widget/componets/common/report_export_button.dart';
@@ -82,7 +83,10 @@ class _CustomerListReportState extends State<CustomerListReport> {
       final status = order.orderStatus ?? '';
       // Skip VOID/VOIDED — not valid sales
       if (OrderStatusFilter.isVoided(status)) continue;
-      if (cutoff != null && order.orderAt != null && order.orderAt!.isBefore(cutoff)) continue;
+      if (cutoff != null &&
+          order.orderAt != null &&
+          order.orderAt!.isBefore(cutoff))
+        continue;
 
       // Period filter — orders without a timestamp can't be placed in a range.
       if (start != null && end != null) {
@@ -97,10 +101,9 @@ class _CustomerListReportState extends State<CustomerListReport> {
           ? 0.0
           : order.totalPrice - (order.refundAmount ?? 0.0);
 
-      ordersByName.putIfAbsent(key, () => []).add(_OrderStats(
-        spent: spent,
-        orderAt: order.orderAt,
-      ));
+      ordersByName
+          .putIfAbsent(key, () => [])
+          .add(_OrderStats(spent: spent, orderAt: order.orderAt));
     }
 
     // Step 2: Map customers to report data — O(customers)
@@ -143,15 +146,17 @@ class _CustomerListReportState extends State<CustomerListReport> {
       // customers who actually ordered within it.
       if (_period != _CustPeriod.all && totalOrders == 0) continue;
 
-      result.add(CustomerReportData(
-        srNo: 0, // assigned after filtering
-        name: customer.name ?? 'Unknown',
-        phone: customer.phone ?? '-',
-        totalOrders: totalOrders,
-        totalSpent: totalSpent,
-        lastOrderDate: lastOrderDate,
-        registrationDate: DateTime.tryParse(customer.createdAt),
-      ));
+      result.add(
+        CustomerReportData(
+          srNo: 0, // assigned after filtering
+          name: customer.name ?? 'Unknown',
+          phone: customer.phone ?? '-',
+          totalOrders: totalOrders,
+          totalSpent: totalSpent,
+          lastOrderDate: lastOrderDate,
+          registrationDate: DateTime.tryParse(customer.createdAt),
+        ),
+      );
     }
 
     _allCustomerData = result;
@@ -179,8 +184,7 @@ class _CustomerListReportState extends State<CustomerListReport> {
     if (_searchQuery.isNotEmpty) {
       final query = _searchQuery.toLowerCase();
       data = data.where((c) {
-        return c.name.toLowerCase().contains(query) ||
-               c.phone.contains(query);
+        return c.name.toLowerCase().contains(query) || c.phone.contains(query);
       }).toList();
     }
 
@@ -232,12 +236,19 @@ class _CustomerListReportState extends State<CustomerListReport> {
     final now = DateTime.now();
     final standard = _standardPeriod(_period);
     if (standard != null) {
-      return (reportPeriodStartBound(standard, now), reportPeriodEndBound(standard, now));
+      return (
+        reportPeriodStartBound(standard, now),
+        reportPeriodEndBound(standard, now),
+      );
     }
     if (_period == _CustPeriod.custom && _fromDate != null && _toDate != null) {
       return (
         DateTime(_fromDate!.year, _fromDate!.month, _fromDate!.day),
-        DateTime(_toDate!.year, _toDate!.month, _toDate!.day).add(const Duration(days: 1)),
+        DateTime(
+          _toDate!.year,
+          _toDate!.month,
+          _toDate!.day,
+        ).add(const Duration(days: 1)),
       );
     }
     return (null, null);
@@ -262,8 +273,11 @@ class _CustomerListReportState extends State<CustomerListReport> {
 
   bool _periodAllowed(_CustPeriod p) {
     final standard = _standardPeriod(p);
-    if (standard == null) return true; // 'all'/'custom' are clamped by the cutoff
-    return ReportHistoryWindow.allows(reportPeriodStartBound(standard, DateTime.now()));
+    if (standard == null)
+      return true; // 'all'/'custom' are clamped by the cutoff
+    return ReportHistoryWindow.allows(
+      reportPeriodStartBound(standard, DateTime.now()),
+    );
   }
 
   IconData _periodIcon(_CustPeriod p) {
@@ -283,25 +297,11 @@ class _CustomerListReportState extends State<CustomerListReport> {
     }
   }
 
-  Future<void> _onPeriodSelected(_CustPeriod p) async {
-    if (p == _CustPeriod.custom) {
-      final range = await showDateRangePicker(
-        context: context,
-        firstDate: ReportHistoryWindow.cutoff ?? DateTime(2020),
-        lastDate: DateTime.now(),
-        initialDateRange: (_fromDate != null && _toDate != null)
-            ? DateTimeRange(start: _fromDate!, end: _toDate!)
-            : null,
-      );
-      if (range == null) return;
-      setState(() {
-        _fromDate = range.start;
-        _toDate = range.end;
-        _period = p;
-      });
-    } else {
-      setState(() => _period = p);
-    }
+  void _onPeriodSelected(_CustPeriod p) {
+    // Custom no longer fires a full-screen showDateRangePicker on tap — the
+    // shared ReportDateRangeCard appears in the body instead, which is how the
+    // other eight reports with a custom range do it.
+    setState(() => _period = p);
     // Re-aggregate (period scopes which orders count) then re-filter/sort.
     _buildCustomerData();
   }
@@ -341,7 +341,8 @@ class _CustomerListReportState extends State<CustomerListReport> {
               context,
               featureName: '${_periodLabel(p)} customers',
               neededDays: ReportHistoryWindow.requiredDays(
-                  reportPeriodStartBound(_standardPeriod(p)!, DateTime.now())),
+                reportPeriodStartBound(_standardPeriod(p)!, DateTime.now()),
+              ),
               allowedDays: ReportHistoryWindow.limitDays ?? 0,
             ),
           ),
@@ -362,28 +363,35 @@ class _CustomerListReportState extends State<CustomerListReport> {
       'Total Orders',
       'Total Spent',
       'Last Order Date',
-      'Registration Date'
+      'Registration Date',
     ];
 
-    final data = _filteredData.map((customer) => [
-      customer.srNo.toString(),
-      customer.name,
-      customer.phone,
-      customer.totalOrders.toString(),
-      ReportExportService.formatCurrency(customer.totalSpent),
-      customer.lastOrderDate != null
-          ? ReportExportService.formatDate(customer.lastOrderDate!)
-          : 'Never',
-      customer.registrationDate != null
-          ? ReportExportService.formatDate(customer.registrationDate!)
-          : '-',
-    ]).toList();
+    final data = _filteredData
+        .map(
+          (customer) => [
+            customer.srNo.toString(),
+            customer.name,
+            customer.phone,
+            customer.totalOrders.toString(),
+            ReportExportService.formatCurrency(customer.totalSpent),
+            customer.lastOrderDate != null
+                ? ReportExportService.formatDate(customer.lastOrderDate!)
+                : 'Never',
+            customer.registrationDate != null
+                ? ReportExportService.formatDate(customer.registrationDate!)
+                : '-',
+          ],
+        )
+        .toList();
 
-    final avgSpent = _totalCustomers > 0 ? _totalRevenue / _totalCustomers : 0.0;
+    final avgSpent = _totalCustomers > 0
+        ? _totalRevenue / _totalCustomers
+        : 0.0;
 
     final summary = {
       'Total Customers': _totalCustomers.toString(),
-      'Active Customers': '$_activeCustomers (${((_activeCustomers / _totalCustomers) * 100).toStringAsFixed(1)}%)',
+      'Active Customers':
+          '$_activeCustomers (${((_activeCustomers / _totalCustomers) * 100).toStringAsFixed(1)}%)',
       'Total Revenue': ReportExportService.formatCurrency(_totalRevenue),
       'Avg Spent/Customer': ReportExportService.formatCurrency(avgSpent),
       'Generated': ReportExportService.formatDateTime(DateTime.now()),
@@ -391,7 +399,8 @@ class _CustomerListReportState extends State<CustomerListReport> {
 
     await ReportExportService.showExportDialog(
       context: context,
-      fileName: 'customer_list_${DateFormat('yyyyMMdd').format(DateTime.now())}',
+      fileName:
+          'customer_list_${DateFormat('yyyyMMdd').format(DateTime.now())}',
       reportTitle: 'Customer List Report',
       headers: headers,
       data: data,
@@ -419,49 +428,76 @@ class _CustomerListReportState extends State<CustomerListReport> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        ReportSummaryRow(cards: [
-                          ReportSummaryCard(
-                            title: 'Total Customers',
-                            value: _totalCustomers.toString(),
-                            icon: Icons.people_outline,
-                            color: Colors.blue,
+                        // Custom period: the shared range card renders in the
+                        // body, same as the eight other reports that offer one.
+                        // The report itself waits until both dates are applied.
+                        if (_period == _CustPeriod.custom) ...[
+                          ReportDateRangeCard(
+                            initialStart: _fromDate,
+                            initialEnd: _toDate,
+                            onApply: (start, end) {
+                              setState(() {
+                                _fromDate = start;
+                                _toDate = end;
+                              });
+                              _buildCustomerData();
+                            },
+                          ),
+                          AppResponsive.verticalSpace(context),
+                        ],
+                        if (_period != _CustPeriod.custom ||
+                            (_fromDate != null && _toDate != null)) ...[
+                          ReportSummaryRow(
+                            cards: [
+                              ReportSummaryCard(
+                                title: 'Total Customers',
+                                value: _totalCustomers.toString(),
+                                icon: Icons.people_outline,
+                                color: Colors.blue,
+                              ),
+                              ReportSummaryCard(
+                                title: 'Active Customers',
+                                value: _activeCustomers.toString(),
+                                icon: Icons.shopping_bag_outlined,
+                                color: Colors.green,
+                              ),
+                            ],
+                          ),
+                          AppResponsive.verticalSpace(
+                            context,
+                            size: SpacingSize.small,
                           ),
                           ReportSummaryCard(
-                            title: 'Active Customers',
-                            value: _activeCustomers.toString(),
-                            icon: Icons.shopping_bag_outlined,
-                            color: Colors.green,
+                            title: 'Total Revenue',
+                            value:
+                                '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalRevenue)}',
+                            icon: Icons.monetization_on_outlined,
+                            color: Colors.orange,
                           ),
-                        ]),
-                        AppResponsive.verticalSpace(context, size: SpacingSize.small),
-                        ReportSummaryCard(
-                          title: 'Total Revenue',
-                          value: '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalRevenue)}',
-                          icon: Icons.monetization_on_outlined,
-                          color: Colors.orange,
-                        ),
-                        AppResponsive.verticalSpace(context),
-                        _buildSearchAndSortCard(),
-                        AppResponsive.verticalSpace(context),
-                        ReportExportButton(onPressed: _exportReport),
-                        AppResponsive.verticalSpace(context),
-                        if (_filteredData.isEmpty)
-                          ReportEmptyState(
-                            icon: Icons.people_outline,
-                            title: 'No Customers',
-                            message: _searchQuery.isNotEmpty
-                                ? 'No customers found matching "$_searchQuery"'
-                                : 'No customers registered yet',
-                          )
-                        else
-                          _buildCustomerTable(),
-                        ReportPagination(
-                          currentPage: _currentPage,
-                          rowsPerPage: _rowsPerPage,
-                          totalCount: _filteredData.length,
-                          onPageChanged: (page) => setState(() => _currentPage = page),
-                          unit: 'customers',
-                        ),
+                          AppResponsive.verticalSpace(context),
+                          _buildSearchAndSortCard(),
+                          AppResponsive.verticalSpace(context),
+                          ReportExportButton(onPressed: _exportReport),
+                          AppResponsive.verticalSpace(context),
+                          if (_filteredData.isEmpty)
+                            ReportEmptyState(
+                              icon: Icons.people_outline,
+                              title: 'No Customers',
+                              message: _searchQuery.isNotEmpty
+                                  ? 'No customers found matching "$_searchQuery"'
+                                  : 'No customers registered yet',
+                            )
+                          else
+                            _buildCustomerTable(),
+                          ReportPagination(
+                            currentPage: _currentPage,
+                            rowsPerPage: _rowsPerPage,
+                            totalCount: _filteredData.length,
+                            onPageChanged: (page) =>
+                                setState(() => _currentPage = page),
+                            unit: 'customers',
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -515,12 +551,18 @@ class _CustomerListReportState extends State<CustomerListReport> {
   }
 
   Widget _buildCustomerTable() {
-    final pageData = ReportPagination.pageSlice(_filteredData, _currentPage, _rowsPerPage);
+    final pageData = ReportPagination.pageSlice(
+      _filteredData,
+      _currentPage,
+      _rowsPerPage,
+    );
 
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.05),
@@ -551,7 +593,9 @@ class _CustomerListReportState extends State<CustomerListReport> {
                   ),
                   decoration: BoxDecoration(
                     color: AppColors.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
+                    borderRadius: BorderRadius.circular(
+                      AppResponsive.smallBorderRadius(context),
+                    ),
                   ),
                   child: Text(
                     '${_filteredData.length} customers',
@@ -566,65 +610,177 @@ class _CustomerListReportState extends State<CustomerListReport> {
             ),
           ),
           ClipRRect(
-            borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+            borderRadius: BorderRadius.circular(
+              AppResponsive.borderRadius(context),
+            ),
             child: LayoutBuilder(
               builder: (context, box) => SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minWidth: box.maxWidth),
-                child: DataTable(
-                  columnSpacing: AppResponsive.tableColumnSpacing(context),
-                  headingRowHeight: AppResponsive.tableHeadingHeight(context),
-                  dataRowMinHeight: AppResponsive.tableRowMinHeight(context),
-                  dataRowMaxHeight: AppResponsive.tableRowMaxHeight(context),
-                  headingRowColor: WidgetStateProperty.all(AppColors.surfaceLight),
-                  columns: [
-                    DataColumn(label: Text('Sr', style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context), fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
-                    DataColumn(label: Text('Name', style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context), fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
-                    DataColumn(label: Text('Mobile', style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context), fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
-                    DataColumn(label: Text('Orders', style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context), fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
-                    DataColumn(label: Text('Spent (${CurrencyHelper.currentSymbol})', style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context), fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
-                    DataColumn(label: Text('Last Order', style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context), fontWeight: FontWeight.w600, color: AppColors.textPrimary))),
-                  ],
-                  rows: pageData.map((customer) {
-                    return DataRow(
-                      cells: [
-                        DataCell(Text(customer.srNo.toString(), style: GoogleFonts.poppins(fontSize: AppResponsive.smallFontSize(context)))),
-                        DataCell(Text(customer.name, style: GoogleFonts.poppins(fontSize: AppResponsive.smallFontSize(context), fontWeight: FontWeight.w500))),
-                        DataCell(Text(customer.phone, style: GoogleFonts.poppins(fontSize: AppResponsive.smallFontSize(context)))),
-                        DataCell(
-                          Container(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: AppResponsive.getValue(context, mobile: 8.0, desktop: 12.0),
-                              vertical: AppResponsive.getValue(context, mobile: 4.0, desktop: 6.0),
-                            ),
-                            decoration: BoxDecoration(
-                              color: customer.totalOrders > 0
-                                  ? Colors.blue.withValues(alpha: 0.1)
-                                  : Colors.grey.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              customer.totalOrders.toString(),
+                scrollDirection: Axis.horizontal,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minWidth: box.maxWidth),
+                  child: DataTable(
+                    columnSpacing: AppResponsive.tableColumnSpacing(context),
+                    headingRowHeight: AppResponsive.tableHeadingHeight(context),
+                    dataRowMinHeight: AppResponsive.tableRowMinHeight(context),
+                    dataRowMaxHeight: AppResponsive.tableRowMaxHeight(context),
+                    headingRowColor: WidgetStateProperty.all(
+                      AppColors.surfaceLight,
+                    ),
+                    columns: [
+                      DataColumn(
+                        label: Text(
+                          'Sr',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.bodyFontSize(context),
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                      DataColumn(
+                        label: Text(
+                          'Name',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.bodyFontSize(context),
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                      DataColumn(
+                        label: Text(
+                          'Mobile',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.bodyFontSize(context),
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                      DataColumn(
+                        label: Text(
+                          'Orders',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.bodyFontSize(context),
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                      DataColumn(
+                        label: Text(
+                          'Spent (${CurrencyHelper.currentSymbol})',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.bodyFontSize(context),
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                      DataColumn(
+                        label: Text(
+                          'Last Order',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.bodyFontSize(context),
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                    ],
+                    rows: pageData.map((customer) {
+                      return DataRow(
+                        cells: [
+                          DataCell(
+                            Text(
+                              customer.srNo.toString(),
                               style: GoogleFonts.poppins(
-                                fontSize: AppResponsive.captionFontSize(context),
-                                fontWeight: FontWeight.w600,
-                                color: customer.totalOrders > 0 ? Colors.blue : Colors.grey,
+                                fontSize: AppResponsive.smallFontSize(context),
                               ),
                             ),
                           ),
-                        ),
-                        DataCell(Text(DecimalSettings.formatAmount(customer.totalSpent), style: GoogleFonts.poppins(fontSize: AppResponsive.smallFontSize(context), fontWeight: FontWeight.w600, color: Colors.green))),
-                        DataCell(Text(
-                          customer.lastOrderDate != null ? DateFormat('dd/MM/yy').format(customer.lastOrderDate!) : 'Never',
-                          style: GoogleFonts.poppins(fontSize: AppResponsive.smallFontSize(context), color: customer.lastOrderDate != null ? AppColors.textPrimary : AppColors.textSecondary),
-                        )),
-                      ],
-                    );
-                  }).toList(),
+                          DataCell(
+                            Text(
+                              customer.name,
+                              style: GoogleFonts.poppins(
+                                fontSize: AppResponsive.smallFontSize(context),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                          DataCell(
+                            Text(
+                              customer.phone,
+                              style: GoogleFonts.poppins(
+                                fontSize: AppResponsive.smallFontSize(context),
+                              ),
+                            ),
+                          ),
+                          DataCell(
+                            Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: AppResponsive.getValue(
+                                  context,
+                                  mobile: 8.0,
+                                  desktop: 12.0,
+                                ),
+                                vertical: AppResponsive.getValue(
+                                  context,
+                                  mobile: 4.0,
+                                  desktop: 6.0,
+                                ),
+                              ),
+                              decoration: BoxDecoration(
+                                color: customer.totalOrders > 0
+                                    ? Colors.blue.withValues(alpha: 0.1)
+                                    : Colors.grey.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                customer.totalOrders.toString(),
+                                style: GoogleFonts.poppins(
+                                  fontSize: AppResponsive.captionFontSize(
+                                    context,
+                                  ),
+                                  fontWeight: FontWeight.w600,
+                                  color: customer.totalOrders > 0
+                                      ? Colors.blue
+                                      : Colors.grey,
+                                ),
+                              ),
+                            ),
+                          ),
+                          DataCell(
+                            Text(
+                              DecimalSettings.formatAmount(customer.totalSpent),
+                              style: GoogleFonts.poppins(
+                                fontSize: AppResponsive.smallFontSize(context),
+                                fontWeight: FontWeight.w600,
+                                color: Colors.green,
+                              ),
+                            ),
+                          ),
+                          DataCell(
+                            Text(
+                              customer.lastOrderDate != null
+                                  ? DateFormat(
+                                      'dd/MM/yy',
+                                    ).format(customer.lastOrderDate!)
+                                  : 'Never',
+                              style: GoogleFonts.poppins(
+                                fontSize: AppResponsive.smallFontSize(context),
+                                color: customer.lastOrderDate != null
+                                    ? AppColors.textPrimary
+                                    : AppColors.textSecondary,
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    }).toList(),
+                  ),
                 ),
               ),
-            ),
             ),
           ),
         ],
@@ -658,7 +814,6 @@ class _CustomerListReportState extends State<CustomerListReport> {
       ),
     );
   }
-
 }
 
 class _OrderStats {

@@ -501,7 +501,7 @@ class _ProfitReportScreenState extends State<ProfitReportScreen>
             dotData: const FlDotData(show: false),
             belowBarData: BarAreaData(
               show: true,
-              color: AppColors.success.withOpacity(0.1),
+              color: AppColors.success.withValues(alpha: 0.1),
             ),
           ),
         ],

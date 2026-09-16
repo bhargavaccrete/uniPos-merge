@@ -10,7 +10,14 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
 import 'package:billberrylite/domain/services/common/report_export_service.dart';
-import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_app_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_body.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_card.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_date_step_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_empty_state.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_export_button.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_summary_card.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_summary_row.dart';
 import 'staff_attendance_detail_screen.dart';
 
 class AttendanceReportScreen extends StatefulWidget {
@@ -373,21 +380,14 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
     final workingDays = _workingDaysInPeriod(_selectedMonth, periodEnd);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F8FA),
-      appBar: buildPrimaryAppBar(
+      backgroundColor: AppColors.surfaceLight,
+      appBar: reportAppBar(
         title: 'Monthly Attendance',
-        titleFontSize: AppResponsive.subheadingFontSize(context),
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
+        subtitle:
+            '${allStaff.length} staff  •  $workingDays working day${workingDays == 1 ? '' : 's'}',
+        // Export moved to the shared full-width button; Print stays here as a
+        // genuinely screen-specific control.
         actions: [
-          IconButton(
-            icon: const Icon(Icons.file_download_outlined),
-            onPressed: () => _doExport(context),
-            tooltip: 'Export',
-          ),
           IconButton(
             icon: const Icon(Icons.print),
             onPressed: _printReport,
@@ -397,285 +397,278 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
       ),
       body: Column(
         children: [
-          // ── Month selector ───────────────────────────────────────────
-          Container(
-            color: Colors.white,
-            padding: EdgeInsets.symmetric(
-              horizontal: AppResponsive.largeSpacing(context),
-              vertical: AppResponsive.mediumSpacing(context),
+          // Point-in-time report: the kit's step bar, not a period filter —
+          // "Monthly Attendance / This Week" would be a different report.
+          ReportDateStepBar(
+            value: _selectedMonth,
+            label: '${_monthName(_selectedMonth.month)} ${_selectedMonth.year}',
+            onPrevious: _prevMonth,
+            // Null at the newest month so the report can't run into the future.
+            onNext: isCurrentMonth ? null : _nextMonth,
+            onPick: _pickMonth,
+          ),
+          AppResponsive.verticalSpace(context, size: SpacingSize.small),
+          Expanded(child: _buildContent(context, allStaff, workingDays)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContent(
+    BuildContext context,
+    List<String> allStaff,
+    int workingDays,
+  ) {
+    if (_isLoading) return const ReportLoading();
+    if (allStaff.isEmpty) {
+      return const ReportEmptyState(
+        icon: Icons.badge_outlined,
+        title: 'No staff data found',
+        message: 'Attendance appears here once staff clock in for this month',
+      );
+    }
+
+    return ReportBody(
+      child: Column(
+        children: [
+          _buildSummaryCards(context, allStaff, workingDays),
+          AppResponsive.verticalSpace(context),
+          ReportExportButton(onPressed: () => _doExport(context)),
+          AppResponsive.verticalSpace(context),
+          _buildStaffList(context, allStaff, workingDays),
+        ],
+      ),
+    );
+  }
+
+  /// Two rows of two, as in totalsales/refunddetails — four cards abreast
+  /// leaves each ~78px on a 360px phone and ellipsises every title.
+  Widget _buildSummaryCards(
+    BuildContext context,
+    List<String> allStaff,
+    int workingDays,
+  ) {
+    var totalPresent = 0;
+    var totalMins = 0;
+    for (final name in allStaff) {
+      totalPresent += _presentDays(name);
+      totalMins += _totalMinutes(name);
+    }
+
+    return Column(
+      children: [
+        ReportSummaryRow(
+          cards: [
+            ReportSummaryCard(
+              title: 'Staff',
+              value: '${allStaff.length}',
+              icon: Icons.people_outline,
+              color: AppColors.primary,
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                IconButton(
-                  icon: Icon(Icons.chevron_left, color: AppColors.primary),
-                  onPressed: _prevMonth,
+            ReportSummaryCard(
+              title: 'Working Days',
+              value: '$workingDays',
+              icon: Icons.event_available_outlined,
+              color: Colors.blue,
+            ),
+          ],
+        ),
+        AppResponsive.verticalSpace(context),
+        ReportSummaryRow(
+          cards: [
+            ReportSummaryCard(
+              title: 'Days Present',
+              value: '$totalPresent',
+              icon: Icons.how_to_reg_outlined,
+              color: AppColors.success,
+            ),
+            ReportSummaryCard(
+              title: 'Total Hours',
+              value: _fmtMins(totalMins),
+              icon: Icons.timer_outlined,
+              color: Colors.orange,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// A plain Column, not a ListView: ReportBody already scrolls and supplies
+  /// the padding + width cap, so a nested scrollable would fight it.
+  Widget _buildStaffList(
+    BuildContext context,
+    List<String> allStaff,
+    int workingDays,
+  ) {
+    return Column(
+      children: [
+        for (var i = 0; i < allStaff.length; i++) ...[
+          if (i > 0) SizedBox(height: AppResponsive.smallSpacing(context)),
+          _staffCard(context, allStaff[i], workingDays),
+        ],
+      ],
+    );
+  }
+
+  Widget _staffCard(BuildContext context, String name, int workingDays) {
+    final presentDays = _presentDays(name);
+    final absentDays = (workingDays - presentDays).clamp(0, workingDays);
+    final totalMins = _totalMinutes(name);
+
+    // Role from staff store or first record
+    final staffModel = staffStore.staff
+        .where((s) => '${s.firstName} ${s.lastName}'.trim() == name)
+        .firstOrNull;
+    final role =
+        staffModel?.isCashier ??
+        (_records.where((r) => r.staffName == name).firstOrNull?.staffRole ??
+            '');
+
+    final staffRecords = _records.where((r) => r.staffName == name).toList();
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => StaffAttendanceDetailScreen(
+              staffName: name,
+              staffRole: role,
+              from: _selectedMonth,
+              to: DateTime(
+                _selectedMonth.year,
+                _selectedMonth.month + 1,
+                0,
+                23,
+                59,
+                59,
+              ),
+              initialRecords: staffRecords,
+            ),
+          ),
+        );
+      },
+      child: Container(
+        padding: EdgeInsets.all(AppResponsive.largeSpacing(context)),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(
+            AppResponsive.borderRadius(context),
+          ),
+          border: Border.all(color: Colors.grey.shade200),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.02),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            // Avatar
+            Container(
+              width: AppResponsive.getValue<double>(
+                context,
+                mobile: 44,
+                tablet: 48,
+                desktop: 52,
+              ),
+              height: AppResponsive.getValue<double>(
+                context,
+                mobile: 44,
+                tablet: 48,
+                desktop: 52,
+              ),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: Text(
+                  name.isNotEmpty ? name[0].toUpperCase() : '?',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.bodyFontSize(context),
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primary,
+                  ),
                 ),
-                GestureDetector(
-                  onTap: _pickMonth,
-                  child: Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: AppResponsive.largeSpacing(context),
-                      vertical: AppResponsive.smallSpacing(context),
+              ),
+            ),
+            SizedBox(width: AppResponsive.mediumSpacing(context)),
+            // Name + role
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.bodyFontSize(context),
+                      fontWeight: FontWeight.w700,
                     ),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(
-                        AppResponsive.borderRadius(context),
+                  ),
+                  Text(
+                    role,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.captionFontSize(context),
+                      color: Colors.grey.shade500,
+                    ),
+                  ),
+                  SizedBox(height: AppResponsive.smallSpacing(context)),
+                  Row(
+                    children: [
+                      _miniChip(
+                        context,
+                        '${presentDays}P',
+                        Colors.green.shade600,
                       ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.calendar_month,
-                          size: AppResponsive.smallIconSize(context),
-                          color: AppColors.primary,
-                        ),
-                        SizedBox(width: AppResponsive.smallSpacing(context)),
-                        Text(
-                          '${_monthName(_selectedMonth.month)} ${_selectedMonth.year}',
-                          style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.bodyFontSize(context),
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ],
-                    ),
+                      SizedBox(
+                        width: AppResponsive.smallSpacing(context) * 0.5,
+                      ),
+                      _miniChip(
+                        context,
+                        '${absentDays}A',
+                        absentDays > 0
+                            ? Colors.red.shade400
+                            : Colors.grey.shade400,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            // Hours + arrow
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  'Total Hours',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.captionFontSize(context),
+                    color: Colors.grey.shade500,
                   ),
                 ),
-                IconButton(
-                  icon: Icon(
-                    Icons.chevron_right,
-                    color: isCurrentMonth
-                        ? Colors.grey.shade300
-                        : AppColors.primary,
+                const SizedBox(height: 2),
+                Text(
+                  _fmtMins(totalMins),
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.bodyFontSize(context),
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primary,
                   ),
-                  onPressed: isCurrentMonth ? null : _nextMonth,
+                ),
+                const SizedBox(height: 4),
+                Icon(
+                  Icons.arrow_forward_ios,
+                  size: AppResponsive.smallIconSize(context),
+                  color: Colors.grey.shade400,
                 ),
               ],
             ),
-          ),
-
-          if (_isLoading)
-            const Expanded(child: Center(child: CircularProgressIndicator()))
-          else if (allStaff.isEmpty)
-            Expanded(
-              child: Center(
-                child: Text(
-                  'No staff data found',
-                  style: GoogleFonts.poppins(color: Colors.grey.shade500),
-                ),
-              ),
-            )
-          else
-            Expanded(
-              child: AppResponsive.constrainedContent(
-                context: context,
-                maxWidth: AppResponsive.maxFormWidth(context),
-                alignment: Alignment.topCenter,
-                child: ListView.separated(
-                  padding: EdgeInsets.all(AppResponsive.largeSpacing(context)),
-                  itemCount: allStaff.length,
-                  separatorBuilder: (_, __) =>
-                      SizedBox(height: AppResponsive.smallSpacing(context)),
-                  itemBuilder: (_, i) {
-                    final name = allStaff[i];
-
-                    final presentDays = _presentDays(name);
-                    final absentDays = (workingDays - presentDays).clamp(
-                      0,
-                      workingDays,
-                    );
-                    final totalMins = _totalMinutes(name);
-
-                    // Role from staff store or first record
-                    final staffModel = staffStore.staff
-                        .where(
-                          (s) => '${s.firstName} ${s.lastName}'.trim() == name,
-                        )
-                        .firstOrNull;
-                    final role =
-                        staffModel?.isCashier ??
-                        (_records
-                                .where((r) => r.staffName == name)
-                                .firstOrNull
-                                ?.staffRole ??
-                            '');
-
-                    final staffRecords = _records
-                        .where((r) => r.staffName == name)
-                        .toList();
-
-                    return GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => StaffAttendanceDetailScreen(
-                              staffName: name,
-                              staffRole: role,
-                              from: _selectedMonth,
-                              to: DateTime(
-                                _selectedMonth.year,
-                                _selectedMonth.month + 1,
-                                0,
-                                23,
-                                59,
-                                59,
-                              ),
-                              initialRecords: staffRecords,
-                            ),
-                          ),
-                        );
-                      },
-                      child: Container(
-                        padding: EdgeInsets.all(
-                          AppResponsive.largeSpacing(context),
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(
-                            AppResponsive.borderRadius(context),
-                          ),
-                          border: Border.all(color: Colors.grey.shade200),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.02),
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          children: [
-                            // Avatar
-                            Container(
-                              width: AppResponsive.getValue<double>(
-                                context,
-                                mobile: 44,
-                                tablet: 48,
-                                desktop: 52,
-                              ),
-                              height: AppResponsive.getValue<double>(
-                                context,
-                                mobile: 44,
-                                tablet: 48,
-                                desktop: 52,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary.withOpacity(0.1),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Center(
-                                child: Text(
-                                  name.isNotEmpty ? name[0].toUpperCase() : '?',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: AppResponsive.bodyFontSize(
-                                      context,
-                                    ),
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.primary,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            SizedBox(
-                              width: AppResponsive.mediumSpacing(context),
-                            ),
-                            // Name + role
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    name,
-                                    style: GoogleFonts.poppins(
-                                      fontSize: AppResponsive.bodyFontSize(
-                                        context,
-                                      ),
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  Text(
-                                    role,
-                                    style: GoogleFonts.poppins(
-                                      fontSize: AppResponsive.captionFontSize(
-                                        context,
-                                      ),
-                                      color: Colors.grey.shade500,
-                                    ),
-                                  ),
-                                  SizedBox(
-                                    height: AppResponsive.smallSpacing(context),
-                                  ),
-                                  Row(
-                                    children: [
-                                      _miniChip(
-                                        context,
-                                        '${presentDays}P',
-                                        Colors.green.shade600,
-                                      ),
-                                      SizedBox(
-                                        width:
-                                            AppResponsive.smallSpacing(
-                                              context,
-                                            ) *
-                                            0.5,
-                                      ),
-                                      _miniChip(
-                                        context,
-                                        '${absentDays}A',
-                                        absentDays > 0
-                                            ? Colors.red.shade400
-                                            : Colors.grey.shade400,
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                            // Hours + arrow
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Text(
-                                  'Total Hours',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: AppResponsive.captionFontSize(
-                                      context,
-                                    ),
-                                    color: Colors.grey.shade500,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  _fmtMins(totalMins),
-                                  style: GoogleFonts.poppins(
-                                    fontSize: AppResponsive.bodyFontSize(
-                                      context,
-                                    ),
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.primary,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Icon(
-                                  Icons.arrow_forward_ios,
-                                  size: AppResponsive.smallIconSize(context),
-                                  color: Colors.grey.shade400,
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -687,7 +680,7 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
         vertical: 2,
       ),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(

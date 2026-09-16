@@ -446,7 +446,7 @@ class _StaffAttendanceDetailScreenState
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
+                  color: Colors.black.withValues(alpha: 0.04),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
@@ -530,10 +530,15 @@ class _StaffAttendanceDetailScreenState
           Expanded(
             child: AppResponsive.constrainedContent(
               context: context,
-              maxWidth: AppResponsive.maxFormWidth(context),
+              // A read-only day list, not an input form — maxFormWidth capped
+              // it at 800px while the staff lists it is reached from use
+              // maxContentWidth, so the two disagreed on desktop.
+              maxWidth: AppResponsive.maxContentWidth(context),
               alignment: Alignment.topCenter,
               child: ListView.separated(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                padding: AppResponsive.horizontalPadding(
+                  context,
+                ).copyWith(bottom: 24),
                 itemCount: days.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 8),
                 itemBuilder: (_, i) {
@@ -550,7 +555,7 @@ class _StaffAttendanceDetailScreenState
                       ),
                       border: Border.all(
                         color: today
-                            ? AppColors.primary.withOpacity(0.5)
+                            ? AppColors.primary.withValues(alpha: 0.5)
                             : isPresent
                             ? Colors.green.shade200
                             : AppColors.divider,
@@ -674,11 +679,8 @@ class _StaffAttendanceDetailScreenState
                                 child: Text(
                                   isPresent ? 'Present' : 'Absent',
                                   style: GoogleFonts.poppins(
-                                    fontSize: AppResponsive.getValue(
+                                    fontSize: AppResponsive.captionFontSize(
                                       context,
-                                      mobile: 11.0,
-                                      tablet: 12.0,
-                                      desktop: 13.0,
                                     ),
                                     fontWeight: FontWeight.w700,
                                     color: isPresent

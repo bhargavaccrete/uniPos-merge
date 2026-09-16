@@ -140,11 +140,16 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
         titleFontSize: AppResponsive.subheadingFontSize(context),
         actions: const [],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _categories.isEmpty
-          ? _buildEmptyState()
-          : _buildCategoryList(),
+      body: AppResponsive.constrainedContent(
+        context: context,
+        maxWidth: AppResponsive.maxContentWidth(context),
+        alignment: Alignment.topCenter,
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _categories.isEmpty
+            ? _buildEmptyState()
+            : _buildCategoryList(),
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _addCategory,
         backgroundColor: AppColors.primary,

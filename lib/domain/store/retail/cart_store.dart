@@ -386,8 +386,11 @@ abstract class _CartStore with Store {
     // Get GST rate using priority: Variant > Product > Default (0%). GST/HSN
     // live on the product/variant, not the category (a category can contain
     // items with different tax classes — e.g. cotton vs synthetic garments).
-    final effectiveGstRate =
-        gstRateOverride ?? await _getEffectiveGstRate(variant, product);
+    // The tax-off gate covers an override too: a sale parked while tax was on
+    // must not charge tax once the business has turned tax off.
+    final effectiveGstRate = !TaxFeature.enabled
+        ? 0.0
+        : (gstRateOverride ?? await _getEffectiveGstRate(variant, product));
     final effectiveHsnCode = _getEffectiveHsnCode(variant, product);
 
     // Check if tax inclusive mode is enabled

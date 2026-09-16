@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:billberrylite/util/common/short_ref.dart';
 import 'package:flutter/services.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../domain/services/restaurant/notification_service.dart';
@@ -215,11 +215,10 @@ class _ReceivePaymentScreenState extends State<ReceivePaymentScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      appBar: AppBar(
-        title: const Text('Receive Payment'),
-        backgroundColor: Colors.white,
-        elevation: 0,
-      ),
+      // buildPrimaryAppBar like every other screen in this flow. This was a
+      // raw white AppBar with an unstyled title, so it was the only
+      // primary-less header in the purchase/return tree.
+      appBar: buildPrimaryAppBar(title: 'Receive Payment'),
       // Every price on this screen goes through formatMoney; MoneyScope is the
       // one subscription that re-renders them when the store's currency or
       // decimal precision changes.
@@ -339,8 +338,13 @@ class _ReceivePaymentScreenState extends State<ReceivePaymentScreen> {
             width: AppResponsive.avatarSize(context),
             height: AppResponsive.avatarSize(context),
             decoration: BoxDecoration(
-              color: AppColors.success.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(24),
+              color: AppColors.success.withValues(alpha: 0.1),
+              // smallBorderRadius, like the other avatar tiles in retail. A
+              // fixed 24 stopped being circular once avatarSize reached 56 on
+              // desktop, so it rendered as a squircle there and a circle below.
+              borderRadius: BorderRadius.circular(
+                AppResponsive.smallBorderRadius(context),
+              ),
             ),
             child: Icon(Icons.person, color: AppColors.success),
           ),
@@ -385,8 +389,8 @@ class _ReceivePaymentScreenState extends State<ReceivePaymentScreen> {
         ),
         border: Border.all(
           color: _totalDue > 0
-              ? Colors.red.withOpacity(0.3)
-              : Colors.green.withOpacity(0.3),
+              ? Colors.red.withValues(alpha: 0.3)
+              : Colors.green.withValues(alpha: 0.3),
         ),
       ),
       child: Row(

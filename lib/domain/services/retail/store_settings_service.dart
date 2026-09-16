@@ -21,6 +21,17 @@ class StoreSettingsService {
 
   final _businessDetailsRepo = BusinessDetailsRepository();
 
+  /// Optional fields: a blank value REMOVES the key, so a cleared field reads
+  /// back as null — the same "not set" state every receipt and screen handles.
+  static Future<bool> _setOrRemove(
+    SharedPreferences prefs,
+    String key,
+    String value,
+  ) {
+    final v = value.trim();
+    return v.isEmpty ? prefs.remove(key) : prefs.setString(key, v);
+  }
+
   /// Get store name
   Future<String?> getStoreName() async {
     final prefs = await SharedPreferences.getInstance();
@@ -42,7 +53,7 @@ class StoreSettingsService {
   /// Set store address
   Future<bool> setStoreAddress(String address) async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.setString(_keyStoreAddress, address);
+    return _setOrRemove(prefs, _keyStoreAddress, address);
   }
 
   /// Get store phone
@@ -54,7 +65,7 @@ class StoreSettingsService {
   /// Set store phone
   Future<bool> setStorePhone(String phone) async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.setString(_keyStorePhone, phone);
+    return _setOrRemove(prefs, _keyStorePhone, phone);
   }
 
   /// Get store email
@@ -66,7 +77,7 @@ class StoreSettingsService {
   /// Set store email
   Future<bool> setStoreEmail(String email) async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.setString(_keyStoreEmail, email);
+    return _setOrRemove(prefs, _keyStoreEmail, email);
   }
 
   /// Get GST number
@@ -75,10 +86,14 @@ class StoreSettingsService {
     return prefs.getString(_keyStoreGST);
   }
 
+  /// The GST number to stamp on a bill being created: '' when the store has
+  /// none, never null — null on a saved bill means "written before stamping".
+  Future<String> gstNumberSnapshot() async => (await getGSTNumber())?.trim() ?? '';
+
   /// Set GST number
   Future<bool> setGSTNumber(String gst) async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.setString(_keyStoreGST, gst);
+    return _setOrRemove(prefs, _keyStoreGST, gst);
   }
 
   // ── UPI (offline scan-and-pay on the bill) ─────────────────────────────────
@@ -133,7 +148,7 @@ class StoreSettingsService {
   /// Set owner name
   Future<bool> setOwnerName(String name) async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.setString(_keyOwnerName, name);
+    return _setOrRemove(prefs, _keyOwnerName, name);
   }
 
   /// Get store city
@@ -145,7 +160,7 @@ class StoreSettingsService {
   /// Set store city
   Future<bool> setStoreCity(String city) async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.setString(_keyStoreCity, city);
+    return _setOrRemove(prefs, _keyStoreCity, city);
   }
 
   /// Get store state
@@ -157,7 +172,7 @@ class StoreSettingsService {
   /// Set store state
   Future<bool> setStoreState(String state) async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.setString(_keyStoreState, state);
+    return _setOrRemove(prefs, _keyStoreState, state);
   }
 
   /// Get store pincode
@@ -169,7 +184,7 @@ class StoreSettingsService {
   /// Set store pincode
   Future<bool> setStorePincode(String pincode) async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.setString(_keyStorePincode, pincode);
+    return _setOrRemove(prefs, _keyStorePincode, pincode);
   }
 
   /// Get store logo as Uint8List from Hive
@@ -259,6 +274,25 @@ class StoreSettingsService {
       if (phone != null) await setStorePhone(phone);
       if (email != null) await setStoreEmail(email);
       if (gstNumber != null) await setGSTNumber(gstNumber);
+
+      // Keep BusinessDetails — onboarding's copy, which a backup restore syncs
+      // back into these prefs — in step, so the two copies never disagree.
+      final details = _businessDetailsRepo.get();
+      if (details != null) {
+        await _businessDetailsRepo.save(
+          details.copyWith(
+            storeName: storeName,
+            ownerName: ownerName,
+            address: address,
+            city: city,
+            state: state,
+            pincode: pincode,
+            phone: phone,
+            email: email,
+            gstin: gstNumber,
+          ),
+        );
+      }
       return true;
     } catch (e) {
       return false;

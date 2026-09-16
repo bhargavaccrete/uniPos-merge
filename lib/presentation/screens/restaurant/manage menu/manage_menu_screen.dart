@@ -240,38 +240,28 @@ class _ManagemenuState extends State<Managemenu>
             ),
           ),
 
-          // Tab Content
+          // Tab Content — the page shell. Applied at every breakpoint, not
+          // just desktop: the old `isDesktop ?` branch left tablet full-bleed,
+          // so this screen's gutters disagreed with its own desktop layout.
+          // maxContentWidth is infinity on mobile, so the cap is a no-op there
+          // and the separate uncapped branch is no longer needed.
           Expanded(
-            child: isDesktop
-                ? Center(
-                    child: Container(
-                      constraints: BoxConstraints(
-                        maxWidth: AppResponsive.maxContentWidth(context),
-                      ),
-                      child: TabBarView(
-                        controller: tabController,
-                        children: [
-                          AllTab(),
-                          ItemsTab(),
-                          CategoryTab(),
-                          VariantTab(),
-                          ChoiceTab(),
-                          ExtraTab(),
-                        ],
-                      ),
-                    ),
-                  )
-                : TabBarView(
-                    controller: tabController,
-                    children: [
-                      AllTab(),
-                      ItemsTab(),
-                      CategoryTab(),
-                      VariantTab(),
-                      ChoiceTab(),
-                      ExtraTab(),
-                    ],
-                  ),
+            child: AppResponsive.constrainedContent(
+              context: context,
+              maxWidth: AppResponsive.maxContentWidth(context),
+              alignment: Alignment.topCenter,
+              child: TabBarView(
+                controller: tabController,
+                children: [
+                  AllTab(),
+                  ItemsTab(),
+                  CategoryTab(),
+                  VariantTab(),
+                  ChoiceTab(),
+                  ExtraTab(),
+                ],
+              ),
+            ),
           ),
         ],
       ),

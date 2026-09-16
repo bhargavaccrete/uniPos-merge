@@ -10,6 +10,7 @@ import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/util/restaurant/restaurant_session.dart';
 
 import 'package:billberrylite/util/restaurant/restaurant_auth_helper.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_empty_state.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/presentation/widget/componets/common/dialog_dispose_scope.dart';
@@ -221,11 +222,9 @@ class _StaffAttendanceScreenState extends State<StaffAttendanceScreen> {
           }).toList();
 
           if (allStaff.isEmpty) {
-            return Center(
-              child: Text(
-                'No staff found',
-                style: GoogleFonts.poppins(color: AppColors.textSecondary),
-              ),
+            return const AppEmptyState(
+              icon: Icons.people_outline,
+              title: 'No staff found',
             );
           }
 
@@ -283,10 +282,12 @@ class _StaffAttendanceScreenState extends State<StaffAttendanceScreen> {
               Expanded(
                 child: AppResponsive.constrainedContent(
                   context: context,
-                  maxWidth: AppResponsive.maxFormWidth(context),
+                  maxWidth: AppResponsive.maxContentWidth(context),
                   alignment: Alignment.topCenter,
                   child: ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                    padding: AppResponsive.horizontalPadding(
+                      context,
+                    ).copyWith(top: 8, bottom: 24),
                     itemCount: allStaff.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 8),
                     itemBuilder: (_, i) {
@@ -538,7 +539,7 @@ class _StaffAttendanceScreenState extends State<StaffAttendanceScreen> {
   }
 
   Widget _divider() =>
-      Container(height: 32, width: 1, color: Colors.white.withOpacity(0.3));
+      Container(height: 32, width: 1, color: Colors.white.withValues(alpha: 0.3));
 
   String _fmt(DateTime d) =>
       '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';

@@ -70,7 +70,7 @@ class _StockHistoryScreenState extends State<StockHistoryScreen> {
           Expanded(
             child: AppResponsive.constrainedContent(
               context: context,
-              maxWidth: AppResponsive.maxFormWidth(context),
+              maxWidth: AppResponsive.maxContentWidth(context),
               alignment: Alignment.topCenter,
               child: _movements.isEmpty ? _buildEmpty() : _buildList(),
             ),

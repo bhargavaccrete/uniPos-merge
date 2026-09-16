@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:billberrylite/util/color.dart';
@@ -18,7 +19,9 @@ class NeedhelpDrawer extends StatelessWidget {
       final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
       if (!ok) {
         messenger.showSnackBar(
-          const SnackBar(content: Text('No app available to handle this action')),
+          const SnackBar(
+            content: Text('No app available to handle this action'),
+          ),
         );
       }
     } catch (_) {
@@ -34,46 +37,51 @@ class NeedhelpDrawer extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      appBar: buildPrimaryAppBar(
-        title: 'Need Help?',
-        centerTitle: true,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _heroBanner(),
-            const SizedBox(height: 24),
+      appBar: buildPrimaryAppBar(title: 'Need Help?', centerTitle: true),
+      body: AppResponsive.constrainedContent(
+        context: context,
+        maxWidth: AppResponsive.maxContentWidth(context),
+        alignment: Alignment.topCenter,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _heroBanner(),
+              const SizedBox(height: 24),
 
-            _sectionTitle('Contact Us'),
-            const SizedBox(height: 12),
-            _contactCard(
-              context: context,
-              icon: Icons.call_rounded,
-              color: const Color(0xFF2E7D32),
-              title: 'Call Support',
-              value: _phone,
-              onTap: () => _launch(context, Uri.parse('tel:${_digits(_phone)}')),
-            ),
-            const SizedBox(height: 12),
-            _contactCard(
-              context: context,
-              icon: Icons.mail_rounded,
-              color: const Color(0xFFD84315),
-              title: 'Email Us',
-              value: _email,
-              onTap: () => _launch(
-                context,
-                Uri.parse('mailto:$_email?subject=${Uri.encodeComponent('Bill Berry Lite Support')}'),
+              _sectionTitle('Contact Us'),
+              const SizedBox(height: 12),
+              _contactCard(
+                context: context,
+                icon: Icons.call_rounded,
+                color: const Color(0xFF2E7D32),
+                title: 'Call Support',
+                value: _phone,
+                onTap: () =>
+                    _launch(context, Uri.parse('tel:${_digits(_phone)}')),
               ),
-            ),
+              const SizedBox(height: 12),
+              _contactCard(
+                context: context,
+                icon: Icons.mail_rounded,
+                color: const Color(0xFFD84315),
+                title: 'Email Us',
+                value: _email,
+                onTap: () => _launch(
+                  context,
+                  Uri.parse(
+                    'mailto:$_email?subject=${Uri.encodeComponent('Bill Berry Lite Support')}',
+                  ),
+                ),
+              ),
 
-            const SizedBox(height: 28),
-            _sectionTitle('Frequently Asked'),
-            const SizedBox(height: 12),
-            ..._faqs.map(_faqTile),
-          ],
+              const SizedBox(height: 28),
+              _sectionTitle('Frequently Asked'),
+              const SizedBox(height: 12),
+              ..._faqs.map(_faqTile),
+            ],
+          ),
         ),
       ),
     );
@@ -96,7 +104,11 @@ class NeedhelpDrawer extends StatelessWidget {
               color: Colors.white.withValues(alpha: 0.2),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.support_agent_rounded, color: Colors.white, size: 30),
+            child: const Icon(
+              Icons.support_agent_rounded,
+              color: Colors.white,
+              size: 30,
+            ),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -194,7 +206,11 @@ class NeedhelpDrawer extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary, size: 22),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.textSecondary,
+                size: 22,
+              ),
             ],
           ),
         ),

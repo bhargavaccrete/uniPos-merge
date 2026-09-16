@@ -93,6 +93,7 @@ class RouteNames {
 
   // Restaurant - Settings
   static const restaurantSettings = '/restaurant-settings';
+  static const restaurantStoreInfo = '/restaurant-store-info';
   static const restaurantUsageLimit = '/restaurant-usage-limit';
   static const restaurantLicensing = '/restaurant-licensing';
   static const restaurantOrderSettings = '/restaurant-order-settings';

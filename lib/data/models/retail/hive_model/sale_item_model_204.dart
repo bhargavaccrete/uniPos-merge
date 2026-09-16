@@ -221,9 +221,13 @@ class SaleItemModel extends HiveObject {
     double? lineDiscountAmount,
     String? lineDiscountReason,
     String? lineDiscountNote,
+    /// The order's stored tax mode. A reprint passes it so line amounts don't
+    /// follow a later change to the inclusive/exclusive setting.
+    bool? isTaxInclusive,
   }) {
-    // ✅ FIX: Check if tax is inclusive (for restaurant mode)
-    final bool isTaxInclusive = AppConfig.isRestaurant && AppSettings.isTaxInclusive;
+    // Restaurant only; retail lines come through fromCalculated.
+    final bool inclusive = AppConfig.isRestaurant &&
+        (isTaxInclusive ?? AppSettings.isTaxInclusive);
 
     final grossAmount = price * qty;
     final discount = discountAmount ?? 0;
@@ -233,7 +237,7 @@ class SaleItemModel extends HiveObject {
     double gstAmt;
     double finalTotal;
 
-    if (isTaxInclusive && rate > 0) {
+    if (inclusive && rate > 0) {
       // Tax Inclusive: Price already includes tax
       // Example: price=100, rate=18%
       // Base price = 100 / 1.18 = 84.75

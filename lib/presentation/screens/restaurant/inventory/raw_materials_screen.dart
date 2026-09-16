@@ -87,7 +87,7 @@ class _RawMaterialsScreenState extends State<RawMaterialsScreen> {
           Expanded(
             child: AppResponsive.constrainedContent(
               context: context,
-              maxWidth: AppResponsive.maxFormWidth(context),
+              maxWidth: AppResponsive.maxContentWidth(context),
               alignment: Alignment.topCenter,
               child: Observer(
                 builder: (_) {

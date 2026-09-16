@@ -499,7 +499,11 @@ class ReportsScreen extends StatelessWidget {
           decoration: BoxDecoration(
             // `color` is this report's own identity, kept as-is.
             color: color.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(10),
+            // smallBorderRadius, not a frozen 10: iconBox scales with
+            // largeIconSize, so the corner should scale with it.
+            borderRadius: BorderRadius.circular(
+              AppResponsive.smallBorderRadius(context),
+            ),
           ),
           child: Icon(
             icon,

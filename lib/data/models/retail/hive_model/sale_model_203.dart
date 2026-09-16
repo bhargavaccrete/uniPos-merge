@@ -184,6 +184,18 @@ class SaleModel extends HiveObject {
   @HiveField(36)
   final String? invoiceNumber;
 
+  /// Whether tax was on for this business when the sale was made. Frozen so a
+  /// reprint after a change to tax registration shows the tax this bill carried.
+  /// Null on sales written before the stamp — read via `TaxFeature.forRecord`.
+  @HiveField(37)
+  final bool? taxEnabled;
+
+  /// The store's GSTIN / tax number when the sale was made, so a reprint after
+  /// the business re-registers shows the number this invoice was issued under.
+  /// '' = the store had none; null = written before the stamp (use the live one).
+  @HiveField(38)
+  final String? storeGstNumber;
+
   SaleModel({
     required this.saleId,
     this.customerId,
@@ -222,6 +234,8 @@ class SaleModel extends HiveObject {
     this.returnReason,
     this.returnNote,
     this.invoiceNumber,
+    this.taxEnabled,
+    this.storeGstNumber,
   })  : isReturn = isReturn ?? false,
         paidAmount = paidAmount ?? totalAmount,
         dueAmount = dueAmount ?? 0.0,
@@ -284,6 +298,7 @@ class SaleModel extends HiveObject {
     bool isReturn = false,
     String? originalSaleId,
     String? shiftId,
+    bool? taxEnabled,
   }) {
     final now = DateTime.now().toIso8601String();
     final halves = TaxSplit.halves(totalGstAmount);
@@ -310,6 +325,7 @@ class SaleModel extends HiveObject {
       totalSgstAmount: sgst,
       grandTotal: grandTotal,
       shiftId: shiftId,
+      taxEnabled: taxEnabled,
     );
   }
 
@@ -345,6 +361,8 @@ class SaleModel extends HiveObject {
     /// The customer-facing number printed on the bill — `INV-00001`. Separate
     /// from [saleId], which stays the internal key.
     String? invoiceNumber,
+    bool? taxEnabled,
+    String? storeGstNumber,
   }) {
     final now = DateTime.now().toIso8601String();
     final halves = TaxSplit.halves(totalGstAmount);
@@ -398,6 +416,8 @@ class SaleModel extends HiveObject {
       exchangeGroupId: exchangeGroupId,
       shiftId: shiftId,
       invoiceNumber: invoiceNumber,
+      taxEnabled: taxEnabled,
+      storeGstNumber: storeGstNumber,
       paidAmount: collected,
       dueAmount: isShort ? due : 0.0,
       status: isShort ? SaleStatus.partiallyPaid : SaleStatus.paid,
@@ -445,6 +465,8 @@ class SaleModel extends HiveObject {
     String? shiftId,
     /// The customer-facing number printed on the bill — `INV-00001`.
     String? invoiceNumber,
+    bool? taxEnabled,
+    String? storeGstNumber,
   }) {
     final now = DateTime.now().toIso8601String();
     final halves = TaxSplit.halves(totalGstAmount);
@@ -487,6 +509,8 @@ class SaleModel extends HiveObject {
       lineDiscountTotal: lineDiscountTotal,
       exchangeGroupId: exchangeGroupId,
       shiftId: shiftId,
+      taxEnabled: taxEnabled,
+      storeGstNumber: storeGstNumber,
     );
   }
 
@@ -559,6 +583,8 @@ class SaleModel extends HiveObject {
     String? returnReason,
     String? returnNote,
     String? invoiceNumber,
+    bool? taxEnabled,
+    String? storeGstNumber,
   }) {
     return SaleModel(
       saleId: saleId ?? this.saleId,
@@ -607,6 +633,8 @@ class SaleModel extends HiveObject {
       returnReason: returnReason ?? this.returnReason,
       returnNote: returnNote ?? this.returnNote,
       invoiceNumber: invoiceNumber ?? this.invoiceNumber,
+      taxEnabled: taxEnabled ?? this.taxEnabled,
+      storeGstNumber: storeGstNumber ?? this.storeGstNumber,
     );
   }
 
@@ -656,6 +684,8 @@ class SaleModel extends HiveObject {
       'returnReason': returnReason,
       'returnNote': returnNote,
       'invoiceNumber': invoiceNumber,
+      'taxEnabled': taxEnabled,
+      'storeGstNumber': storeGstNumber,
     };
   }
 
@@ -711,6 +741,8 @@ class SaleModel extends HiveObject {
       returnReason: map['returnReason'] as String?,
       returnNote: map['returnNote'] as String?,
       invoiceNumber: map['invoiceNumber'] as String?,
+      taxEnabled: map['taxEnabled'] as bool?,
+      storeGstNumber: map['storeGstNumber'] as String?,
     );
   }
 }

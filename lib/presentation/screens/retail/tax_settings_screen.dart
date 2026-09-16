@@ -12,6 +12,7 @@ import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:uuid/uuid.dart';
 import 'package:billberrylite/domain/services/retail/gst_service.dart';
 import 'package:billberrylite/data/models/common/taxmodel_314.dart';
+import 'package:billberrylite/presentation/screens/retail/apply_tax_to_products_screen.dart';
 
 import '../../../core/di/service_locator.dart';
 import '../../../core/config/tax_feature.dart';
@@ -194,7 +195,7 @@ class _TaxSettingsScreenState extends State<TaxSettingsScreen> {
         children: [
           if (!enabled)
             _buildTaxDisabledNotice(
-              'Tax is currently disabled. This business is marked as not registered for tax during setup.',
+              'Tax is currently disabled because this business is not registered for tax. Turn on Tax Registration in Settings → Store Information.',
             ),
           Padding(
             padding: AppResponsive.cardPadding(context),
@@ -386,6 +387,20 @@ class _TaxSettingsScreenState extends State<TaxSettingsScreen> {
                               ),
                             ],
                           ),
+                        ),
+                        IconButton(
+                          tooltip: 'Apply to products',
+                          onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => RetailApplyTaxScreen(tax: tax),
+                            ),
+                          ),
+                          icon: Icon(
+                            Icons.playlist_add_check_rounded,
+                            size: AppResponsive.iconSize(context),
+                          ),
+                          color: AppColors.primary,
                         ),
                         IconButton(
                           onPressed: () => _showTaxDialog(existingTax: tax),

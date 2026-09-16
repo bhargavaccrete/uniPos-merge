@@ -11,12 +11,15 @@ import '../../../../core/di/service_locator.dart';
 import '../../../../core/config/tax_feature.dart';
 import '../../../../data/models/common/taxmodel_314.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
+import '../../../widget/componets/common/app_empty_state.dart';
 import '../../../widget/componets/common/app_text_field.dart';
 import '../../../widget/componets/common/primary_app_bar.dart';
 import 'apply_tax_screen.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 
 class Addtax extends StatefulWidget {
+  const Addtax({super.key});
+
   @override
   State<Addtax> createState() => _AddtaxState();
 }
@@ -149,12 +152,14 @@ class _AddtaxState extends State<Addtax> {
       ),
       body: Column(
         children: [
-          // Tax List — capped so rows do not span a 1440px laptop. The
-          // Scaffold background stays full-bleed; only the content narrows.
+          // Tax List — the page shell. maxContentWidth, not maxFormWidth:
+          // this page is a LIST. Both text fields live in _taxFields, which
+          // only the add/edit dialog and sheet use, so nothing here is a
+          // form. The Scaffold background stays full-bleed.
           Expanded(
             child: AppResponsive.constrainedContent(
               context: context,
-              maxWidth: AppResponsive.maxFormWidth(context),
+              maxWidth: AppResponsive.maxContentWidth(context),
               alignment: Alignment.topCenter,
               child: Observer(
                 builder: (context) {
@@ -173,46 +178,12 @@ class _AddtaxState extends State<Addtax> {
                   final allTax = taxStore.taxes;
 
                   if (allTax.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.calculate_outlined,
-                            size: AppResponsive.getValue(
-                              context,
-                              mobile: 64.0,
-                              tablet: 80.0,
-                              desktop: 96.0,
-                            ),
-                            color: AppColors.divider,
-                          ),
-                          SizedBox(height: AppResponsive.largeSpacing(context)),
-                          Text(
-                            'No taxes configured yet',
-                            style: GoogleFonts.poppins(
-                              fontSize: AppResponsive.subheadingFontSize(
-                                context,
-                              ),
-                              fontWeight: FontWeight.w500,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                          SizedBox(height: 8),
-                          Text(
-                            'Add your first tax to get started',
-                            style: GoogleFonts.poppins(
-                              fontSize: AppResponsive.getValue(
-                                context,
-                                mobile: 13.0,
-                                tablet: 14.0,
-                                desktop: 15.0,
-                              ),
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
+                    // Shared component — this was a hand-rolled icon + two
+                    // Texts, the exact shape AppEmptyState exists to replace.
+                    return const AppEmptyState(
+                      icon: Icons.calculate_outlined,
+                      title: 'No taxes configured yet',
+                      message: 'Add your first tax to get started',
                     );
                   }
 
@@ -416,7 +387,7 @@ class _AddtaxState extends State<Addtax> {
               padding: EdgeInsets.all(AppResponsive.largeSpacing(context)),
               child: AppResponsive.constrainedContent(
                 context: context,
-                maxWidth: AppResponsive.maxFormWidth(context),
+                maxWidth: AppResponsive.maxContentWidth(context),
                 heightFactor: 1,
                 child: SizedBox(
                   width: double.infinity,
@@ -433,7 +404,9 @@ class _AddtaxState extends State<Addtax> {
                       foregroundColor: Colors.white,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        // 10, matching the other ElevatedButton on this screen
+                        // and the shared report/dialog buttons. Was 12.
+                        borderRadius: BorderRadius.circular(10),
                       ),
                     ),
                     icon: Icon(
@@ -492,7 +465,7 @@ class _AddtaxState extends State<Addtax> {
           ),
           SizedBox(height: 8),
           Text(
-            'This business is marked as not registered for tax during setup.',
+            'This business is not registered for tax. Turn on Tax Registration in Settings → Store Information.',
             textAlign: TextAlign.center,
             style: GoogleFonts.poppins(
               fontSize: AppResponsive.getValue(
@@ -574,10 +547,12 @@ class _AddtaxState extends State<Addtax> {
         if (!isEdit) ...[
           const SizedBox(height: 8),
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
             decoration: BoxDecoration(
               color: AppColors.surfaceLight,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(
+                AppResponsive.borderRadius(context),
+              ),
             ),
             child: Row(
               children: [
@@ -635,14 +610,16 @@ class _AddtaxState extends State<Addtax> {
         Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(10),
+              padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
               decoration: BoxDecoration(
                 color: AppColors.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(
+                  AppResponsive.smallBorderRadius(context),
+                ),
               ),
               child: Icon(
                 isEdit ? Icons.edit_rounded : Icons.add_circle_rounded,
-                size: 24,
+                size: AppResponsive.iconSize(context),
                 color: AppColors.primary,
               ),
             ),
@@ -728,9 +705,9 @@ class _AddtaxState extends State<Addtax> {
             return Padding(
               padding: EdgeInsets.only(
                 bottom: MediaQuery.of(context).viewInsets.bottom,
-                left: 20,
-                right: 20,
-                top: 20,
+                left: AppResponsive.largeSpacing(context),
+                right: AppResponsive.largeSpacing(context),
+                top: AppResponsive.largeSpacing(context),
               ),
               child: SingleChildScrollView(
                 child: _buildSheetContent(

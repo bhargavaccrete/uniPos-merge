@@ -55,6 +55,8 @@ class _RetailPrinterConnectionScreenState
       ? Icons.bluetooth
       : p.isUsb
       ? Icons.usb
+      : p.isWindowsPdf
+      ? Icons.picture_as_pdf_outlined
       : p.isWindows
       ? Icons.desktop_windows_outlined
       : Icons.wifi;

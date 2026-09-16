@@ -253,13 +253,15 @@ mixin _$PrinterStore on _PrinterStore, Store {
       required String queueName,
       int paperSize = 80,
       String role = 'both',
-      String? assignRole}) {
+      String? assignRole,
+      bool asPdfPrinter = false}) {
     return _$saveWindowsPrinterAsyncAction.run(() => super.saveWindowsPrinter(
         name: name,
         queueName: queueName,
         paperSize: paperSize,
         role: role,
-        assignRole: assignRole));
+        assignRole: assignRole,
+        asPdfPrinter: asPdfPrinter));
   }
 
   late final _$testWifiConnectionAsyncAction =

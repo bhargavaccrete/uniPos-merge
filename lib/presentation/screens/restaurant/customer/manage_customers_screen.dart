@@ -67,117 +67,126 @@ class _ManageCustomersScreenState extends State<ManageCustomersScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // Search Bar
-          Padding(
-            padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
-            child: AppTextField(
-              controller: _searchController,
-              hint: 'Search by name, phone, or email',
-              icon: Icons.search,
-              onChanged: (value) {
-                setState(() {
-                  _searchQuery = value.toLowerCase();
-                });
-              },
-              suffixIcon: _searchQuery.isNotEmpty
-                  ? GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _searchController.clear();
-                          _searchQuery = '';
-                        });
-                      },
-                      child: Icon(Icons.clear, color: Colors.grey),
-                    )
-                  : null,
-              onFieldSubmitted: (value) {
-                setState(() {
-                  _searchQuery = value.toLowerCase();
-                });
-              },
+      body: AppResponsive.constrainedContent(
+        context: context,
+        maxWidth: AppResponsive.maxContentWidth(context),
+        alignment: Alignment.topCenter,
+        child: Column(
+          children: [
+            // Search Bar
+            Padding(
+              padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
+              child: AppTextField(
+                controller: _searchController,
+                hint: 'Search by name, phone, or email',
+                icon: Icons.search,
+                onChanged: (value) {
+                  setState(() {
+                    _searchQuery = value.toLowerCase();
+                  });
+                },
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _searchController.clear();
+                            _searchQuery = '';
+                          });
+                        },
+                        child: Icon(Icons.clear, color: Colors.grey),
+                      )
+                    : null,
+                onFieldSubmitted: (value) {
+                  setState(() {
+                    _searchQuery = value.toLowerCase();
+                  });
+                },
+              ),
             ),
-          ),
 
-          // Customer List
-          Expanded(
-            child: Observer(
-              builder: (context) {
-                if (customerStore.customerCount == 0) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        // 64 is a decorative empty-state glyph, well above the
-                        // largeIconSize ceiling (36) — no ladder applies.
-                        Icon(
-                          Icons.people_outline,
-                          size: 64,
-                          color: AppColors.divider,
-                        ),
-                        SizedBox(height: AppResponsive.largeSpacing(context)),
-                        Text(
-                          'No customers yet',
-                          style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.subheadingFontSize(context),
-                            color: AppColors.textSecondary,
-                            fontWeight: FontWeight.w500,
+            // Customer List
+            Expanded(
+              child: Observer(
+                builder: (context) {
+                  if (customerStore.customerCount == 0) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // 64 is a decorative empty-state glyph, well above the
+                          // largeIconSize ceiling (36) — no ladder applies.
+                          Icon(
+                            Icons.people_outline,
+                            size: 64,
+                            color: AppColors.divider,
                           ),
-                        ),
-                        SizedBox(height: AppResponsive.smallSpacing(context)),
-                        Text(
-                          'Tap + to add your first customer',
-                          style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.bodyFontSize(context),
-                            color: AppColors.textSecondary,
+                          SizedBox(height: AppResponsive.largeSpacing(context)),
+                          Text(
+                            'No customers yet',
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.subheadingFontSize(
+                                context,
+                              ),
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
-                        ),
-                      ],
+                          SizedBox(height: AppResponsive.smallSpacing(context)),
+                          Text(
+                            'Tap + to add your first customer',
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.bodyFontSize(context),
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  final customers = _getFilteredCustomers();
+
+                  if (customers.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.search_off,
+                            size: 64,
+                            color: AppColors.divider,
+                          ),
+                          SizedBox(height: AppResponsive.largeSpacing(context)),
+                          Text(
+                            'No customers found',
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.subheadingFontSize(
+                                context,
+                              ),
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return ListView.builder(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: AppResponsive.smallSpacing(context),
                     ),
+                    itemCount: customers.length,
+                    itemBuilder: (context, index) {
+                      final customer = customers[index];
+                      return _buildCustomerCard(context, customer);
+                    },
                   );
-                }
-
-                final customers = _getFilteredCustomers();
-
-                if (customers.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.search_off,
-                          size: 64,
-                          color: AppColors.divider,
-                        ),
-                        SizedBox(height: AppResponsive.largeSpacing(context)),
-                        Text(
-                          'No customers found',
-                          style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.subheadingFontSize(context),
-                            color: AppColors.textSecondary,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-
-                return ListView.builder(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: AppResponsive.smallSpacing(context),
-                  ),
-                  itemCount: customers.length,
-                  itemBuilder: (context, index) {
-                    final customer = customers[index];
-                    return _buildCustomerCard(context, customer);
-                  },
-                );
-              },
+                },
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

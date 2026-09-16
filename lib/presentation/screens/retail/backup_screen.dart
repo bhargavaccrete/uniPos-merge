@@ -174,7 +174,7 @@ class _BackupScreenState extends State<BackupScreen> {
     _autoBackupEnabled = await AutoBackupService.isAutoBackupEnabled();
 
     // Get backup files from Downloads folder
-    final backupDir = '/storage/emulated/0/Download';
+    final backupDir = await UnifiedBackupService.downloadsBackupPath();
     _backupDirectory = backupDir;
 
     try {

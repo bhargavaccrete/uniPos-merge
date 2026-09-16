@@ -41,11 +41,11 @@ import 'stock_history_screen.dart';
 /// Width cap for this screen's content.
 ///
 /// Wider than `maxFormWidth` (800) on purpose: this is a module grid plus
-/// per-item stock adjusters, not a form. At 800 the grid drops to 3 columns
-/// and the adjuster row crowds; 1100 keeps 4 columns at ~248px and leaves the
-/// adjusters comfortable. The gradient hero stays full-bleed — it is a
-/// background, and Rule 5 caps content, not backgrounds.
-const double kInventoryContentMaxWidth = 1100.0;
+/// per-item stock adjusters, not a form. The gradient hero stays full-bleed —
+/// it is a background, and the rule caps content, not backgrounds.
+/// Uses the shared ladder: the old local 1100 was a fourth width value in an
+/// app that otherwise has three, and maxContentWidth (1000/1400) is wider on
+/// desktop, so the module grid keeps its columns.
 
 /// Hub module-grid columns from the MEASURED grid width, not the screen.
 ///
@@ -1314,7 +1314,7 @@ class _ManageInventoryState extends State<ManageInventory> {
   Widget _buildSectionHeading(String title, String subtitle) {
     return AppResponsive.constrainedContent(
       context: context,
-      maxWidth: kInventoryContentMaxWidth,
+      maxWidth: AppResponsive.maxContentWidth(context),
       alignment: Alignment.topCenter,
       heightFactor: 1,
       child: Padding(
@@ -1353,7 +1353,7 @@ class _ManageInventoryState extends State<ManageInventory> {
     final actions = _hubActions(context);
     return AppResponsive.constrainedContent(
       context: context,
-      maxWidth: kInventoryContentMaxWidth,
+      maxWidth: AppResponsive.maxContentWidth(context),
       alignment: Alignment.topCenter,
       heightFactor: 1,
       child: Padding(
@@ -1586,7 +1586,7 @@ class _ManageInventoryState extends State<ManageInventory> {
               SliverToBoxAdapter(
                 child: AppResponsive.constrainedContent(
                   context: context,
-                  maxWidth: kInventoryContentMaxWidth,
+                  maxWidth: AppResponsive.maxContentWidth(context),
                   alignment: Alignment.topCenter,
                   heightFactor: 1,
                   child: Padding(
@@ -1750,7 +1750,7 @@ class _ManageInventoryState extends State<ManageInventory> {
 
                       return AppResponsive.constrainedContent(
                         context: context,
-                        maxWidth: kInventoryContentMaxWidth,
+                        maxWidth: AppResponsive.maxContentWidth(context),
                         alignment: Alignment.topCenter,
                         heightFactor: 1,
                         child: Container(

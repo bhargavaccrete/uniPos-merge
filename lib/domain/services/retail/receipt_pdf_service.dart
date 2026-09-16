@@ -21,6 +21,7 @@ import '../restaurant/tax_breakdown.dart';
 import 'package:billberrylite/core/config/food_license_rule.dart';
 import 'package:billberrylite/core/config/tariff_code_rule.dart';
 import 'package:billberrylite/core/config/tax_label_rule.dart';
+import 'package:billberrylite/core/config/tax_id_rule.dart';
 import 'package:billberrylite/util/common/short_ref.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
@@ -518,7 +519,7 @@ class ReceiptPdfService {
         ],
         if (showGST && data.gstNumber != null) ...[
           pw.Text(
-            'GSTIN: ${data.gstNumber}',
+            '${TaxIdRule.printLabel}: ${data.gstNumber}',
             style: pw.TextStyle(fontSize: bodySize),
           ),
         ],
@@ -1049,7 +1050,7 @@ class ReceiptPdfService {
                         if (showStoreEmail)
                           pw.Text('Email: $storeEmail', style: const pw.TextStyle(fontSize: 10)),
                         if (showGST && data.gstNumber != null)
-                          pw.Text('GST No: ${data.gstNumber}', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                          pw.Text('${TaxIdRule.printLabel}: ${data.gstNumber}', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
                         if (FoodLicenseRule.number != null)
                           pw.Text('${FoodLicenseRule.label}: ${FoodLicenseRule.number}', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
                       ],

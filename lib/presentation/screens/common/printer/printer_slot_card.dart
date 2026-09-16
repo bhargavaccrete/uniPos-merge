@@ -273,9 +273,11 @@ class _PrinterSlotCardState extends State<PrinterSlotCard> {
             ? Icons.bluetooth
             : p.isUsb
                 ? Icons.usb
-                : p.isWindows
-                    ? Icons.desktop_windows_outlined
-                    : Icons.wifi,
+                : p.isWindowsPdf
+                    ? Icons.picture_as_pdf_outlined
+                    : p.isWindows
+                        ? Icons.desktop_windows_outlined
+                        : Icons.wifi,
         color: AppColors.info,
       ),
       title: Text(p.name,

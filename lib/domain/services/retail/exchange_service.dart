@@ -3,6 +3,8 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/core/config/tax_feature.dart';
+import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
 import 'package:billberrylite/data/models/restaurant/db/stock_movement_model.dart';
 import 'package:billberrylite/data/models/retail/hive_model/cart_model_202.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_item_model_204.dart';
@@ -574,6 +576,8 @@ class ExchangeService {
       changeReturn: 0,
       roundOff: bill.roundOff,
       isTaxInclusive: bill.isTaxInclusive,
+      taxEnabled: TaxFeature.enabled,
+      storeGstNumber: await StoreSettingsService().gstNumberSnapshot(),
       lineDiscountTotal: bill.lineDiscountTotal,
       exchangeGroupId: groupId,
       // Both legs of an exchange belong to the shift that processed it —

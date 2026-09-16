@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/core/config/tax_id_rule.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
@@ -262,7 +263,7 @@ class _SupplierDetailScreenState extends State<SupplierDetailScreen>
     final details = <String>[
       if (_supplier.phone?.isNotEmpty ?? false) _supplier.phone!,
       if (_supplier.gstNumber?.isNotEmpty ?? false)
-        'GSTIN: ${_supplier.gstNumber}',
+        '${TaxIdRule.printLabel}: ${_supplier.gstNumber}',
     ];
 
     return Container(

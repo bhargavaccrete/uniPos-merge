@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/util/color.dart';
@@ -33,14 +34,16 @@ class _UsageLimitScreenState extends State<UsageLimitScreen> {
   }
 
   Future<void> _refresh() async {
-    await Future.wait([
-      itemStore.loadItems(),
-      categoryStore.loadCategories(),
-      tableStore.loadTables(),
-      staffStore.loadStaff(),
-      customerStore.loadCustomers(),
-      printerStore.loadSavedPrinters(),
-    ].map((f) => f.catchError((_) {})));
+    await Future.wait(
+      [
+        itemStore.loadItems(),
+        categoryStore.loadCategories(),
+        tableStore.loadTables(),
+        staffStore.loadStaff(),
+        customerStore.loadCustomers(),
+        printerStore.loadSavedPrinters(),
+      ].map((f) => f.catchError((_) {})),
+    );
   }
 
   @override
@@ -70,7 +73,11 @@ class _UsageLimitScreenState extends State<UsageLimitScreen> {
           child: Center(
             child: ConstrainedBox(
               // Keep the column comfortable on tablet / desktop / web.
-              constraints: const BoxConstraints(maxWidth: 640),
+              // One cap only: an outer constrainedContent here would fight
+              // this one (600 < 640 on tablet, 800 > 640 on desktop).
+              constraints: BoxConstraints(
+                maxWidth: AppResponsive.maxContentWidth(context),
+              ),
               child: Observer(
                 builder: (_) {
                   final isPremium = PlanGate.isPremium;
@@ -146,18 +153,48 @@ class _UsageLimitScreenState extends State<UsageLimitScreen> {
     }
 
     return [
-      make('Menu Items', Icons.restaurant_menu, AppColors.menuTab,
-          itemStore.itemCount, EntKeys.manageMenuItemsMax),
-      make('Categories', Icons.category_outlined, AppColors.secondary,
-          categoryStore.categoryCount, null),
-      make('Tables', Icons.table_restaurant_outlined, AppColors.tablesTab,
-          tableStore.totalTables, EntKeys.billingTablesMax),
-      make('Staff', Icons.badge_outlined, AppColors.info,
-          staffStore.totalStaff, EntKeys.usersMax),
-      make('Customers', Icons.people_alt_outlined, AppColors.orange,
-          customerStore.totalCustomers, EntKeys.customersMax),
-      make('Printers', Icons.print_outlined, AppColors.accent,
-          printerStore.savedPrinters.length, null),
+      make(
+        'Menu Items',
+        Icons.restaurant_menu,
+        AppColors.menuTab,
+        itemStore.itemCount,
+        EntKeys.manageMenuItemsMax,
+      ),
+      make(
+        'Categories',
+        Icons.category_outlined,
+        AppColors.secondary,
+        categoryStore.categoryCount,
+        null,
+      ),
+      make(
+        'Tables',
+        Icons.table_restaurant_outlined,
+        AppColors.tablesTab,
+        tableStore.totalTables,
+        EntKeys.billingTablesMax,
+      ),
+      make(
+        'Staff',
+        Icons.badge_outlined,
+        AppColors.info,
+        staffStore.totalStaff,
+        EntKeys.usersMax,
+      ),
+      make(
+        'Customers',
+        Icons.people_alt_outlined,
+        AppColors.orange,
+        customerStore.totalCustomers,
+        EntKeys.customersMax,
+      ),
+      make(
+        'Printers',
+        Icons.print_outlined,
+        AppColors.accent,
+        printerStore.savedPrinters.length,
+        null,
+      ),
     ];
   }
 }
@@ -234,7 +271,9 @@ class _PlanBanner extends StatelessWidget {
               borderRadius: BorderRadius.circular(14),
             ),
             child: Icon(
-              isPremium ? Icons.workspace_premium_outlined : Icons.speed_outlined,
+              isPremium
+                  ? Icons.workspace_premium_outlined
+                  : Icons.speed_outlined,
               color: accent,
               size: 28,
             ),
@@ -257,7 +296,9 @@ class _PlanBanner extends StatelessWidget {
                     const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 3),
+                        horizontal: 10,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
                         color: accent.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(20),
@@ -370,7 +411,9 @@ class _UsageCard extends StatelessWidget {
                   ? AppColors.info.withValues(alpha: 0.14)
                   : color.withValues(alpha: 0.14),
               valueColor: AlwaysStoppedAnimation<Color>(
-                metric.isUnlimited ? AppColors.info.withValues(alpha: 0.35) : color,
+                metric.isUnlimited
+                    ? AppColors.info.withValues(alpha: 0.35)
+                    : color,
               ),
             ),
           ),

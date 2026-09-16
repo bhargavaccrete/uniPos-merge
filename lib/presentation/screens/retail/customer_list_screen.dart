@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/core/config/tax_id_rule.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -123,8 +124,8 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                 _dialogSectionLabel('Business Information'),
                 AppTextField(
                   controller: gstController,
-                  label: 'GST Number',
-                  hint: 'e.g. 22AAAAA0000A1Z5',
+                  label: TaxIdRule.label,
+                  hint: TaxIdRule.hint,
                   icon: Icons.badge_outlined,
                   textCapitalization: TextCapitalization.characters,
                 ),
@@ -308,6 +309,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
               child: AppResponsive.constrainedContent(
                 context: context,
                 alignment: Alignment.topCenter,
+                maxWidth: AppResponsive.maxContentWidth(context),
                 child: AppTextField(
                   controller: _searchController,
                   hint: 'Search by name or phone...',
@@ -363,6 +365,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                   return AppResponsive.constrainedContent(
                     context: context,
                     alignment: Alignment.topCenter,
+                    maxWidth: AppResponsive.maxContentWidth(context),
                     child: ListView.builder(
                       padding: AppResponsive.padding(
                         context,
@@ -455,6 +458,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
           child: AppResponsive.constrainedContent(
             context: context,
             alignment: Alignment.topCenter,
+            maxWidth: AppResponsive.maxContentWidth(context),
             child: content,
           ),
         );

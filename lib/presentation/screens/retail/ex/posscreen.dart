@@ -41,7 +41,7 @@ import 'package:billberrylite/domain/services/restaurant/day_management_service.
 import 'package:billberrylite/domain/services/retail/hold_sale_service.dart';
 import 'package:billberrylite/presentation/widget/restaurant/opening_balance_dialog.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
-import 'package:billberrylite/util/common/decimal_settings.dart';
+import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
 import 'package:billberrylite/data/models/common/categorymodel_300.dart';
 import 'package:billberrylite/presentation/widget/componets/common/weight_item_dialog.dart';
 
@@ -208,24 +208,6 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
   /// `categoryNameById` is a memoised computed, so this is no slower.
   String _categoryName(String categoryId) =>
       categoryStore.displayNameFor(categoryId);
-
-  /// Money string honouring the store's currency + decimal-precision settings.
-  /// The whole body sits under [_moneyScope], so these stay live.
-  String _money(double amount) => CurrencyHelper.formatAmountWithSymbol(
-    amount,
-    CurrencyHelper.currentSymbol,
-    decimalPlaces: DecimalSettings.precision,
-  );
-
-  /// Rebuilds [child] when the currency or decimal precision changes — one
-  /// subscription for the screen instead of a nested pair per price label.
-  Widget _moneyScope(Widget child) => ValueListenableBuilder<String>(
-    valueListenable: CurrencyHelper.currencyNotifier,
-    builder: (context, _, _) => ValueListenableBuilder<int>(
-      valueListenable: DecimalSettings.precisionNotifier,
-      builder: (context, _, _) => child,
-    ),
-  );
 
   /// Shown when billing can't start and there's nowhere to go back to. No
   /// AppBar back arrow — there is no previous screen, and offering one here is
@@ -934,7 +916,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
       appBar: _buildAppBar(context),
-      body: _moneyScope(body),
+      body: MoneyScope(child: body),
     );
   }
 
@@ -1029,10 +1011,10 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
 
     await showDialog<bool>(
       context: context,
-      builder: (_) => _moneyScope(
-        QuickItemDialog(
+      builder: (_) => MoneyScope(
+        child: QuickItemDialog(
           defaultGstRate: defaultGstRate,
-          money: _money,
+          money: formatMoney,
           onApply:
               ({
                 required String name,
@@ -1599,7 +1581,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        _money(price),
+                        formatMoney(price),
                         style: GoogleFonts.poppins(
                           fontSize: AppResponsive.bodyFontSize(context),
                           fontWeight: FontWeight.w700,
@@ -1887,7 +1869,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                   ),
                   const Spacer(),
                   Text(
-                    _money(price),
+                    formatMoney(price),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.poppins(
@@ -2118,7 +2100,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
   );
 
   Widget _lineTotal(BuildContext context, CartItemModel item) => Text(
-    _money(item.total),
+    formatMoney(item.total),
     maxLines: 1,
     overflow: TextOverflow.ellipsis,
     textAlign: TextAlign.right,
@@ -2341,11 +2323,11 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
 
     await showDialog<bool>(
       context: context,
-      builder: (_) => _moneyScope(
-        LineDiscountDialog(
+      builder: (_) => MoneyScope(
+        child: LineDiscountDialog(
           item: item,
           variant: variant,
-          money: _money,
+          money: formatMoney,
           onApply:
               ({
                 required DiscountType type,
@@ -2393,7 +2375,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
       children: [
         if (overridden)
           Text(
-            _money(item.originalPrice!),
+            formatMoney(item.originalPrice!),
             style: GoogleFonts.poppins(
               fontSize: AppResponsive.smallFontSize(context),
               color: AppColors.textSecondary,
@@ -2401,7 +2383,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
             ),
           ),
         Text(
-          _money(item.price),
+          formatMoney(item.price),
           style: GoogleFonts.poppins(
             fontSize: AppResponsive.smallFontSize(context),
             fontWeight: overridden ? FontWeight.w700 : FontWeight.w400,
@@ -2418,7 +2400,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
         // mirroring the receipt, and this is what explains the gap.
         if (item.hasLineDiscount)
           Text(
-            '-${_money(item.lineDiscountAmount!)}'
+            '-${formatMoney(item.lineDiscountAmount!)}'
             '${item.lineDiscountType == 'percentage' && item.lineDiscountValue != null ? ' (${_trimPct(item.lineDiscountValue!)}%)' : ''}',
             style: GoogleFonts.poppins(
               fontSize: AppResponsive.smallFontSize(context),
@@ -2460,11 +2442,11 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
 
     await showDialog<bool>(
       context: context,
-      builder: (_) => _moneyScope(
-        PriceOverrideDialog(
+      builder: (_) => MoneyScope(
+        child: PriceOverrideDialog(
           item: item,
           variant: variant,
-          money: _money,
+          money: formatMoney,
           onApply:
               ({
                 required double newPrice,
@@ -2583,7 +2565,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                         ),
                       ),
                       Text(
-                        _money(totalPrice),
+                        formatMoney(totalPrice),
                         style: GoogleFonts.poppins(
                           fontSize: AppResponsive.subheadingFontSize(context),
                           fontWeight: FontWeight.w700,

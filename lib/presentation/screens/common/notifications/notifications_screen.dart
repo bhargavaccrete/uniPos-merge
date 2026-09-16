@@ -102,7 +102,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             // here, because a phone should render the feed edge to edge.
             child: AppResponsive.constrainedContent(
               context: context,
-              maxWidth: AppResponsive.maxFormWidth(context),
+              maxWidth: AppResponsive.maxContentWidth(context),
               alignment: Alignment.topCenter,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

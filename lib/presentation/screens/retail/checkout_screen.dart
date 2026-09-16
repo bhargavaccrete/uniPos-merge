@@ -379,6 +379,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         loyaltyPointsUsed: _pointsRedeemed,
         roundOff: bill.roundOff,
         isTaxInclusive: bill.isTaxInclusive,
+        taxEnabled: TaxFeature.enabled,
+        storeGstNumber: await StoreSettingsService().gstNumberSnapshot(),
         // Stamp the open shift so the Shift Report and Staff Performance can
         // attribute this sale directly instead of inferring from its timestamp.
         shiftId: RestaurantSession.currentShiftId,
@@ -588,6 +590,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         loyaltyPointsUsed: _pointsRedeemed,
         roundOff: bill.roundOff,
         isTaxInclusive: bill.isTaxInclusive,
+        taxEnabled: TaxFeature.enabled,
+        storeGstNumber: await StoreSettingsService().gstNumberSnapshot(),
         // In partial mode record what was actually collected; the factory
         // derives dueAmount and flips the status to partially_paid.
         amountCollected: _allowPartialPayment ? _totalPaid : null,

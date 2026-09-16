@@ -608,7 +608,7 @@ class _EdititemScreenState extends State<EdititemScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(
         title: 'Edit Item',
         titleFontSize: AppResponsive.subheadingFontSize(context),
@@ -667,364 +667,378 @@ class _EdititemScreenState extends State<EdititemScreen> {
     final selectedCategoryName = match.isEmpty ? null : match.first.name;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Basic Information Section
-          _buildSectionHeader('Basic Information', Icons.info_outline),
-          SizedBox(height: AppResponsive.largeSpacing(context)),
-          AppTextField(
-            controller: _nameController,
-            focusNode: _nameFocus,
-            label: 'Item Name',
-            icon: Icons.fastfood_outlined,
-            required: true,
-            textInputAction: TextInputAction.next,
-            onFieldSubmitted: (_) => _codeFocus.requestFocus(),
-          ),
-          SizedBox(height: AppResponsive.largeSpacing(context)),
-          AppTextField(
-            controller: _itemCodeController,
-            focusNode: _codeFocus,
-            label: 'Item Code',
-            icon: Icons.qr_code_scanner_rounded,
-            required: true,
-            keyboardType: TextInputType.number,
-            inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly,
-              LengthLimitingTextInputFormatter(5),
-            ],
-            textInputAction: TextInputAction.next,
-            onFieldSubmitted: (_) => _priceFocus.requestFocus(),
-          ),
-          SizedBox(height: AppResponsive.largeSpacing(context)),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            dense: true,
-            title: Text(
-              'Active / Enabled',
-              style: GoogleFonts.poppins(
-                fontSize: AppResponsive.bodyFontSize(context),
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            subtitle: Text(
-              'Turn off to temporarily hide this item from POS and listings.',
-              style: GoogleFonts.poppins(
-                fontSize: AppResponsive.smallFontSize(context),
-                color: AppColors.textSecondary,
-              ),
-            ),
-            value: _isEnabled,
-            activeColor: AppColors.primary,
-            onChanged: (v) => setState(() => _isEnabled = v),
-          ),
-          SizedBox(height: AppResponsive.extraLargeSpacing(context)),
-
-          // Selling Method Section — Raw Material/Semi-Finished get a plain
-          // Stock Unit picker instead (they aren't sold, so Selling Method
-          // doesn't apply).
-          if (_productType == ProductType.rawMaterial ||
-              _productType == ProductType.semiFinished) ...[
-            _buildSectionHeader('Stock Unit', Icons.straighten_outlined),
+      padding: AppResponsive.padding(context),
+      // Form width cap — a single-column form stretched to a 1400px desktop is
+      // unreadable. heightFactor: 1 is required inside a scroll view, or the
+      // Align tries to take infinite height.
+      child: AppResponsive.constrainedContent(
+        context: context,
+        maxWidth: AppResponsive.maxFormWidth(context),
+        alignment: Alignment.topCenter,
+        heightFactor: 1,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Basic Information Section
+            _buildSectionHeader('Basic Information', Icons.info_outline),
             SizedBox(height: AppResponsive.largeSpacing(context)),
-            SellingMethodButton(
-              method: _sellingMethod,
-              unit: _selectedUnit,
-              unitOnly: true,
-              onTap: _selectStockUnit,
+            AppTextField(
+              controller: _nameController,
+              focusNode: _nameFocus,
+              label: 'Item Name',
+              icon: Icons.fastfood_outlined,
+              required: true,
+              textInputAction: TextInputAction.next,
+              onFieldSubmitted: (_) => _codeFocus.requestFocus(),
             ),
-          ] else ...[
-            _buildSectionHeader('Selling Method', Icons.scale),
             SizedBox(height: AppResponsive.largeSpacing(context)),
-            SellingMethodButton(
-              method: _sellingMethod,
-              unit: _selectedUnit,
-              onTap: _selectSellingMethod,
+            AppTextField(
+              controller: _itemCodeController,
+              focusNode: _codeFocus,
+              label: 'Item Code',
+              icon: Icons.qr_code_scanner_rounded,
+              required: true,
+              keyboardType: TextInputType.number,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(5),
+              ],
+              textInputAction: TextInputAction.next,
+              onFieldSubmitted: (_) => _priceFocus.requestFocus(),
             ),
-          ],
-          SizedBox(height: AppResponsive.extraLargeSpacing(context)),
-
-          // Price
-          AppTextField(
-            controller: _itemPriceController,
-            focusNode: _priceFocus,
-            label: 'Price',
-            prefixWidget: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-              child: Text(
-                "${CurrencyHelper.currentSymbol}",
-                style: GoogleFonts.poppins(
-                  fontSize: AppResponsive.bodyFontSize(context),
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.primary,
-                ),
-              ),
-            ),
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
-            ],
-            textInputAction: TextInputAction.next,
-            onFieldSubmitted: (_) => _descFocus.requestFocus(),
-          ),
-          SizedBox(height: AppResponsive.extraLargeSpacing(context)),
-
-          // Category Section
-          _buildSectionHeader('Category', Icons.category_outlined),
-          SizedBox(height: AppResponsive.largeSpacing(context)),
-          CategorySelectorButton(
-            selectedCategoryName: selectedCategoryName,
-            onTap: _selectCategory,
-          ),
-          SizedBox(height: AppResponsive.extraLargeSpacing(context)),
-
-          // Product Type — determines whether this item is stocked directly,
-          // made from a recipe, or both. See docs/inventory_recipe_system_plan.md §3/§8.1.
-          if (PlanEnforce.allows(EntKeys.inventory)) ...[
-            _buildSectionHeader('Product Type', Icons.category_rounded),
             SizedBox(height: AppResponsive.largeSpacing(context)),
-            Dropdown(
-              items: ProductType.all.map(ProductType.displayName).toList(),
-              selectedItem: ProductType.displayName(_productType),
-              onChanged: (label) {
-                final type = ProductType.all.firstWhere(
-                  (t) => ProductType.displayName(t) == label,
-                  orElse: () => ProductType.finishedGood,
-                );
-                setState(() {
-                  _productType = type;
-                  // Switching away from a recipe type drops the in-progress
-                  // recipe rather than silently keeping stale ingredients.
-                  if (!ProductType.hasRecipe(type)) _currentRecipe = null;
-                  // Recipe-Based is always stock-governed via its ingredients —
-                  // same "enforce limits by default" policy as enabling
-                  // inventory tracking above, so Add and Edit agree.
-                  if (type == ProductType.recipeBased) {
-                    allowOutOfStockFilter = 'NO';
-                  }
-                });
-              },
-            ),
-          ],
-          // Raw Materials / Semi-Finished are ingredients/prep items, so they stay out of
-          // the POS sale grid unless explicitly opted in.
-          if (_productType == ProductType.rawMaterial ||
-              _productType == ProductType.semiFinished) ...[
-            const SizedBox(height: 6),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               dense: true,
               title: Text(
-                _productType == ProductType.rawMaterial
-                    ? 'Sell directly at POS'
-                    : 'Show on POS Menu',
+                'Active / Enabled',
                 style: GoogleFonts.poppins(
                   fontSize: AppResponsive.bodyFontSize(context),
                   fontWeight: FontWeight.w500,
                 ),
               ),
               subtitle: Text(
-                _productType == ProductType.rawMaterial
-                    ? 'Raw materials are hidden from the menu by default. Turn on to sell this one as-is.'
-                    : 'Semi-finished prep items are hidden from the menu by default. Turn on to show and sell this one.',
+                'Turn off to temporarily hide this item from POS and listings.',
                 style: GoogleFonts.poppins(
                   fontSize: AppResponsive.smallFontSize(context),
                   color: AppColors.textSecondary,
                 ),
               ),
-              value: _sellDirectlyAtPos ?? false,
+              value: _isEnabled,
               activeColor: AppColors.primary,
-              onChanged: (v) => setState(() => _sellDirectlyAtPos = v),
+              onChanged: (v) => setState(() => _isEnabled = v),
             ),
-          ],
-          SizedBox(height: AppResponsive.extraLargeSpacing(context)),
-
-          // Tax Section
-          if (TaxFeature.enabled) ...[
-            _buildSectionHeader('Tax', Icons.percent_rounded),
-            SizedBox(height: AppResponsive.largeSpacing(context)),
-            TaxSelectorButton(taxRate: selectedTaxRate, onTap: _selectTax),
             SizedBox(height: AppResponsive.extraLargeSpacing(context)),
-          ],
 
-          // Food Type (Veg / Non-Veg)
-          _buildSectionHeader('Food Type', Icons.eco_outlined),
-          SizedBox(height: AppResponsive.largeSpacing(context)),
-          VegSelectorButton(
-            selectedCategory: selectedIMGCategory,
-            onTap: _selectVeg,
-          ),
-          SizedBox(height: AppResponsive.extraLargeSpacing(context)),
+            // Selling Method Section — Raw Material/Semi-Finished get a plain
+            // Stock Unit picker instead (they aren't sold, so Selling Method
+            // doesn't apply).
+            if (_productType == ProductType.rawMaterial ||
+                _productType == ProductType.semiFinished) ...[
+              _buildSectionHeader('Stock Unit', Icons.straighten_outlined),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
+              SellingMethodButton(
+                method: _sellingMethod,
+                unit: _selectedUnit,
+                unitOnly: true,
+                onTap: _selectStockUnit,
+              ),
+            ] else ...[
+              _buildSectionHeader('Selling Method', Icons.scale),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
+              SellingMethodButton(
+                method: _sellingMethod,
+                unit: _selectedUnit,
+                onTap: _selectSellingMethod,
+              ),
+            ],
+            SizedBox(height: AppResponsive.extraLargeSpacing(context)),
 
-          // Description
-          AppTextField(
-            controller: _descController,
-            focusNode: _descFocus,
-            label: 'Description',
-            hint: 'Optional',
-            icon: Icons.notes_outlined,
-            maxLines: 3,
-            minLines: 1,
-            onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
-          ),
-          SizedBox(height: AppResponsive.extraLargeSpacing(context)),
-
-          // Inventory Management — stock module. InventoryToggle hides itself
-          // when the plan excludes `inventory`, so guard the header/fields to match.
-          // Recipe-Based items have no stock of their own — their availability is
-          // derived live from the recipe's ingredients (§7 of the design doc), so
-          // this whole module is replaced by an "Available to Make" readout below.
-          if (PlanEnforce.allows(EntKeys.inventory) &&
-              _productType != ProductType.recipeBased) ...[
-            _buildSectionHeader(
-              'Inventory Management',
-              Icons.inventory_2_outlined,
+            // Price
+            AppTextField(
+              controller: _itemPriceController,
+              focusNode: _priceFocus,
+              label: 'Price',
+              prefixWidget: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 14,
+                ),
+                child: Text(
+                  CurrencyHelper.currentSymbol,
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.bodyFontSize(context),
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+              ],
+              textInputAction: TextInputAction.next,
+              onFieldSubmitted: (_) => _descFocus.requestFocus(),
             ),
+            SizedBox(height: AppResponsive.extraLargeSpacing(context)),
+
+            // Category Section
+            _buildSectionHeader('Category', Icons.category_outlined),
             SizedBox(height: AppResponsive.largeSpacing(context)),
-            InventoryToggle(
-              trackInventory: selectedFilter.toLowerCase() == 'yes',
-              allowOrderWhenOutOfStock:
-                  allowOutOfStockFilter.toLowerCase() == 'yes',
-              onTrackInventoryChanged: (v) => setState(() {
-                selectedFilter = v ? 'YES' : 'NO';
-                // Enforce stock limits by default when enabling tracking.
-                if (v) allowOutOfStockFilter = 'NO';
-              }),
-              onAllowOutOfStockChanged: (v) =>
-                  setState(() => allowOutOfStockFilter = v ? 'YES' : 'NO'),
+            CategorySelectorButton(
+              selectedCategoryName: selectedCategoryName,
+              onTap: _selectCategory,
             ),
-            if (selectedFilter.toLowerCase() == 'yes') ...[
-              // Current Stock — only for SIMPLE items. Variant items track stock
-              // per-variant in the Variants section below.
-              if (!_variantCheckedList.contains(true)) ...[
-                SizedBox(height: AppResponsive.mediumSpacing(context)),
-                _buildCurrentStockField(),
-              ] else ...[
-                SizedBox(height: AppResponsive.smallSpacing(context)),
-                Text(
-                  'Stock is set per variant below.',
+            SizedBox(height: AppResponsive.extraLargeSpacing(context)),
+
+            // Product Type — determines whether this item is stocked directly,
+            // made from a recipe, or both. See docs/inventory_recipe_system_plan.md §3/§8.1.
+            if (PlanEnforce.allows(EntKeys.inventory)) ...[
+              _buildSectionHeader('Product Type', Icons.category_rounded),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
+              Dropdown(
+                items: ProductType.all.map(ProductType.displayName).toList(),
+                selectedItem: ProductType.displayName(_productType),
+                onChanged: (label) {
+                  final type = ProductType.all.firstWhere(
+                    (t) => ProductType.displayName(t) == label,
+                    orElse: () => ProductType.finishedGood,
+                  );
+                  setState(() {
+                    _productType = type;
+                    // Switching away from a recipe type drops the in-progress
+                    // recipe rather than silently keeping stale ingredients.
+                    if (!ProductType.hasRecipe(type)) _currentRecipe = null;
+                    // Recipe-Based is always stock-governed via its ingredients —
+                    // same "enforce limits by default" policy as enabling
+                    // inventory tracking above, so Add and Edit agree.
+                    if (type == ProductType.recipeBased) {
+                      allowOutOfStockFilter = 'NO';
+                    }
+                  });
+                },
+              ),
+            ],
+            // Raw Materials / Semi-Finished are ingredients/prep items, so they stay out of
+            // the POS sale grid unless explicitly opted in.
+            if (_productType == ProductType.rawMaterial ||
+                _productType == ProductType.semiFinished) ...[
+              const SizedBox(height: 6),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: Text(
+                  _productType == ProductType.rawMaterial
+                      ? 'Sell directly at POS'
+                      : 'Show on POS Menu',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.bodyFontSize(context),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                subtitle: Text(
+                  _productType == ProductType.rawMaterial
+                      ? 'Raw materials are hidden from the menu by default. Turn on to sell this one as-is.'
+                      : 'Semi-finished prep items are hidden from the menu by default. Turn on to show and sell this one.',
                   style: GoogleFonts.poppins(
                     fontSize: AppResponsive.smallFontSize(context),
                     color: AppColors.textSecondary,
                   ),
                 ),
-              ],
-              SizedBox(height: AppResponsive.mediumSpacing(context)),
-              _buildLowStockSection(),
+                value: _sellDirectlyAtPos ?? false,
+                activeColor: AppColors.primary,
+                onChanged: (v) => setState(() => _sellDirectlyAtPos = v),
+              ),
             ],
             SizedBox(height: AppResponsive.extraLargeSpacing(context)),
-          ],
-          if (_productType == ProductType.recipeBased) ...[
-            _buildSectionHeader('Availability', Icons.inventory_2_outlined),
+
+            // Tax Section
+            if (TaxFeature.enabled) ...[
+              _buildSectionHeader('Tax', Icons.percent_rounded),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
+              TaxSelectorButton(taxRate: selectedTaxRate, onTap: _selectTax),
+              SizedBox(height: AppResponsive.extraLargeSpacing(context)),
+            ],
+
+            // Food Type (Veg / Non-Veg)
+            _buildSectionHeader('Food Type', Icons.eco_outlined),
             SizedBox(height: AppResponsive.largeSpacing(context)),
-            _buildAvailableToMakeCard(),
-            SizedBox(height: AppResponsive.mediumSpacing(context)),
-            // No physical stock for Recipe-Based — this only controls whether
-            // POS may sell when the calculated available-to-make figure is
-            // zero, exactly as InventoryService already enforces.
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-              title: Text(
-                'Allow order if out of stock',
-                style: GoogleFonts.poppins(
-                  fontSize: AppResponsive.bodyFontSize(context),
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              subtitle: Text(
-                'Let staff sell this even when no ingredients remain to make it.',
-                style: GoogleFonts.poppins(
-                  fontSize: AppResponsive.smallFontSize(context),
-                  color: AppColors.textSecondary,
-                ),
-              ),
-              value: allowOutOfStockFilter.toLowerCase() == 'yes',
-              activeColor: AppColors.primary,
-              onChanged: (v) =>
-                  setState(() => allowOutOfStockFilter = v ? 'YES' : 'NO'),
+            VegSelectorButton(
+              selectedCategory: selectedIMGCategory,
+              onTap: _selectVeg,
             ),
             SizedBox(height: AppResponsive.extraLargeSpacing(context)),
-          ],
 
-          // Recipe (Bill of Materials) — Semi-Finished items describe what
-          // they're prepped FROM; Recipe-Based items describe what they're
-          // assembled FROM at sale time. See design doc §3/§4/§8.2.
-          if (PlanEnforce.allows(EntKeys.inventory) &&
-              ProductType.hasRecipe(_productType)) ...[
-            RecipeBuilderWidget(
-              itemId: widget.items.id,
-              allItems: itemStore.items
-                  .where((i) => i.id != widget.items.id)
-                  .toList(),
-              initialRecipe: _currentRecipe,
-              sellingPrice: double.tryParse(_itemPriceController.text.trim()),
-              onChanged: (recipe) => setState(() => _currentRecipe = recipe),
+            // Description
+            AppTextField(
+              controller: _descController,
+              focusNode: _descFocus,
+              label: 'Description',
+              hint: 'Optional',
+              icon: Icons.notes_outlined,
+              maxLines: 3,
+              minLines: 1,
+              onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
             ),
             SizedBox(height: AppResponsive.extraLargeSpacing(context)),
-          ],
 
-          // Item Image Section
-          _buildSectionHeader('Item Image', Icons.image_outlined),
-          SizedBox(height: AppResponsive.largeSpacing(context)),
-          ImageUploader(imageBytes: _displayImageBytes, onTap: _pickImage),
-          SizedBox(height: AppResponsive.extraLargeSpacing(context)),
-
-          // Variants, Choices & Extras Section — always shown so new options can
-          // be created here (via the "+ New" button in each section header).
-          _buildSectionHeader('Additional Options', Icons.extension),
-          SizedBox(height: AppResponsive.largeSpacing(context)),
-          if (_productType != ProductType.rawMaterial &&
-              _productType != ProductType.semiFinished) ...[
-            _buildVariantSection(_allVariants),
-          ],
-          _buildChoiceSection(_allChoices),
-          if (_choiceCheckedList.contains(true))
-            _buildDefaultSelectionButton(_allChoices),
-          _buildExtrtaSection(_allExtra),
-          const SizedBox(height: 30),
-          // Save Button
-          SizedBox(
-            width: double.infinity,
-            height: 56,
-            child: ElevatedButton.icon(
-              onPressed: _isSaving ? null : () => _saveChanges(data),
-              icon: _isSaving
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Icon(Icons.save, color: Colors.white),
-              label: Text(
-                _isSaving ? 'Saving…' : 'Save Changes',
-                style: GoogleFonts.poppins(
-                  color: Colors.white,
-                  fontSize: AppResponsive.subheadingFontSize(context),
-                  fontWeight: FontWeight.w600,
-                ),
+            // Inventory Management — stock module. InventoryToggle hides itself
+            // when the plan excludes `inventory`, so guard the header/fields to match.
+            // Recipe-Based items have no stock of their own — their availability is
+            // derived live from the recipe's ingredients (§7 of the design doc), so
+            // this whole module is replaced by an "Available to Make" readout below.
+            if (PlanEnforce.allows(EntKeys.inventory) &&
+                _productType != ProductType.recipeBased) ...[
+              _buildSectionHeader(
+                'Inventory Management',
+                Icons.inventory_2_outlined,
               ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                disabledBackgroundColor: AppColors.primary.withValues(
-                  alpha: 0.5,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(
-                    AppResponsive.borderRadius(context),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
+              InventoryToggle(
+                trackInventory: selectedFilter.toLowerCase() == 'yes',
+                allowOrderWhenOutOfStock:
+                    allowOutOfStockFilter.toLowerCase() == 'yes',
+                onTrackInventoryChanged: (v) => setState(() {
+                  selectedFilter = v ? 'YES' : 'NO';
+                  // Enforce stock limits by default when enabling tracking.
+                  if (v) allowOutOfStockFilter = 'NO';
+                }),
+                onAllowOutOfStockChanged: (v) =>
+                    setState(() => allowOutOfStockFilter = v ? 'YES' : 'NO'),
+              ),
+              if (selectedFilter.toLowerCase() == 'yes') ...[
+                // Current Stock — only for SIMPLE items. Variant items track stock
+                // per-variant in the Variants section below.
+                if (!_variantCheckedList.contains(true)) ...[
+                  SizedBox(height: AppResponsive.mediumSpacing(context)),
+                  _buildCurrentStockField(),
+                ] else ...[
+                  SizedBox(height: AppResponsive.smallSpacing(context)),
+                  Text(
+                    'Stock is set per variant below.',
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.smallFontSize(context),
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
+                _buildLowStockSection(),
+              ],
+              SizedBox(height: AppResponsive.extraLargeSpacing(context)),
+            ],
+            if (_productType == ProductType.recipeBased) ...[
+              _buildSectionHeader('Availability', Icons.inventory_2_outlined),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
+              _buildAvailableToMakeCard(),
+              SizedBox(height: AppResponsive.mediumSpacing(context)),
+              // No physical stock for Recipe-Based — this only controls whether
+              // POS may sell when the calculated available-to-make figure is
+              // zero, exactly as InventoryService already enforces.
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: Text(
+                  'Allow order if out of stock',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.bodyFontSize(context),
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
-                elevation: 0,
+                subtitle: Text(
+                  'Let staff sell this even when no ingredients remain to make it.',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.smallFontSize(context),
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                value: allowOutOfStockFilter.toLowerCase() == 'yes',
+                activeColor: AppColors.primary,
+                onChanged: (v) =>
+                    setState(() => allowOutOfStockFilter = v ? 'YES' : 'NO'),
+              ),
+              SizedBox(height: AppResponsive.extraLargeSpacing(context)),
+            ],
+
+            // Recipe (Bill of Materials) — Semi-Finished items describe what
+            // they're prepped FROM; Recipe-Based items describe what they're
+            // assembled FROM at sale time. See design doc §3/§4/§8.2.
+            if (PlanEnforce.allows(EntKeys.inventory) &&
+                ProductType.hasRecipe(_productType)) ...[
+              RecipeBuilderWidget(
+                itemId: widget.items.id,
+                allItems: itemStore.items
+                    .where((i) => i.id != widget.items.id)
+                    .toList(),
+                initialRecipe: _currentRecipe,
+                sellingPrice: double.tryParse(_itemPriceController.text.trim()),
+                onChanged: (recipe) => setState(() => _currentRecipe = recipe),
+              ),
+              SizedBox(height: AppResponsive.extraLargeSpacing(context)),
+            ],
+
+            // Item Image Section
+            _buildSectionHeader('Item Image', Icons.image_outlined),
+            SizedBox(height: AppResponsive.largeSpacing(context)),
+            ImageUploader(imageBytes: _displayImageBytes, onTap: _pickImage),
+            SizedBox(height: AppResponsive.extraLargeSpacing(context)),
+
+            // Variants, Choices & Extras Section — always shown so new options can
+            // be created here (via the "+ New" button in each section header).
+            _buildSectionHeader('Additional Options', Icons.extension),
+            SizedBox(height: AppResponsive.largeSpacing(context)),
+            if (_productType != ProductType.rawMaterial &&
+                _productType != ProductType.semiFinished) ...[
+              _buildVariantSection(_allVariants),
+            ],
+            _buildChoiceSection(_allChoices),
+            if (_choiceCheckedList.contains(true))
+              _buildDefaultSelectionButton(_allChoices),
+            _buildExtrtaSection(_allExtra),
+            SizedBox(height: AppResponsive.extraLargeSpacing(context)),
+            // Save Button
+            SizedBox(
+              width: double.infinity,
+              height: AppResponsive.buttonHeight(context),
+              child: ElevatedButton.icon(
+                onPressed: _isSaving ? null : () => _saveChanges(data),
+                icon: _isSaving
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.save, color: Colors.white),
+                label: Text(
+                  _isSaving ? 'Saving…' : 'Save Changes',
+                  style: GoogleFonts.poppins(
+                    color: Colors.white,
+                    fontSize: AppResponsive.subheadingFontSize(context),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  disabledBackgroundColor: AppColors.primary.withValues(
+                    alpha: 0.5,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(
+                      AppResponsive.borderRadius(context),
+                    ),
+                  ),
+                  elevation: 0,
+                ),
               ),
             ),
-          ),
-          SizedBox(height: AppResponsive.largeSpacing(context)),
-        ],
+            SizedBox(height: AppResponsive.largeSpacing(context)),
+          ],
+        ),
       ),
     );
   }
@@ -1258,9 +1272,11 @@ class _EdititemScreenState extends State<EdititemScreen> {
     return Container(
       padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withOpacity(0.3)),
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
@@ -1504,66 +1520,22 @@ class _EdititemScreenState extends State<EdititemScreen> {
                     ),
                   ),
                 ),
-              ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: variants.length,
-                itemBuilder: (context, index) {
-                  final trackOn = selectedFilter.toLowerCase() == 'yes';
-                  // Flex-based layout so name/price/stock share the row width and
-                  // scale on any screen — fixed-width fields used to squeeze the
-                  // name column to nothing (e.g. "Half" wrapped to "Ha"/"lf").
-                  return Row(
-                    children: [
-                      Checkbox(
-                        value: _variantCheckedList[index],
-                        onChanged: (value) =>
-                            setState(() => _variantCheckedList[index] = value!),
-                      ),
-                      Expanded(
-                        flex: 3,
-                        child: Text(
-                          variants[index].name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      SizedBox(width: AppResponsive.smallSpacing(context)),
-                      Expanded(
-                        flex: 3,
-                        child: AppTextField(
-                          controller: _variantPriceControllers[index],
-                          hint: 'Price',
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          inputFormatters: [
-                            FilteringTextInputFormatter.allow(
-                              RegExp(r'^\d*\.?\d{0,2}'),
-                            ),
-                          ],
-                        ),
-                      ),
-                      // Per-variant stock — only when inventory tracking is on.
-                      if (trackOn && _variantCheckedList[index]) ...[
-                        SizedBox(width: AppResponsive.smallSpacing(context)),
-                        Expanded(
-                          flex: 3,
-                          child: AppTextField(
-                            controller: _variantStockControllers[index],
-                            hint: 'Stock',
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                            inputFormatters: [
-                              FilteringTextInputFormatter.allow(
-                                RegExp(r'^\d*\.?\d{0,2}'),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ],
+              // Bucket on the MEASURED row width, not the screen width: the
+              // page cap, page padding and card padding all shrink what a row
+              // actually gets (a 360px phone leaves this ListView ~296px).
+              // Resolve once here and pass it to every row.
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final stacked = constraints.maxWidth < _variantRowStackBelow;
+                  return ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: variants.length,
+                    itemBuilder: (context, index) => _buildVariantRow(
+                      variants[index],
+                      index,
+                      stacked: stacked,
+                    ),
                   );
                 },
               ),
@@ -1574,18 +1546,117 @@ class _EdititemScreenState extends State<EdititemScreen> {
     );
   }
 
+  /// Below this row width the variant fields move to a second line. Derived
+  /// from the single-row layout: a 48px checkbox plus two 8px gaps leaves
+  /// (w - 64) / 3 per column, and AppTextField's static 16px content padding
+  /// eats 32 of that — so under ~400px the price/stock boxes fall below ~70px
+  /// of usable typing width and the name ellipsises to a couple of letters.
+  static const double _variantRowStackBelow = 400;
+
+  /// One variant row. When [stacked], the name gets its own line and the
+  /// price/stock fields sit indented beneath it; otherwise all three share a
+  /// single row. Which fields appear is identical either way.
+  Widget _buildVariantRow(
+    VariantModel variant,
+    int index, {
+    required bool stacked,
+  }) {
+    final trackOn = selectedFilter.toLowerCase() == 'yes';
+    // Per-variant stock — only when inventory tracking is on.
+    final showStock = trackOn && _variantCheckedList[index];
+    final gap = SizedBox(width: AppResponsive.smallSpacing(context));
+
+    final checkbox = Checkbox(
+      value: _variantCheckedList[index],
+      onChanged: (value) => setState(() => _variantCheckedList[index] = value!),
+    );
+
+    final name = Text(
+      variant.name,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: GoogleFonts.poppins(
+        fontSize: AppResponsive.bodyFontSize(context),
+        color: AppColors.textPrimary,
+      ),
+    );
+
+    final priceField = AppTextField(
+      controller: _variantPriceControllers[index],
+      hint: 'Price',
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      inputFormatters: [
+        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+      ],
+    );
+
+    final stockField = AppTextField(
+      controller: _variantStockControllers[index],
+      hint: 'Stock',
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      inputFormatters: [
+        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+      ],
+    );
+
+    if (!stacked) {
+      // Flex-based layout so name/price/stock share the row width and scale on
+      // any screen — fixed-width fields used to squeeze the name column to
+      // nothing (e.g. "Half" wrapped to "Ha"/"lf").
+      return Row(
+        children: [
+          checkbox,
+          Expanded(flex: 3, child: name),
+          gap,
+          Expanded(flex: 3, child: priceField),
+          if (showStock) ...[gap, Expanded(flex: 3, child: stockField)],
+        ],
+      );
+    }
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              checkbox,
+              Expanded(child: name),
+            ],
+          ),
+          Padding(
+            // 48 = the Checkbox's tap-target width, so the fields line up under
+            // the variant name rather than under the checkbox.
+            padding: const EdgeInsets.only(left: 48),
+            child: Row(
+              children: [
+                Expanded(child: priceField),
+                if (showStock) ...[gap, Expanded(child: stockField)],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// Tappable card to set this item's default-selected choice options.
   Widget _buildDefaultSelectionButton(List<ChoicesModel> allChoices) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: InkWell(
         onTap: () => _pickItemDefaults(allChoices),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         child: Container(
           padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
           decoration: BoxDecoration(
             border: Border.all(color: AppColors.divider),
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(
+              AppResponsive.borderRadius(context),
+            ),
           ),
           child: Row(
             children: [
@@ -1639,7 +1710,7 @@ class _EdititemScreenState extends State<EdititemScreen> {
               SizedBox(width: AppResponsive.smallSpacing(context)),
               Icon(
                 Icons.arrow_forward_ios,
-                size: 14,
+                size: AppResponsive.smallIconSize(context),
                 color: AppColors.textSecondary,
               ),
             ],
@@ -1766,7 +1837,13 @@ class _EdititemScreenState extends State<EdititemScreen> {
                 itemBuilder: (context, index) {
                   return CheckboxListTile(
                     controlAffinity: ListTileControlAffinity.leading,
-                    title: Text(choices[index].name),
+                    title: Text(
+                      choices[index].name,
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.bodyFontSize(context),
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
                     value: _choiceCheckedList[index],
                     onChanged: (value) =>
                         setState(() => _choiceCheckedList[index] = value!),
@@ -1884,7 +1961,13 @@ class _EdititemScreenState extends State<EdititemScreen> {
                     children: [
                       CheckboxListTile(
                         controlAffinity: ListTileControlAffinity.leading,
-                        title: Text(extraItem.Ename),
+                        title: Text(
+                          extraItem.Ename,
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.bodyFontSize(context),
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
                         value: isChecked,
                         onChanged: (value) =>
                             setState(() => _extraCheckedList[index] = value!),

@@ -129,7 +129,7 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
                       size: AppResponsive.smallIconSize(context),
                       color: Colors.white,
                     ),
-                    SizedBox(width: 4),
+                    const SizedBox(width: 4),
                     Text(
                       '≤${_alertStore.threshold}',
                       style: GoogleFonts.poppins(
@@ -291,7 +291,11 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
                   AppResponsive.smallBorderRadius(context),
                 ),
               ),
-              child: Icon(alertIcon, color: alertColor, size: 28),
+              child: Icon(
+                alertIcon,
+                color: alertColor,
+                size: AppResponsive.largeIconSize(context),
+              ),
             ),
             SizedBox(width: AppResponsive.largeSpacing(context)),
             // Product Info
@@ -309,7 +313,7 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   if (variantInfo.isNotEmpty) ...[
-                    SizedBox(height: 4),
+                    const SizedBox(height: 4),
                     Text(
                       variantInfo,
                       style: GoogleFonts.poppins(
@@ -334,9 +338,9 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: AppResponsive.largeSpacing(context),
+                    vertical: AppResponsive.smallSpacing(context),
                   ),
                   decoration: BoxDecoration(
                     color: alertColor.withValues(alpha: 0.1),
@@ -353,7 +357,7 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
                     ),
                   ),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
                   'in stock',
                   style: GoogleFonts.poppins(

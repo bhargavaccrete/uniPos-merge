@@ -701,7 +701,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
       ),
       body: AppResponsive.constrainedContent(
         context: context,
-        maxWidth: AppResponsive.maxFormWidth(context),
+        maxWidth: AppResponsive.maxContentWidth(context),
         alignment: Alignment.topCenter,
         child: Column(
           children: [

@@ -218,7 +218,7 @@ class _FoodCostReportScreenState extends State<FoodCostReportScreen> {
             Expanded(
               child: AppResponsive.constrainedContent(
                 context: context,
-                maxWidth: AppResponsive.maxFormWidth(context),
+                maxWidth: AppResponsive.maxContentWidth(context),
                 alignment: Alignment.topCenter,
                 child: TabBarView(
                   children: [
@@ -361,7 +361,6 @@ class _FoodCostCard extends StatelessWidget {
     final Color pillColor = foodCostPercent == null
         ? AppColors.textSecondary
         : colorOf(foodCostPercent);
-    final isSemi = row.item.isSemiFinished;
 
     return Container(
       decoration: BoxDecoration(

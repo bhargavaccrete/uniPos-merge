@@ -307,7 +307,7 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
                 padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
                 child: AppResponsive.constrainedContent(
                   context: context,
-                  maxWidth: AppResponsive.maxFormWidth(context),
+                  maxWidth: AppResponsive.maxContentWidth(context),
                   heightFactor: 1,
                   child: Column(
                     children: [
@@ -340,7 +340,7 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
               Expanded(
                 child: AppResponsive.constrainedContent(
                   context: context,
-                  maxWidth: AppResponsive.maxFormWidth(context),
+                  maxWidth: AppResponsive.maxContentWidth(context),
                   alignment: Alignment.topCenter,
                   child: visibleItems.isEmpty
                       ? Center(
@@ -592,7 +592,7 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
         top: false,
         child: AppResponsive.constrainedContent(
           context: context,
-          maxWidth: AppResponsive.maxFormWidth(context),
+          maxWidth: AppResponsive.maxContentWidth(context),
           heightFactor: 1,
           child: Row(
             children: [

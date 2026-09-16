@@ -97,6 +97,11 @@ class CartCalculationService {
   /// ₹ value of loyalty points redeemed. Reduces the taxable base BEFORE GST
   /// (treated like a discount) so GST is charged on the post-redemption amount.
   final double loyaltyRedemption;
+  /// Optional: the tax flag a saved bill was made under. Reprints pass it so
+  /// the totals don't follow a later change to tax registration.
+  final bool? taxEnabled;
+  /// Optional: the round-off step a saved bill was settled with (0 = off).
+  final double? roundOffStep;
 
   // --- Final Calculated Properties ---
   /// Item Total = Gross total of all items (before discount)
@@ -135,6 +140,8 @@ class CartCalculationService {
     bool? isTaxInclusive,
     bool? discountOnItems,
     double loyaltyRedemption = 0.0,
+    bool? taxEnabled,
+    double? roundOffStep,
   }) : this.fromLines(
           lines: items
               .map((i) => CalcLine(
@@ -151,6 +158,8 @@ class CartCalculationService {
           isTaxInclusive: isTaxInclusive,
           discountOnItems: discountOnItems,
           loyaltyRedemption: loyaltyRedemption,
+          taxEnabled: taxEnabled,
+          roundOffStep: roundOffStep,
         );
 
   /// Model-agnostic entry point. Retail uses this via `RetailBillingService`.
@@ -164,6 +173,8 @@ class CartCalculationService {
     this.isTaxInclusive, // If provided, use this instead of AppSettings
     this.discountOnItems, // If provided, use this instead of AppSettings
     this.loyaltyRedemption = 0.0,
+    this.taxEnabled,
+    this.roundOffStep,
   }) {
     // The calculation is triggered the moment the service is created.
     _calculate();
@@ -214,7 +225,7 @@ class CartCalculationService {
     final List<CalcLineResult> results = [];
 
     // STEP 3: Loop through items
-    final bool taxFeatureEnabled = TaxFeature.enabled;
+    final bool taxFeatureEnabled = TaxFeature.forRecord(taxEnabled);
     for (int i = 0; i < lines.length; i++) {
       final item = lines[i];
       final double itemOriginalAmount = item.price * item.quantity;
@@ -386,9 +397,9 @@ class CartCalculationService {
     // STEP 6: Grand Total
     double calculatedTotal = taxableAmount + totalGST + serviceChargeAmount;
 
-    // STEP 7: Round Off
-    if (AppSettings.roundOff) {
-      final roundTo = double.parse(AppSettings.selectedRoundOffValue);
+    // STEP 7: Round Off — a saved bill passes the step it was settled with.
+    final double roundTo = roundOffStep ?? AppSettings.roundOffStepForRecord;
+    if (roundTo > 0) {
       final roundedTotal = _roundToNearest(calculatedTotal, roundTo);
       roundOffAmount = roundedTotal - calculatedTotal;
       grandTotal = roundedTotal;

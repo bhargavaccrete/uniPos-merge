@@ -1094,6 +1094,9 @@ class _OrderdetailsState extends State<Orderdetails> {
         deliveryCharge: currentOrder.serviceCharge ?? 0,
         isTaxInclusive:
             currentOrder.isTaxInclusive, // Use stored tax mode from order
+        taxEnabled: currentOrder.taxEnabled,
+        discountOnItems: currentOrder.discountOnItems,
+        roundOffStep: currentOrder.roundOffStep,
       );
 
       // Print using RestaurantPrintHelper
@@ -1103,6 +1106,8 @@ class _OrderdetailsState extends State<Orderdetails> {
         calculations: calculations,
         billNumber: currentOrder.billNumber,
         loyaltyPointsDiscount: currentOrder.loyaltyPointsUsed ?? 0,
+        taxEnabled: currentOrder.taxEnabled,
+        storeGstNumber: currentOrder.storeGstNumber,
       );
     } catch (e) {
       NotificationService.instance.showError('Failed to print: $e');

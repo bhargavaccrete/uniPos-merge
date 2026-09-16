@@ -126,14 +126,19 @@ class ExpiryAlertsScreen extends StatelessWidget {
     final unit = item['unit'] as String?;
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 10),
+      margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
+      // A Card with no explicit colour falls back to the M3 default surface,
+      // and main.dart declares no colorScheme — so this rendered lavender
+      // while the sibling Stock Alerts row (a plain Container) was white.
+      color: AppColors.white,
+      surfaceTintColor: Colors.transparent,
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
         side: BorderSide(color: color.withValues(alpha: 0.3)),
       ),
       child: Padding(
-        padding: AppResponsive.padding(context),
+        padding: AppResponsive.cardPadding(context),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -150,7 +155,7 @@ class ExpiryAlertsScreen extends StatelessWidget {
                     ),
                   ),
                   if (_variantDescription(item).isNotEmpty) ...[
-                    SizedBox(height: 2),
+                    const SizedBox(height: 2),
                     Text(
                       _variantDescription(item),
                       style: GoogleFonts.poppins(
@@ -159,7 +164,7 @@ class ExpiryAlertsScreen extends StatelessWidget {
                       ),
                     ),
                   ],
-                  SizedBox(height: 6),
+                  const SizedBox(height: 6),
                   AppStatusPill(label: status.label, color: color, dense: true),
                 ],
               ),
@@ -177,7 +182,7 @@ class ExpiryAlertsScreen extends StatelessWidget {
                       color: color,
                     ),
                   ),
-                SizedBox(height: 2),
+                const SizedBox(height: 2),
                 Text(
                   _relativeLabel(daysUntil),
                   style: GoogleFonts.poppins(
@@ -185,7 +190,7 @@ class ExpiryAlertsScreen extends StatelessWidget {
                     color: color.withValues(alpha: 0.8),
                   ),
                 ),
-                SizedBox(height: 6),
+                const SizedBox(height: 6),
                 Text(
                   '${formatQty(stock)}${unit == null ? '' : ' $unit'} in stock',
                   style: GoogleFonts.poppins(

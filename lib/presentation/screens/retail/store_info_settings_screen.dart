@@ -7,6 +7,9 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
 import 'package:billberrylite/core/config/food_license_rule.dart';
+import 'package:billberrylite/core/config/tax_id_rule.dart';
+import 'package:billberrylite/domain/services/restaurant/day_management_service.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:flutter/services.dart';
 import 'package:billberrylite/util/color.dart';
@@ -34,10 +37,19 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
   final _emailController = TextEditingController();
   final _gstNumberController = TextEditingController();
   final _foodLicenseController = TextEditingController();
+  final _panController = TextEditingController();
 
   // Logo
   Uint8List? _logoBytes;
   bool _logoChanged = false;
+
+  // Tax registration as saved, and as currently chosen on screen. Written only
+  // on Save, and only while no day is open.
+  bool _savedRegistered = true;
+  bool _isRegistered = true;
+
+  static const _dayOpenMessage =
+      'Close the day with End of Day before changing tax registration.';
 
   bool _isLoading = true;
   bool _isSaving = false;
@@ -69,6 +81,9 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
     // for it, and the receipt builders read it straight off BusinessDetails.
     _foodLicenseController.text =
         businessDetailsRepository.get()?.foodLicenseNo ?? '';
+    _isRegistered = _savedRegistered = TaxIdRule.isRegistered;
+    // PAN, like the food licence, lives only on BusinessDetails.
+    _panController.text = businessDetailsRepository.get()?.pan ?? '';
     _logoBytes = await _storeSettingsService.getStoreLogo();
 
     setState(() => _isLoading = false);
@@ -116,30 +131,75 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
     });
   }
 
+  /// Carts and the retail bill do not re-read the tax flag mid-sale, so the
+  /// switch is only allowed with no session open and no End of Day pending.
+  Future<bool> _dayIsOpen() async =>
+      await DayManagementService.isDayStarted() ||
+      await DayManagementService.hasPendingEOD();
+
+  Future<void> _onRegistrationToggled(bool registered) async {
+    if (await _dayIsOpen()) {
+      NotificationService.instance.showError(_dayOpenMessage);
+      return;
+    }
+    if (!mounted) return;
+    final number = TaxIdRule.label;
+    final confirm = await showAppConfirmDialog(
+      context: context,
+      title: registered ? 'Turn on tax?' : 'Turn off tax?',
+      message: registered
+          ? 'After you save, new bills will charge tax at each item\'s tax '
+                'rate and your $number will print on bills. Saved bills keep '
+                'their amounts.'
+          : 'After you save, new bills will charge no tax and your $number '
+                'will stop printing. Item tax rates and your $number are kept, '
+                'so you can turn tax back on later. Saved bills keep their '
+                'amounts.',
+      confirmLabel: registered ? 'Turn On' : 'Turn Off',
+      accent: registered ? AppColors.primary : AppColors.warning,
+      icon: Icons.receipt_long_rounded,
+    );
+    if (!confirm || !mounted) return;
+    setState(() => _isRegistered = registered);
+  }
+
   Future<void> _saveSettings() async {
     if (!_formKey.currentState!.validate()) return;
 
+    // Re-checked here: a day could have been started after the switch moved.
+    final registrationChanged = _isRegistered != _savedRegistered;
+    if (registrationChanged && await _dayIsOpen()) {
+      NotificationService.instance.showError(_dayOpenMessage);
+      return;
+    }
+
     setState(() => _isSaving = true);
+
+    bool registrationSuccess = true;
+    if (registrationChanged) {
+      try {
+        await businessDetailsRepository.saveTaxRegistration(_isRegistered);
+        _savedRegistered = _isRegistered;
+      } catch (e) {
+        registrationSuccess = false;
+        debugPrint('StoreInfoSettings: failed to save tax registration: $e');
+      }
+    }
 
     // Save text settings
     final success = await _storeSettingsService.saveAllSettings(
       storeName: _storeNameController.text,
-      ownerName: _ownerNameController.text.isNotEmpty
-          ? _ownerNameController.text
-          : null,
-      address: _addressController.text.isNotEmpty
-          ? _addressController.text
-          : null,
-      city: _cityController.text.isNotEmpty ? _cityController.text : null,
-      state: _stateController.text.isNotEmpty ? _stateController.text : null,
-      pincode: _pincodeController.text.isNotEmpty
-          ? _pincodeController.text
-          : null,
-      phone: _phoneController.text.isNotEmpty ? _phoneController.text : null,
-      email: _emailController.text.isNotEmpty ? _emailController.text : null,
-      gstNumber: _gstNumberController.text.isNotEmpty
-          ? _gstNumberController.text
-          : null,
+      // Optional fields are always passed: null means "leave unchanged", so an
+      // emptied field used to keep its old value on bills. A blank value now
+      // removes it (StoreSettingsService._setOrRemove).
+      ownerName: _ownerNameController.text.trim(),
+      address: _addressController.text.trim(),
+      city: _cityController.text.trim(),
+      state: _stateController.text.trim(),
+      pincode: _pincodeController.text.trim(),
+      phone: _phoneController.text.trim(),
+      email: _emailController.text.trim(),
+      gstNumber: _gstNumberController.text.trim(),
     );
 
     // Food licence has no prefs key — persist it to the Hive record the
@@ -149,7 +209,10 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
       final details = businessDetailsRepository.get();
       if (details != null) {
         await businessDetailsRepository.save(
-          details.copyWith(foodLicenseNo: _foodLicenseController.text.trim()),
+          details.copyWith(
+            foodLicenseNo: _foodLicenseController.text.trim(),
+            pan: _panController.text.trim(),
+          ),
         );
       }
     } catch (e) {
@@ -170,10 +233,13 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
     setState(() => _isSaving = false);
 
     if (mounted) {
-      final bool allSuccess = success && logoSuccess && licenseSuccess;
+      final bool allSuccess =
+          success && logoSuccess && licenseSuccess && registrationSuccess;
       if (allSuccess) {
         NotificationService.instance.showSuccess(
-          'Store information saved successfully',
+          registrationChanged && _isRegistered
+              ? 'Saved. Tax is on — set up rates in Tax Settings and apply them to your products.'
+              : 'Store information saved successfully',
         );
       } else {
         NotificationService.instance.showError('Failed to save some settings');
@@ -197,6 +263,7 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
     _emailController.dispose();
     _gstNumberController.dispose();
     _foodLicenseController.dispose();
+    _panController.dispose();
     super.dispose();
   }
 
@@ -277,7 +344,7 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
                         controller: _storeNameController,
                         label: 'Store Name',
                         icon: Icons.store,
-                        hint: 'e.g., ABC Retail Store',
+                        hint: 'e.g., ABC Store',
                         validator: (value) {
                           if (value == null || value.isEmpty) {
                             return 'Store name is required';
@@ -293,14 +360,36 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
                         hint: 'e.g., John Doe',
                       ),
                       SizedBox(height: AppResponsive.largeSpacing(context)),
-                      _buildTextField(
-                        controller: _gstNumberController,
-                        label: 'GST Number',
-                        icon: Icons.account_balance_wallet,
-                        hint: 'e.g., 22AAAAA0000A1Z5',
-                        textCapitalization: TextCapitalization.characters,
-                      ),
+                      _buildTaxRegistrationCard(),
                       SizedBox(height: AppResponsive.largeSpacing(context)),
+                      // Hidden while "Not Registered", as on Store Details. The
+                      // controller keeps the value and saves it back unchanged,
+                      // so turning registration off never clears the number.
+                      if (_isRegistered) ...[
+                        _buildTextField(
+                          controller: _gstNumberController,
+                          label: TaxIdRule.label,
+                          icon: Icons.account_balance_wallet,
+                          hint: TaxIdRule.hint,
+                          maxLength: TaxIdRule.maxLength,
+                          textCapitalization: TextCapitalization.characters,
+                          validator: TaxIdRule.validate,
+                        ),
+                        SizedBox(height: AppResponsive.largeSpacing(context)),
+                        // PAN is India-only, as on Store Details.
+                        if (TaxIdRule.isIndia) ...[
+                          _buildTextField(
+                            controller: _panController,
+                            label: 'PAN',
+                            icon: Icons.credit_card_rounded,
+                            hint: 'e.g. ABCDE1234F',
+                            maxLength: 10,
+                            textCapitalization: TextCapitalization.characters,
+                            validator: TaxIdRule.validatePan,
+                          ),
+                          SizedBox(height: AppResponsive.largeSpacing(context)),
+                        ],
+                      ],
                       _buildTextField(
                         controller: _foodLicenseController,
                         label: FoodLicenseRule.label,
@@ -427,6 +516,45 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
                   ),
                 ),
               ),
+      ),
+    );
+  }
+
+  Widget _buildTaxRegistrationCard() {
+    final radius = BorderRadius.circular(AppResponsive.borderRadius(context));
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: radius,
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: SwitchListTile(
+        shape: RoundedRectangleBorder(borderRadius: radius),
+        value: _isRegistered,
+        onChanged: _isSaving ? null : _onRegistrationToggled,
+        activeThumbColor: AppColors.primary,
+        secondary: Icon(
+          Icons.receipt_long_rounded,
+          color: AppColors.primary,
+          size: AppResponsive.iconSize(context),
+        ),
+        title: Text(
+          TaxIdRule.registrationTitle,
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.bodyFontSize(context),
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        subtitle: Text(
+          _isRegistered
+              ? 'Registered — tax is charged on bills'
+              : 'Not registered — no tax is charged',
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.captionFontSize(context),
+            color: AppColors.textSecondary,
+          ),
+        ),
       ),
     );
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/core/config/tax_id_rule.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -225,7 +226,7 @@ class _RestaurantSupplierFormSheetState
                 const SizedBox(height: 14),
                 AppTextField(
                   controller: _gstController,
-                  label: 'GST number',
+                  label: TaxIdRule.label,
                   hint: 'Optional',
                   icon: Icons.receipt_long_outlined,
                   textCapitalization: TextCapitalization.characters,

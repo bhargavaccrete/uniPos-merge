@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/core/config/tax_id_rule.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -124,8 +125,8 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
                 SizedBox(height: AppResponsive.mediumSpacing(context)),
                 AppTextField(
                   controller: gstController,
-                  label: 'GST Number',
-                  hint: 'e.g. 22AAAAA0000A1Z5',
+                  label: TaxIdRule.label,
+                  hint: TaxIdRule.hint,
                   icon: Icons.badge_outlined,
                   textCapitalization: TextCapitalization.characters,
                 ),

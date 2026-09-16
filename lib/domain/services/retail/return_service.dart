@@ -397,6 +397,8 @@ class ReturnService {
       // Carried from the sale being reversed so a reprint renders under the
       // rules it was charged under, not today's settings.
       isTaxInclusive: original.isTaxInclusive,
+      taxEnabled: original.taxEnabled,
+      storeGstNumber: original.storeGstNumber,
       // A return settles immediately; there is no receivable on a credit note.
       paidAmount: -figures.totalAmount,
       dueAmount: 0,

@@ -5,6 +5,9 @@ import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/stores/payment_method_store.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 
 class PaymentSetupScreen extends StatefulWidget {
   final VoidCallback? onComplete;
@@ -48,88 +51,78 @@ class _PaymentSetupScreenState extends State<PaymentSetupScreen> {
 
     await showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Add Payment Method'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameController,
-                  decoration: InputDecoration(
-                    labelText: 'Display Name',
-                    hintText: 'e.g., PayTM, GPay',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AppDialogShell(
+          title: 'Add Payment Method',
+          icon: Icons.payment,
+          accent: AppColors.primary,
+          // No SingleChildScrollView here - AppDialogShell already wraps the
+          // body in Flexible(SingleChildScrollView(...)).
+          body: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AppTextField(
+                controller: nameController,
+                label: 'Display Name',
+                hint: 'e.g., PayTM, GPay',
+              ),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
+              AppTextField(
+                controller: valueController,
+                label: 'Internal Value',
+                hint: 'e.g., paytm, gpay',
+              ),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
+              DropdownButtonFormField<String>(
+                value: selectedIcon,
+                decoration: InputDecoration(
+                  labelText: 'Icon',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                SizedBox(height: AppResponsive.largeSpacing(context)),
-                TextField(
-                  controller: valueController,
-                  decoration: InputDecoration(
-                    labelText: 'Internal Value',
-                    hintText: 'e.g., paytm, gpay',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
+                items: _availableIcons.entries.map((entry) {
+                  return DropdownMenuItem(
+                    value: entry.key,
+                    child: Row(
+                      children: [
+                        Icon(
+                          entry.value,
+                          size: AppResponsive.iconSize(context),
+                        ),
+                        SizedBox(width: AppResponsive.smallSpacing(context)),
+                        Text(entry.key),
+                      ],
                     ),
-                  ),
-                ),
-                SizedBox(height: AppResponsive.largeSpacing(context)),
-                DropdownButtonFormField<String>(
-                  value: selectedIcon,
-                  decoration: InputDecoration(
-                    labelText: 'Icon',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  items: _availableIcons.entries.map((entry) {
-                    return DropdownMenuItem(
-                      value: entry.key,
-                      child: Row(
-                        children: [
-                          Icon(
-                            entry.value,
-                            size: AppResponsive.iconSize(context),
-                          ),
-                          SizedBox(width: AppResponsive.smallSpacing(context)),
-                          Text(entry.key),
-                        ],
-                      ),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    setDialogState(() {
-                      selectedIcon = value!;
-                    });
-                  },
-                ),
-              ],
-            ),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  setDialogState(() {
+                    selectedIcon = value!;
+                  });
+                },
+              ),
+            ],
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
+            appDialogCancelButton(dialogContext),
+            appDialogPrimaryButton(
+              label: 'Add',
               onPressed: () async {
-                if (nameController.text.isNotEmpty &&
-                    valueController.text.isNotEmpty) {
-                  await _store.addPaymentMethod(
-                    name: nameController.text,
-                    value: valueController.text,
-                    iconName: selectedIcon,
-                  );
-                  if (mounted) Navigator.pop(context);
+                if (nameController.text.isEmpty ||
+                    valueController.text.isEmpty) {
+                  return;
                 }
+                // Navigator captured before the await - the dialog context is
+                // not what the State's `mounted` flag tracks.
+                final nav = Navigator.of(dialogContext);
+                await _store.addPaymentMethod(
+                  name: nameController.text,
+                  value: valueController.text,
+                  iconName: selectedIcon,
+                );
+                nav.pop();
               },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-              ),
-              child: const Text('Add'),
             ),
           ],
         ),
@@ -138,28 +131,16 @@ class _PaymentSetupScreenState extends State<PaymentSetupScreen> {
   }
 
   Future<void> _deleteMethod(String id) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAppConfirmDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Payment Method'),
-        content: const Text(
-          'Are you sure you want to delete this payment method?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+      title: 'Delete Payment Method',
+      message: 'Are you sure you want to delete this payment method?',
+      confirmLabel: 'Delete',
+      accent: AppColors.danger,
+      icon: Icons.delete_outline_rounded,
     );
 
-    if (confirmed == true) {
+    if (confirmed) {
       await _store.deletePaymentMethod(id);
     }
   }
@@ -171,11 +152,7 @@ class _PaymentSetupScreenState extends State<PaymentSetupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Payment Methods Setup'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-      ),
+      appBar: buildPrimaryAppBar(title: 'Payment Methods Setup'),
       body: AppResponsive.constrainedContent(
         context: context,
         alignment: Alignment.topCenter,
@@ -242,6 +219,11 @@ class _PaymentSetupScreenState extends State<PaymentSetupScreen> {
                           itemBuilder: (context, index) {
                             final method = _store.paymentMethods[index];
                             return Card(
+                              // Explicit white + no surface tint — see
+                              // eod_reports_list_screen: an untinted Card
+                              // picks up M3's default lavender at elevation.
+                              color: AppColors.white,
+                              surfaceTintColor: Colors.transparent,
                               margin: EdgeInsets.only(
                                 bottom: AppResponsive.mediumSpacing(context),
                               ),
@@ -262,7 +244,9 @@ class _PaymentSetupScreenState extends State<PaymentSetupScreen> {
                                   ),
                                   decoration: BoxDecoration(
                                     color: method.isEnabled
-                                        ? AppColors.primary.withOpacity(0.1)
+                                        ? AppColors.primary.withValues(
+                                            alpha: 0.1,
+                                          )
                                         : Colors.grey[200],
                                     borderRadius: BorderRadius.circular(10),
                                   ),
@@ -336,7 +320,7 @@ class _PaymentSetupScreenState extends State<PaymentSetupScreen> {
                     color: Colors.white,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
+                        color: Colors.black.withValues(alpha: 0.05),
                         blurRadius: 10,
                         offset: const Offset(0, -2),
                       ),

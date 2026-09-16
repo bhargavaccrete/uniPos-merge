@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hive/hive.dart';
@@ -8,12 +7,19 @@ import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/data/models/restaurant/db/cash_handover_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/cash_movement_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/pastordermodel_313.dart';
-import 'package:billberrylite/data/models/restaurant/db/expensel_316.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
-import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_app_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_body.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_date_step_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_card.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_empty_state.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_export_button.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_filter_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_summary_card.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_summary_row.dart';
 import 'package:billberrylite/domain/services/common/report_export_service.dart';
 
 // ─── Draft model (pre-sort, no running balance yet) ──────────────────────────
@@ -87,21 +93,62 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
   List<_HistoryRow> _allRows = [];
   List<_HistoryRow> _filteredRows = [];
 
-  DateTime _fromDate = DateTime.now();
-  DateTime _toDate = DateTime.now();
+  /// This ledger reads one day at a time — a drawer is opened, worked and
+  /// closed within a day, and the running balance only means anything inside
+  /// one. A from/to pair implied a range the report never really wanted.
+  DateTime _selectedDate = DateTime.now();
   String _typeFilter = 'All';
 
+  /// Movement types, not reporting periods — this ledger filters by what the
+  /// cash did, so it feeds the generic ReportFilterBar rather than adopting
+  /// ReportPeriodFilterBar. The day stays on its own step bar above.
   static const _typeOptions = [
-    'All',
-    'Opening',
-    'Sale',
-    'Refund',
-    'Expense',
-    'Cash In',
-    'Cash Out',
-    'Withdrawal',
-    'Adjustment',
-    'Shift End',
+    ReportFilterOption(
+      value: 'All',
+      label: 'All',
+      icon: Icons.list_alt_rounded,
+    ),
+    ReportFilterOption(
+      value: 'Opening',
+      label: 'Opening',
+      icon: Icons.play_circle_outline,
+    ),
+    ReportFilterOption(value: 'Sale', label: 'Sale', icon: Icons.point_of_sale),
+    ReportFilterOption(
+      value: 'Refund',
+      label: 'Refund',
+      icon: Icons.undo_rounded,
+    ),
+    ReportFilterOption(
+      value: 'Expense',
+      label: 'Expense',
+      icon: Icons.receipt_long_outlined,
+    ),
+    ReportFilterOption(
+      value: 'Cash In',
+      label: 'Cash In',
+      icon: Icons.arrow_downward_rounded,
+    ),
+    ReportFilterOption(
+      value: 'Cash Out',
+      label: 'Cash Out',
+      icon: Icons.arrow_upward_rounded,
+    ),
+    ReportFilterOption(
+      value: 'Withdrawal',
+      label: 'Withdrawal',
+      icon: Icons.account_balance_outlined,
+    ),
+    ReportFilterOption(
+      value: 'Adjustment',
+      label: 'Adjustment',
+      icon: Icons.tune_rounded,
+    ),
+    ReportFilterOption(
+      value: 'Shift End',
+      label: 'Shift End',
+      icon: Icons.stop_circle_outlined,
+    ),
   ];
 
   // Pre-computed summary totals
@@ -409,10 +456,85 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
     return 0.0;
   }
 
+  // ── Day selection ───────────────────────────────────────────────────────────
+
+  bool _isToday(DateTime d) {
+    final now = DateTime.now();
+    return d.year == now.year && d.month == now.month && d.day == now.day;
+  }
+
+  void _stepDay(int delta) {
+    final next = DateTime(
+      _selectedDate.year,
+      _selectedDate.month,
+      _selectedDate.day + delta,
+    );
+    if (next.isAfter(DateTime.now())) return;
+    setState(() => _selectedDate = next);
+    _applyFilter();
+  }
+
+  Future<void> _pickDay() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      // The picker's colours come from Theme.datePickerTheme, which main.dart
+      // never sets — so by default it renders in Material 3's own palette, a
+      // lavender-tinted surface under a blue-violet header. A ColorScheme
+      // override alone does NOT fix that: M3 tints the surface by elevation,
+      // so surfaceTintColor has to be cleared explicitly.
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          datePickerTheme: DatePickerThemeData(
+            backgroundColor: AppColors.white,
+            surfaceTintColor: Colors.transparent,
+            headerBackgroundColor: AppColors.primary,
+            headerForegroundColor: AppColors.white,
+            elevation: 2,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            todayBorder: const BorderSide(color: AppColors.primary),
+            dayBackgroundColor: WidgetStateProperty.resolveWith(
+              (s) =>
+                  s.contains(WidgetState.selected) ? AppColors.primary : null,
+            ),
+            dayForegroundColor: WidgetStateProperty.resolveWith(
+              (s) => s.contains(WidgetState.selected)
+                  ? AppColors.white
+                  : AppColors.textPrimary,
+            ),
+            todayForegroundColor: WidgetStateProperty.resolveWith(
+              (s) => s.contains(WidgetState.selected)
+                  ? AppColors.white
+                  : AppColors.primary,
+            ),
+            yearBackgroundColor: WidgetStateProperty.resolveWith(
+              (s) =>
+                  s.contains(WidgetState.selected) ? AppColors.primary : null,
+            ),
+            yearForegroundColor: WidgetStateProperty.resolveWith(
+              (s) => s.contains(WidgetState.selected)
+                  ? AppColors.white
+                  : AppColors.textPrimary,
+            ),
+          ),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked == null) return;
+    setState(() => _selectedDate = picked);
+    _applyFilter();
+  }
+
   void _applyFilter() {
-    // Half-open: [from, toExclusive)
-    final from = DateTime(_fromDate.year, _fromDate.month, _fromDate.day);
-    final toExclusive = DateTime(_toDate.year, _toDate.month, _toDate.day + 1);
+    // Half-open: [from, toExclusive) — the selected day, midnight to midnight.
+    final d = _selectedDate;
+    final from = DateTime(d.year, d.month, d.day);
+    final toExclusive = DateTime(d.year, d.month, d.day + 1);
 
     final results = <_HistoryRow>[];
     double inSum = 0.0;
@@ -442,140 +564,6 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
       _totalOut = outSum;
       _net = inSum - outSum;
     });
-  }
-
-  Future<void> _showDateOptions() async {
-    await showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(
-                color: AppColors.divider,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  Icons.today_outlined,
-                  color: AppColors.primary,
-                  size: 20,
-                ),
-              ),
-              title: Text(
-                'Single Day',
-                style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-              ),
-              subtitle: Text(
-                'View one specific day',
-                style: GoogleFonts.poppins(
-                  fontSize: AppResponsive.smallFontSize(context),
-                  color: AppColors.textSecondary,
-                ),
-              ),
-              onTap: () {
-                Navigator.pop(ctx);
-                _pickSingleDay();
-              },
-            ),
-            ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  Icons.date_range_outlined,
-                  color: AppColors.primary,
-                  size: 20,
-                ),
-              ),
-              title: Text(
-                'Date Range',
-                style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-              ),
-              subtitle: Text(
-                'View multiple days',
-                style: GoogleFonts.poppins(
-                  fontSize: AppResponsive.smallFontSize(context),
-                  color: AppColors.textSecondary,
-                ),
-              ),
-              onTap: () {
-                Navigator.pop(ctx);
-                _pickDateRange();
-              },
-            ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _pickSingleDay() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _fromDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
-      builder: (context, child) => Theme(
-        data: ThemeData.light().copyWith(
-          colorScheme: ColorScheme.light(
-            primary: AppColors.primary,
-            onPrimary: Colors.white,
-          ),
-        ),
-        child: child!,
-      ),
-    );
-    if (picked != null) {
-      setState(() {
-        _fromDate = picked;
-        _toDate = picked;
-      });
-      _applyFilter();
-    }
-  }
-
-  Future<void> _pickDateRange() async {
-    final range = await showDateRangePicker(
-      context: context,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
-      initialDateRange: DateTimeRange(start: _fromDate, end: _toDate),
-      builder: (context, child) => Theme(
-        data: ThemeData.light().copyWith(
-          colorScheme: ColorScheme.light(
-            primary: AppColors.primary,
-            onPrimary: Colors.white,
-          ),
-        ),
-        child: child!,
-      ),
-    );
-    if (range != null) {
-      setState(() {
-        _fromDate = range.start;
-        _toDate = range.end;
-      });
-      _applyFilter();
-    }
   }
 
   // ── Export (Excel + PDF via the shared report service) ──────────────────────
@@ -616,8 +604,7 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
         )
         .toList();
 
-    final periodName =
-        '${dateFmt.format(_fromDate)} – ${dateFmt.format(_toDate)}';
+    final periodName = dateFmt.format(_selectedDate);
     final summary = {
       'Report Period': periodName,
       'Total In': ReportExportService.formatCurrency(_totalIn),
@@ -645,189 +632,52 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
     final currency = CurrencyHelper.currentSymbol;
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      appBar: buildPrimaryAppBar(
-        titleWidget: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Cash Drawer History',
-              style: GoogleFonts.poppins(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-                fontSize: AppResponsive.headingFontSize(context),
-              ),
-            ),
-            Text(
-              'Full audit trail — every cash movement',
-              style: GoogleFonts.poppins(
-                color: Colors.white70,
-                fontSize: AppResponsive.smallFontSize(context),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.file_download_outlined),
-            tooltip: 'Export Report',
-            onPressed: _filteredRows.isEmpty ? null : _exportReport,
-          ),
-        ],
+      appBar: reportAppBar(
+        title: 'Cash Drawer History',
+        subtitle: 'Full audit trail — every cash movement',
       ),
-      // Filter/summary bars are margin'd cards, not full-bleed strips, so the
-      // whole body caps together. The Scaffold background still spans.
-      body: AppResponsive.constrainedContent(
-        context: context,
-        maxWidth: AppResponsive.maxFormWidth(context),
-        alignment: Alignment.topCenter,
-        child: Column(
-          children: [
-            if (!_isLoading) ...[
-              _buildFilterBar(context),
-              _buildSummaryBar(context, currency),
-            ],
-            Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : _filteredRows.isEmpty
-                  ? _buildEmpty(context)
-                  : _buildTable(context, currency),
+      body: Column(
+        children: [
+          if (!_isLoading) ...[
+            // The day comes first — it's this ledger's scope; the type chips
+            // below only refine what's already in that day. Stepping matters
+            // here: checking yesterday's drawer is one tap, not a dialog.
+            ReportDateStepBar(
+              value: _selectedDate,
+              label: DateFormat('EEE, dd MMM yyyy').format(_selectedDate),
+              onPrevious: () => _stepDay(-1),
+              // Null at today so the ledger can't run into the future.
+              onNext: _isToday(_selectedDate) ? null : () => _stepDay(1),
+              onPick: _pickDay,
             ),
+            ReportFilterBar<String>(
+              options: _typeOptions,
+              selected: _typeFilter,
+              onSelected: (option) {
+                setState(() => _typeFilter = option);
+                _applyFilter();
+              },
+            ),
+            AppResponsive.verticalSpace(context, size: SpacingSize.small),
           ],
-        ),
+          Expanded(child: _buildContent(context, currency)),
+        ],
       ),
     );
   }
 
-  // ── Filter bar ───────────────────────────────────────────────────────────────
+  Widget _buildContent(BuildContext context, String currency) {
+    if (_isLoading) return const ReportLoading();
+    if (_filteredRows.isEmpty) return _buildEmpty(context);
 
-  Widget _buildFilterBar(BuildContext context) {
-    final dateFmt = DateFormat('dd MMM yy');
-    final isSingleDay =
-        _fromDate.year == _toDate.year &&
-        _fromDate.month == _toDate.month &&
-        _fromDate.day == _toDate.day;
-    final dateLabel = isSingleDay
-        ? dateFmt.format(_fromDate)
-        : '${dateFmt.format(_fromDate)}  –  ${dateFmt.format(_toDate)}';
-
-    return Container(
-      margin: EdgeInsets.fromLTRB(
-        AppResponsive.largeSpacing(context),
-        AppResponsive.mediumSpacing(context),
-        AppResponsive.largeSpacing(context),
-        0,
-      ),
-      padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(
-          AppResponsive.borderRadius(context),
-        ),
-        border: Border.all(color: AppColors.divider),
-      ),
+    return ReportBody(
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Date picker button
-          GestureDetector(
-            onTap: _showDateOptions,
-            child: Container(
-              padding: EdgeInsets.symmetric(
-                horizontal: AppResponsive.mediumSpacing(context),
-                vertical: AppResponsive.smallSpacing(context) + 2,
-              ),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.07),
-                borderRadius: BorderRadius.circular(
-                  AppResponsive.borderRadius(context),
-                ),
-                border: Border.all(
-                  color: AppColors.primary.withValues(alpha: 0.25),
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    isSingleDay
-                        ? Icons.today_outlined
-                        : Icons.date_range_outlined,
-                    size: AppResponsive.smallIconSize(context),
-                    color: AppColors.primary,
-                  ),
-                  SizedBox(width: AppResponsive.smallSpacing(context)),
-                  Text(
-                    dateLabel,
-                    style: GoogleFonts.poppins(
-                      fontSize: AppResponsive.bodyFontSize(context),
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                  SizedBox(width: AppResponsive.smallSpacing(context)),
-                  Icon(
-                    Icons.arrow_drop_down,
-                    size: AppResponsive.iconSize(context),
-                    color: AppColors.primary,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          SizedBox(height: AppResponsive.mediumSpacing(context)),
-          // Type filter chips
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: _typeOptions.map((option) {
-                final isSelected = _typeFilter == option;
-                return Padding(
-                  padding: EdgeInsets.only(
-                    right: AppResponsive.smallSpacing(context),
-                  ),
-                  child: GestureDetector(
-                    onTap: () {
-                      setState(() => _typeFilter = option);
-                      _applyFilter();
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 150),
-                      padding: EdgeInsets.symmetric(
-                        horizontal: AppResponsive.largeSpacing(context),
-                        vertical: AppResponsive.smallSpacing(context),
-                      ),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? AppColors.primary
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: isSelected
-                              ? AppColors.primary
-                              : AppColors.divider,
-                          width: isSelected ? 1.5 : 1,
-                        ),
-                      ),
-                      child: Text(
-                        option,
-                        style: GoogleFonts.poppins(
-                          fontSize: AppResponsive.smallFontSize(context),
-                          fontWeight: isSelected
-                              ? FontWeight.w700
-                              : FontWeight.w500,
-                          color: isSelected
-                              ? Colors.white
-                              : AppColors.textSecondary,
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
+          _buildSummaryCards(context, currency),
+          AppResponsive.verticalSpace(context),
+          ReportExportButton(onPressed: _exportReport),
+          AppResponsive.verticalSpace(context),
+          _buildTable(context, currency),
         ],
       ),
     );
@@ -835,129 +685,55 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
 
   // ── Summary bar ──────────────────────────────────────────────────────────────
 
-  Widget _buildSummaryBar(BuildContext context, String currency) {
+  /// Two rows of two, as in totalsales/refunddetails — four cards abreast
+  /// leaves each ~78px on a 360px phone and ellipsises every title.
+  Widget _buildSummaryCards(BuildContext context, String currency) {
     final netColor = _net >= 0 ? Colors.teal.shade700 : Colors.red.shade700;
-    return Container(
-      margin: EdgeInsets.fromLTRB(
-        AppResponsive.largeSpacing(context),
-        AppResponsive.smallSpacing(context),
-        AppResponsive.largeSpacing(context),
-        0,
-      ),
-      padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(
-          AppResponsive.borderRadius(context),
+    return Column(
+      children: [
+        ReportSummaryRow(
+          cards: [
+            ReportSummaryCard(
+              title: 'Total In',
+              value: '$currency${DecimalSettings.formatAmount(_totalIn)}',
+              icon: Icons.arrow_downward_rounded,
+              color: Colors.green.shade700,
+            ),
+            ReportSummaryCard(
+              title: 'Total Out',
+              value: '$currency${DecimalSettings.formatAmount(_totalOut)}',
+              icon: Icons.arrow_upward_rounded,
+              color: Colors.red.shade700,
+            ),
+          ],
         ),
-        border: Border.all(color: AppColors.divider),
-      ),
-      child: Row(
-        children: [
-          _summaryTile(
-            context,
-            'Total In',
-            _totalIn,
-            Colors.green.shade700,
-            currency,
-          ),
-          _vDivider(),
-          _summaryTile(
-            context,
-            'Total Out',
-            _totalOut,
-            Colors.red.shade700,
-            currency,
-          ),
-          _vDivider(),
-          _summaryTile(context, 'Net', _net, netColor, currency),
-          _vDivider(),
-          _summaryTile(
-            context,
-            'Entries',
-            _filteredRows.length.toDouble(),
-            AppColors.textSecondary,
-            '',
-            isCount: true,
-          ),
-        ],
-      ),
+        AppResponsive.verticalSpace(context),
+        ReportSummaryRow(
+          cards: [
+            ReportSummaryCard(
+              title: 'Net',
+              value: '$currency${DecimalSettings.formatAmount(_net)}',
+              icon: Icons.account_balance_wallet_outlined,
+              color: netColor,
+            ),
+            ReportSummaryCard(
+              title: 'Entries',
+              value: '${_filteredRows.length}',
+              icon: Icons.list_alt_rounded,
+              color: AppColors.primary,
+            ),
+          ],
+        ),
+      ],
     );
   }
 
-  Widget _summaryTile(
-    BuildContext context,
-    String label,
-    double amount,
-    Color color,
-    String currency, {
-    bool isCount = false,
-  }) => Expanded(
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: GoogleFonts.poppins(
-            fontSize: AppResponsive.captionFontSize(context),
-            color: AppColors.textSecondary,
-          ),
-        ),
-        const SizedBox(height: 2),
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.centerLeft,
-          child: Text(
-            isCount
-                ? '${amount.toInt()}'
-                : '$currency${DecimalSettings.formatAmount(amount)}',
-            style: GoogleFonts.poppins(
-              fontSize: AppResponsive.bodyFontSize(context),
-              fontWeight: FontWeight.w700,
-              color: color,
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
-
-  Widget _vDivider() => Container(
-    width: 1,
-    height: 36,
-    color: AppColors.divider,
-    margin: const EdgeInsets.symmetric(horizontal: 8),
-  );
-
   // ── Empty state ──────────────────────────────────────────────────────────────
 
-  Widget _buildEmpty(BuildContext context) => Center(
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(
-          Icons.history_outlined,
-          size: AppResponsive.largeIconSize(context) * 1.5,
-          color: AppColors.divider,
-        ),
-        SizedBox(height: AppResponsive.mediumSpacing(context)),
-        Text(
-          'No transactions found',
-          style: GoogleFonts.poppins(
-            fontSize: AppResponsive.bodyFontSize(context),
-            color: AppColors.textSecondary,
-          ),
-        ),
-        SizedBox(height: AppResponsive.smallSpacing(context)),
-        Text(
-          'Try widening the date range or changing the filter',
-          style: GoogleFonts.poppins(
-            fontSize: AppResponsive.smallFontSize(context),
-            color: AppColors.textSecondary,
-          ),
-        ),
-      ],
-    ),
+  Widget _buildEmpty(BuildContext context) => const ReportEmptyState(
+    icon: Icons.history_outlined,
+    title: 'No transactions found',
+    message: 'Try widening the date range or changing the filter',
   );
 
   // ── Table ────────────────────────────────────────────────────────────────────
@@ -981,16 +757,12 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
     DateFormat dateFmt,
     DateFormat timeFmt,
   ) {
-    return ListView.builder(
-      padding: EdgeInsets.fromLTRB(
-        AppResponsive.largeSpacing(context),
-        AppResponsive.mediumSpacing(context),
-        AppResponsive.largeSpacing(context),
-        AppResponsive.largeSpacing(context),
-      ),
-      itemCount: _filteredRows.length,
-      itemBuilder: (_, i) =>
-          _mobileCard(context, _filteredRows[i], currency, dateFmt, timeFmt),
+    // A plain Column, not a ListView: ReportBody already scrolls and supplies
+    // the padding + width cap, so a nested scrollable would fight it.
+    return Column(
+      children: _filteredRows
+          .map((r) => _mobileCard(context, r, currency, dateFmt, timeFmt))
+          .toList(),
     );
   }
 
@@ -1201,42 +973,36 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
     DateFormat dateFmt,
     DateFormat timeFmt,
   ) {
-    return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(
-        AppResponsive.largeSpacing(context),
-        AppResponsive.mediumSpacing(context),
-        AppResponsive.largeSpacing(context),
-        AppResponsive.largeSpacing(context),
-      ),
-      child: Column(
-        children: [
-          _tableHeader(context, currency),
-          Container(
-            decoration: BoxDecoration(
-              color: AppColors.white,
-              borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(12),
-                bottomRight: Radius.circular(12),
-              ),
-              border: Border.all(color: AppColors.divider),
+    // No SingleChildScrollView here — ReportBody supplies the scroll, padding
+    // and width cap.
+    return Column(
+      children: [
+        _tableHeader(context, currency),
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: const BorderRadius.only(
+              bottomLeft: Radius.circular(12),
+              bottomRight: Radius.circular(12),
             ),
-            child: ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: _filteredRows.length,
-              separatorBuilder: (_, __) =>
-                  Divider(height: 1, color: AppColors.divider),
-              itemBuilder: (_, i) => _tableRow(
-                context,
-                _filteredRows[i],
-                currency,
-                dateFmt,
-                timeFmt,
-              ),
+            border: Border.all(color: AppColors.divider),
+          ),
+          child: ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _filteredRows.length,
+            separatorBuilder: (_, __) =>
+                Divider(height: 1, color: AppColors.divider),
+            itemBuilder: (_, i) => _tableRow(
+              context,
+              _filteredRows[i],
+              currency,
+              dateFmt,
+              timeFmt,
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 

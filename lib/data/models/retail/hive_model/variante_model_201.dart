@@ -351,6 +351,9 @@ class VarianteModel extends HiveObject {
     /// Same reason as [clearMrp]: `expiryDate ?? this.expiryDate` cannot put the
     /// field back to null, so REMOVING an expiry needs an explicit flag.
     bool clearExpiryDate = false,
+    /// Same reason as [clearMrp], for bulk tax removal: drops [taxRate] and
+    /// [taxId] together so the variant falls back to the product/default rate.
+    bool clearTax = false,
   }) {
     return VarianteModel(
       varianteId: varianteId ?? this.varianteId,
@@ -361,7 +364,7 @@ class VarianteModel extends HiveObject {
       costPrice: costPrice ?? this.costPrice,
       stockQty: stockQty ?? this.stockQty,
       minStock: clearMinStock ? null : (minStock ?? this.minStock),
-      taxRate: taxRate ?? this.taxRate,
+      taxRate: clearTax ? null : (taxRate ?? this.taxRate),
       createdAt: createdAt ?? this.createdAt,
       updateAt: updateAt ?? DateTime.now().toIso8601String(),
       customAttributes: customAttributes ?? this.customAttributes,
@@ -371,7 +374,7 @@ class VarianteModel extends HiveObject {
       imagePath: imagePath ?? this.imagePath,
       isDefault: isDefault ?? this.isDefault,
       status: status ?? this.status,
-      taxId: taxId ?? this.taxId,
+      taxId: clearTax ? null : (taxId ?? this.taxId),
       isDecimalQuantity: isDecimalQuantity ?? this.isDecimalQuantity,
       unit: unit ?? this.unit,
       expiryDate:

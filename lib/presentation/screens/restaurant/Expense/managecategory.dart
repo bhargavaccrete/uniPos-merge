@@ -3,6 +3,7 @@ import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/data/models/restaurant/db/expensemodel_315.dart';
 import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_empty_state.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:uuid/uuid.dart';
@@ -186,7 +187,7 @@ class _ManageCategoryState extends State<ManageCategory> {
             padding: AppResponsive.padding(context),
             child: AppResponsive.constrainedContent(
               context: context,
-              maxWidth: AppResponsive.maxFormWidth(context),
+              maxWidth: AppResponsive.maxContentWidth(context),
               heightFactor: 1,
               child: SizedBox(
                 width: double.infinity,
@@ -267,7 +268,7 @@ class _ManageCategoryState extends State<ManageCategory> {
                               foregroundColor: Colors.white,
                               elevation: 0,
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(10),
                               ),
                             ),
                             child: Text(
@@ -394,7 +395,7 @@ class _ManageCategoryState extends State<ManageCategory> {
                     foregroundColor: Colors.white,
                     elevation: 0,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(10),
                     ),
                   ),
                 ),
@@ -406,62 +407,18 @@ class _ManageCategoryState extends State<ManageCategory> {
           Expanded(
             child: AppResponsive.constrainedContent(
               context: context,
-              maxWidth: AppResponsive.maxFormWidth(context),
+              maxWidth: AppResponsive.maxContentWidth(context),
               alignment: Alignment.topCenter,
               child: Observer(
                 builder: (context) {
                   final allcategory = expenseCategoryStore.categories;
 
                   if (allcategory.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            padding: EdgeInsets.all(
-                              AppResponsive.getValue(
-                                context,
-                                mobile: 20.0,
-                                tablet: 24.0,
-                                desktop: 28.0,
-                              ),
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.surfaceMedium,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              Icons.category_rounded,
-                              size: AppResponsive.getValue(
-                                context,
-                                mobile: 56.0,
-                                tablet: 64.0,
-                                desktop: 72.0,
-                              ),
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                          SizedBox(height: 16),
-                          Text(
-                            'No categories found',
-                            style: GoogleFonts.poppins(
-                              fontSize: AppResponsive.subheadingFontSize(
-                                context,
-                              ),
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                          SizedBox(height: 8),
-                          Text(
-                            'Add your first category to get started',
-                            style: GoogleFonts.poppins(
-                              fontSize: AppResponsive.bodyFontSize(context),
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
+                    // Shared component — was a hand-rolled badge + two Texts.
+                    return const AppEmptyState(
+                      icon: Icons.category_rounded,
+                      title: 'No categories found',
+                      message: 'Add your first category to get started',
                     );
                   }
 

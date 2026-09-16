@@ -491,12 +491,16 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
       margin: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: AppColors.divider),
       ),
       child: InkWell(
         onTap: () => _selectCustomer(customer),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         child: Padding(
           padding: EdgeInsets.symmetric(
             horizontal: AppResponsive.mediumSpacing(context),

@@ -99,112 +99,123 @@ class _InvoiceNumberingScreenState extends State<InvoiceNumberingScreen> {
         title: 'Invoice Numbering',
         titleFontSize: AppResponsive.subheadingFontSize(context),
       ),
-      body: SingleChildScrollView(
-        padding: AppResponsive.padding(context),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(height: AppResponsive.mediumSpacing(context)),
-            _card(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Prefix',
+      body: AppResponsive.constrainedContent(
+        context: context,
+        maxWidth: AppResponsive.maxCardWidth(context),
+        alignment: Alignment.topCenter,
+        child: SingleChildScrollView(
+          padding: AppResponsive.padding(context),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(height: AppResponsive.mediumSpacing(context)),
+              _card(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Prefix',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.bodyFontSize(context),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    SizedBox(height: AppResponsive.smallSpacing(context)),
+                    AppTextField(
+                      controller: _prefixController,
+                      hint: 'INV',
+                      maxLength: DocumentNumberService.maxPrefixLength,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(
+                          RegExp('[A-Za-z0-9]'),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      'Up to ${DocumentNumberService.maxPrefixLength} letters or '
+                      'numbers, so the whole invoice number stays within the 16 '
+                      'characters the tax rules allow.',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.captionFontSize(context),
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    SizedBox(height: AppResponsive.largeSpacing(context)),
+                    Text(
+                      'Next number',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.bodyFontSize(context),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    SizedBox(height: AppResponsive.smallSpacing(context)),
+                    AppTextField(
+                      controller: _nextController,
+                      hint: '1',
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    ),
+                    Text(
+                      'Set this to continue a series you already issue elsewhere. '
+                      'It only moves the series forward from the next sale on — '
+                      'invoices already recorded keep their numbers.',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.captionFontSize(context),
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
+              _card(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _row(context, 'Next invoice', _preview, emphasise: true),
+                    const Divider(height: 24, thickness: 0.5),
+                    _row(
+                      context,
+                      'Restarts at 1 on',
+                      FiscalYearRule.resetLabel,
+                    ),
+                    SizedBox(height: AppResponsive.smallSpacing(context)),
+                    Text(
+                      'The series restarts each financial year. Last year\'s '
+                      '$_preview and this year\'s are different sales — each keeps '
+                      'its own record.',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.captionFontSize(context),
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: AppResponsive.extraLargeSpacing(context)),
+              SizedBox(
+                width: double.infinity,
+                height: AppResponsive.buttonHeight(context),
+                child: ElevatedButton(
+                  onPressed: _save,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: Text(
+                    'Save',
                     style: GoogleFonts.poppins(
                       fontSize: AppResponsive.bodyFontSize(context),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  SizedBox(height: AppResponsive.smallSpacing(context)),
-                  AppTextField(
-                    controller: _prefixController,
-                    hint: 'INV',
-                    maxLength: DocumentNumberService.maxPrefixLength,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp('[A-Za-z0-9]')),
-                    ],
-                  ),
-                  Text(
-                    'Up to ${DocumentNumberService.maxPrefixLength} letters or '
-                    'numbers, so the whole invoice number stays within the 16 '
-                    'characters the tax rules allow.',
-                    style: GoogleFonts.poppins(
-                      fontSize: AppResponsive.captionFontSize(context),
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  SizedBox(height: AppResponsive.largeSpacing(context)),
-                  Text(
-                    'Next number',
-                    style: GoogleFonts.poppins(
-                      fontSize: AppResponsive.bodyFontSize(context),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  SizedBox(height: AppResponsive.smallSpacing(context)),
-                  AppTextField(
-                    controller: _nextController,
-                    hint: '1',
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  ),
-                  Text(
-                    'Set this to continue a series you already issue elsewhere. '
-                    'It only moves the series forward from the next sale on — '
-                    'invoices already recorded keep their numbers.',
-                    style: GoogleFonts.poppins(
-                      fontSize: AppResponsive.captionFontSize(context),
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(height: AppResponsive.largeSpacing(context)),
-            _card(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _row(context, 'Next invoice', _preview, emphasise: true),
-                  const Divider(height: 24, thickness: 0.5),
-                  _row(context, 'Restarts at 1 on', FiscalYearRule.resetLabel),
-                  SizedBox(height: AppResponsive.smallSpacing(context)),
-                  Text(
-                    'The series restarts each financial year. Last year\'s '
-                    '$_preview and this year\'s are different sales — each keeps '
-                    'its own record.',
-                    style: GoogleFonts.poppins(
-                      fontSize: AppResponsive.captionFontSize(context),
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(height: AppResponsive.extraLargeSpacing(context)),
-            SizedBox(
-              width: double.infinity,
-              height: AppResponsive.buttonHeight(context),
-              child: ElevatedButton(
-                onPressed: _save,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                child: Text(
-                  'Save',
-                  style: GoogleFonts.poppins(
-                    fontSize: AppResponsive.bodyFontSize(context),
-                    fontWeight: FontWeight.w600,
-                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

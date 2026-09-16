@@ -11,6 +11,7 @@ import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/presentation/widget/componets/common/report_app_bar.dart';
 import 'package:billberrylite/presentation/widget/componets/common/report_body.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_date_range_card.dart';
 import 'package:billberrylite/presentation/widget/componets/common/report_card.dart';
 import 'package:billberrylite/presentation/widget/componets/common/report_empty_state.dart';
 import 'package:billberrylite/presentation/widget/componets/common/report_export_button.dart';
@@ -77,7 +78,10 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
     for (final order in pastOrderStore.pastOrders) {
       final status = order.orderStatus?.toUpperCase() ?? '';
       if (OrderStatusFilter.isExcludedFromRevenue(status)) continue;
-      if (cutoff != null && order.orderAt != null && order.orderAt!.isBefore(cutoff)) continue;
+      if (cutoff != null &&
+          order.orderAt != null &&
+          order.orderAt!.isBefore(cutoff))
+        continue;
 
       // Period filter — orders without a timestamp can't be placed in a range.
       if (start != null && end != null) {
@@ -132,12 +136,19 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
     final now = DateTime.now();
     final standard = _standardPeriod(_period);
     if (standard != null) {
-      return (reportPeriodStartBound(standard, now), reportPeriodEndBound(standard, now));
+      return (
+        reportPeriodStartBound(standard, now),
+        reportPeriodEndBound(standard, now),
+      );
     }
     if (_period == _RevPeriod.custom && _fromDate != null && _toDate != null) {
       return (
         DateTime(_fromDate!.year, _fromDate!.month, _fromDate!.day),
-        DateTime(_toDate!.year, _toDate!.month, _toDate!.day).add(const Duration(days: 1)),
+        DateTime(
+          _toDate!.year,
+          _toDate!.month,
+          _toDate!.day,
+        ).add(const Duration(days: 1)),
       );
     }
     return (null, null);
@@ -162,8 +173,11 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
 
   bool _periodAllowed(_RevPeriod p) {
     final standard = _standardPeriod(p);
-    if (standard == null) return true; // 'all'/'custom' are clamped by the cutoff
-    return ReportHistoryWindow.allows(reportPeriodStartBound(standard, DateTime.now()));
+    if (standard == null)
+      return true; // 'all'/'custom' are clamped by the cutoff
+    return ReportHistoryWindow.allows(
+      reportPeriodStartBound(standard, DateTime.now()),
+    );
   }
 
   IconData _periodIcon(_RevPeriod p) {
@@ -183,25 +197,11 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
     }
   }
 
-  Future<void> _onPeriodSelected(_RevPeriod p) async {
-    if (p == _RevPeriod.custom) {
-      final range = await showDateRangePicker(
-        context: context,
-        firstDate: ReportHistoryWindow.cutoff ?? DateTime(2020),
-        lastDate: DateTime.now(),
-        initialDateRange: (_fromDate != null && _toDate != null)
-            ? DateTimeRange(start: _fromDate!, end: _toDate!)
-            : null,
-      );
-      if (range == null) return;
-      setState(() {
-        _fromDate = range.start;
-        _toDate = range.end;
-        _period = p;
-      });
-    } else {
-      setState(() => _period = p);
-    }
+  void _onPeriodSelected(_RevPeriod p) {
+    // Custom no longer fires a full-screen showDateRangePicker on tap — the
+    // shared ReportDateRangeCard appears in the body instead, which is how the
+    // other reports with a custom range do it.
+    setState(() => _period = p);
     // Data is already loaded — just re-aggregate for the new period.
     _buildCustomerData();
   }
@@ -241,7 +241,8 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
               context,
               featureName: '${_periodLabel(p)} customer revenue',
               neededDays: ReportHistoryWindow.requiredDays(
-                  reportPeriodStartBound(_standardPeriod(p)!, DateTime.now())),
+                reportPeriodStartBound(_standardPeriod(p)!, DateTime.now()),
+              ),
               allowedDays: ReportHistoryWindow.limitDays ?? 0,
             ),
           ),
@@ -255,33 +256,37 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
       return;
     }
 
-    final headers = [
-      'Rank',
-      'Customer Name',
-      'Total Orders',
-      'Total Revenue',
-    ];
+    final headers = ['Rank', 'Customer Name', 'Total Orders', 'Total Revenue'];
 
-    final data = _customers.map((customer) => [
-      customer.srNo.toString(),
-      customer.name,
-      customer.orderCount.toString(),
-      ReportExportService.formatCurrency(customer.revenue),
-    ]).toList();
+    final data = _customers
+        .map(
+          (customer) => [
+            customer.srNo.toString(),
+            customer.name,
+            customer.orderCount.toString(),
+            ReportExportService.formatCurrency(customer.revenue),
+          ],
+        )
+        .toList();
 
-    final averageRevenue = _customers.isNotEmpty ? _totalRevenue / _customers.length : 0.0;
+    final averageRevenue = _customers.isNotEmpty
+        ? _totalRevenue / _customers.length
+        : 0.0;
 
     final summary = {
       'Total Customers': _customers.length.toString(),
       'Total Orders': _totalOrders.toString(),
       'Total Revenue': ReportExportService.formatCurrency(_totalRevenue),
-      'Average Revenue per Customer': ReportExportService.formatCurrency(averageRevenue),
+      'Average Revenue per Customer': ReportExportService.formatCurrency(
+        averageRevenue,
+      ),
       'Generated': ReportExportService.formatDateTime(DateTime.now()),
     };
 
     await ReportExportService.showExportDialog(
       context: context,
-      fileName: 'customer_revenue_${DateFormat('yyyyMMdd').format(DateTime.now())}',
+      fileName:
+          'customer_revenue_${DateFormat('yyyyMMdd').format(DateTime.now())}',
       reportTitle: 'Customer Revenue Report',
       headers: headers,
       data: data,
@@ -317,58 +322,87 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
         _buildPeriodFilter(context),
         AppResponsive.verticalSpace(context, size: SpacingSize.small),
         Expanded(
-          child: _customers.isEmpty
-              ? const ReportEmptyState(
-                  icon: Icons.people,
-                  title: 'No Customer Data',
-                  message: 'No customer revenue data found',
-                )
-              : ReportBody(
-                  child: Column(
-                    children: [
-                      _buildSummaryCards(context),
-                      AppResponsive.verticalSpace(context),
-                      ReportExportButton(onPressed: _exportReport),
-                      AppResponsive.verticalSpace(context),
-                      _buildCustomersTable(context),
-                      ReportPagination(
-                        currentPage: _currentPage,
-                        rowsPerPage: _rowsPerPage,
-                        totalCount: _customers.length,
-                        onPageChanged: (page) => setState(() => _currentPage = page),
-                        unit: 'customers',
-                      ),
-                    ],
+          child: ReportBody(
+            child: Column(
+              children: [
+                // Custom period: the shared range card renders in the body,
+                // same as the other reports that offer one. The report itself
+                // waits until both dates are applied.
+                if (_period == _RevPeriod.custom) ...[
+                  ReportDateRangeCard(
+                    initialStart: _fromDate,
+                    initialEnd: _toDate,
+                    onApply: (start, end) {
+                      setState(() {
+                        _fromDate = start;
+                        _toDate = end;
+                      });
+                      _buildCustomerData();
+                    },
                   ),
-                ),
+                  AppResponsive.verticalSpace(context),
+                ],
+                if (_period != _RevPeriod.custom ||
+                    (_fromDate != null && _toDate != null)) ...[
+                  if (_customers.isEmpty)
+                    const ReportEmptyState(
+                      icon: Icons.people,
+                      title: 'No Customer Data',
+                      message: 'No customer revenue data found',
+                    )
+                  else ...[
+                    _buildSummaryCards(context),
+                    AppResponsive.verticalSpace(context),
+                    ReportExportButton(onPressed: _exportReport),
+                    AppResponsive.verticalSpace(context),
+                    _buildCustomersTable(context),
+                    ReportPagination(
+                      currentPage: _currentPage,
+                      rowsPerPage: _rowsPerPage,
+                      totalCount: _customers.length,
+                      onPageChanged: (page) =>
+                          setState(() => _currentPage = page),
+                      unit: 'customers',
+                    ),
+                  ],
+                ],
+              ],
+            ),
+          ),
         ),
       ],
     );
   }
 
   Widget _buildSummaryCards(BuildContext context) {
-    final averageRevenue = _customers.isNotEmpty ? _totalRevenue / _customers.length : 0.0;
+    final averageRevenue = _customers.isNotEmpty
+        ? _totalRevenue / _customers.length
+        : 0.0;
 
-    return ReportSummaryRow(cards: [
-      ReportSummaryCard(
-        title: 'Total Customers',
-        value: _customers.length.toString(),
-        icon: Icons.people,
-        color: AppColors.primary,
-      ),
-      ReportSummaryCard(
-        title: 'Total Revenue',
-        value: '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalRevenue)}',
-        icon: Icons.attach_money,
-        color: Colors.green,
-      ),
-      ReportSummaryCard(
-        title: 'Avg Revenue',
-        value: '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(averageRevenue)}',
-        icon: Icons.analytics,
-        color: Colors.orange,
-      ),
-    ]);
+    return ReportSummaryRow(
+      cards: [
+        ReportSummaryCard(
+          title: 'Total Customers',
+          value: _customers.length.toString(),
+          icon: Icons.people,
+          color: AppColors.primary,
+        ),
+        ReportSummaryCard(
+          title: 'Total Revenue',
+          value:
+              '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalRevenue)}',
+          icon: Icons.attach_money,
+          color: Colors.green,
+        ),
+        ReportSummaryCard(
+          title: 'Avg Revenue',
+          value:
+              '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(averageRevenue)}',
+          icon: Icons.analytics,
+          color: Colors.orange,
+        ),
+      ],
+    );
   }
 
   Widget _buildCustomersTable(BuildContext context) {
@@ -381,94 +415,124 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
         ReportTable.column(context, 'Total Orders', numeric: true),
         ReportTable.column(context, 'Total Revenue', numeric: true),
       ],
-      rows: ReportPagination.pageSlice(_customers, _currentPage, _rowsPerPage).map((customer) {
-                // Medal colors for top 3
-                Color? rankColor;
-                IconData? medalIcon;
-                if (customer.srNo == 1) {
-                  rankColor = Color(0xFFFFD700); // Gold
-                  medalIcon = Icons.workspace_premium;
-                } else if (customer.srNo == 2) {
-                  rankColor = Color(0xFFC0C0C0); // Silver
-                  medalIcon = Icons.workspace_premium;
-                } else if (customer.srNo == 3) {
-                  rankColor = Color(0xFFCD7F32); // Bronze
-                  medalIcon = Icons.workspace_premium;
-                }
+      rows: ReportPagination.pageSlice(_customers, _currentPage, _rowsPerPage).map((
+        customer,
+      ) {
+        // Medal colors for top 3
+        Color? rankColor;
+        IconData? medalIcon;
+        if (customer.srNo == 1) {
+          rankColor = Color(0xFFFFD700); // Gold
+          medalIcon = Icons.workspace_premium;
+        } else if (customer.srNo == 2) {
+          rankColor = Color(0xFFC0C0C0); // Silver
+          medalIcon = Icons.workspace_premium;
+        } else if (customer.srNo == 3) {
+          rankColor = Color(0xFFCD7F32); // Bronze
+          medalIcon = Icons.workspace_premium;
+        }
 
-                return DataRow(
-                  cells: [
-                    DataCell(
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (medalIcon != null) ...[
-                            Icon(medalIcon, color: rankColor, size: AppResponsive.getValue(context, mobile: 18.0, desktop: 20.0)),
-                            SizedBox(width: 4),
-                          ],
-                          Text(
-                            customer.srNo.toString(),
-                            style: GoogleFonts.poppins(
-                              fontSize: cellFontSize,
-                              color: AppColors.textPrimary,
-                              fontWeight: customer.srNo <= 3 ? FontWeight.w700 : FontWeight.w500,
-                            ),
-                          ),
-                        ],
+        return DataRow(
+          cells: [
+            DataCell(
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (medalIcon != null) ...[
+                    Icon(
+                      medalIcon,
+                      color: rankColor,
+                      size: AppResponsive.getValue(
+                        context,
+                        mobile: 18.0,
+                        desktop: 20.0,
                       ),
                     ),
-                    DataCell(
-                      Text(
-                        customer.name,
-                        style: GoogleFonts.poppins(
-                          fontSize: cellFontSize,
-                          color: AppColors.textPrimary,
-                          fontWeight: customer.srNo <= 3 ? FontWeight.w600 : FontWeight.w400,
-                        ),
-                      ),
-                    ),
-                    DataCell(
-                      Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: AppResponsive.getValue(context, mobile: 8.0, desktop: 12.0),
-                          vertical: AppResponsive.getValue(context, mobile: 4.0, desktop: 6.0),
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          customer.orderCount.toString(),
-                          style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.captionFontSize(context),
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                    DataCell(
-                      Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: AppResponsive.getValue(context, mobile: 8.0, desktop: 12.0),
-                          vertical: AppResponsive.getValue(context, mobile: 4.0, desktop: 6.0),
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.green.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(customer.revenue)}',
-                          style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.captionFontSize(context),
-                            color: Colors.green,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ),
+                    SizedBox(width: 4),
                   ],
-                );
+                  Text(
+                    customer.srNo.toString(),
+                    style: GoogleFonts.poppins(
+                      fontSize: cellFontSize,
+                      color: AppColors.textPrimary,
+                      fontWeight: customer.srNo <= 3
+                          ? FontWeight.w700
+                          : FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            DataCell(
+              Text(
+                customer.name,
+                style: GoogleFonts.poppins(
+                  fontSize: cellFontSize,
+                  color: AppColors.textPrimary,
+                  fontWeight: customer.srNo <= 3
+                      ? FontWeight.w600
+                      : FontWeight.w400,
+                ),
+              ),
+            ),
+            DataCell(
+              Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppResponsive.getValue(
+                    context,
+                    mobile: 8.0,
+                    desktop: 12.0,
+                  ),
+                  vertical: AppResponsive.getValue(
+                    context,
+                    mobile: 4.0,
+                    desktop: 6.0,
+                  ),
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  customer.orderCount.toString(),
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.captionFontSize(context),
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+            DataCell(
+              Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppResponsive.getValue(
+                    context,
+                    mobile: 8.0,
+                    desktop: 12.0,
+                  ),
+                  vertical: AppResponsive.getValue(
+                    context,
+                    mobile: 4.0,
+                    desktop: 6.0,
+                  ),
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.green.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(customer.revenue)}',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.captionFontSize(context),
+                    color: Colors.green,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
       }).toList(),
     );
   }

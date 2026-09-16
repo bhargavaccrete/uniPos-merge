@@ -84,6 +84,7 @@ import 'package:billberrylite/presentation/screens/restaurant/Settings/orderSett
 import 'package:billberrylite/presentation/screens/restaurant/Settings/paymentsMethods.dart';
 import 'package:billberrylite/presentation/screens/restaurant/Settings/changePassword.dart';
 import 'package:billberrylite/presentation/screens/restaurant/Settings/licensing_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/store_info_settings_screen.dart';
 
 // Restaurant - Tax
 import 'package:billberrylite/presentation/screens/restaurant/TaxSetting/apply_tax_screen.dart';
@@ -378,6 +379,12 @@ class RestaurantRoutes {
     // be entitlement-gated, or a plan without `settings` (e.g. trial) could not
     // reach it to fix its own license. Role check only.
     RouteNames.restaurantLicensing: _guard(const LicensingScreen(), 'settings'),
+    // Same screen retail uses — both verticals print from StoreSettingsService.
+    RouteNames.restaurantStoreInfo: _guard(
+      const StoreInfoSettingsScreen(),
+      'settings',
+      EntKeys.settings,
+    ),
     RouteNames.restaurantOrderSettings: _guard(
       Ordersettings(),
       'settings',

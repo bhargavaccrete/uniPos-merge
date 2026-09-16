@@ -4,6 +4,7 @@ import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_empty_state.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/presentation/widget/componets/common/dialog_dispose_scope.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
@@ -362,7 +363,7 @@ class _ViewExpenseState extends State<ViewExpense> {
                     elevation: 0,
                     padding: EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(10),
                     ),
                   ),
                   child: Text(
@@ -430,7 +431,7 @@ class _ViewExpenseState extends State<ViewExpense> {
                     elevation: 0,
                     padding: EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(10),
                     ),
                   ),
                   child: Text(
@@ -831,10 +832,14 @@ class _ViewExpenseState extends State<ViewExpense> {
           Container(
             color: AppColors.white,
             child: Padding(
-              padding: EdgeInsets.fromLTRB(16, 8, 16, 12),
+              // Matches the Expense.dart tab strip above it, so the two white
+              // bands read as one header block.
+              padding: AppResponsive.horizontalPadding(
+                context,
+              ).copyWith(top: 8, bottom: 12),
               child: AppResponsive.constrainedContent(
                 context: context,
-                maxWidth: AppResponsive.maxFormWidth(context),
+                maxWidth: AppResponsive.maxContentWidth(context),
                 heightFactor: 1,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -967,32 +972,19 @@ class _ViewExpenseState extends State<ViewExpense> {
           Expanded(
             child: AppResponsive.constrainedContent(
               context: context,
-              maxWidth: AppResponsive.maxFormWidth(context),
+              maxWidth: AppResponsive.maxContentWidth(context),
               alignment: Alignment.topCenter,
               child: Observer(
                 builder: (context) {
                   final filteredExpenses = expenseStore.filteredExpenses;
 
                   if (filteredExpenses.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.receipt_long_outlined,
-                            size: 48,
-                            color: AppColors.divider,
-                          ),
-                          SizedBox(height: 12),
-                          Text(
-                            'No expenses found',
-                            style: GoogleFonts.poppins(
-                              fontSize: AppResponsive.bodyFontSize(context),
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
+                    // Shared component — was a hand-rolled Center + icon at a
+                    // hardcoded size: 48, with no title/message split.
+                    return const AppEmptyState(
+                      icon: Icons.receipt_long_outlined,
+                      title: 'No expenses found',
+                      message: 'Expenses you record will appear here',
                     );
                   }
 

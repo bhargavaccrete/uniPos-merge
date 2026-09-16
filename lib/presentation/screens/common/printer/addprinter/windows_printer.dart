@@ -329,7 +329,10 @@ class _WindowsPrinterTabState extends State<WindowsPrinterTab> {
                   child: ListTile(
                     // In assign mode, tapping a row makes it the active printer.
                     onTap: () => setActiveForSlot(printer, widget.assignToRole),
-                    leading: Icon(Icons.desktop_windows_outlined,
+                    leading: Icon(
+                        printer.isWindowsPdf
+                            ? Icons.picture_as_pdf_outlined
+                            : Icons.desktop_windows_outlined,
                         color: AppColors.info,
                         size: AppResponsive.iconSize(context)),
                     title: Text(
@@ -383,11 +386,17 @@ class _WindowsPrinterTabState extends State<WindowsPrinterTab> {
   /// both `url` and `name`), and it is what `OpenPrinter` needs. Stored whole —
   /// a queue name may contain a colon.
   Future<void> _showSaveDialog(Printer queue) async {
+    // The output mode is an EXPLICIT choice, never inferred from the printer's
+    // name — the saved type is what decides the print path. The hint below only
+    // informs the decision; it does not make it.
+    final asPdf = await _askOutputMode(queue);
+    if (asPdf == null) return;
+
     final result = await showDialog<SavePrinterResult>(
       context: context,
       builder: (ctx) => SavePrinterDialog(
-        title: 'Save Windows Printer',
-        icon: Icons.desktop_windows_outlined,
+        title: asPdf ? 'Save PDF Printer' : 'Save Thermal Printer',
+        icon: asPdf ? Icons.picture_as_pdf_outlined : Icons.print_outlined,
         subtitle: queue.url,
         initialName: queue.name,
       ),
@@ -400,10 +409,104 @@ class _WindowsPrinterTabState extends State<WindowsPrinterTab> {
       paperSize: result.paperSize,
       role: 'receipt',
       assignRole: widget.assignToRole,
+      asPdfPrinter: asPdf,
     );
     if (mounted) {
       NotificationService.instance.showSuccess('Printer "${result.name}" saved');
     }
+  }
+
+  /// Ask how this queue should be driven. Returns true for a PDF/document
+  /// printer, false for a RAW ESC/POS thermal printer, null if cancelled.
+  Future<bool?> _askOutputMode(Printer queue) {
+    final looksVirtual = isLikelyVirtualQueue(queue.name, queue.model);
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AppDialogShell(
+        title: 'How should we print?',
+        subtitle: queue.name,
+        accent: AppColors.primary,
+        icon: Icons.tune,
+        actions: [appDialogCancelButton(ctx)],
+        body: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (looksVirtual) ...[
+              Text(
+                'This looks like a PDF writer rather than a thermal printer.',
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.smallFontSize(ctx),
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              SizedBox(height: AppResponsive.mediumSpacing(ctx)),
+            ],
+            _modeTile(
+              ctx,
+              icon: Icons.print_outlined,
+              title: 'Thermal printer',
+              subtitle: 'Sends ESC/POS directly. Use for receipt printers.',
+              onTap: () => Navigator.pop(ctx, false),
+            ),
+            SizedBox(height: AppResponsive.smallSpacing(ctx)),
+            _modeTile(
+              ctx,
+              icon: Icons.picture_as_pdf_outlined,
+              title: 'PDF / document printer',
+              subtitle:
+                  'Sends the rendered receipt. Use for doPDF, Print to PDF.',
+              onTap: () => Navigator.pop(ctx, true),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _modeTile(
+    BuildContext ctx, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppResponsive.borderRadius(ctx)),
+      child: Container(
+        padding: EdgeInsets.all(AppResponsive.mediumSpacing(ctx)),
+        decoration: BoxDecoration(
+          border: Border.all(color: AppColors.divider),
+          borderRadius: BorderRadius.circular(AppResponsive.borderRadius(ctx)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon,
+                color: AppColors.primary,
+                size: AppResponsive.smallIconSize(ctx)),
+            SizedBox(width: AppResponsive.smallSpacing(ctx)),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.bodyFontSize(ctx),
+                        fontWeight: FontWeight.w600,
+                      )),
+                  Text(subtitle,
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.smallFontSize(ctx),
+                        color: AppColors.textSecondary,
+                      )),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _testPrint(String id) async {

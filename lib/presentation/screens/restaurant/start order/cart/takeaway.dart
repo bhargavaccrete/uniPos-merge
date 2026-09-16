@@ -20,6 +20,8 @@ import '../../../../../util/restaurant/restaurant_session.dart';
 
 import '../../../../../data/models/common/customer_model_125.dart';
 import '../../../../../core/di/service_locator.dart';
+import '../../../../../core/config/tax_feature.dart';
+import '../../../../../domain/services/retail/store_settings_service.dart';
 import '../../../../../core/plan/plan_enforcement.dart';
 import '../../../../../core/plan/plan_guard.dart';
 import '../../../../../core/plan/entitlement_keys.dart';
@@ -2938,6 +2940,10 @@ class _TakeawayState extends State<Takeaway> {
       billNumber: billNumber, // Daily bill number (resets every day)
       isTaxInclusive:
           activeModel.isTaxInclusive, // Use stored tax mode from active order
+      taxEnabled: TaxFeature.enabled,
+      storeGstNumber: await StoreSettingsService().gstNumberSnapshot(),
+      roundOffStep: AppSettings.roundOffStepForRecord,
+      discountOnItems: AppSettings.discountOnItems,
       shiftId: RestaurantSession.currentShiftId,
     );
 
@@ -3315,6 +3321,10 @@ class _TakeawayState extends State<Takeaway> {
       billNumber: billNumber, // Daily bill number (resets every day)
       isTaxInclusive:
           AppSettings.isTaxInclusive, // Store tax mode at order creation
+      taxEnabled: TaxFeature.enabled,
+      storeGstNumber: await StoreSettingsService().gstNumberSnapshot(),
+      roundOffStep: AppSettings.roundOffStepForRecord,
+      discountOnItems: AppSettings.discountOnItems,
       tableNo: widget.isDineIn
           ? (widget.selectedTableNo ?? widget.tableid)
           : null,

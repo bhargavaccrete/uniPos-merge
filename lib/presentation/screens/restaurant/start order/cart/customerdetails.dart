@@ -1,12 +1,15 @@
 import 'dart:convert';
 import 'package:country_code_picker/country_code_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:billberrylite/core/config/tax_label_rule.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../../core/di/service_locator.dart';
+import '../../../../../core/config/tax_feature.dart';
+import '../../../../../domain/services/retail/store_settings_service.dart';
 import '../../../../../core/plan/entitlement_keys.dart';
 import '../../../../../core/plan/plan_guard.dart';
 import '../../../../../core/plan/plan_enforcement.dart';
@@ -1143,7 +1146,9 @@ class _CustomerdetailsState extends State<Customerdetails> {
           // GST (mode-aware label)
           if (calcs.totalGST > 0.009)
             _buildSummaryRow(
-              isInclusive ? 'GST (Included):' : 'GST:',
+              isInclusive
+                  ? '${TaxLabelRule.name} (Included):'
+                  : '${TaxLabelRule.name}:',
               '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calcs.totalGST)}'
             ),
 
@@ -1469,6 +1474,10 @@ class _CustomerdetailsState extends State<Customerdetails> {
           activeModel.kotBoundaries, // KOT boundaries for grouping items
       billNumber: billNumber, // Daily bill number (resets every day)
       isTaxInclusive: AppSettings.isTaxInclusive, // Store tax mode at order creation
+      taxEnabled: TaxFeature.enabled,
+      storeGstNumber: await StoreSettingsService().gstNumberSnapshot(),
+      roundOffStep: AppSettings.roundOffStepForRecord,
+      discountOnItems: AppSettings.discountOnItems,
       tableNo: activeModel.tableNo,
       shiftId: RestaurantSession.currentShiftId,
       sessionId: currentSessionId ?? activeModel.sessionId, // Assign to current session to reflect payment
@@ -1539,6 +1548,10 @@ class _CustomerdetailsState extends State<Customerdetails> {
         totalPaid: _totalPaid,
         changeReturn: _changeReturn,
         isTaxInclusive: AppSettings.isTaxInclusive, // Store tax mode at order creation
+        taxEnabled: TaxFeature.enabled,
+        storeGstNumber: await StoreSettingsService().gstNumberSnapshot(),
+        roundOffStep: AppSettings.roundOffStepForRecord,
+        discountOnItems: AppSettings.discountOnItems,
         tableNo: widget.orderType == 'Dine In' ? widget.tableid : null,
         loyaltyPointsUsed: pointsUsed > 0 ? pointsUsed : null,
         shiftId: RestaurantSession.currentShiftId,

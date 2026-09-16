@@ -70,7 +70,9 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
 
       final saved = await _storeSettings.setStoreLogo(bytes);
       if (!saved) {
-        NotificationService.instance.showError('Could not save logo. Please try again.');
+        NotificationService.instance.showError(
+          'Could not save logo. Please try again.',
+        );
         return;
       }
       if (mounted) setState(() => _logoBytes = bytes);
@@ -87,7 +89,8 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
     final confirmed = await showAppConfirmDialog(
       context: context,
       title: 'Remove Logo?',
-      message: 'The logo will no longer print on receipts. You can add it again anytime.',
+      message:
+          'The logo will no longer print on receipts. You can add it again anytime.',
       confirmLabel: 'Remove',
       accent: AppColors.danger,
       icon: Icons.delete_outline_rounded,
@@ -105,36 +108,100 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
     if (removed) {
       NotificationService.instance.showSuccess('Logo removed');
     } else {
-      NotificationService.instance.showError('Could not remove logo. Please try again.');
+      NotificationService.instance.showError(
+        'Could not remove logo. Please try again.',
+      );
     }
   }
 
   // Group settings by category
   final Map<String, List<Map<String, dynamic>>> _settingGroups = {
     'Store Information': [
-      {'key': 'Restaurant Logo', 'icon': Icons.image_outlined, 'description': 'Show store logo at the top of receipts'},
-      {'key': 'Restaurant Name', 'icon': Icons.restaurant, 'description': 'Show restaurant name on receipts'},
-      {'key': 'Restaurant Address', 'icon': Icons.location_on, 'description': 'Show restaurant address'},
-      {'key': 'Restaurant Mobile No', 'icon': Icons.phone, 'description': 'Show contact number'},
+      {
+        'key': 'Restaurant Logo',
+        'icon': Icons.image_outlined,
+        'description': 'Show store logo at the top of receipts',
+      },
+      {
+        'key': 'Restaurant Name',
+        'icon': Icons.restaurant,
+        'description': 'Show restaurant name on receipts',
+      },
+      {
+        'key': 'Restaurant Address',
+        'icon': Icons.location_on,
+        'description': 'Show restaurant address',
+      },
+      {
+        'key': 'Restaurant Mobile No',
+        'icon': Icons.phone,
+        'description': 'Show contact number',
+      },
     ],
     'Order Details': [
-      {'key': 'Order ID', 'icon': Icons.numbers, 'description': 'Show order/bill number'},
-      {'key': 'Ordered Time', 'icon': Icons.access_time, 'description': 'Show order date and time'},
-      {'key': 'Order Type', 'icon': Icons.shopping_bag, 'description': 'Show order type (Dine-in/Takeaway)'},
-      {'key': 'Customer Name', 'icon': Icons.person, 'description': 'Show customer name if available'},
+      {
+        'key': 'Order ID',
+        'icon': Icons.numbers,
+        'description': 'Show order/bill number',
+      },
+      {
+        'key': 'Ordered Time',
+        'icon': Icons.access_time,
+        'description': 'Show order date and time',
+      },
+      {
+        'key': 'Order Type',
+        'icon': Icons.shopping_bag,
+        'description': 'Show order type (Dine-in/Takeaway)',
+      },
+      {
+        'key': 'Customer Name',
+        'icon': Icons.person,
+        'description': 'Show customer name if available',
+      },
     ],
     'Payment & Pricing': [
-      {'key': 'Payment Type', 'icon': Icons.payment, 'description': 'Show payment method (Cash/Card/UPI)'},
-      {'key': 'Tax', 'icon': Icons.percent, 'description': 'Show GST/tax breakdown'},
-      {'key': 'Subtotal', 'icon': Icons.calculate, 'description': 'Show subtotal before tax'},
-      {'key': 'Payment Paid', 'icon': Icons.money, 'description': 'Show cash received and change'},
-      {'key': 'UPI QR', 'icon': Icons.qr_code_2, 'description': 'Show UPI Scan & Pay QR on unpaid bills'},
-      {'key': 'UPI QR Amount', 'icon': Icons.currency_rupee, 'description': 'Prefill the bill amount in the UPI QR so scanning shows the total'},
+      {
+        'key': 'Payment Type',
+        'icon': Icons.payment,
+        'description': 'Show payment method (Cash/Card/UPI)',
+      },
+      {
+        'key': 'Tax',
+        'icon': Icons.percent,
+        'description': 'Show GST/tax breakdown',
+      },
+      {
+        'key': 'Subtotal',
+        'icon': Icons.calculate,
+        'description': 'Show subtotal before tax',
+      },
+      {
+        'key': 'Payment Paid',
+        'icon': Icons.money,
+        'description': 'Show cash received and change',
+      },
+      {
+        'key': 'UPI QR',
+        'icon': Icons.qr_code_2,
+        'description': 'Show UPI Scan & Pay QR on unpaid bills',
+      },
+      {
+        'key': 'UPI QR Amount',
+        'icon': Icons.currency_rupee,
+        'description':
+            'Prefill the bill amount in the UPI QR so scanning shows the total',
+      },
     ],
     'Branding': [
       // Locked ON when the admin forces branding via `billing.invoice.print`;
       // when the admin allows it (flag false), this becomes a user choice.
-      {'key': 'Powered By', 'icon': Icons.verified_outlined, 'description': 'Show "Powered by Bill Berry Lite" at the bottom of the bill'},
+      {
+        'key': 'Powered By',
+        'icon': Icons.verified_outlined,
+        'description':
+            'Show "Powered by Bill Berry Lite" at the bottom of the bill',
+      },
     ],
   };
 
@@ -180,7 +247,11 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
                   color: AppColors.primary.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(Icons.image_outlined, color: AppColors.primary, size: 22),
+                child: Icon(
+                  Icons.image_outlined,
+                  color: AppColors.primary,
+                  size: 22,
+                ),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -229,9 +300,12 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
                         ),
                       )
                     : hasLogo
-                        ? Image.memory(_logoBytes!, fit: BoxFit.contain)
-                        : Icon(Icons.storefront_outlined,
-                            color: AppColors.textSecondary, size: 28),
+                    ? Image.memory(_logoBytes!, fit: BoxFit.contain)
+                    : Icon(
+                        Icons.storefront_outlined,
+                        color: AppColors.textSecondary,
+                        size: 28,
+                      ),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -244,14 +318,17 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
                         label: Text(
                           hasLogo ? 'Change' : 'Add Logo',
                           style: GoogleFonts.poppins(
-                              fontSize: 13, fontWeight: FontWeight.w600),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.primary,
                           side: BorderSide(color: AppColors.primary),
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                         ),
                       ),
                     ),
@@ -273,7 +350,10 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
             const SizedBox(height: 10),
             Text(
               'Logo printing is turned off below — this image will not appear on receipts.',
-              style: GoogleFonts.poppins(fontSize: 11, color: AppColors.warning),
+              style: GoogleFonts.poppins(
+                fontSize: 11,
+                color: AppColors.warning,
+              ),
             ),
           ],
         ],
@@ -302,8 +382,11 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
                   color: AppColors.primary.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(Icons.chat_bubble_outline_rounded,
-                    color: AppColors.primary, size: 22),
+                child: Icon(
+                  Icons.chat_bubble_outline_rounded,
+                  color: AppColors.primary,
+                  size: 22,
+                ),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -452,7 +535,9 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
         padding: const EdgeInsets.all(12),
         height: 110,
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary.withOpacity(0.04) : Colors.white,
+          color: isSelected
+              ? AppColors.primary.withOpacity(0.04)
+              : Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected ? AppColors.primary : AppColors.divider,
@@ -464,7 +549,7 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
                     color: AppColors.primary.withOpacity(0.08),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
-                  )
+                  ),
                 ]
               : [],
         ),
@@ -476,7 +561,9 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
               children: [
                 Icon(
                   icon,
-                  color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                  color: isSelected
+                      ? AppColors.primary
+                      : AppColors.textSecondary,
                   size: 20,
                 ),
                 if (isSelected)
@@ -559,14 +646,16 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
         builder: (context, settings, child) {
           return Center(
             child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: isTablet ? 700 : double.infinity),
+              constraints: BoxConstraints(
+                maxWidth: AppResponsive.maxContentWidth(context),
+              ),
               child: SingleChildScrollView(
-            padding: EdgeInsets.all(isTablet ? 20 : 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Info Banner
-              /*  Container(
+                padding: EdgeInsets.all(isTablet ? 20 : 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Info Banner
+                    /*  Container(
                   width: double.infinity,
                   padding: EdgeInsets.all(isTablet ? 16 : 14),
                   decoration: BoxDecoration(
@@ -614,74 +703,83 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
 
                 SizedBox(height: 24),*/
 
-                // Bill & KOT templates at the TOP — thermal only (A4 is fixed).
-                ValueListenableBuilder<String>(
-                  valueListenable: PrintSettings.billFormatNotifier,
-                  builder: (_, fmt, __) => fmt == 'thermal'
-                      ? _buildTemplateSection(isTablet)
-                      : const SizedBox.shrink(),
-                ),
-
-                // Store logo (image itself — the on/off toggle is below)
-                _buildLogoCard(context, isTablet),
-
-                SizedBox(height: 24),
-
-                // Settings groups EXCEPT Branding (Powered By) — that goes last.
-                ..._settingGroups.entries
-                    .where((group) => group.key != 'Branding')
-                    .map((group) => _buildSettingGroup(
-                          context,
-                          group.key,
-                          group.value,
-                          settings,
-                          isTablet,
-                        )),
-
-                // Dynamic footer / "Thank You" message — just before Powered By.
-                _buildFooterMessageCard(context, isTablet),
-
-                SizedBox(height: 24),
-
-                // Branding (Powered By) group — last.
-                if (_settingGroups.containsKey('Branding'))
-                  _buildSettingGroup(
-                    context,
-                    'Branding',
-                    _settingGroups['Branding']!,
-                    settings,
-                    isTablet,
-                  ),
-
-                // Footer
-                SizedBox(height: 8),
-                Center(
-                  child: Container(
-                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceMedium,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: AppColors.divider),
+                    // Bill & KOT templates at the TOP — thermal only (A4 is fixed).
+                    ValueListenableBuilder<String>(
+                      valueListenable: PrintSettings.billFormatNotifier,
+                      builder: (_, fmt, __) => fmt == 'thermal'
+                          ? _buildTemplateSection(isTablet)
+                          : const SizedBox.shrink(),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.cloud_done, color: AppColors.success, size: 18),
-                        SizedBox(width: 8),
-                        Text(
-                          'Settings auto-save',
-                          style: GoogleFonts.poppins(
-                            fontSize: 12,
-                            color: AppColors.textSecondary,
-                            fontWeight: FontWeight.w500,
+
+                    // Store logo (image itself — the on/off toggle is below)
+                    _buildLogoCard(context, isTablet),
+
+                    SizedBox(height: 24),
+
+                    // Settings groups EXCEPT Branding (Powered By) — that goes last.
+                    ..._settingGroups.entries
+                        .where((group) => group.key != 'Branding')
+                        .map(
+                          (group) => _buildSettingGroup(
+                            context,
+                            group.key,
+                            group.value,
+                            settings,
+                            isTablet,
                           ),
                         ),
-                      ],
+
+                    // Dynamic footer / "Thank You" message — just before Powered By.
+                    _buildFooterMessageCard(context, isTablet),
+
+                    SizedBox(height: 24),
+
+                    // Branding (Powered By) group — last.
+                    if (_settingGroups.containsKey('Branding'))
+                      _buildSettingGroup(
+                        context,
+                        'Branding',
+                        _settingGroups['Branding']!,
+                        settings,
+                        isTablet,
+                      ),
+
+                    // Footer
+                    SizedBox(height: 8),
+                    Center(
+                      child: Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceMedium,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: AppColors.divider),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.cloud_done,
+                              color: AppColors.success,
+                              size: 18,
+                            ),
+                            SizedBox(width: 8),
+                            Text(
+                              'Settings auto-save',
+                              style: GoogleFonts.poppins(
+                                fontSize: 12,
+                                color: AppColors.textSecondary,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
-            ),
               ),
             ),
           );
@@ -737,7 +835,8 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
           // enabled; when the admin turns that flag off, the user controls it.
           // `shown` drives the visuals; `locked` disables input.
           final bool locked =
-              key == 'Powered By' && PlanEnforce.allows(ModeKeys.billingInvoicePrint);
+              key == 'Powered By' &&
+              PlanEnforce.allows(ModeKeys.billingInvoicePrint);
           final bool shown = locked ? true : isEnabled;
 
           return Container(
@@ -746,7 +845,9 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
               color: AppColors.white,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: shown ? AppColors.primary.withOpacity(0.3) : AppColors.divider,
+                color: shown
+                    ? AppColors.primary.withOpacity(0.3)
+                    : AppColors.divider,
                 width: shown ? 1.5 : 1,
               ),
               boxShadow: [
@@ -765,7 +866,8 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
                 onTap: () async {
                   if (locked) {
                     NotificationService.instance.showInfo(
-                        'Upgrade to Premium to remove the "Powered by Bill Berry Lite" footer.');
+                      'Upgrade to Premium to remove the "Powered by Bill Berry Lite" footer.',
+                    );
                     return;
                   }
                   await PrintSettings.updateSetting(key, !isEnabled);
@@ -786,7 +888,9 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
                         ),
                         child: Icon(
                           icon,
-                          color: shown ? AppColors.primary : AppColors.textSecondary,
+                          color: shown
+                              ? AppColors.primary
+                              : AppColors.textSecondary,
                           size: 22,
                         ),
                       ),
@@ -805,14 +909,19 @@ class _CustomizationPrinterState extends State<CustomizationPrinter> {
                                     style: GoogleFonts.poppins(
                                       fontSize: isTablet ? 15 : 14,
                                       fontWeight: FontWeight.w600,
-                                      color: shown ? AppColors.textPrimary : AppColors.textSecondary,
+                                      color: shown
+                                          ? AppColors.textPrimary
+                                          : AppColors.textSecondary,
                                     ),
                                   ),
                                 ),
                                 if (locked) ...[
                                   const SizedBox(width: 6),
-                                  Icon(Icons.lock_rounded,
-                                      size: 14, color: AppColors.textSecondary),
+                                  Icon(
+                                    Icons.lock_rounded,
+                                    size: 14,
+                                    color: AppColors.textSecondary,
+                                  ),
                                 ],
                               ],
                             ),

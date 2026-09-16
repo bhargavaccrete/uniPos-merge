@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 
 /// Change PIN — same mechanism as restaurant's admin PIN (see
@@ -85,19 +86,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      appBar: AppBar(
-        title: Text(
-          'Change PIN',
-          style: GoogleFonts.poppins(
-            fontSize: AppResponsive.subheadingFontSize(context),
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        centerTitle: true,
-        elevation: 0,
-        backgroundColor: Colors.white,
-        foregroundColor: AppColors.textPrimary,
-      ),
+      appBar: buildPrimaryAppBar(title: 'Change PIN', centerTitle: true),
       body: AppResponsive.constrainedContent(
         context: context,
         alignment: Alignment.topCenter,
@@ -113,11 +102,11 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 Container(
                   padding: AppResponsive.cardPadding(context),
                   decoration: BoxDecoration(
-                    color: AppColors.info.withOpacity(0.1),
+                    color: AppColors.info.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(
                       AppResponsive.borderRadius(context),
                     ),
-                    border: Border.all(color: AppColors.info.withOpacity(0.3)),
+                    border: Border.all(color: AppColors.info.withValues(alpha: 0.3)),
                   ),
                   child: Row(
                     children: [
@@ -158,12 +147,12 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                       AppResponsive.mediumSpacing(context),
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.danger.withOpacity(0.1),
+                      color: AppColors.danger.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(
                         AppResponsive.smallBorderRadius(context),
                       ),
                       border: Border.all(
-                        color: AppColors.danger.withOpacity(0.3),
+                        color: AppColors.danger.withValues(alpha: 0.3),
                       ),
                     ),
                     child: Row(

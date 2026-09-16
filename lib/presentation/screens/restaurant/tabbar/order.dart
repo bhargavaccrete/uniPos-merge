@@ -163,7 +163,17 @@ class _OrderState extends State<Order> {
             ),
           ),
 
-          Expanded(child: _getBody()),
+          // Cap the CONTENT, not the tab strip above it — same split
+          // manage_menu_screen uses. The children (ActiveOrder / PastOrder)
+          // stay uncapped so nothing is constrained twice.
+          Expanded(
+            child: AppResponsive.constrainedContent(
+              context: context,
+              maxWidth: AppResponsive.maxContentWidth(context),
+              alignment: Alignment.topCenter,
+              child: _getBody(),
+            ),
+          ),
         ],
       ),
     );

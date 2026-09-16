@@ -122,7 +122,6 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
   Widget build(BuildContext context) {
     // True on desktop too — it means "not a phone", not "tablet".
     final isWide = !AppResponsive.isMobile(context);
-    final isDesktop = AppResponsive.isDesktop(context);
 
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
@@ -168,16 +167,19 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
       body: SafeArea(
         child: Column(
           children: [
-            _buildTabBar(isWide, isDesktop),
+            _buildTabBar(isWide),
+            // The shared ladder, not a local 1400. maxContentWidth is
+            // double.infinity on mobile so the cap is a no-op there, which is
+            // why the old `isDesktop ?` branch is gone — it also meant tablet
+            // went UNCAPPED while every other retail page capped at 1000.
+            // The hub owns the cap; the embedded tab children cap nothing.
             Expanded(
-              child: isDesktop
-                  ? Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 1400),
-                        child: _buildTabViews(),
-                      ),
-                    )
-                  : _buildTabViews(),
+              child: AppResponsive.constrainedContent(
+                context: context,
+                maxWidth: AppResponsive.maxContentWidth(context),
+                alignment: Alignment.topCenter,
+                child: _buildTabViews(),
+              ),
             ),
           ],
         ),
@@ -207,7 +209,7 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
   }
 
   // ==================== TAB BAR ====================
-  Widget _buildTabBar(bool isWide, bool isDesktop) {
+  Widget _buildTabBar(bool isWide) {
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(
@@ -238,14 +240,14 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
               ],
             );
 
-            // Desktop keeps the same 1400 cap as the content below, so the
-            // pills don't stretch across an ultrawide monitor.
-            if (!isDesktop) return row;
-            return Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1400),
-                child: row,
-              ),
+            // Same cap as the content below, from the shared ladder — so the
+            // pills sit directly above the tab they switch to at every
+            // breakpoint, not just desktop.
+            return AppResponsive.constrainedContent(
+              context: context,
+              maxWidth: AppResponsive.maxContentWidth(context),
+              heightFactor: 1,
+              child: row,
             );
           },
         ),

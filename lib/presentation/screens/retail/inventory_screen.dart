@@ -380,53 +380,57 @@ class _InventoryScreenState extends State<InventoryScreen>
   Widget _buildDesktopLayout(BuildContext context) {
     return Column(
       children: [
-        Container(
-          padding: EdgeInsets.symmetric(
-            horizontal: _gutter,
-            vertical: AppResponsive.largeSpacing(context),
-          ),
-          decoration: const BoxDecoration(
-            color: AppColors.white,
-            border: Border(
-              bottom: BorderSide(color: AppColors.divider, width: 1),
+        // Standalone only. Embedded in the Products hub this band was a
+        // THIRD copy of the same information: the hub's AppBar already says
+        // "Products" and its tab pill already shows the same count.
+        if (!widget.embedded)
+          Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: _gutter,
+              vertical: AppResponsive.largeSpacing(context),
+            ),
+            decoration: const BoxDecoration(
+              color: AppColors.white,
+              border: Border(
+                bottom: BorderSide(color: AppColors.divider, width: 1),
+              ),
+            ),
+            child: Row(
+              children: [
+                Text(
+                  'Product Inventory',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.headingFontSize(context),
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                SizedBox(width: AppResponsive.largeSpacing(context)),
+                Observer(
+                  builder: (context) => Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(
+                        AppResponsive.borderRadius(context),
+                      ),
+                    ),
+                    child: Text(
+                      '${productStore.products.length} products',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.smallFontSize(context),
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-          child: Row(
-            children: [
-              Text(
-                'Product Inventory',
-                style: GoogleFonts.poppins(
-                  fontSize: AppResponsive.headingFontSize(context),
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              SizedBox(width: AppResponsive.largeSpacing(context)),
-              Observer(
-                builder: (context) => Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 5,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(
-                      AppResponsive.borderRadius(context),
-                    ),
-                  ),
-                  child: Text(
-                    '${productStore.products.length} products',
-                    style: GoogleFonts.poppins(
-                      fontSize: AppResponsive.smallFontSize(context),
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
         // No wrapping Padding: the row supplies its own gutter, and an extra
         // 24 here is what pushed the field 12px right of the cards below.
         // Full-bleed white also matches the header band directly above it.

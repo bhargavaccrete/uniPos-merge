@@ -11,7 +11,7 @@ import 'package:billberrylite/domain/services/restaurant/day_management_service.
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
-import 'package:billberrylite/util/common/decimal_settings.dart';
+import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/common/dialog_dispose_scope.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
@@ -464,9 +464,9 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
                       context: ctx,
                       title: 'Balance Warning',
                       message:
-                          'This withdrawal (${CurrencyHelper.currentSymbol}${amount.toStringAsFixed(DecimalSettings.precision)}) '
+                          'This withdrawal (${formatMoney(amount)}) '
                           'exceeds the estimated drawer balance '
-                          '(${CurrencyHelper.currentSymbol}${_balance.toStringAsFixed(DecimalSettings.precision)}). '
+                          '(${formatMoney(_balance)}). '
                           'Proceed only if you have physically verified the cash.',
                       confirmLabel: 'Proceed Anyway',
                       accent: AppColors.warning,
@@ -500,17 +500,19 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
 
   @override
   Widget build(BuildContext context) {
-    final currency = CurrencyHelper.currentSymbol;
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(title: 'Cash Drawer'),
+      // MoneyScope so every figure re-renders when the store's currency or
+      // decimal precision changes in Settings — the same subscription the
+      // other 45 retail screens use.
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Observer(builder: (_) => _buildBody(context, currency)),
+          : MoneyScope(child: Observer(builder: (_) => _buildBody(context))),
     );
   }
 
-  Widget _buildBody(BuildContext context, String currency) {
+  Widget _buildBody(BuildContext context) {
     return AppResponsive.constrainedContent(
       context: context,
       alignment: Alignment.topCenter,
@@ -518,21 +520,21 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
       child: ListView(
         padding: EdgeInsets.all(AppResponsive.largeSpacing(context)),
         children: [
-          _buildBalanceCard(context, currency),
+          _buildBalanceCard(context),
           SizedBox(height: AppResponsive.largeSpacing(context)),
           _buildActionButtons(context),
           SizedBox(height: AppResponsive.largeSpacing(context)),
-          _buildBreakdownRow(context, currency),
+          _buildBreakdownRow(context),
           SizedBox(height: AppResponsive.largeSpacing(context)),
-          _buildSalesSummaryCard(context, currency),
+          _buildSalesSummaryCard(context),
           SizedBox(height: AppResponsive.largeSpacing(context)),
-          _buildActivityLog(context, currency),
+          _buildActivityLog(context),
         ],
       ),
     );
   }
 
-  Widget _buildBalanceCard(BuildContext context, String currency) {
+  Widget _buildBalanceCard(BuildContext context) {
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(AppResponsive.largeSpacing(context)),
@@ -554,7 +556,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
           ),
           SizedBox(height: AppResponsive.smallSpacing(context)),
           Text(
-            '$currency ${_balance.toStringAsFixed(DecimalSettings.precision)}',
+            formatMoney(_balance),
             style: GoogleFonts.poppins(
               fontSize: AppResponsive.getValue<double>(
                 context,
@@ -640,7 +642,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
     );
   }
 
-  Widget _buildBreakdownRow(BuildContext context, String currency) {
+  Widget _buildBreakdownRow(BuildContext context) {
     return Container(
       padding: EdgeInsets.all(AppResponsive.largeSpacing(context)),
       decoration: BoxDecoration(
@@ -656,23 +658,14 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
             context,
             'Opening Balance',
             _openingBalance,
-            currency,
             Colors.blue,
             true,
           ),
-          _breakdownLine(
-            context,
-            'Cash Sales',
-            _cashSales,
-            currency,
-            Colors.green,
-            true,
-          ),
+          _breakdownLine(context, 'Cash Sales', _cashSales, Colors.green, true),
           _breakdownLine(
             context,
             'Cash In',
             cashMovementStore.totalCashIn,
-            currency,
             Colors.teal,
             true,
           ),
@@ -680,7 +673,6 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
             context,
             'Cash Out',
             cashMovementStore.totalCashOut,
-            currency,
             Colors.orange,
             false,
           ),
@@ -688,7 +680,6 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
             context,
             'Cash Expenses',
             _cashExpenses,
-            currency,
             Colors.red,
             false,
           ),
@@ -697,7 +688,6 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
               context,
               'Cash Refunds',
               _cashRefunds,
-              currency,
               AppColors.danger,
               false,
             ),
@@ -717,7 +707,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
                 ),
               ),
               Text(
-                '$currency ${_balance.toStringAsFixed(DecimalSettings.precision)}',
+                formatMoney(_balance),
                 style: GoogleFonts.poppins(
                   fontWeight: FontWeight.w700,
                   fontSize: AppResponsive.bodyFontSize(context),
@@ -735,7 +725,6 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
     BuildContext context,
     String label,
     double amount,
-    String currency,
     Color color,
     bool isPositive,
   ) {
@@ -774,7 +763,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
           ),
           SizedBox(width: AppResponsive.smallSpacing(context)),
           Text(
-            '${isPositive ? '+' : '−'} $currency ${amount.toStringAsFixed(DecimalSettings.precision)}',
+            '${isPositive ? '+' : '−'} ${formatMoney(amount)}',
             maxLines: 1,
             style: GoogleFonts.poppins(
               fontSize: AppResponsive.smallFontSize(context),
@@ -798,7 +787,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
   /// same split (balance card + "Shift Sales Summary"); this is its retail
   /// counterpart. Net of refunds — a card refund reduces the Card line without
   /// touching the till.
-  Widget _buildSalesSummaryCard(BuildContext context, String currency) {
+  Widget _buildSalesSummaryCard(BuildContext context) {
     final credit = _method('credit');
     final other = _otherCollected;
 
@@ -834,39 +823,11 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
           ),
           SizedBox(height: AppResponsive.smallSpacing(context)),
 
-          _breakdownLine(
-            context,
-            'Cash',
-            _method('cash'),
-            currency,
-            Colors.green,
-            true,
-          ),
-          _breakdownLine(
-            context,
-            'Card',
-            _method('card'),
-            currency,
-            Colors.blue,
-            true,
-          ),
-          _breakdownLine(
-            context,
-            'UPI',
-            _method('upi'),
-            currency,
-            Colors.purple,
-            true,
-          ),
+          _breakdownLine(context, 'Cash', _method('cash'), Colors.green, true),
+          _breakdownLine(context, 'Card', _method('card'), Colors.blue, true),
+          _breakdownLine(context, 'UPI', _method('upi'), Colors.purple, true),
           if (other != 0)
-            _breakdownLine(
-              context,
-              'Other',
-              other,
-              currency,
-              Colors.teal,
-              true,
-            ),
+            _breakdownLine(context, 'Other', other, Colors.teal, true),
 
           Padding(
             padding: EdgeInsets.symmetric(vertical: 8),
@@ -884,7 +845,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
                 ),
               ),
               Text(
-                '$currency ${_collectedRevenue.toStringAsFixed(DecimalSettings.precision)}',
+                formatMoney(_collectedRevenue),
                 style: GoogleFonts.poppins(
                   fontSize: AppResponsive.bodyFontSize(context),
                   fontWeight: FontWeight.w700,
@@ -903,7 +864,6 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
               context,
               'Credit (unpaid)',
               credit,
-              currency,
               AppColors.warning,
               true,
             ),
@@ -913,7 +873,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
     );
   }
 
-  Widget _buildActivityLog(BuildContext context, String currency) {
+  Widget _buildActivityLog(BuildContext context) {
     if (_log.isEmpty) {
       return Center(
         child: Padding(
@@ -951,14 +911,14 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
             itemCount: _log.length,
             separatorBuilder: (_, __) =>
                 Divider(height: 1, color: AppColors.divider),
-            itemBuilder: (_, i) => _buildLogRow(context, _log[i], currency),
+            itemBuilder: (_, i) => _buildLogRow(context, _log[i]),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildLogRow(BuildContext context, _LogEntry entry, String currency) {
+  Widget _buildLogRow(BuildContext context, _LogEntry entry) {
     final Color dotColor;
     final IconData dotIcon;
     switch (entry.type) {
@@ -1041,7 +1001,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                '${isPositive ? '+' : ''}$currency ${entry.signedAmount.abs().toStringAsFixed(DecimalSettings.precision)}',
+                '${isPositive ? '+' : ''}${formatMoney(entry.signedAmount.abs())}',
                 maxLines: 1,
                 style: GoogleFonts.poppins(
                   fontWeight: FontWeight.w700,
@@ -1052,7 +1012,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
                 ),
               ),
               Text(
-                'Bal: $currency ${entry.runningBalance.toStringAsFixed(DecimalSettings.precision)}',
+                'Bal: ${formatMoney(entry.runningBalance)}',
                 maxLines: 1,
                 style: GoogleFonts.poppins(
                   fontSize: AppResponsive.captionFontSize(context),

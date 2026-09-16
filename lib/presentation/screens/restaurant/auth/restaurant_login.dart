@@ -11,6 +11,7 @@ import '../../../widget/componets/restaurant/componets/Button.dart';
 import '../../../widget/componets/common/app_text_field.dart';
 import '../../../../domain/store/restaurant/license_store.dart';
 import 'package:flutter/services.dart' show FilteringTextInputFormatter;
+
 class RestaurantLogin extends StatefulWidget {
   const RestaurantLogin({super.key});
 
@@ -56,11 +57,17 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
     }
 
     if (!prefs.containsKey(_passwordKey)) {
-      await prefs.setString(_passwordKey, RestaurantAuthHelper.hashPassword(_defaultPassword));
+      await prefs.setString(
+        _passwordKey,
+        RestaurantAuthHelper.hashPassword(_defaultPassword),
+      );
     } else {
       final stored = prefs.getString(_passwordKey)!;
       if (!RestaurantAuthHelper.isHashed(stored)) {
-        await prefs.setString(_passwordKey, RestaurantAuthHelper.hashPassword(stored));
+        await prefs.setString(
+          _passwordKey,
+          RestaurantAuthHelper.hashPassword(stored),
+        );
       }
     }
   }
@@ -92,10 +99,13 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
 
       // ── 2. Staff (match PIN against active staff) ─────────────────────────
       await staffStore.loadStaff();
-      final match = staffStore.staff.where(
-        (s) => s.isActive &&
-            RestaurantAuthHelper.verifyPassword(enteredPin, s.pinNo.trim()),
-      ).firstOrNull;
+      final match = staffStore.staff
+          .where(
+            (s) =>
+                s.isActive &&
+                RestaurantAuthHelper.verifyPassword(enteredPin, s.pinNo.trim()),
+          )
+          .firstOrNull;
 
       if (match != null) {
         await prefs.setBool(_isLoggedInKey, true);
@@ -124,152 +134,205 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
   Future<void> _autoClockIn(String staffName, String role) async {
     try {
       await attendanceStore.clockIn(staffName: staffName, staffRole: role);
-
     } catch (_) {}
   }
 
   @override
   Widget build(BuildContext context) {
-    final height = MediaQuery.of(context).size.height;
-    final width = MediaQuery.of(context).size.width;
-
     return Scaffold(
       backgroundColor: AppColors.white,
       body: SafeArea(
+        // A login form is a bounded CARD, not page content, so it gets its own
+        // cap rather than maxFormWidth — that helper is double.infinity on
+        // mobile, which would stretch the card to the bezel on a phone.
+        // Uncapped, the 5%-of-screen padding reached 96px and the logo 960px on
+        // a 1920px laptop. Mirrors retail's login_screen, which already had
+        // this fix.
         child: SingleChildScrollView(
-          child: Container(
-            width: width,
-            height: height * 0.95,
-            padding: EdgeInsets.symmetric(
-              horizontal: AppResponsive.width(context, 0.05),
-              vertical: AppResponsive.height(context, 0.02),
-            ),
-            child: Form(
-              key: _formkey,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // Logo
-                  Container(
-                    alignment: Alignment.center,
-                    width: AppResponsive.width(context, 0.5),
-                    height: AppResponsive.height(context, 0.20),
-                    child: Image.asset(AppImages.logo),
-                  ),
-
-                  SizedBox(height: AppResponsive.height(context, 0.02)),
-
-                  // Title
-                  Text(
-                    'Restaurant',
-                    style: GoogleFonts.poppins(
-                      fontSize: AppResponsive.getValue(context, mobile: 24.0, tablet: 26.4, desktop: 28.8),
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
-                    ),
-                  ),
-
-                  SizedBox(height: AppResponsive.height(context, 0.01)),
-
-                  Text(
-                    'Login to Continue',
-                    style: GoogleFonts.poppins(
-                      fontSize: AppResponsive.getValue(context, mobile: 16.0, tablet: 17.6, desktop: 19.2),
-                      fontWeight: FontWeight.w400,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
-
-                  SizedBox(height: AppResponsive.height(context, 0.05)),
-
-                  // Error Message
-                  if (_errorMessage != null) ...[
-                    Container(
-                      width: width,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.red.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.red.shade200),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: AppResponsive.getValue(
+                  context,
+                  mobile: 400.0,
+                  tablet: 480.0,
+                  desktop: 560.0,
+                ),
+              ),
+              child: Container(
+                width: double.infinity,
+                height: AppResponsive.height(context, 0.95),
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppResponsive.padding(context).left,
+                  vertical: AppResponsive.height(context, 0.02),
+                ),
+                child: Form(
+                  key: _formkey,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Logo
+                      Container(
+                        alignment: Alignment.center,
+                        // Sized against the card, not the screen — 50% of a 1920px
+                        // viewport made this 960px wide.
+                        width: AppResponsive.getValue(
+                          context,
+                          mobile: 200.0,
+                          tablet: 240.0,
+                          desktop: 280.0,
+                        ),
+                        height: AppResponsive.height(context, 0.20),
+                        child: Image.asset(AppImages.logo),
                       ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.error_outline, color: Colors.red.shade700, size: 20),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              _errorMessage!,
-                              style: GoogleFonts.poppins(
+
+                      SizedBox(height: AppResponsive.height(context, 0.02)),
+
+                      // Title
+                      Text(
+                        'Restaurant',
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.getValue(
+                            context,
+                            mobile: 24.0,
+                            tablet: 26.4,
+                            desktop: 28.8,
+                          ),
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary,
+                        ),
+                      ),
+
+                      SizedBox(height: AppResponsive.height(context, 0.01)),
+
+                      Text(
+                        'Login to Continue',
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.subheadingFontSize(context),
+                          fontWeight: FontWeight.w400,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+
+                      SizedBox(height: AppResponsive.height(context, 0.05)),
+
+                      // Error Message
+                      if (_errorMessage != null) ...[
+                        Container(
+                          width: double.infinity,
+                          padding: EdgeInsets.all(
+                            AppResponsive.mediumSpacing(context),
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.red.shade50,
+                            borderRadius: BorderRadius.circular(
+                              AppResponsive.smallBorderRadius(context),
+                            ),
+                            border: Border.all(color: Colors.red.shade200),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.error_outline,
                                 color: Colors.red.shade700,
-                                fontSize: AppResponsive.getValue(context, mobile: 14.0, tablet: 15.4, desktop: 16.8),
+                                size: AppResponsive.iconSize(context),
                               ),
-                            ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _errorMessage!,
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.red.shade700,
+                                    fontSize: AppResponsive.bodyFontSize(
+                                      context,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
+                        ),
+                        SizedBox(height: AppResponsive.height(context, 0.02)),
+                      ],
+
+                      // PIN Field — the only credential needed
+                      AppTextField(
+                        controller: _passwordController,
+                        autofocus: true,
+                        label: 'PIN',
+                        hint: 'Enter your PIN',
+                        icon: Icons.lock_outline_rounded,
+                        required: true,
+                        obscureText: _obscurePassword,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
                         ],
-                      ),
-                    ),
-                    SizedBox(height: AppResponsive.height(context, 0.02)),
-                  ],
-
-                  // PIN Field — the only credential needed
-                  AppTextField(
-                    controller: _passwordController,
-                    autofocus: true,
-                    label: 'PIN',
-                    hint: 'Enter your PIN',
-                    icon: Icons.lock_outline_rounded,
-                    required: true,
-                    obscureText: _obscurePassword,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    maxLength: 6,
-                    textInputAction: TextInputAction.done,
-                    onFieldSubmitted: (_) {
-                      if (!_isLoading) _handleLogin();
-                    },
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscurePassword ? Icons.visibility_off_rounded : Icons.visibility_rounded,
-                        size: 20,
-                        color: AppColors.textSecondary,
-                      ),
-                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                    ),
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) return 'PIN is required';
-                      if (!RegExp(r'^\d{4,6}$').hasMatch(v.trim())) return 'PIN must be 4–6 digits';
-                      return null;
-                    },
-                  ),
-
-                  SizedBox(height: AppResponsive.height(context, 0.04)),
-
-                  // Login Button
-                  CommonButton(
-                    width: width,
-                    height: AppResponsive.height(context, 0.065),
-                    onTap: _isLoading ? () {} : _handleLogin,
-                    bgcolor: _isLoading ? Colors.grey : AppColors.primary,
-                    child: _isLoading
-                        ? const SizedBox(
-                            height: 24,
-                            width: 24,
-                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                          )
-                        : Center(
-                            child: Text(
-                              'Login',
-                              style: GoogleFonts.poppins(
-                                color: Colors.white,
-                                fontSize: AppResponsive.getValue(context, mobile: 18.0, tablet: 19.8, desktop: 21.6),
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
+                        maxLength: 6,
+                        textInputAction: TextInputAction.done,
+                        onFieldSubmitted: (_) {
+                          if (!_isLoading) _handleLogin();
+                        },
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscurePassword
+                                ? Icons.visibility_off_rounded
+                                : Icons.visibility_rounded,
+                            size: AppResponsive.iconSize(context),
+                            color: AppColors.textSecondary,
                           ),
-                  ),
+                          onPressed: () => setState(
+                            () => _obscurePassword = !_obscurePassword,
+                          ),
+                        ),
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) {
+                            return 'PIN is required';
+                          }
+                          if (!RegExp(r'^\d{4,6}$').hasMatch(v.trim())) {
+                            return 'PIN must be 4–6 digits';
+                          }
+                          return null;
+                        },
+                      ),
 
-                  SizedBox(height: AppResponsive.height(context, 0.03)),
-                ],
+                      SizedBox(height: AppResponsive.height(context, 0.04)),
+
+                      // Login Button
+                      CommonButton(
+                        width: double.infinity,
+                        height: AppResponsive.height(context, 0.065),
+                        onTap: _isLoading ? () {} : _handleLogin,
+                        bgcolor: _isLoading
+                            ? AppColors.divider
+                            : AppColors.primary,
+                        child: _isLoading
+                            ? const SizedBox(
+                                height: 24,
+                                width: 24,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Center(
+                                child: Text(
+                                  'Login',
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.white,
+                                    fontSize: AppResponsive.subheadingFontSize(
+                                      context,
+                                    ),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                      ),
+
+                      SizedBox(height: AppResponsive.height(context, 0.03)),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),

@@ -11,7 +11,7 @@ import 'package:billberrylite/domain/services/retail/gst_service.dart';
 import 'package:billberrylite/domain/services/retail/report_service.dart';
 import 'package:billberrylite/presentation/widget/componets/common/report_notice.dart';
 import 'package:billberrylite/util/common/quantity_format.dart';
-import 'package:billberrylite/util/common/currency_helper.dart';
+import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
 
 class GstReportScreen extends StatefulWidget {
   const GstReportScreen({super.key});
@@ -172,120 +172,124 @@ class _GstReportScreenState extends State<GstReportScreen>
           ],
         ),
       ),
-      body: AppResponsive.constrainedContent(
-        context: context,
-        alignment: Alignment.topCenter,
-        maxWidth: AppResponsive.maxContentWidth(context),
-        child: Column(
-          children: [
-            if (!TaxFeature.enabled)
+      // MoneyScope: one subscription for the surface, so every figure
+      // re-renders when currency or decimal precision changes.
+      body: MoneyScope(
+        child: AppResponsive.constrainedContent(
+          context: context,
+          alignment: Alignment.topCenter,
+          maxWidth: AppResponsive.maxContentWidth(context),
+          child: Column(
+            children: [
+              if (!TaxFeature.enabled)
+                Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
+                  color: const Color(0xFFFFF8E1),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        size: AppResponsive.smallIconSize(context),
+                        color: Color(0xFFB28900),
+                      ),
+                      SizedBox(width: AppResponsive.smallSpacing(context)),
+                      Expanded(
+                        child: Text(
+                          'Tax is currently disabled for new sales. This report reflects '
+                          'historical data collected while tax was active.',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.captionFontSize(context),
+                            color: Color(0xFF7A5C00),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              // Date Range Selector
               Container(
-                width: double.infinity,
-                padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
-                color: const Color(0xFFFFF8E1),
+                color: Colors.white,
+                padding: AppResponsive.cardPadding(context),
                 child: Row(
                   children: [
-                    Icon(
-                      Icons.info_outline,
-                      size: AppResponsive.smallIconSize(context),
-                      color: Color(0xFFB28900),
-                    ),
-                    SizedBox(width: AppResponsive.smallSpacing(context)),
                     Expanded(
-                      child: Text(
-                        'Tax is currently disabled for new sales. This report reflects '
-                        'historical data collected while tax was active.',
-                        style: GoogleFonts.poppins(
-                          fontSize: AppResponsive.captionFontSize(context),
-                          color: Color(0xFF7A5C00),
+                      child: InkWell(
+                        onTap: _selectDateRange,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: AppColors.divider),
+                            borderRadius: BorderRadius.circular(
+                              AppResponsive.smallBorderRadius(context),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.calendar_today,
+                                size: AppResponsive.smallIconSize(context),
+                                color: AppColors.success,
+                              ),
+                              SizedBox(
+                                width: AppResponsive.mediumSpacing(context),
+                              ),
+                              Text(
+                                '${dateFormat.format(_dateRange.start)} - ${dateFormat.format(_dateRange.end)}',
+                                style: GoogleFonts.poppins(
+                                  fontSize: AppResponsive.bodyFontSize(context),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const Spacer(),
+                              Icon(
+                                Icons.arrow_drop_down,
+                                color: AppColors.textSecondary,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
                   ],
                 ),
               ),
-            // Date Range Selector
-            Container(
-              color: Colors.white,
-              padding: AppResponsive.cardPadding(context),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: InkWell(
-                      onTap: _selectDateRange,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: AppColors.divider),
-                          borderRadius: BorderRadius.circular(
-                            AppResponsive.smallBorderRadius(context),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.calendar_today,
-                              size: AppResponsive.smallIconSize(context),
-                              color: AppColors.success,
-                            ),
-                            SizedBox(
-                              width: AppResponsive.mediumSpacing(context),
-                            ),
-                            Text(
-                              '${dateFormat.format(_dateRange.start)} - ${dateFormat.format(_dateRange.end)}',
-                              style: GoogleFonts.poppins(
-                                fontSize: AppResponsive.bodyFontSize(context),
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const Spacer(),
-                            Icon(
-                              Icons.arrow_drop_down,
-                              color: AppColors.textSecondary,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+              if (_skippedRows > 0)
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    AppResponsive.cardPadding(context).left,
+                    0,
+                    AppResponsive.cardPadding(context).left,
+                    AppResponsive.largeSpacing(context),
                   ),
-                ],
-              ),
-            ),
-            if (_skippedRows > 0)
-              Padding(
-                padding: EdgeInsets.fromLTRB(
-                  AppResponsive.cardPadding(context).left,
-                  0,
-                  AppResponsive.cardPadding(context).left,
-                  AppResponsive.largeSpacing(context),
+                  child: ReportNotice(
+                    message:
+                        '$_skippedRows sale${_skippedRows == 1 ? '' : 's'} '
+                        'could not be dated and ${_skippedRows == 1 ? 'is' : 'are'} '
+                        'excluded from every figure below.',
+                  ),
                 ),
-                child: ReportNotice(
-                  message:
-                      '$_skippedRows sale${_skippedRows == 1 ? '' : 's'} '
-                      'could not be dated and ${_skippedRows == 1 ? 'is' : 'are'} '
-                      'excluded from every figure below.',
-                ),
-              ),
-            const Divider(height: 1),
+              const Divider(height: 1),
 
-            // Tab Content
-            Expanded(
-              child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : TabBarView(
-                      controller: _tabController,
-                      children: [
-                        _buildSummaryTab(),
-                        _buildByRateTab(),
-                        _buildByProductTab(),
-                        _buildByCategoryTab(),
-                      ],
-                    ),
-            ),
-          ],
+              // Tab Content
+              Expanded(
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : TabBarView(
+                        controller: _tabController,
+                        children: [
+                          _buildSummaryTab(),
+                          _buildByRateTab(),
+                          _buildByProductTab(),
+                          _buildByCategoryTab(),
+                        ],
+                      ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -314,7 +318,7 @@ class _GstReportScreenState extends State<GstReportScreen>
                 const Divider(height: 24),
                 _buildSummaryRow(
                   'Total Taxable Amount',
-                  '${CurrencyHelper.currentSymbol}${_totalTaxableAmount.toStringAsFixed(2)}',
+                  formatMoney(_totalTaxableAmount),
                 ),
                 // Outside India there are no components — VAT and US sales tax
                 // are one figure, and the stored halves mean nothing.
@@ -322,18 +326,18 @@ class _GstReportScreenState extends State<GstReportScreen>
                   SizedBox(height: AppResponsive.mediumSpacing(context)),
                   _buildSummaryRow(
                     'Total ${_taxComponents.first}',
-                    '${CurrencyHelper.currentSymbol}${_totalCgstAmount.toStringAsFixed(2)}',
+                    formatMoney(_totalCgstAmount),
                   ),
                   SizedBox(height: AppResponsive.smallSpacing(context)),
                   _buildSummaryRow(
                     'Total ${_taxComponents.second}',
-                    '${CurrencyHelper.currentSymbol}${_totalSgstAmount.toStringAsFixed(2)}',
+                    formatMoney(_totalSgstAmount),
                   ),
                 ],
                 const Divider(height: 24),
                 _buildSummaryRow(
                   'Total $_taxName Collected',
-                  '${CurrencyHelper.currentSymbol}${_totalGstAmount.toStringAsFixed(2)}',
+                  formatMoney(_totalGstAmount),
                   isBold: true,
                   fontSize: AppResponsive.subheadingFontSize(context),
                 ),
@@ -392,7 +396,7 @@ class _GstReportScreenState extends State<GstReportScreen>
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              '${CurrencyHelper.currentSymbol}${summary.totalGst.toStringAsFixed(2)}',
+                              formatMoney(summary.totalGst),
                               style: GoogleFonts.poppins(
                                 fontWeight: FontWeight.w500,
                               ),
@@ -475,24 +479,24 @@ class _GstReportScreenState extends State<GstReportScreen>
               const Divider(height: 24),
               _buildDetailRow(
                 'Taxable Amount',
-                '${CurrencyHelper.currentSymbol}${summary.taxableAmount.toStringAsFixed(2)}',
+                formatMoney(summary.taxableAmount),
               ),
               if (_splitsTax && _taxComponents != null) ...[
                 SizedBox(height: AppResponsive.smallSpacing(context)),
                 _buildDetailRow(
                   '${_taxComponents.first} (${(entry.key / 2).toStringAsFixed(1)}%)',
-                  '${CurrencyHelper.currentSymbol}${summary.cgst.toStringAsFixed(2)}',
+                  formatMoney(summary.cgst),
                 ),
                 SizedBox(height: AppResponsive.smallSpacing(context)),
                 _buildDetailRow(
                   '${_taxComponents.second} (${(entry.key / 2).toStringAsFixed(1)}%)',
-                  '${CurrencyHelper.currentSymbol}${summary.sgst.toStringAsFixed(2)}',
+                  formatMoney(summary.sgst),
                 ),
               ],
               const Divider(height: 16),
               _buildDetailRow(
                 'Total $_taxName',
-                '${CurrencyHelper.currentSymbol}${summary.totalGst.toStringAsFixed(2)}',
+                formatMoney(summary.totalGst),
                 isBold: true,
               ),
             ],
@@ -552,7 +556,7 @@ class _GstReportScreenState extends State<GstReportScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Taxable: ${CurrencyHelper.currentSymbol}${summary.taxableAmount.toStringAsFixed(2)}',
+                        'Taxable: ${formatMoney(summary.taxableAmount)}',
                         style: GoogleFonts.poppins(
                           fontSize: AppResponsive.smallFontSize(context),
                           color: Colors.grey[600],
@@ -578,7 +582,7 @@ class _GstReportScreenState extends State<GstReportScreen>
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
-                      '$_taxName: ${CurrencyHelper.currentSymbol}${summary.totalGst.toStringAsFixed(2)}',
+                      '$_taxName: ${formatMoney(summary.totalGst)}',
                       style: GoogleFonts.poppins(
                         fontWeight: FontWeight.w600,
                         color: AppColors.success,
@@ -652,24 +656,24 @@ class _GstReportScreenState extends State<GstReportScreen>
               SizedBox(height: AppResponsive.smallSpacing(context)),
               _buildDetailRow(
                 'Taxable Amount',
-                '${CurrencyHelper.currentSymbol}${summary.taxableAmount.toStringAsFixed(2)}',
+                formatMoney(summary.taxableAmount),
               ),
               if (_splitsTax && _taxComponents != null) ...[
                 SizedBox(height: AppResponsive.smallSpacing(context)),
                 _buildDetailRow(
                   _taxComponents.first,
-                  '${CurrencyHelper.currentSymbol}${summary.cgst.toStringAsFixed(2)}',
+                  formatMoney(summary.cgst),
                 ),
                 SizedBox(height: AppResponsive.smallSpacing(context)),
                 _buildDetailRow(
                   _taxComponents.second,
-                  '${CurrencyHelper.currentSymbol}${summary.sgst.toStringAsFixed(2)}',
+                  formatMoney(summary.sgst),
                 ),
               ],
               const Divider(height: 16),
               _buildDetailRow(
                 'Total $_taxName',
-                '${CurrencyHelper.currentSymbol}${summary.totalGst.toStringAsFixed(2)}',
+                formatMoney(summary.totalGst),
                 isBold: true,
               ),
             ],

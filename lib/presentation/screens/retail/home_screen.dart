@@ -35,6 +35,8 @@ import 'package:billberrylite/presentation/screens/retail/settings_screen.dart';
 import 'package:billberrylite/core/plan/plan_guard.dart';
 import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
 import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
+import 'package:billberrylite/util/common/quantity_format.dart';
+import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -50,11 +52,6 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadStoreName();
-    // The desktop sidebar's Customers stat reads customerStore.customers, and
-    // CustomerStore is the one store here that does NOT hydrate in its
-    // constructor — sale/product/stockAlert all call _init(). Without this the
-    // stat sat at 0 until the user opened Customers and came back.
-    customerStore.loadCustomers();
     _startShiftIfNeeded();
   }
 
@@ -106,6 +103,28 @@ class _HomeScreenState extends State<HomeScreen> {
     if (mounted && name != null && name.isNotEmpty) {
       setState(() => _storeName = name);
     }
+  }
+
+  /// Today's sale rows — the single source all three Quick Stats read, so the
+  /// figures can never disagree about where "today" starts.
+  ///
+  /// Return rows are INCLUDED, and the two kinds of field behave differently.
+  /// A return stores its MONEY negated (`return_service.dart`), so summing
+  /// nets refunds out on its own. It stores its COUNTS positive, so anything
+  /// counting units or customers has to exclude returns by hand.
+  ///
+  /// Called inside each Observer, not hoisted — the `saleStore.sales` read has
+  /// to happen during the builder for MobX to track it.
+  Iterable<SaleModel> _todaySales() {
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day);
+    return saleStore.sales.where((sale) {
+      try {
+        return !DateTime.parse(sale.createdAt).isBefore(todayStart);
+      } catch (_) {
+        return false;
+      }
+    });
   }
 
   @override
@@ -495,22 +514,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     SizedBox(height: AppResponsive.largeSpacing(context)),
                     Observer(
                       builder: (context) {
-                        final now = DateTime.now();
-                        final todayStart = DateTime(
-                          now.year,
-                          now.month,
-                          now.day,
-                        );
-                        final todaySales = saleStore.sales.where((sale) {
-                          try {
-                            final saleDate = DateTime.parse(sale.createdAt);
-                            return saleDate.isAfter(todayStart) ||
-                                saleDate.isAtSameMomentAs(todayStart);
-                          } catch (_) {
-                            return false;
-                          }
-                        });
-                        final total = todaySales.fold(
+                        // Returns self-net here: their money is stored negated.
+                        final total = _todaySales().fold<double>(
                           0.0,
                           (sum, sale) =>
                               sum + (sale.grandTotal ?? sale.totalAmount),
@@ -529,19 +534,42 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     SizedBox(height: AppResponsive.mediumSpacing(context)),
                     Observer(
-                      builder: (context) => _buildSidebarStat(
-                        Icons.inventory_2_rounded,
-                        'Products',
-                        '${productStore.products.length}',
-                      ),
+                      builder: (context) {
+                        // Returned units are subtracted BY HAND. Unlike the
+                        // money total above, totalItems stays positive on a
+                        // return row, so a blind sum counts a refund as a sale.
+                        final sold = _todaySales().fold<double>(
+                          0.0,
+                          (sum, sale) => (sale.isReturn ?? false)
+                              ? sum - sale.totalItems
+                              : sum + sale.totalItems,
+                        );
+                        // formatQty, not toString — a loose-goods variant sells
+                        // in fractional quantities.
+                        return _buildSidebarStat(
+                          Icons.inventory_2_rounded,
+                          'Items Sold',
+                          formatQty(sold),
+                        );
+                      },
                     ),
                     SizedBox(height: AppResponsive.mediumSpacing(context)),
                     Observer(
-                      builder: (context) => _buildSidebarStat(
-                        Icons.people_rounded,
-                        'Customers',
-                        '${customerStore.customers.length}',
-                      ),
+                      builder: (context) {
+                        // Distinct NAMED customers: walk-ins carry no
+                        // customerId, and a return-only visit is not a sale.
+                        final served = <String>{};
+                        for (final sale in _todaySales()) {
+                          if (sale.isReturn ?? false) continue;
+                          final id = sale.customerId;
+                          if (id != null && id.isNotEmpty) served.add(id);
+                        }
+                        return _buildSidebarStat(
+                          Icons.people_rounded,
+                          'Customers Served',
+                          '${served.length}',
+                        );
+                      },
                     ),
                   ],
                 ),

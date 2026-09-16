@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/core/config/tax_id_rule.dart';
 import 'package:billberrylite/util/common/short_ref.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -175,7 +176,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
               SizedBox(height: AppResponsive.mediumSpacing(context)),
               AppTextField(
                 controller: gstController,
-                label: 'GST Number',
+                label: TaxIdRule.label,
                 icon: Icons.badge_outlined,
                 textCapitalization: TextCapitalization.characters,
               ),
@@ -435,7 +436,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                   if (_customer.address?.isNotEmpty ?? false)
                     _buildInfoRow('Address', _customer.address!),
                   if (_customer.gstNumber?.isNotEmpty ?? false)
-                    _buildInfoRow('GST Number', _customer.gstNumber!),
+                    _buildInfoRow(TaxIdRule.label, _customer.gstNumber!),
                 ],
               ),
               SizedBox(height: AppResponsive.largeSpacing(context)),
@@ -830,7 +831,9 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                   decoration: BoxDecoration(
                     color: (hasCredit ? AppColors.danger : AppColors.success)
                         .withValues(alpha: 0.07),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(
+                      AppResponsive.borderRadius(context),
+                    ),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1098,7 +1101,9 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
       margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(
           color: isReturn
               ? AppColors.danger.withValues(alpha: 0.3)
@@ -1106,7 +1111,9 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
         ),
       ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         onTap: () {
           Navigator.push(
             context,

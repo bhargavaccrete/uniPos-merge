@@ -8,6 +8,7 @@ import '../../../presentation/widget/componets/common/location_dropdown_field.da
 import '../../../presentation/widget/componets/retail/retail_store_type_field.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/config/food_license_rule.dart';
+import '../../../core/config/tax_id_rule.dart';
 import '../../../domain/services/common/notification_service.dart';
 import '../../../util/common/country_state_city_data.dart';
 import '../../../util/color.dart';
@@ -150,12 +151,8 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
     setState(() {
       widget.store.setIsRegisteredForTax(registered);
       widget.store.setTaxEnabled(registered);
-      if (!registered) {
-        _gstController.clear();
-        _panController.clear();
-        widget.store.setGstin('');
-        widget.store.setPan('');
-      }
+      // Hiding the GSTIN/PAN fields keeps what was typed, so switching back to
+      // Registered restores it. Bills only print the number while tax is on.
     });
   }
 
@@ -795,29 +792,10 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
     return null;
   }
 
-  /// Always optional; format-checked only when non-empty, and only against the
-  /// GSTIN pattern when country is India (Rest of World has no format check).
-  String? _validateGstin(String? v) {
-    final value = (v ?? '').trim();
-    if (value.isEmpty) return null;
-    if (!_isIndia) return null;
-    final pattern = RegExp(
-      r'^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$',
-      caseSensitive: false,
-    );
-    if (!pattern.hasMatch(value)) return 'Enter a valid 15-character GSTIN';
-    return null;
-  }
+  String? _validateGstin(String? v) =>
+      TaxIdRule.validateFor(_countryController.text, v);
 
-  /// Always optional; format-checked only when non-empty. Only ever rendered
-  /// (and therefore only ever has user-entered content) when country is India.
-  String? _validatePan(String? v) {
-    final value = (v ?? '').trim();
-    if (value.isEmpty) return null;
-    final pattern = RegExp(r'^[A-Z]{5}[0-9]{4}[A-Z]{1}$', caseSensitive: false);
-    if (!pattern.hasMatch(value)) return 'Enter a valid 10-character PAN';
-    return null;
-  }
+  String? _validatePan(String? v) => TaxIdRule.validatePan(v);
 
   /// First invalid required field, top-to-bottom → its focus node (null for the
   /// Country/State/City dropdowns, which have none) + the message to show. Used
@@ -1029,10 +1007,12 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
                       focusNode: _gstFocus,
                       textInputAction: TextInputAction.next,
                       onFieldSubmitted: (_) => _panFocus.requestFocus(),
-                      label: 'GSTIN',
-                      hint: 'Optional',
+                      label: TaxIdRule.labelFor(_countryController.text),
+                      hint: TaxIdRule.hintFor(_countryController.text),
                       icon: Icons.receipt_long_rounded,
-                      maxLength: 15,
+                      maxLength: TaxIdRule.maxLengthFor(
+                        _countryController.text,
+                      ),
                       onChanged: (v) => widget.store.setGstin(v),
                       validator: _validateGstin,
                     ),
@@ -1054,10 +1034,10 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
                     focusNode: _gstFocus,
                     textInputAction: TextInputAction.done,
                     onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
-                    label: 'Tax Registration Number',
-                    hint: 'VAT / EIN / Tax ID (optional)',
+                    label: TaxIdRule.labelFor(_countryController.text),
+                    hint: TaxIdRule.hintFor(_countryController.text),
                     icon: Icons.receipt_long_rounded,
-                    maxLength: 20,
+                    maxLength: TaxIdRule.maxLengthFor(_countryController.text),
                     onChanged: (v) => widget.store.setGstin(v),
                     validator: _validateGstin,
                   ),
@@ -1100,7 +1080,7 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          isIndia ? 'GST Registration' : 'Tax Registration',
+          TaxIdRule.registrationTitleFor(_countryController.text),
           style: GoogleFonts.poppins(
             fontSize: AppResponsive.bodyFontSize(context),
             fontWeight: FontWeight.w600,

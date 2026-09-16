@@ -216,6 +216,12 @@ class _PartialRefundDialogState extends State<PartialRefundDialog> {
               if (maxQty == 0) return const SizedBox.shrink();
 
               return Card(
+                // Explicit white + no surface tint. Material 3 tints a Card's
+                // default surface by elevation, and main.dart sets no
+                // colorScheme, so an untinted Card picks up M3's default
+                // lavender while every neighbouring surface stays white.
+                color: AppColors.white,
+                surfaceTintColor: Colors.transparent,
                 margin: const EdgeInsets.symmetric(vertical: 4),
                 child: Padding(
                   padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),

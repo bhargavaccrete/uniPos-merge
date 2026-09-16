@@ -217,7 +217,7 @@ class _LowStockScreenState extends State<LowStockScreen> {
           });
           return AppResponsive.constrainedContent(
             context: context,
-            maxWidth: AppResponsive.maxFormWidth(context),
+            maxWidth: AppResponsive.maxContentWidth(context),
             alignment: Alignment.topCenter,
             child: ListView.separated(
               padding: const EdgeInsets.all(12),

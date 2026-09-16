@@ -88,7 +88,7 @@ class _orderSettingsState extends State<Ordersettings>
       // AppBar and TabBar stay full-bleed; capping here covers all three tabs.
       body: AppResponsive.constrainedContent(
         context: context,
-        maxWidth: AppResponsive.maxFormWidth(context),
+        maxWidth: AppResponsive.maxContentWidth(context),
         alignment: Alignment.topCenter,
         child: TabBarView(
           controller: _tabController,

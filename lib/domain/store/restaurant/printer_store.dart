@@ -96,9 +96,11 @@ abstract class _PrinterStore with Store {
   List<SavedPrinterModel> get wifiPrinters =>
       savedPrinters.where((p) => p.isWifi).toList();
 
+  /// Both Windows transports — the tab lists RAW thermal and PDF printers
+  /// together, distinguished by their type.
   @computed
   List<SavedPrinterModel> get windowsPrinters =>
-      savedPrinters.where((p) => p.isWindows).toList();
+      savedPrinters.where((p) => p.isWindows || p.isWindowsPdf).toList();
 
   /// Whether thermal printing is supported on this platform
   bool get isPrintingSupported => _thermalService.isSupported;
@@ -182,10 +184,14 @@ abstract class _PrinterStore with Store {
   // ACTIONS — Windows Spooler Printer Management
   // ══════════════════════════════════════════════════════════════════════════
 
-  /// Save a printer that prints through a Windows spooler queue.
+  /// Save a printer that prints through a Windows queue.
   ///
   /// [queueName] is stored verbatim in `address` — Windows queue names can
   /// contain a colon, so it must never be parsed the way WiFi's `ip:port` is.
+  ///
+  /// [asPdfPrinter] picks the OUTPUT MODE, and is an explicit user choice made
+  /// in the Windows tab — never inferred from the printer's name. False sends
+  /// RAW ESC/POS (thermal); true sends a rendered receipt PDF.
   @action
   Future<void> saveWindowsPrinter({
     required String name,
@@ -193,11 +199,12 @@ abstract class _PrinterStore with Store {
     int paperSize = 80,
     String role = 'both',
     String? assignRole,
+    bool asPdfPrinter = false,
   }) async {
     final printer = SavedPrinterModel(
       id: const Uuid().v4(),
       name: name,
-      type: 'windows',
+      type: asPdfPrinter ? 'windows_pdf' : 'windows',
       address: queueName,
       paperSize: paperSize,
       role: role,
@@ -365,6 +372,14 @@ abstract class _PrinterStore with Store {
       } else if (printer.isWindows) {
         return await _sendViaWindows(bytes, printer.address, printer.name,
             verifyDelivery: verifyDelivery);
+      } else if (printer.isWindowsPdf) {
+        // Safety net for EVERY caller. A PDF/document printer cannot interpret
+        // ESC/POS — the spooler accepts the bytes, the writer discards them and
+        // the job completes, so a RAW send here looks successful while nothing
+        // is produced. Callers render a PDF instead (bills) or fall back to the
+        // PDF preview (KOT, EOD, retail).
+        errorMessage = 'PDF printer — sending as a PDF instead';
+        return false;
       }
       errorMessage = 'Unknown printer type: ${printer.type}';
       return false;

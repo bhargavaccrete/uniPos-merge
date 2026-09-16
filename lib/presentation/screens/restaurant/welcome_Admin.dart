@@ -223,191 +223,77 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                     ),
                   ],
                 ),
-                actions: [NotificationBell(iconSize: isTablet ? 24 : 22)],
+                actions: [
+                  NotificationBell(iconSize: AppResponsive.iconSize(context)),
+                ],
               ),
         body: Stack(
           children: [
-            Column(
-              children: [
-                // License expiry warning banner (7 days or less remaining)
-                Observer(
-                  builder: (_) {
-                    final licStore = locator<LicenseStore>();
-                    if (!licStore.isExpiringSoon ||
-                        licStore.licenseInfo == null)
-                      return const SizedBox.shrink();
-                    final days = licStore.licenseInfo!.daysRemaining;
-
-                    // If not expired yet (days > 0), check if snoozed
-                    if (days > 0) {
-                      if (_snoozeLicenseUntil != null &&
-                          _snoozeLicenseUntil!.isAfter(DateTime.now())) {
+            // Dashboard content is capped; the EOD lock overlay below stays
+            // full-bleed because it is a background, not content.
+            AppResponsive.constrainedContent(
+              context: context,
+              maxWidth: AppResponsive.maxContentWidth(context),
+              alignment: Alignment.topCenter,
+              child: Column(
+                children: [
+                  // License expiry warning banner (7 days or less remaining)
+                  Observer(
+                    builder: (_) {
+                      final licStore = locator<LicenseStore>();
+                      if (!licStore.isExpiringSoon ||
+                          licStore.licenseInfo == null)
                         return const SizedBox.shrink();
+                      final days = licStore.licenseInfo!.daysRemaining;
+
+                      // If not expired yet (days > 0), check if snoozed
+                      if (days > 0) {
+                        if (_snoozeLicenseUntil != null &&
+                            _snoozeLicenseUntil!.isAfter(DateTime.now())) {
+                          return const SizedBox.shrink();
+                        }
                       }
-                    }
 
-                    return Container(
-                      margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                      padding: EdgeInsets.symmetric(
-                        horizontal: AppResponsive.largeSpacing(context),
-                        vertical: AppResponsive.mediumSpacing(context),
-                      ),
-                      decoration: BoxDecoration(
-                        color: days <= 0
-                            ? Colors.red.shade50
-                            : Colors.orange.shade50,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: days <= 0
-                              ? Colors.red.shade200
-                              : Colors.orange.shade200,
+                      return Container(
+                        margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: AppResponsive.largeSpacing(context),
+                          vertical: AppResponsive.mediumSpacing(context),
                         ),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: EdgeInsets.all(
-                              AppResponsive.smallSpacing(context),
-                            ),
-                            decoration: BoxDecoration(
-                              color: days <= 0
-                                  ? Colors.red.shade100
-                                  : Colors.orange.shade100,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Icon(
-                              days <= 0
-                                  ? Icons.error_outline_rounded
-                                  : Icons.timer_outlined,
-                              color: days <= 0
-                                  ? Colors.red.shade700
-                                  : Colors.orange.shade700,
-                              size: AppResponsive.iconSize(context),
-                            ),
+                        decoration: BoxDecoration(
+                          color: days <= 0
+                              ? Colors.red.shade50
+                              : Colors.orange.shade50,
+                          borderRadius: BorderRadius.circular(
+                            AppResponsive.smallBorderRadius(context),
                           ),
-                          SizedBox(width: AppResponsive.mediumSpacing(context)),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  days <= 0
-                                      ? 'License expired!'
-                                      : days == 0
-                                      ? 'License expires today!'
-                                      : 'License expires in $days day${days == 1 ? '' : 's'}',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: AppResponsive.bodyFontSize(
-                                      context,
-                                    ),
-                                    fontWeight: FontWeight.w600,
-                                    color: days <= 0
-                                        ? Colors.red.shade800
-                                        : Colors.orange.shade800,
-                                  ),
-                                ),
-                                Text(
-                                  'Renew your license to avoid service interruption.',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: AppResponsive.captionFontSize(
-                                      context,
-                                    ),
-                                    color: days <= 0
-                                        ? Colors.red.shade700
-                                        : Colors.orange.shade700,
-                                  ),
-                                ),
-                              ],
-                            ),
+                          border: Border.all(
+                            color: days <= 0
+                                ? Colors.red.shade200
+                                : Colors.orange.shade200,
                           ),
-                          SizedBox(width: AppResponsive.smallSpacing(context)),
-                          TextButton(
-                            onPressed: () => Navigator.pushNamed(
-                              context,
-                              RouteNames.restaurantLicensing,
-                            ),
-                            style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 6,
-                              ),
-                              backgroundColor: days <= 0
-                                  ? Colors.red.shade100
-                                  : Colors.orange.shade100,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                            child: Text(
-                              'Renew',
-                              style: GoogleFonts.poppins(
-                                fontSize: AppResponsive.smallFontSize(context),
-                                fontWeight: FontWeight.w600,
-                                color: days <= 0
-                                    ? Colors.red.shade800
-                                    : Colors.orange.shade800,
-                              ),
-                            ),
-                          ),
-                          // If not expired, show the snooze button
-                          if (days > 0) ...[
-                            SizedBox(
-                              width: AppResponsive.smallSpacing(context),
-                            ),
-                            IconButton(
-                              icon: Icon(
-                                Icons.close_rounded,
-                                color: Colors.orange.shade800,
-                                size: AppResponsive.smallIconSize(context),
-                              ),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                              onPressed: () => _snoozeAlert(
-                                'snooze_license_until',
-                                const Duration(hours: 24),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    );
-                  },
-                ),
-
-                // Pending EOD warning banner
-                if (_hasPendingEOD &&
-                    (_snoozeEodUntil == null ||
-                        _snoozeEodUntil!.isBefore(DateTime.now())))
-                  Container(
-                    margin: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    padding: EdgeInsets.symmetric(
-                      horizontal: AppResponsive.largeSpacing(context),
-                      vertical: AppResponsive.mediumSpacing(context),
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.red.shade50,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.red.shade200),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
+                        ),
+                        child: Row(
                           children: [
                             Container(
                               padding: EdgeInsets.all(
                                 AppResponsive.smallSpacing(context),
                               ),
                               decoration: BoxDecoration(
-                                color: Colors.red.shade100,
-                                borderRadius: BorderRadius.circular(8),
+                                color: days <= 0
+                                    ? Colors.red.shade100
+                                    : Colors.orange.shade100,
+                                borderRadius: BorderRadius.circular(
+                                  AppResponsive.smallBorderRadius(context),
+                                ),
                               ),
                               child: Icon(
-                                Icons.warning_amber_rounded,
-                                color: Colors.red.shade700,
+                                days <= 0
+                                    ? Icons.error_outline_rounded
+                                    : Icons.timer_outlined,
+                                color: days <= 0
+                                    ? Colors.red.shade700
+                                    : Colors.orange.shade700,
                                 size: AppResponsive.iconSize(context),
                               ),
                             ),
@@ -419,22 +305,30 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'End of Day Pending',
+                                    days <= 0
+                                        ? 'License expired!'
+                                        : days == 0
+                                        ? 'License expires today!'
+                                        : 'License expires in $days day${days == 1 ? '' : 's'}',
                                     style: GoogleFonts.poppins(
                                       fontSize: AppResponsive.bodyFontSize(
                                         context,
                                       ),
                                       fontWeight: FontWeight.w600,
-                                      color: Colors.red.shade800,
+                                      color: days <= 0
+                                          ? Colors.red.shade800
+                                          : Colors.orange.shade800,
                                     ),
                                   ),
                                   Text(
-                                    'Previous day session is still open.',
+                                    'Renew your license to avoid service interruption.',
                                     style: GoogleFonts.poppins(
                                       fontSize: AppResponsive.captionFontSize(
                                         context,
                                       ),
-                                      color: Colors.red.shade600,
+                                      color: days <= 0
+                                          ? Colors.red.shade700
+                                          : Colors.orange.shade700,
                                     ),
                                   ),
                                 ],
@@ -443,29 +337,142 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                             SizedBox(
                               width: AppResponsive.smallSpacing(context),
                             ),
-                            IconButton(
-                              icon: Icon(
-                                Icons.close_rounded,
-                                color: Colors.red.shade800,
-                                size: AppResponsive.smallIconSize(context),
+                            TextButton(
+                              onPressed: () => Navigator.pushNamed(
+                                context,
+                                RouteNames.restaurantLicensing,
                               ),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                              onPressed: () async {
-                                await DayManagementService.snoozeEODAlert();
-                                await _snoozeAlert(
-                                  'snooze_eod_until',
-                                  const Duration(hours: 24),
-                                );
-                              },
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 6,
+                                ),
+                                backgroundColor: days <= 0
+                                    ? Colors.red.shade100
+                                    : Colors.orange.shade100,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                              child: Text(
+                                'Renew',
+                                style: GoogleFonts.poppins(
+                                  fontSize: AppResponsive.smallFontSize(
+                                    context,
+                                  ),
+                                  fontWeight: FontWeight.w600,
+                                  color: days <= 0
+                                      ? Colors.red.shade800
+                                      : Colors.orange.shade800,
+                                ),
+                              ),
                             ),
+                            // If not expired, show the snooze button
+                            if (days > 0) ...[
+                              SizedBox(
+                                width: AppResponsive.smallSpacing(context),
+                              ),
+                              IconButton(
+                                icon: Icon(
+                                  Icons.close_rounded,
+                                  color: Colors.orange.shade800,
+                                  size: AppResponsive.smallIconSize(context),
+                                ),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                                onPressed: () => _snoozeAlert(
+                                  'snooze_license_until',
+                                  const Duration(hours: 24),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
-                        SizedBox(height: AppResponsive.smallSpacing(context)),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton(
+                      );
+                    },
+                  ),
+
+                  // Pending EOD warning banner
+                  if (_hasPendingEOD &&
+                      (_snoozeEodUntil == null ||
+                          _snoozeEodUntil!.isBefore(DateTime.now())))
+                    Container(
+                      margin: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: AppResponsive.largeSpacing(context),
+                        vertical: AppResponsive.mediumSpacing(context),
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(
+                          AppResponsive.smallBorderRadius(context),
+                        ),
+                        border: Border.all(color: Colors.red.shade200),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: EdgeInsets.all(
+                                  AppResponsive.smallSpacing(context),
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.shade100,
+                                  borderRadius: BorderRadius.circular(
+                                    AppResponsive.smallBorderRadius(context),
+                                  ),
+                                ),
+                                child: Icon(
+                                  Icons.warning_amber_rounded,
+                                  color: Colors.red.shade700,
+                                  size: AppResponsive.iconSize(context),
+                                ),
+                              ),
+                              SizedBox(
+                                width: AppResponsive.mediumSpacing(context),
+                              ),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'End of Day Pending',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: AppResponsive.bodyFontSize(
+                                          context,
+                                        ),
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.red.shade800,
+                                      ),
+                                    ),
+                                    Text(
+                                      'Previous day session is still open.',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: AppResponsive.captionFontSize(
+                                          context,
+                                        ),
+                                        color: Colors.red.shade600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              SizedBox(
+                                width: AppResponsive.smallSpacing(context),
+                              ),
+                              IconButton(
+                                icon: Icon(
+                                  Icons.close_rounded,
+                                  color: Colors.red.shade800,
+                                  size: AppResponsive.smallIconSize(context),
+                                ),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
                                 onPressed: () async {
                                   await DayManagementService.snoozeEODAlert();
                                   await _snoozeAlert(
@@ -473,290 +480,308 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                                     const Duration(hours: 24),
                                   );
                                 },
-                                style: OutlinedButton.styleFrom(
-                                  side: BorderSide(color: Colors.red.shade300),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 8,
-                                  ),
-                                ),
-                                child: Text(
-                                  'Continue Today',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: AppResponsive.smallFontSize(
-                                      context,
-                                    ),
-                                    fontWeight: FontWeight.w500,
-                                    color: Colors.red.shade700,
-                                  ),
-                                ),
                               ),
-                            ),
-                            SizedBox(
-                              width: AppResponsive.smallSpacing(context),
-                            ),
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: () async {
-                                  await Navigator.pushNamed(
-                                    context,
-                                    RouteNames.restaurantEndDay,
-                                  );
-                                  if (mounted) _checkDayStarted();
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.red.shade600,
-                                  elevation: 0,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 8,
-                                  ),
-                                ),
-                                child: Text(
-                                  'Complete EOD',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: AppResponsive.smallFontSize(
-                                      context,
-                                    ),
-                                    fontWeight: FontWeight.w500,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-
-                // Day-not-started banner (non-blocking). The day starts on the first
-                // order; this just lets the user start it early if they want.
-                if (_dayNotStarted &&
-                    !_hasPendingEOD &&
-                    (_snoozeDayStartUntil == null ||
-                        _snoozeDayStartUntil!.isBefore(DateTime.now())))
-                  Container(
-                    margin: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    padding: EdgeInsets.symmetric(
-                      horizontal: AppResponsive.largeSpacing(context),
-                      vertical: AppResponsive.mediumSpacing(context),
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.warning.withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: AppColors.warning.withOpacity(0.4),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.wb_sunny_outlined,
-                          color: AppColors.warning,
-                          size: AppResponsive.iconSize(context),
-                        ),
-                        SizedBox(width: AppResponsive.mediumSpacing(context)),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                            ],
+                          ),
+                          SizedBox(height: AppResponsive.smallSpacing(context)),
+                          Row(
                             children: [
-                              Text(
-                                'Day not started',
-                                style: GoogleFonts.poppins(
-                                  fontSize: AppResponsive.bodyFontSize(context),
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.textPrimary,
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: () async {
+                                    await DayManagementService.snoozeEODAlert();
+                                    await _snoozeAlert(
+                                      'snooze_eod_until',
+                                      const Duration(hours: 24),
+                                    );
+                                  },
+                                  style: OutlinedButton.styleFrom(
+                                    side: BorderSide(
+                                      color: Colors.red.shade300,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 8,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    'Continue Today',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: AppResponsive.smallFontSize(
+                                        context,
+                                      ),
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.red.shade700,
+                                    ),
+                                  ),
                                 ),
                               ),
-                              Text(
-                                'Starts automatically on your first order, or start it now.',
-                                style: GoogleFonts.poppins(
-                                  fontSize: AppResponsive.captionFontSize(
-                                    context,
+                              SizedBox(
+                                width: AppResponsive.smallSpacing(context),
+                              ),
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: () async {
+                                    await Navigator.pushNamed(
+                                      context,
+                                      RouteNames.restaurantEndDay,
+                                    );
+                                    if (mounted) _checkDayStarted();
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.red.shade600,
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 8,
+                                    ),
                                   ),
-                                  color: AppColors.textSecondary,
+                                  child: Text(
+                                    'Complete EOD',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: AppResponsive.smallFontSize(
+                                        context,
+                                      ),
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.white,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ],
                           ),
-                        ),
-                        SizedBox(width: AppResponsive.smallSpacing(context)),
-                        ElevatedButton(
-                          onPressed: () async {
-                            final started = await promptStartDay(context);
-                            if (started && mounted)
-                              setState(() => _dayNotStarted = false);
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 8,
-                            ),
-                          ),
-                          child: Text(
-                            'Start Day',
-                            style: GoogleFonts.poppins(
-                              fontSize: AppResponsive.smallFontSize(context),
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                        SizedBox(width: AppResponsive.smallSpacing(context)),
-                        IconButton(
-                          icon: Icon(
-                            Icons.close_rounded,
-                            color: AppColors.warning,
-                            size: AppResponsive.smallIconSize(context),
-                          ),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          onPressed: () => _snoozeAlert(
-                            'snooze_day_start_until',
-                            const Duration(hours: 24),
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
 
-                // Content
-                Expanded(
-                  child: Observer(
-                    builder: (_) => LayoutBuilder(
-                      builder: (context, constraints) {
-                        final cards = _getVisibleCards(context);
-                        // Single source of truth for column count (respects AppResponsive breakpoints).
-                        final columns = AppResponsive.gridColumns(context);
-                        final rows = (cards.length / columns).ceil();
-
-                        final spacing = AppResponsive.gridSpacing(context);
-                        final padH = AppResponsive.getValue(
-                          context,
-                          mobile: 16.0,
-                          tablet: 24.0,
-                          desktop: 28.0,
-                        );
-                        final padTop = AppResponsive.getValue(
-                          context,
-                          mobile: 4.0,
-                          tablet: 8.0,
-                          desktop: 12.0,
-                        );
-                        final pad = EdgeInsets.fromLTRB(
-                          padH,
-                          padTop,
-                          padH,
-                          padH,
-                        );
-
-                        // The densest the cards should ever be (their current look).
-                        final naturalRatio = AppResponsive.getValue(
-                          context,
-                          mobile: 1.2,
-                          tablet: 1.3,
-                          desktop: 1.4,
-                        );
-
-                        final availW = constraints.maxWidth - padH * 2;
-                        final availH = constraints.maxHeight - padTop - padH;
-                        final cellW =
-                            (availW - (columns - 1) * spacing) / columns;
-                        final naturalGridH =
-                            (cellW / naturalRatio) * rows +
-                            (rows - 1) * spacing;
-
-                        final children = cards
-                            .map(
-                              (card) => DashboardMenuCard(
-                                icon: card.icon,
-                                title: card.title,
-                                color: card.color,
-                                compact: !isTablet,
-                                onTap: () {
-                                  // Entitlement denied → show upgrade blocker
-                                  // instead of navigating.
-                                  if (card.entitlementKey != null &&
-                                      !PlanGuard.allowedOr(
-                                        context,
-                                        card.entitlementKey!,
-                                        featureName: card.title,
-                                      )) {
-                                    return;
-                                  }
-                                  card.onTap();
-                                },
-                                // Low-stock count badge on the Inventory tile.
-                                badge: card.title == 'Inventory'
-                                    ? Observer(
-                                        builder: (_) {
-                                          final count =
-                                              StockAdjustService.lowStockEntries()
-                                                  .length;
-                                          if (count == 0) {
-                                            return const SizedBox.shrink();
-                                          }
-                                          return DashboardCardBadge(
-                                            count: count,
-                                          );
-                                        },
-                                      )
-                                    : null,
+                  // Day-not-started banner (non-blocking). The day starts on the first
+                  // order; this just lets the user start it early if they want.
+                  if (_dayNotStarted &&
+                      !_hasPendingEOD &&
+                      (_snoozeDayStartUntil == null ||
+                          _snoozeDayStartUntil!.isBefore(DateTime.now())))
+                    Container(
+                      margin: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: AppResponsive.largeSpacing(context),
+                        vertical: AppResponsive.mediumSpacing(context),
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.warning.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(
+                          AppResponsive.smallBorderRadius(context),
+                        ),
+                        border: Border.all(
+                          color: AppColors.warning.withValues(alpha: 0.4),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.wb_sunny_outlined,
+                            color: AppColors.warning,
+                            size: AppResponsive.iconSize(context),
+                          ),
+                          SizedBox(width: AppResponsive.mediumSpacing(context)),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Day not started',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: AppResponsive.bodyFontSize(
+                                      context,
+                                    ),
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
+                                Text(
+                                  'Starts automatically on your first order, or start it now.',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: AppResponsive.captionFontSize(
+                                      context,
+                                    ),
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          SizedBox(width: AppResponsive.smallSpacing(context)),
+                          ElevatedButton(
+                            onPressed: () async {
+                              final started = await promptStartDay(context);
+                              if (started && mounted)
+                                setState(() => _dayNotStarted = false);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
                               ),
-                            )
-                            .toList();
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 8,
+                              ),
+                            ),
+                            child: Text(
+                              'Start Day',
+                              style: GoogleFonts.poppins(
+                                fontSize: AppResponsive.smallFontSize(context),
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                          SizedBox(width: AppResponsive.smallSpacing(context)),
+                          IconButton(
+                            icon: Icon(
+                              Icons.close_rounded,
+                              color: AppColors.warning,
+                              size: AppResponsive.smallIconSize(context),
+                            ),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                            onPressed: () => _snoozeAlert(
+                              'snooze_day_start_until',
+                              const Duration(hours: 24),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
 
-                        // Content taller than the viewport (e.g. phone, many rows) → scroll.
-                        if (naturalGridH > availH) {
-                          return SingleChildScrollView(
+                  // Content
+                  Expanded(
+                    child: Observer(
+                      builder: (_) => LayoutBuilder(
+                        builder: (context, constraints) {
+                          final cards = _getVisibleCards(context);
+                          // Single source of truth for column count (respects AppResponsive breakpoints).
+                          final columns = AppResponsive.gridColumns(context);
+                          final rows = (cards.length / columns).ceil();
+
+                          final spacing = AppResponsive.gridSpacing(context);
+                          // The shared padding ladder, not a local 16/24/28 —
+                          // retail's dashboard uses AppResponsive.padding too,
+                          // so the two gutters agree.
+                          final padH = AppResponsive.padding(context).left;
+                          // Content sets its own top padding under the flat
+                          // AppBar; the old 4px on mobile left the first card
+                          // row jammed against it. Same fix retail already has.
+                          final padTop = AppResponsive.mediumSpacing(context);
+                          final pad = EdgeInsets.fromLTRB(
+                            padH,
+                            padTop,
+                            padH,
+                            padH,
+                          );
+
+                          // The densest the cards should ever be (their current look).
+                          final naturalRatio = AppResponsive.getValue(
+                            context,
+                            mobile: 1.2,
+                            tablet: 1.3,
+                            desktop: 1.4,
+                          );
+
+                          final availW = constraints.maxWidth - padH * 2;
+                          final availH = constraints.maxHeight - padTop - padH;
+                          final cellW =
+                              (availW - (columns - 1) * spacing) / columns;
+                          final naturalGridH =
+                              (cellW / naturalRatio) * rows +
+                              (rows - 1) * spacing;
+
+                          final children = cards
+                              .map(
+                                (card) => DashboardMenuCard(
+                                  icon: card.icon,
+                                  title: card.title,
+                                  color: card.color,
+                                  compact: !isTablet,
+                                  onTap: () {
+                                    // Entitlement denied → show upgrade blocker
+                                    // instead of navigating.
+                                    if (card.entitlementKey != null &&
+                                        !PlanGuard.allowedOr(
+                                          context,
+                                          card.entitlementKey!,
+                                          featureName: card.title,
+                                        )) {
+                                      return;
+                                    }
+                                    card.onTap();
+                                  },
+                                  // Low-stock count badge on the Inventory tile.
+                                  badge: card.title == 'Inventory'
+                                      ? Observer(
+                                          builder: (_) {
+                                            final count =
+                                                StockAdjustService.lowStockEntries()
+                                                    .length;
+                                            if (count == 0) {
+                                              return const SizedBox.shrink();
+                                            }
+                                            return DashboardCardBadge(
+                                              count: count,
+                                            );
+                                          },
+                                        )
+                                      : null,
+                                ),
+                              )
+                              .toList();
+
+                          // Content taller than the viewport (e.g. phone, many rows) → scroll.
+                          if (naturalGridH > availH) {
+                            return SingleChildScrollView(
+                              padding: pad,
+                              child: GridView.count(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                crossAxisCount: columns,
+                                crossAxisSpacing: spacing,
+                                mainAxisSpacing: spacing,
+                                childAspectRatio: naturalRatio,
+                                children: children,
+                              ),
+                            );
+                          }
+
+                          // Fits → stretch the rows to fill the leftover vertical space.
+                          final cellH = (availH - (rows - 1) * spacing) / rows;
+                          final fillRatio = (cellW / cellH).clamp(
+                            0.85,
+                            naturalRatio,
+                          );
+                          return Padding(
                             padding: pad,
                             child: GridView.count(
-                              shrinkWrap: true,
                               physics: const NeverScrollableScrollPhysics(),
                               crossAxisCount: columns,
                               crossAxisSpacing: spacing,
                               mainAxisSpacing: spacing,
-                              childAspectRatio: naturalRatio,
+                              childAspectRatio: fillRatio,
                               children: children,
                             ),
                           );
-                        }
-
-                        // Fits → stretch the rows to fill the leftover vertical space.
-                        final cellH = (availH - (rows - 1) * spacing) / rows;
-                        final fillRatio = (cellW / cellH).clamp(
-                          0.85,
-                          naturalRatio,
-                        );
-                        return Padding(
-                          padding: pad,
-                          child: GridView.count(
-                            physics: const NeverScrollableScrollPhysics(),
-                            crossAxisCount: columns,
-                            crossAxisSpacing: spacing,
-                            mainAxisSpacing: spacing,
-                            childAspectRatio: fillRatio,
-                            children: children,
-                          ),
-                        );
-                      },
+                        },
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ), // Column / body
             if (_isEodStrictlyPending)
               Positioned.fill(child: _buildLockedOverlay(context)),
@@ -909,7 +934,9 @@ class _AdminWelcomeState extends State<AdminWelcome> {
           constraints: const BoxConstraints(maxWidth: 380),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(
+              AppResponsive.largeBorderRadius(context),
+            ),
           ),
           clipBehavior: Clip.hardEdge,
           child: Column(
@@ -934,12 +961,12 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                     Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(
+                      child: Icon(
                         Icons.logout_rounded,
-                        size: 32,
+                        size: AppResponsive.largeIconSize(context),
                         color: Colors.white,
                       ),
                     ),
@@ -957,7 +984,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                       'End your current session',
                       style: GoogleFonts.poppins(
                         fontSize: AppResponsive.smallFontSize(context),
-                        color: Colors.white.withOpacity(0.85),
+                        color: Colors.white.withValues(alpha: 0.85),
                       ),
                     ),
                   ],
@@ -975,15 +1002,19 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                         vertical: 12,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.red.withOpacity(0.06),
-                        border: Border.all(color: Colors.red.withOpacity(0.2)),
-                        borderRadius: BorderRadius.circular(12),
+                        color: Colors.red.withValues(alpha: 0.06),
+                        border: Border.all(
+                          color: Colors.red.withValues(alpha: 0.2),
+                        ),
+                        borderRadius: BorderRadius.circular(
+                          AppResponsive.borderRadius(context),
+                        ),
                       ),
                       child: Row(
                         children: [
                           Icon(
                             Icons.info_outline_rounded,
-                            size: 18,
+                            size: AppResponsive.smallIconSize(context),
                             color: Colors.red.shade700,
                           ),
                           SizedBox(width: AppResponsive.smallSpacing(context)),
@@ -1014,7 +1045,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                               padding: const EdgeInsets.symmetric(vertical: 14),
                               side: const BorderSide(color: AppColors.divider),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(10),
                               ),
                             ),
                             child: Text(
@@ -1047,7 +1078,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                               padding: const EdgeInsets.symmetric(vertical: 14),
                               elevation: 0,
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(10),
                               ),
                             ),
                             child: Text(
@@ -1082,7 +1113,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
       child: BackdropFilter(
         filter: ui.ImageFilter.blur(sigmaX: 6, sigmaY: 6),
         child: Container(
-          color: Colors.black.withOpacity(0.30),
+          color: Colors.black.withValues(alpha: 0.30),
           alignment: Alignment.center,
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
@@ -1099,10 +1130,12 @@ class _AdminWelcomeState extends State<AdminWelcome> {
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.largeBorderRadius(context),
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.18),
+            color: Colors.black.withValues(alpha: 0.18),
             blurRadius: 30,
             offset: const Offset(0, 12),
           ),
@@ -1121,7 +1154,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
             ),
             child: Icon(
               Icons.lock_clock_rounded,
-              size: 56,
+              size: AppResponsive.largeIconSize(context),
               color: Colors.orange.shade700,
             ),
           ),
@@ -1160,7 +1193,9 @@ class _AdminWelcomeState extends State<AdminWelcome> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
               color: Colors.orange.shade50,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(
+                AppResponsive.borderRadius(context),
+              ),
               border: Border.all(color: Colors.orange.shade200),
             ),
             child: Column(
@@ -1169,7 +1204,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                   children: [
                     Icon(
                       Icons.schedule_rounded,
-                      size: 18,
+                      size: AppResponsive.smallIconSize(context),
                       color: Colors.orange.shade800,
                     ),
                     SizedBox(width: AppResponsive.smallSpacing(context)),
@@ -1190,7 +1225,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                     children: [
                       Icon(
                         Icons.table_restaurant_rounded,
-                        size: 18,
+                        size: AppResponsive.smallIconSize(context),
                         color: Colors.orange.shade800,
                       ),
                       SizedBox(width: AppResponsive.smallSpacing(context)),
@@ -1226,10 +1261,10 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                       );
                       _checkDayStarted();
                     },
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.wb_sunny_rounded,
                       color: Colors.white,
-                      size: 20,
+                      size: AppResponsive.iconSize(context),
                     ),
                     label: Text(
                       'Complete End Day',
@@ -1243,7 +1278,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                       backgroundColor: Colors.green.shade600,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(10),
                       ),
                     ),
                   ),
@@ -1266,7 +1301,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                     icon: Icon(
                       Icons.logout_rounded,
                       color: Colors.grey.shade700,
-                      size: 20,
+                      size: AppResponsive.iconSize(context),
                     ),
                     label: Text(
                       'Logout',
@@ -1279,7 +1314,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
                     style: OutlinedButton.styleFrom(
                       side: BorderSide(color: Colors.grey.shade300, width: 1.5),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(10),
                       ),
                     ),
                   ),

@@ -7,6 +7,9 @@ import 'package:billberrylite/presentation/widget/componets/common/app_dialog.da
 import 'package:billberrylite/presentation/widget/componets/common/dialog_dispose_scope.dart';
 
 import '../../../../core/di/service_locator.dart';
+import '../../../../core/config/tax_feature.dart';
+import '../../../../util/restaurant/staticswitch.dart';
+import '../../../../domain/services/retail/store_settings_service.dart';
 import '../../../../core/plan/plan_guard.dart';
 import '../../../../core/plan/entitlement_keys.dart';
 import '../../../../util/restaurant/restaurant_session.dart';
@@ -179,6 +182,10 @@ class _ActiveorderState extends State<Activeorder> {
             ? 'Admin'
             : '${RestaurantSession.staffName ?? 'Staff'} (${RestaurantSession.effectiveRole})',
         voidReason: voidReason.isNotEmpty ? voidReason : null,
+        taxEnabled: TaxFeature.enabled,
+        storeGstNumber: await StoreSettingsService().gstNumberSnapshot(),
+        roundOffStep: AppSettings.roundOffStepForRecord,
+        discountOnItems: AppSettings.discountOnItems,
       );
       await pastOrderStore.addOrder(voidRecord);
 
@@ -1517,6 +1524,10 @@ class _ActiveorderState extends State<Activeorder> {
       sessionId: latestOrder.sessionId,
       serviceCharge: latestOrder.serviceCharge,
       isTaxInclusive: latestOrder.isTaxInclusive,
+      taxEnabled: TaxFeature.enabled,
+      storeGstNumber: await StoreSettingsService().gstNumberSnapshot(),
+      roundOffStep: AppSettings.roundOffStepForRecord,
+      discountOnItems: AppSettings.discountOnItems,
     );
 
     await pastOrderStore.addOrder(pastOrder);

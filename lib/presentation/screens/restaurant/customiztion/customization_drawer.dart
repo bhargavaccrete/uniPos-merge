@@ -79,18 +79,23 @@ class _CustomizationDrawerState extends State<CustomizationDrawer> {
 
           return Center(
             child: ConstrainedBox(
-              constraints:
-                  BoxConstraints(maxWidth: isTablet ? 700 : double.infinity),
+              constraints: BoxConstraints(
+                maxWidth: AppResponsive.maxContentWidth(context),
+              ),
               child: SingleChildScrollView(
                 padding: EdgeInsets.all(isTablet ? 20 : 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                   /* _infoBanner(isTablet),
+                    /* _infoBanner(isTablet),
                     const SizedBox(height: 24),*/
                     ...AppSettings.groupedSettings.entries.map((group) {
                       return _buildSettingGroup(
-                          group.key, group.value, settings, isTablet);
+                        group.key,
+                        group.value,
+                        settings,
+                        isTablet,
+                      );
                     }),
                     const SizedBox(height: 8),
                     _autoSaveFooter(),
@@ -105,7 +110,7 @@ class _CustomizationDrawerState extends State<CustomizationDrawer> {
   }
 
   // ── Info banner ──────────────────────────────────────────────────────────
-/*  Widget _infoBanner(bool isTablet) {
+  /*  Widget _infoBanner(bool isTablet) {
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(isTablet ? 16 : 14),
@@ -154,8 +159,12 @@ class _CustomizationDrawerState extends State<CustomizationDrawer> {
   }*/
 
   // ── Group ────────────────────────────────────────────────────────────────
-  Widget _buildSettingGroup(String groupTitle, List<String> keys,
-      Map<String, bool> settings, bool isTablet) {
+  Widget _buildSettingGroup(
+    String groupTitle,
+    List<String> keys,
+    Map<String, bool> settings,
+    bool isTablet,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -298,7 +307,11 @@ class _CustomizationDrawerState extends State<CustomizationDrawer> {
             const Divider(height: 1),
             Padding(
               padding: EdgeInsets.fromLTRB(
-                  isTablet ? 16 : 14, 12, isTablet ? 16 : 14, 14),
+                isTablet ? 16 : 14,
+                12,
+                isTablet ? 16 : 14,
+                14,
+              ),
               child: _buildRoundOffDropdown(),
             ),
           ],
@@ -333,10 +346,14 @@ class _CustomizationDrawerState extends State<CustomizationDrawer> {
                   onTap: () => AppSettings.updateRoundOffValue(value),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 150),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
-                      color: selected ? AppColors.primary : AppColors.surfaceLight,
+                      color: selected
+                          ? AppColors.primary
+                          : AppColors.surfaceLight,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
                         color: selected ? AppColors.primary : AppColors.divider,

@@ -169,48 +169,53 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
           ),
         ],
       ),
-      body: _isGenerating || _isClearing
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(color: AppColors.primary),
-                  const SizedBox(height: 20),
-                  Text(
-                    _isGenerating
-                        ? 'Generating data...\nThis may take a while for large datasets'
-                        : 'Clearing all data...',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.poppins(
-                      fontSize: isTablet ? 18 : 16,
-                      color: Colors.black87,
-                    ),
-                  ),
-                ],
-              ),
-            )
-          : SingleChildScrollView(
-              padding: EdgeInsets.all(isTablet ? 20 : 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _buildInfoCard(),
-                  const SizedBox(height: 20),
-                  _buildInputSection(),
-                  const SizedBox(height: 20),
-                  _buildImageOptionsCard(),
-                  const SizedBox(height: 20),
-                  _buildActionButtons(),
-                  const SizedBox(height: 20),
-                  if (_lastGenerationResults != null) _buildResultsCard(),
-                  if (_lastGenerationResults != null)
+      body: AppResponsive.constrainedContent(
+        context: context,
+        maxWidth: AppResponsive.maxContentWidth(context),
+        alignment: Alignment.topCenter,
+        child: _isGenerating || _isClearing
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(color: AppColors.primary),
                     const SizedBox(height: 20),
-                  _buildStatsCard(),
-                  const SizedBox(height: 20),
-                  _buildFileSizesCard(),
-                ],
+                    Text(
+                      _isGenerating
+                          ? 'Generating data...\nThis may take a while for large datasets'
+                          : 'Clearing all data...',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.poppins(
+                        fontSize: isTablet ? 18 : 16,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            : SingleChildScrollView(
+                padding: EdgeInsets.all(isTablet ? 20 : 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildInfoCard(),
+                    const SizedBox(height: 20),
+                    _buildInputSection(),
+                    const SizedBox(height: 20),
+                    _buildImageOptionsCard(),
+                    const SizedBox(height: 20),
+                    _buildActionButtons(),
+                    const SizedBox(height: 20),
+                    if (_lastGenerationResults != null) _buildResultsCard(),
+                    if (_lastGenerationResults != null)
+                      const SizedBox(height: 20),
+                    _buildStatsCard(),
+                    const SizedBox(height: 20),
+                    _buildFileSizesCard(),
+                  ],
+                ),
               ),
-            ),
+      ),
     );
   }
 
@@ -233,7 +238,7 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
                 Text(
                   'Overall Statistics & Reports',
                   style: TextStyle(
-                    fontSize: 18,
+                    fontSize: AppResponsive.subheadingFontSize(context),
                     fontWeight: FontWeight.bold,
                     color: Colors.purple.shade700,
                   ),
@@ -366,7 +371,10 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
       children: [
         Text(
           title,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontSize: AppResponsive.subheadingFontSize(context),
+            fontWeight: FontWeight.bold,
+          ),
         ),
         const SizedBox(height: 12),
         ...children,
@@ -388,11 +396,16 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
             Icon(icon, size: 20, color: AppColors.textSecondary),
             const SizedBox(width: 8),
           ],
-          Expanded(child: Text(label, style: const TextStyle(fontSize: 14))),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(fontSize: AppResponsive.bodyFontSize(context)),
+            ),
+          ),
           Text(
             value,
             style: TextStyle(
-              fontSize: 14,
+              fontSize: AppResponsive.bodyFontSize(context),
               fontWeight: FontWeight.bold,
               color: valueColor,
             ),
@@ -421,7 +434,7 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
               Text(
                 'Performance Test Results',
                 style: TextStyle(
-                  fontSize: 16,
+                  fontSize: AppResponsive.subheadingFontSize(context),
                   fontWeight: FontWeight.bold,
                   color: Colors.green.shade700,
                 ),
@@ -441,7 +454,7 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
           Text(
             'All $pastOrders records are accessible and queryable.',
             style: TextStyle(
-              fontSize: 12,
+              fontSize: AppResponsive.smallFontSize(context),
               fontStyle: FontStyle.italic,
               color: Colors.green.shade800,
             ),
@@ -457,10 +470,16 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontSize: 13)),
+          Text(
+            label,
+            style: TextStyle(fontSize: AppResponsive.bodyFontSize(context)),
+          ),
           Text(
             value,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontSize: AppResponsive.bodyFontSize(context),
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ],
       ),
@@ -540,7 +559,7 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
               Text(
                 'Performance Testing Tool',
                 style: GoogleFonts.poppins(
-                  fontSize: 18,
+                  fontSize: AppResponsive.subheadingFontSize(context),
                   fontWeight: FontWeight.w600,
                   color: Colors.blue.shade700,
                 ),
@@ -555,7 +574,7 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
             '• Test performance with large datasets (50,000+ records)\n'
             '• Verify data integrity and query performance',
             style: GoogleFonts.poppins(
-              fontSize: 14,
+              fontSize: AppResponsive.bodyFontSize(context),
               height: 1.5,
               color: Colors.black87,
             ),
@@ -585,7 +604,7 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
           Text(
             'Configure Data Counts',
             style: GoogleFonts.poppins(
-              fontSize: 18,
+              fontSize: AppResponsive.subheadingFontSize(context),
               fontWeight: FontWeight.w600,
               color: Colors.black87,
             ),
@@ -666,7 +685,7 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
               Text(
                 'Image Generation Options',
                 style: GoogleFonts.poppins(
-                  fontSize: 18,
+                  fontSize: AppResponsive.subheadingFontSize(context),
                   fontWeight: FontWeight.w600,
                   color: Colors.orange.shade700,
                 ),
@@ -675,12 +694,12 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
           ),
           const SizedBox(height: 12),
           SwitchListTile(
-            title: const Text('Include Images for Items'),
+            title: Text('Include Images for Items'),
             subtitle: Text(
               _includeImages
                   ? 'All items will have 400x400px placeholder images with vibrant colors and gradients'
                   : 'Items will be generated without images',
-              style: const TextStyle(fontSize: 12),
+              style: TextStyle(fontSize: AppResponsive.smallFontSize(context)),
             ),
             value: _includeImages,
             onChanged: (value) {
@@ -723,14 +742,17 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  const Text(
+                  Text(
                     '• 400x400px high-quality images\n'
                     '• 15 vibrant color variations\n'
                     '• Gradient backgrounds\n'
                     '• Decorative shapes and borders\n'
                     '• Tests app performance with image data\n'
                     '• Tests import/export with larger file sizes',
-                    style: TextStyle(fontSize: 13, height: 1.4),
+                    style: TextStyle(
+                      fontSize: AppResponsive.smallFontSize(context),
+                      height: 1.4,
+                    ),
                   ),
                 ],
               ),
@@ -753,7 +775,7 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
             label: Text(
               'Generate Test Data',
               style: GoogleFonts.poppins(
-                fontSize: 16,
+                fontSize: AppResponsive.subheadingFontSize(context),
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -777,7 +799,7 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
             label: Text(
               'Clear All Data',
               style: GoogleFonts.poppins(
-                fontSize: 16,
+                fontSize: AppResponsive.subheadingFontSize(context),
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -815,7 +837,7 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
                 Text(
                   success ? '✅ Generation Successful!' : '❌ Generation Failed',
                   style: TextStyle(
-                    fontSize: 18,
+                    fontSize: AppResponsive.subheadingFontSize(context),
                     fontWeight: FontWeight.bold,
                     color: success
                         ? Colors.green.shade700
@@ -898,9 +920,12 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           '📊 Performance Metrics',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontSize: AppResponsive.subheadingFontSize(context),
+            fontWeight: FontWeight.bold,
+          ),
         ),
         const SizedBox(height: 8),
         _buildResultRow('Total Records', '$totalRecords'),
@@ -920,9 +945,12 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               '📊 Current Data Statistics',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: AppResponsive.subheadingFontSize(context),
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 16),
             if (_isLoadingStats)
@@ -963,9 +991,12 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               '💾 Hive Box File Sizes',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: AppResponsive.subheadingFontSize(context),
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 16),
             if (_isLoadingStats)
@@ -1036,15 +1067,18 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        const Text(
+        Text(
           'Total Size',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: AppResponsive.subheadingFontSize(context),
+          ),
         ),
         Text(
           totalSize,
-          style: const TextStyle(
+          style: TextStyle(
             fontWeight: FontWeight.bold,
-            fontSize: 16,
+            fontSize: AppResponsive.subheadingFontSize(context),
             fontFamily: 'monospace',
             color: Colors.blue,
           ),
