@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/core/constants/image_sizes.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:billberrylite/util/common/image_picker_service.dart';
@@ -18,7 +19,7 @@ class UniversalImagePicker {
   }) async {
     if (kIsWeb || !showCameraOption) {
       // On web or if camera disabled, go directly to gallery
-      return await ImagePickerService.pickImageFromGallery();
+      return await ImagePickerService.pickProductImage();
     }
 
     // On mobile, show options dialog
@@ -50,7 +51,7 @@ class UniversalImagePicker {
                     label: 'Gallery',
                     onTap: () async {
                       final bytes =
-                          await ImagePickerService.pickImageFromGallery();
+                          await ImagePickerService.pickProductImage();
                       Navigator.pop(context, bytes);
                     },
                     color: AppColors.primary,
@@ -61,8 +62,8 @@ class UniversalImagePicker {
                       icon: Icons.camera_alt,
                       label: 'Camera',
                       onTap: () async {
-                        final bytes =
-                            await ImagePickerService.pickImageFromCamera();
+                        final bytes = await ImagePickerService
+                            .pickProductImageFromCamera();
                         Navigator.pop(context, bytes);
                       },
                       color: AppColors.primary,
@@ -162,6 +163,7 @@ class UniversalImageUploader extends StatelessWidget {
                           fit: BoxFit.contain,
                           width: double.infinity,
                           height: double.infinity,
+                          cacheWidth: ImageDecodeSizes.preview,
                         ),
                       ),
                       // Delete button

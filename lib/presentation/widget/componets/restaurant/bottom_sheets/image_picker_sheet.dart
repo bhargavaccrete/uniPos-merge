@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/core/constants/image_sizes.dart';
 import '../../../../../util/common/app_responsive.dart';
 
 /// Bottom sheet for selecting image source (Gallery)
@@ -185,6 +186,7 @@ class ImageUploader extends StatelessWidget {
                       imageBytes!,
                       fit: BoxFit.cover,
                       width: double.infinity,
+                      cacheWidth: ImageDecodeSizes.preview,
                     ),
                   )
                 : Column(

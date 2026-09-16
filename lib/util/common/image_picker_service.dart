@@ -94,6 +94,19 @@ class ImagePickerService {
     );
   }
 
+  /// Camera counterpart to [pickProductImage] — same quality and size cap.
+  ///
+  /// Exists because [pickProductImage] is gallery-only, and the product picker
+  /// offers a camera option too. Without this, routing that option through the
+  /// gallery helper would silently drop camera capture.
+  static Future<Uint8List?> pickProductImageFromCamera() async {
+    return await pickImageFromCamera(
+      imageQuality: 85,
+      maxWidth: 1200,
+      maxHeight: 1200,
+    );
+  }
+
   /// Pick image for categories/items
   static Future<Uint8List?> pickCategoryImage() async {
     return await pickImageFromGallery(

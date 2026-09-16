@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:billberrylite/presentation/screens/restaurant/start%20order/cart/cart.dart';
 import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/core/constants/image_sizes.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../domain/services/restaurant/day_management_service.dart';
@@ -1866,6 +1867,7 @@ class _MenuScreenState extends State<MenuScreen> {
           fit: BoxFit.cover,
           width: double.infinity,
           height: double.infinity,
+          cacheWidth: ImageDecodeSizes.gridTile,
         );
     }
     return Icon(
@@ -2410,7 +2412,13 @@ class _ItemListTileState extends State<_ItemListTile> {
     if (widget.item.imageBytes != null && widget.item.imageBytes!.isNotEmpty) {
       final file = widget.item.imageBytes;
       if (file != null)
-        return Image.memory(file, fit: BoxFit.cover, width: 58, height: 58);
+        return Image.memory(
+          file,
+          fit: BoxFit.cover,
+          width: 58,
+          height: 58,
+          cacheWidth: ImageDecodeSizes.thumbnail,
+        );
     }
     return const Icon(
       Icons.fastfood_rounded,

@@ -8,6 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/core/constants/image_sizes.dart';
 import 'package:billberrylite/domain/store/retail/product_store.dart';
 import 'package:billberrylite/domain/services/common/notification_service.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
@@ -759,7 +760,11 @@ class _InventoryScreenState extends State<InventoryScreen>
                 size: size * 0.5,
                 color: AppColors.textSecondary,
               )
-            : Image.memory(bytes, fit: BoxFit.cover),
+            : Image.memory(
+                bytes,
+                fit: BoxFit.cover,
+                cacheWidth: ImageDecodeSizes.thumbnail,
+              ),
       ),
     );
   }

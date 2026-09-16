@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:image_picker/image_picker.dart';
+import '../../../../../util/common/image_picker_service.dart';
 import '../../../../../core/plan/entitlement_keys.dart';
 import '../../../../../core/plan/plan_enforcement.dart';
 import '../../../../../core/di/service_locator.dart';
@@ -121,13 +121,11 @@ class _AddItemSheetState extends State<AddItemSheet> {
 
   Future<void> _pickImage() async {
     try {
-      final picker = ImagePicker();
-      final pickedFile = await picker.pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 85,
-      );
-      if (pickedFile == null) return;
-      final Uint8List bytes = await pickedFile.readAsBytes();
+      // Through the shared service so the stored image is capped at 1200x1200 —
+      // picking full-resolution meant a 12MP photo was kept, and every menu tile
+      // decoded it at native size.
+      final Uint8List? bytes = await ImagePickerService.pickProductImage();
+      if (bytes == null) return;
       if (bytes.length > 3 * 1024 * 1024) {
         NotificationService.instance.showError(
           'Image size must be less than 3MB. Please choose a smaller image.',

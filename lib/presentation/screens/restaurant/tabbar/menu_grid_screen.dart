@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:billberrylite/presentation/screens/restaurant/start%20order/cart/cart.dart';
 import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/core/constants/image_sizes.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../domain/services/restaurant/day_management_service.dart';
@@ -785,7 +786,10 @@ class _MenuGridScreenState extends State<MenuGridScreen> {
       final file = item.imageBytes;
       if (file != null) {
         return Image.memory(file,
-            fit: BoxFit.cover, width: double.infinity, height: double.infinity);
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: double.infinity,
+            cacheWidth: ImageDecodeSizes.gridTile);
       }
     }
     return Icon(Icons.fastfood_rounded, size: AppResponsive.getValue(context, mobile: 48.0, tablet: 56.0, desktop: 64.0), color: AppColors.textSecondary);

@@ -19,6 +19,7 @@ import 'package:billberrylite/data/models/restaurant/db/itemmodel_302.dart';
 import 'package:billberrylite/data/models/restaurant/db/itemvariantemodel_312.dart';
 import 'package:billberrylite/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/core/constants/image_sizes.dart';
 import 'package:billberrylite/presentation/screens/restaurant/auth/category_management_screen.dart';
 import 'package:billberrylite/presentation/screens/restaurant/item/add_more_info_screen.dart';
 import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/tax_selector_sheet.dart';
@@ -181,6 +182,12 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
     final pickedFile = await _imagePicker.pickImage(
       source: ImageSource.gallery,
       imageQuality: 80,
+      // Capped at 1200x1200. Inline rather than through
+      // ImagePickerService.pickProductImage because this screen also needs the
+      // picked file's PATH (_selectedImage / _saveImageToLocalStorage below),
+      // which the bytes-only helper does not return.
+      maxWidth: 1200,
+      maxHeight: 1200,
     );
 
     if (pickedFile != null) {
@@ -1003,6 +1010,7 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
                 ),
                 child: Image.memory(
                   _selectedImageBytes!,
+                  cacheWidth: ImageDecodeSizes.preview,
                   height: AppResponsive.getValue(
                     context,
                     mobile: 200.0,

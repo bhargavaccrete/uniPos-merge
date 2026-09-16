@@ -3,7 +3,7 @@ import 'package:billberrylite/util/restaurant/restaurant_session.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:billberrylite/util/common/image_picker_service.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/core/constants/item_units.dart';
 import 'package:billberrylite/util/restaurant/staticswitch.dart';
@@ -1129,12 +1129,11 @@ class _EdititemScreenState extends State<EdititemScreen> {
   }
 
   Future<void> _pickImage() async {
-    final picked = await ImagePicker().pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 85,
-    );
-    if (picked == null) return;
-    final bytes = await picked.readAsBytes();
+    // Through the shared service so the stored image is capped at 1200x1200 —
+    // picking full-resolution meant a 12MP photo was kept, and every menu tile
+    // decoded it at native size.
+    final bytes = await ImagePickerService.pickProductImage();
+    if (bytes == null) return;
     // 3 MB cap — matches the Add Item sheet (was 2 MB here).
     if (bytes.length > 3 * 1024 * 1024) {
       NotificationService.instance.showError(

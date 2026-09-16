@@ -34,6 +34,7 @@ import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sh
 import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/add_category_dialog.dart';
 import 'package:billberrylite/domain/services/common/notification_service.dart';
 import 'package:billberrylite/core/constants/item_units.dart';
+import 'package:billberrylite/core/constants/image_sizes.dart';
 import 'package:billberrylite/domain/services/retail/expiry_status.dart';
 import 'package:billberrylite/presentation/widget/componets/retail/expiry_date_field.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
@@ -216,7 +217,16 @@ class _AddProductScreenState extends State<AddProductScreen>
 
   Future<void> _pickImage() async {
     final picker = ImagePicker();
-    final image = await picker.pickImage(source: ImageSource.gallery);
+    // Capped at 1200x1200 (and quality set, which this call omitted entirely).
+    // Inline rather than through ImagePickerService.pickProductImage because
+    // this screen also needs the picked file's PATH for setImagePath below,
+    // which the bytes-only helper does not return.
+    final image = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 85,
+      maxWidth: 1200,
+      maxHeight: 1200,
+    );
     if (image != null) {
       final bytes = await image.readAsBytes();
 
@@ -939,12 +949,14 @@ class _AddProductScreenState extends State<AddProductScreen>
                     _formStore.imageBytes!,
                     fit: BoxFit.cover,
                     width: double.infinity,
+                    cacheWidth: ImageDecodeSizes.preview,
                   )
                 : hasPath
                 ? Image.file(
                     File(_formStore.imagePath!),
                     fit: BoxFit.cover,
                     width: double.infinity,
+                    cacheWidth: ImageDecodeSizes.preview,
                   )
                 : Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -3956,6 +3968,7 @@ class _AddProductScreenState extends State<AddProductScreen>
               child: Image.file(
                 File(imagePath),
                 fit: BoxFit.cover,
+                cacheWidth: ImageDecodeSizes.thumbnail,
                 errorBuilder: (_, __, ___) => placeholder,
               ),
             ),
@@ -4163,6 +4176,7 @@ class _AddProductScreenState extends State<AddProductScreen>
                                   child: Image.memory(
                                     item.imageBytes!,
                                     fit: BoxFit.cover,
+                                    cacheWidth: ImageDecodeSizes.thumbnail,
                                   ),
                                 )
                               : Icon(Icons.restaurant),
