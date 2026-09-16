@@ -58,7 +58,6 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
     final result = await showCustomerFormDialog(context);
 
     if (result == 'added') {
-      await customerStore.loadCustomers();
       if (mounted) {
         NotificationService.instance.showSuccess('Customer added successfully');
       }
@@ -69,7 +68,6 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
     final result = await showCustomerFormDialog(context, customer: customer);
 
     if (result == 'updated') {
-      await customerStore.loadCustomers();
       if (mounted) {
         NotificationService.instance.showSuccess(
           'Customer updated successfully',
@@ -87,14 +85,11 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
     );
 
     if (result == 'deleted') {
-      await customerStore.loadCustomers();
       if (mounted) {
         NotificationService.instance.showSuccess(
           'Customer deleted successfully',
         );
       }
-    } else if (result != null) {
-      await customerStore.loadCustomers();
     }
   }
 
