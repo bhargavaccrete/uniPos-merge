@@ -72,22 +72,27 @@ class _StartorderState extends State<Startorder>
     _refreshCurrentTab();
   }
 
+  /// Only the loads covering a real stale-data path remain. Category, cart and
+  /// table stores all keep their observable lists current on write, so
+  /// reloading them here was duplicate work.
   void _refreshCurrentTab() {
-    // Refresh menu/cart data when switching to menu tab
+    // Refresh menu data when switching to menu tab
     if (tabController.index == 0) {
-      categoryStore.loadCategories();
+      // Kept: InventoryService deducts stock with `item.save()`, which bypasses
+      // ItemStore and never notifies MobX — without this the menu shows stale
+      // stock after a sale.
       itemStore.loadItems();
-      restaurantCartStore.loadCartItems();
     }
     // Refresh orders when switching to orders tab
     else if (tabController.index == 1) {
+      // Kept: captain-app edits go through HiveOrders.updateOrder, which writes
+      // straight to the box and leaves orderStore's list stale.
       orderStore.loadOrders();
     }
-    // Refresh tables when switching to tables tab (only if dine-in enabled)
+    // Refresh orders when switching to tables tab (only if dine-in enabled)
     else if (tabController.index == 2 &&
         (OrderSettings.enableDineIn &&
             PlanEnforce.allows(EntKeys.billingTables))) {
-      tableStore.loadTables();
       orderStore
           .loadOrders(); // CRITICAL: Need orders to find active order for table
     }
