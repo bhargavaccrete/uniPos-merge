@@ -80,21 +80,9 @@ class _ProfitReportScreenState extends State<ProfitReportScreen>
     setState(() => _isLoading = true);
     final (start, end) = _bounds;
 
-    // Started together rather than awaited one after another — four sequential
-    // round-trips through the sales box was the whole load time.
-    final overallFuture = _reportService.getProfitReport(
-      startDate: start,
-      endDate: end,
-    );
-    final perDayFuture = _reportService.getProfitPerDayReport(
-      startDate: start,
-      endDate: end,
-    );
-    final perItemFuture = _reportService.getProfitPerItemReport(
-      startDate: start,
-      endDate: end,
-    );
-    final perSaleFuture = _reportService.getProfitPerSaleReport(
+    // One shared window for the four tabs — calling the four report methods
+    // separately scanned the sales and sale-line boxes four times each.
+    final reportsFuture = _reportService.getProfitReports(
       startDate: start,
       endDate: end,
     );
@@ -102,18 +90,15 @@ class _ProfitReportScreenState extends State<ProfitReportScreen>
     // question, not a sales-history one (see ReportService.getBundleMarginReport).
     final bundleMarginFuture = _reportService.getBundleMarginReport();
 
-    final overallData = await overallFuture;
-    final perDayData = await perDayFuture;
-    final perItemData = await perItemFuture;
-    final perSaleData = await perSaleFuture;
+    final reports = await reportsFuture;
     final bundleMarginData = await bundleMarginFuture;
 
     if (!mounted || token != _loadToken) return;
     setState(() {
-      _overallReport = overallData;
-      _profitPerDay = perDayData;
-      _profitPerItem = perItemData;
-      _profitPerSale = perSaleData;
+      _overallReport = reports.overall;
+      _profitPerDay = reports.perDay;
+      _profitPerItem = reports.perItem;
+      _profitPerSale = reports.perSale;
       _bundleMargin = bundleMarginData;
       _isLoading = false;
     });
@@ -391,9 +376,8 @@ class _ProfitReportScreenState extends State<ProfitReportScreen>
 
     final (unknownLines, unknownRevenue) = _unknownCostOf(_profitPerDay);
 
-    return ListView(
-      padding: AppResponsive.cardPadding(context),
-      children: [
+    return _lazyList(
+      [
         _unknownCostBanner(unknownLines, unknownRevenue),
         Container(
           height: 250,
@@ -429,8 +413,23 @@ class _ProfitReportScreenState extends State<ProfitReportScreen>
           ),
         ),
         SizedBox(height: AppResponsive.smallSpacing(context)),
-        ..._profitPerDay.map((day) => _buildDailyProfitCard(day)),
       ],
+      _profitPerDay.length,
+      (i) => _buildDailyProfitCard(_profitPerDay[i]),
+    );
+  }
+
+  /// [header] then [count] cards, built only as they scroll into view.
+  Widget _lazyList(
+    List<Widget> header,
+    int count,
+    Widget Function(int index) cardAt,
+  ) {
+    return ListView.builder(
+      padding: AppResponsive.cardPadding(context),
+      itemCount: header.length + count,
+      itemBuilder: (context, i) =>
+          i < header.length ? header[i] : cardAt(i - header.length),
     );
   }
 
@@ -603,9 +602,8 @@ class _ProfitReportScreenState extends State<ProfitReportScreen>
       _profitPerItem,
     );
 
-    return ListView(
-      padding: AppResponsive.cardPadding(context),
-      children: [
+    return _lazyList(
+      [
         _unknownCostBanner(itemUnknownLines, itemUnknownRevenue),
         Text(
           'Profit by Product Variant',
@@ -615,8 +613,9 @@ class _ProfitReportScreenState extends State<ProfitReportScreen>
           ),
         ),
         SizedBox(height: AppResponsive.smallSpacing(context)),
-        ..._profitPerItem.map((item) => _buildItemProfitCard(item)),
       ],
+      _profitPerItem.length,
+      (i) => _buildItemProfitCard(_profitPerItem[i]),
     );
   }
 
@@ -731,9 +730,8 @@ class _ProfitReportScreenState extends State<ProfitReportScreen>
       _profitPerSale,
     );
 
-    return ListView(
-      padding: AppResponsive.cardPadding(context),
-      children: [
+    return _lazyList(
+      [
         _unknownCostBanner(saleUnknownLines, saleUnknownRevenue),
         Text(
           'Profit by Individual Sale',
@@ -743,8 +741,9 @@ class _ProfitReportScreenState extends State<ProfitReportScreen>
           ),
         ),
         SizedBox(height: AppResponsive.smallSpacing(context)),
-        ..._profitPerSale.take(50).map((sale) => _buildSaleProfitCard(sale)),
       ],
+      _profitPerSale.length < 50 ? _profitPerSale.length : 50,
+      (i) => _buildSaleProfitCard(_profitPerSale[i]),
     );
   }
 
@@ -857,9 +856,8 @@ class _ProfitReportScreenState extends State<ProfitReportScreen>
       );
     }
 
-    return ListView(
-      padding: AppResponsive.cardPadding(context),
-      children: [
+    return _lazyList(
+      [
         Text(
           'Bundle & Repack Margin',
           style: GoogleFonts.poppins(
@@ -876,8 +874,9 @@ class _ProfitReportScreenState extends State<ProfitReportScreen>
           ),
         ),
         SizedBox(height: AppResponsive.smallSpacing(context)),
-        ..._bundleMargin.map((row) => _buildBundleMarginCard(row)),
       ],
+      _bundleMargin.length,
+      (i) => _buildBundleMarginCard(_bundleMargin[i]),
     );
   }
 

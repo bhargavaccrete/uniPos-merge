@@ -29,6 +29,7 @@ import 'package:billberrylite/util/restaurant/report_history_window.dart';
 import 'package:billberrylite/util/retail/sale_revenue_filter.dart';
 import 'package:billberrylite/data/repositories/restaurant/cash_movement_repository.dart';
 import 'package:billberrylite/util/retail/cash_drawer_ledger.dart';
+import 'package:billberrylite/util/retail/sale_created_at_prefilter.dart';
 
 import '../../../data/models/retail/hive_model/sale_item_model_204.dart';
 
@@ -200,23 +201,27 @@ class ReportService {
   /// so an unfiltered report skipped it entirely and counted return lines,
   /// which are stored positive, as extra sales.
   Future<_SaleWindow> _salesInWindow(DateTime? start, DateTime? end) async {
-    // Bounded read when we have both ends. `getSalesByDateRange` filters on the
-    // same field with the same exclusive-end rule as `_inWindow`, so this is a
-    // narrowing, not a different answer — and `_inWindow` below still applies
-    // the plan's history cutoff either way.
-    final allSales = (start != null && end != null)
-        ? await saleStore.getSalesByDateRange(start, end)
-        : await saleStore.getAllSales();
+    // One pass over the sales box, one parse per sale. `_inWindow` applies the
+    // same `[start, end)` rule the bounded `getSalesByDateRange` read did, plus
+    // the plan's history cutoff.
+    //
+    // That bounded read silently dropped unparseable dates before this loop saw
+    // them, so they only count toward `skippedRows` when a bound is missing.
+    final bounded = start != null && end != null;
+    // Skips the parse for sales provably outside a bound. Such a string always
+    // parses, so skipping it never moves `skippedRows`.
+    final prefilter = SaleCreatedAtPrefilter.forWindow(start, end);
 
     final forward = <SaleModel>[];
     final returns = <SaleModel>[];
     final signBySaleId = <String, int>{};
     var skipped = 0;
 
-    for (final sale in allSales) {
+    for (final sale in saleStore.salesInStorageOrder()) {
+      if (prefilter.isDefinitelyOutside(sale.createdAt)) continue;
       final at = _reportedAt(sale);
       if (at == null) {
-        skipped++;
+        if (!bounded) skipped++;
         continue;
       }
       if (!_inWindow(at, start, end)) continue;
@@ -246,10 +251,10 @@ class ReportService {
   Future<List<({SaleItemModel item, int sign})>> _signedLinesInWindow(
       DateTime? start, DateTime? end) async {
     final window = await _salesInWindow(start, end);
-    final allItems = await saleItemRepository.getAllSaleItems();
 
+    // Box order, uncopied — accumulation order downstream depends on it.
     final signed = <({SaleItemModel item, int sign})>[];
-    for (final item in allItems) {
+    for (final item in saleItemRepository.saleItemsInStorageOrder()) {
       final sign = window.signBySaleId[item.saleId];
       if (sign == null) continue; // outside the window, or an excluded sale
       signed.add((item: item, sign: sign));
@@ -284,15 +289,18 @@ class ReportService {
   double? _unitCostOf(SaleItemModel item, Map<String, double?> liveCost) =>
       item.costPrice ?? liveCost[item.varianteId];
 
-  /// saleId → its lines, indexed in a single pass.
+  /// saleId → its lines, for the sales in [window] only, indexed in a single
+  /// pass. Each list keeps box order.
   ///
   /// `saleItemRepository.getItemsBySaleId` has no index and scans the whole
   /// box, so calling it per sale meant a 1,000-sale month cost 1,000 full
-  /// scans — and the profit screen did that twice over.
-  Future<Map<String, List<SaleItemModel>>> _itemsBySaleId() async {
-    final all = await saleItemRepository.getAllSaleItems();
+  /// scans — and the profit screen did that twice over. Callers only look up
+  /// ids from `window.all`, so lines of other sales are never grouped.
+  Future<Map<String, List<SaleItemModel>>> _itemsBySaleId(
+      _SaleWindow window) async {
     final bySaleId = <String, List<SaleItemModel>>{};
-    for (final item in all) {
+    for (final item in saleItemRepository.saleItemsInStorageOrder()) {
+      if (!window.signBySaleId.containsKey(item.saleId)) continue;
       (bySaleId[item.saleId] ??= <SaleItemModel>[]).add(item);
     }
     return bySaleId;
@@ -629,7 +637,7 @@ class ReportService {
     // `SaleItemModel` carries no date of its own and this report reports when a
     // name was last sold.
     final window = await _salesInWindow(startDate, endDate);
-    final itemsBySaleId = await _itemsBySaleId();
+    final itemsBySaleId = await _itemsBySaleId(window);
 
     final stats = <String, Map<String, dynamic>>{};
     // Denominator for each row's share. Every line in the window, quick or
@@ -773,8 +781,16 @@ class ReportService {
     // case, and it should cost one bounded read rather than four full scans.
     if (window.returns.isEmpty) return const [];
 
-    final allSales = await saleStore.getAllSales();
-    final originalById = {for (final s in allSales) s.saleId: s};
+    // Originals resolved by key, here — the same moment the old full-box copy
+    // was taken. Writers key every sale by its own saleId, so a key lookup
+    // finds exactly the sale an id match over all sales would.
+    final originalById = <String, SaleModel>{};
+    for (final sale in window.returns) {
+      final id = sale.originalSaleId;
+      if (id == null || originalById.containsKey(id)) continue;
+      final original = saleStore.saleInStorage(id);
+      if (original != null) originalById[id] = original;
+    }
 
     // referenceId -> value written off a due by that return.
     final adjustments = <String, double>{};
@@ -892,7 +908,7 @@ class ReportService {
     DateTime? endDate,
   }) async {
     final window = await _salesInWindow(startDate, endDate);
-    final itemsBySaleId = await _itemsBySaleId();
+    final itemsBySaleId = await _itemsBySaleId(window);
     final customerNames = await _customerNameById();
     final staffNames = await _staffNameByShiftId();
 
@@ -1323,7 +1339,7 @@ class ReportService {
       {DateTime? startDate, DateTime? endDate}) async {
     final window = await _salesInWindow(startDate, endDate);
     final lines = <({SaleItemModel item, int sign})>[];
-    for (final item in await saleItemRepository.getAllSaleItems()) {
+    for (final item in saleItemRepository.saleItemsInStorageOrder()) {
       final sign = window.signBySaleId[item.saleId];
       if (sign == null) continue;
       lines.add((item: item, sign: sign));
@@ -1483,10 +1499,53 @@ class ReportService {
   // ==================== Profit Report ====================
 
   /// Get profit report (Revenue - Cost)
-  Future<Map<String, dynamic>> getProfitReport({DateTime? startDate, DateTime? endDate}) async {
-    final lines = await _signedLinesInWindow(startDate, endDate);
+  Future<Map<String, dynamic>> getProfitReport({DateTime? startDate, DateTime? endDate}) async =>
+      _profitOverall(
+        await _signedLinesInWindow(startDate, endDate),
+        await _liveCostByVariantId(),
+      );
+
+  /// All four profit tabs over one window, prepared once: one sales pass, one
+  /// sale-line pass and one cost map, where calling the four report methods
+  /// separately builds each of those four times.
+  ///
+  /// Each tab keeps its own iteration order. Overall and By-Item fold the flat
+  /// line list in box order; By-Sale and By-Day walk `window.all` and each
+  /// sale's lines in box order — exactly what the separate methods read.
+  Future<
+      ({
+        Map<String, dynamic> overall,
+        List<Map<String, dynamic>> perDay,
+        List<Map<String, dynamic>> perItem,
+        List<Map<String, dynamic>> perSale,
+      })> getProfitReports({DateTime? startDate, DateTime? endDate}) async {
+    final window = await _salesInWindow(startDate, endDate);
+
+    // The same line pass as `_signedLinesInWindow` and `_itemsBySaleId`,
+    // filling both shapes at once.
+    final lines = <({SaleItemModel item, int sign})>[];
+    final itemsBySaleId = <String, List<SaleItemModel>>{};
+    for (final item in saleItemRepository.saleItemsInStorageOrder()) {
+      final sign = window.signBySaleId[item.saleId];
+      if (sign == null) continue;
+      lines.add((item: item, sign: sign));
+      (itemsBySaleId[item.saleId] ??= <SaleItemModel>[]).add(item);
+    }
+
     final liveCost = await _liveCostByVariantId();
 
+    return (
+      overall: _profitOverall(lines, liveCost),
+      perDay: _profitPerDay(window, itemsBySaleId, liveCost),
+      perItem: _profitPerItem(lines, liveCost),
+      perSale: _profitPerSale(window, itemsBySaleId, liveCost),
+    );
+  }
+
+  Map<String, dynamic> _profitOverall(
+    List<({SaleItemModel item, int sign})> lines,
+    Map<String, double?> liveCost,
+  ) {
     double totalRevenue = 0.0;
     double totalCost = 0.0;
     var unknownCostLines = 0;
@@ -1525,10 +1584,16 @@ class ReportService {
   // ==================== Profit Per Item Report ====================
 
   /// Get profit breakdown per item/variant
-  Future<List<Map<String, dynamic>>> getProfitPerItemReport({DateTime? startDate, DateTime? endDate}) async {
-    final lines = await _signedLinesInWindow(startDate, endDate);
-    final liveCost = await _liveCostByVariantId();
+  Future<List<Map<String, dynamic>>> getProfitPerItemReport({DateTime? startDate, DateTime? endDate}) async =>
+      _profitPerItem(
+        await _signedLinesInWindow(startDate, endDate),
+        await _liveCostByVariantId(),
+      );
 
+  List<Map<String, dynamic>> _profitPerItem(
+    List<({SaleItemModel item, int sign})> lines,
+    Map<String, double?> liveCost,
+  ) {
     // Group by variant and calculate profit
     final Map<String, Map<String, dynamic>> itemProfits = {};
 
@@ -1662,9 +1727,18 @@ class ReportService {
   /// Get profit breakdown per individual sale transaction
   Future<List<Map<String, dynamic>>> getProfitPerSaleReport({DateTime? startDate, DateTime? endDate}) async {
     final window = await _salesInWindow(startDate, endDate);
-    final itemsBySaleId = await _itemsBySaleId();
-    final liveCost = await _liveCostByVariantId();
+    return _profitPerSale(
+      window,
+      await _itemsBySaleId(window),
+      await _liveCostByVariantId(),
+    );
+  }
 
+  List<Map<String, dynamic>> _profitPerSale(
+    _SaleWindow window,
+    Map<String, List<SaleItemModel>> itemsBySaleId,
+    Map<String, double?> liveCost,
+  ) {
     final saleProfits = <Map<String, dynamic>>[];
 
     // Returns are listed too, as negative rows. Excluding them here while the
@@ -1743,9 +1817,18 @@ class ReportService {
   /// Get daily profit breakdown over a date range
   Future<List<Map<String, dynamic>>> getProfitPerDayReport({DateTime? startDate, DateTime? endDate}) async {
     final window = await _salesInWindow(startDate, endDate);
-    final itemsBySaleId = await _itemsBySaleId();
-    final liveCost = await _liveCostByVariantId();
+    return _profitPerDay(
+      window,
+      await _itemsBySaleId(window),
+      await _liveCostByVariantId(),
+    );
+  }
 
+  List<Map<String, dynamic>> _profitPerDay(
+    _SaleWindow window,
+    Map<String, List<SaleItemModel>> itemsBySaleId,
+    Map<String, double?> liveCost,
+  ) {
     // Group by day
     final Map<String, Map<String, dynamic>> dailyProfits = {};
 

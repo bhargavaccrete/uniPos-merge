@@ -15,6 +15,10 @@ class SaleItemRepository {
     return _saleItemBox.values.toList();
   }
 
+  /// Every sale line in box order, without copying the box. Same order as
+  /// [getAllSaleItems]; iterate synchronously — a write mid-iteration is unsafe.
+  Iterable<SaleItemModel> saleItemsInStorageOrder() => _saleItemBox.values;
+
   /// Get a sale item by ID
   SaleItemModel? getSaleItemById(String saleItemId) {
     return _saleItemBox.get(saleItemId);

@@ -8,6 +8,7 @@ import '../../../../core/di/service_locator.dart';
 import '../../../../data/models/restaurant/db/pastordermodel_313.dart';
 import '../util/restaurant_print_helper.dart';
 import 'orderDetails.dart';
+import 'past_order_list_index.dart';
 import '../../../../util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
@@ -32,15 +33,22 @@ class _PastorderState extends State<Pastorder> {
   final TextEditingController _searchCtrl = TextEditingController();
   DateTimeRange? _dateRange;
 
+  /// Sorted orders + search text, rebuilt only when the orders list changes.
+  PastOrderListIndex? _index;
+  late final void Function() _disposeOrdersObserver;
+
   @override
   void initState() {
     super.initState();
     _searchCtrl.addListener(() => setState(() {})); // live filter
+    _disposeOrdersObserver =
+        pastOrderStore.pastOrders.observe((_) => _index = null);
     pastOrderStore.loadPastOrders(); // Load past orders from store
   }
 
   @override
   void dispose() {
+    _disposeOrdersObserver();
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -60,29 +68,6 @@ class _PastorderState extends State<Pastorder> {
 
   String _fmtDate(DateTime d) =>
       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
-
-  bool _withinRange(DateTime? dt) {
-    if (dt == null) return true;
-    if (_dateRange == null) return true;
-    final start = DateTime(
-      _dateRange!.start.year,
-      _dateRange!.start.month,
-      _dateRange!.start.day,
-      0,
-      0,
-      0,
-    );
-    final end = DateTime(
-      _dateRange!.end.year,
-      _dateRange!.end.month,
-      _dateRange!.end.day,
-      23,
-      59,
-      59,
-    );
-    return (dt.isAfter(start) || dt.isAtSameMomentAs(start)) &&
-        (dt.isBefore(end) || dt.isAtSameMomentAs(end));
-  }
 
   Future<void> _pickDateRange() async {
     final now = DateTime.now();
@@ -283,7 +268,7 @@ class _PastorderState extends State<Pastorder> {
         Expanded(
           child: Observer(
             builder: (_) {
-              final all = pastOrderStore.pastOrders.toList();
+              final all = pastOrderStore.pastOrders;
 
               if (pastOrderStore.isLoading && all.isEmpty) {
                 return Center(child: CircularProgressIndicator());
@@ -318,39 +303,11 @@ class _PastorderState extends State<Pastorder> {
                 );
               }
 
-              // newest first
-              all.sort(
-                (a, b) => (b.orderAt ?? DateTime(2000)).compareTo(
-                  a.orderAt ?? DateTime(2000),
-                ),
+              final filtered = (_index ??= PastOrderListIndex(all)).filter(
+                orderType: _orderType,
+                dateRange: _dateRange,
+                rawQuery: _searchCtrl.text,
               );
-
-              final q = _searchCtrl.text.trim().toLowerCase();
-              final filtered = all.where((o) {
-                final typeOk =
-                    _orderType == 'All' ||
-                    (o.orderType ?? '').toLowerCase() ==
-                        _orderType.toLowerCase();
-                final dateOk = _withinRange(o.orderAt);
-                final kotStr = o.kotNumbers.map((k) => k.toString()).join(' ');
-                final billStr = o.billNumber != null
-                    ? 'inv${o.billNumber} ${o.billNumber}'
-                    : '';
-                final text =
-                    [
-                          o.customerName,
-                          kotStr,
-                          billStr,
-                          o.orderType,
-                          o.paymentmode,
-                          o.tableNo,
-                        ]
-                        .where((e) => e != null && e!.isNotEmpty)
-                        .map((e) => e!.toLowerCase())
-                        .join(' ');
-                final searchOk = q.isEmpty || text.contains(q);
-                return typeOk && dateOk && searchOk;
-              }).toList();
 
               if (filtered.isEmpty) {
                 return Center(

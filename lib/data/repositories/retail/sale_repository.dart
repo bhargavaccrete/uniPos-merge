@@ -1,5 +1,6 @@
 import 'package:hive/hive.dart';
 import '../../models/retail/hive_model/sale_model_203.dart';
+import '../../../util/retail/sale_created_at_prefilter.dart';
 
 /// Repository layer for Sale data access
 /// Handles all Hive database operations for sales
@@ -14,6 +15,15 @@ class SaleRepository {
   Future<List<SaleModel>> getAllSales() async {
     return _saleBox.values.toList();
   }
+
+  /// Every sale in box order, without copying the box. Same order as
+  /// [getAllSales]; iterate synchronously — a write mid-iteration is unsafe.
+  Iterable<SaleModel> salesInStorageOrder() => _saleBox.values;
+
+  /// The sale stored under [saleId], synchronously. Every writer (`addSale`,
+  /// `updateSale`, backup restore) keys a sale by its own `saleId`, so this is
+  /// the one sale carrying that id — or null.
+  SaleModel? saleInStorage(String saleId) => _saleBox.get(saleId);
 
   /// Add a new sale to Hive
   Future<void> addSale(SaleModel sale) async {
@@ -42,7 +52,10 @@ class SaleRepository {
   /// An unparseable `createdAt` is skipped rather than thrown, so one bad row
   /// can't take out the whole query.
   Future<List<SaleModel>> getSalesByDateRange(DateTime startDate, DateTime endDate) async {
+    // Skips the parse only for sales provably outside the range.
+    final prefilter = SaleCreatedAtPrefilter.forWindow(startDate, endDate);
     return _saleBox.values.where((sale) {
+      if (prefilter.isDefinitelyOutside(sale.createdAt)) return false;
       final saleCreatedAt = DateTime.tryParse(sale.createdAt);
       if (saleCreatedAt == null) return false;
       return !saleCreatedAt.isBefore(startDate) && saleCreatedAt.isBefore(endDate);

@@ -1,6 +1,7 @@
 import '../../../core/di/service_locator.dart';
 import '../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../data/models/restaurant/db/recipe_model.dart';
+import '../../../data/models/restaurant/db/stock_movement_model.dart';
 import '../../../data/repositories/restaurant/stock_movement_repository.dart';
 
 /// One row of [RecipeReportService.foodCostReport] — cost/margin snapshot for
@@ -71,21 +72,55 @@ class WastageRow {
 /// reporting surface: food-cost %, ingredient usage, recipe margin, wastage.
 /// See docs/inventory_recipe_system_plan.md §10 (Phase 6).
 class RecipeReportService {
+  /// id → item, FIRST occurrence wins — the item a `firstWhere` scan returns
+  /// when ids are duplicated.
+  static Map<String, Items> _firstItemById(Iterable<Items> items) {
+    final byId = <String, Items>{};
+    for (final item in items) {
+      byId.putIfAbsent(item.id, () => item);
+    }
+    return byId;
+  }
+
+  /// Fallback cost for a movement logged before `unitCost` existed: the
+  /// item's current cost, or 0.0 when the item — or the item list itself —
+  /// can't be resolved. [items] is only read on the first such movement,
+  /// matching the original per-movement `try { itemStore… } catch (_) {}`.
+  static double Function(String itemId) _legacyCostLookup(
+    Iterable<Items> Function() items,
+  ) {
+    Map<String, Items>? byId;
+    return (itemId) {
+      if (byId == null) {
+        try {
+          byId = _firstItemById(items());
+        } catch (_) {
+          byId = const {};
+        }
+      }
+      final item = byId![itemId];
+      return item == null ? 0.0 : (item.lastPurchaseCost ?? 0.0);
+    };
+  }
+
   /// Cost/margin snapshot for every Semi-Finished and Recipe-Based item that
   /// has a configured recipe. Items without one (or without ingredients) are
   /// skipped — nothing meaningful to report yet.
-  static List<RecipeCostReportRow> foodCostReport() {
-    double costOf(String ingredientItemId) {
-      try {
-        final ingredient = itemStore.items.firstWhere((i) => i.id == ingredientItemId);
-        return ingredient.lastPurchaseCost ?? 0.0;
-      } catch (_) {
-        return 0.0;
-      }
-    }
+  static List<RecipeCostReportRow> foodCostReport() => foodCostReportFrom(
+        items: itemStore.items,
+        recipeForItem: recipeRepository.getRecipeForItem,
+      );
+
+  static List<RecipeCostReportRow> foodCostReportFrom({
+    required Iterable<Items> items,
+    required RecipeModel? Function(String itemId) recipeForItem,
+  }) {
+    final itemById = _firstItemById(items);
+    double costOf(String ingredientItemId) =>
+        itemById[ingredientItemId]?.lastPurchaseCost ?? 0.0;
 
     final rows = <RecipeCostReportRow>[];
-    for (final item in itemStore.items) {
+    for (final item in items) {
       final isRecipe = item.isSemiFinished || item.isRecipeBased;
       if (!isRecipe && !item.isFinishedGood) continue;
 
@@ -97,7 +132,7 @@ class RecipeReportService {
       double costPerUnit = 0.0;
 
       if (isRecipe) {
-        recipe = recipeRepository.getRecipeForItem(item.id);
+        recipe = recipeForItem(item.id);
         if (recipe == null || !recipe.hasIngredients) continue;
         costPerUnit = recipe.estimatedCostPerUnit(costOf);
         ingredientCount = recipe.ingredients.length;
@@ -133,9 +168,21 @@ class RecipeReportService {
   /// reason `'Sale (recipe: ...)'`) and batch production
   /// (`InventoryService.produceBatch`, reason `'Production (...)'`) within
   /// [from]..[to] (inclusive; null means unbounded on that side).
-  static List<IngredientUsageRow> ingredientUsageReport({DateTime? from, DateTime? to}) {
-    final stockRepo = StockMovementRepository();
-    final movements = stockRepo.allMovements().where((m) {
+  static List<IngredientUsageRow> ingredientUsageReport({DateTime? from, DateTime? to}) =>
+      ingredientUsageReportFrom(
+        movements: StockMovementRepository().allMovements(),
+        items: () => itemStore.items,
+        from: from,
+        to: to,
+      );
+
+  static List<IngredientUsageRow> ingredientUsageReportFrom({
+    required Iterable<StockMovementModel> movements,
+    required Iterable<Items> Function() items,
+    DateTime? from,
+    DateTime? to,
+  }) {
+    final filtered = movements.where((m) {
       if (m.type != 'out') return false;
       final isRecipeCascade = m.reason.startsWith('Sale (recipe');
       final isProduction = m.reason.startsWith('Production (');
@@ -145,8 +192,9 @@ class RecipeReportService {
       return true;
     });
 
+    final legacyCostOf = _legacyCostLookup(items);
     final byItem = <String, IngredientUsageRow>{};
-    for (final m in movements) {
+    for (final m in filtered) {
       // Prefer the cost that was actually in effect when this movement was
       // recorded (StockMovementModel.unitCost) over today's live cost, so a
       // report for last month prices last month's ingredients correctly even
@@ -154,9 +202,7 @@ class RecipeReportService {
       // field existed fall back to the item's current cost.
       double costPerUnit = m.unitCost ?? 0.0;
       if (m.unitCost == null) {
-        try {
-          costPerUnit = itemStore.items.firstWhere((i) => i.id == m.itemId).lastPurchaseCost ?? 0.0;
-        } catch (_) {}
+        costPerUnit = legacyCostOf(m.itemId);
       }
 
       final existing = byItem[m.itemId];
@@ -189,9 +235,21 @@ class RecipeReportService {
   /// Total quantity of each raw material/semi-finished item logged as
   /// 'Wastage / Spoilage' (the manual removal reason offered on the
   /// Inventory screen's stock-adjustment dialog) within [from]..[to].
-  static List<WastageRow> wastageReport({DateTime? from, DateTime? to}) {
-    final stockRepo = StockMovementRepository();
-    final movements = stockRepo.allMovements().where((m) {
+  static List<WastageRow> wastageReport({DateTime? from, DateTime? to}) =>
+      wastageReportFrom(
+        movements: StockMovementRepository().allMovements(),
+        items: () => itemStore.items,
+        from: from,
+        to: to,
+      );
+
+  static List<WastageRow> wastageReportFrom({
+    required Iterable<StockMovementModel> movements,
+    required Iterable<Items> Function() items,
+    DateTime? from,
+    DateTime? to,
+  }) {
+    final filtered = movements.where((m) {
       if (m.type != 'out') return false;
       if (m.reason != 'Wastage / Spoilage') return false;
       if (from != null && m.timestamp.isBefore(from)) return false;
@@ -199,14 +257,13 @@ class RecipeReportService {
       return true;
     });
 
+    final legacyCostOf = _legacyCostLookup(items);
     final byItem = <String, WastageRow>{};
-    for (final m in movements) {
+    for (final m in filtered) {
       // Same historical-cost preference as ingredientUsageReport — see there.
       double costPerUnit = m.unitCost ?? 0.0;
       if (m.unitCost == null) {
-        try {
-          costPerUnit = itemStore.items.firstWhere((i) => i.id == m.itemId).lastPurchaseCost ?? 0.0;
-        } catch (_) {}
+        costPerUnit = legacyCostOf(m.itemId);
       }
 
       final existing = byItem[m.itemId];

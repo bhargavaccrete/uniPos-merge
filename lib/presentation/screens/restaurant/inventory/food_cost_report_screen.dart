@@ -45,12 +45,28 @@ class _FoodCostReportScreenState extends State<FoodCostReportScreen> {
   DateTime? _customStart;
   DateTime? _customEnd;
 
+  /// Shared by the hero and the Food Cost tab; dropped on any items-list change,
+  /// the same signal both Observers rebuild on.
+  List<RecipeCostReportRow>? _foodCostRows;
+  late final void Function() _disposeItemsObserver;
+
+  List<RecipeCostReportRow> get _foodCost =>
+      _foodCostRows ??= RecipeReportService.foodCostReport();
+
   @override
   void initState() {
     super.initState();
+    _disposeItemsObserver =
+        itemStore.items.observe((_) => _foodCostRows = null);
     if (itemStore.items.isEmpty) {
       itemStore.loadItems();
     }
+  }
+
+  @override
+  void dispose() {
+    _disposeItemsObserver();
+    super.dispose();
   }
 
   ({DateTime? from, DateTime? to}) get _effectiveRange {
@@ -162,7 +178,7 @@ class _FoodCostReportScreenState extends State<FoodCostReportScreen> {
                 // Reads itemStore so live recipe/cost numbers refresh the hero.
                 // ignore: unused_local_variable
                 final _ = itemStore.items.length;
-                final rows = RecipeReportService.foodCostReport();
+                final rows = _foodCost;
                 final priced = rows
                     .where((r) => r.foodCostPercent != null)
                     .toList();
@@ -222,7 +238,7 @@ class _FoodCostReportScreenState extends State<FoodCostReportScreen> {
                 alignment: Alignment.topCenter,
                 child: TabBarView(
                   children: [
-                    _FoodCostMarginTab(),
+                    _FoodCostMarginTab(rows: () => _foodCost),
                     _IngredientUsageTab(
                       rangeLabel: _rangeLabel,
                       selectedRange: _selectedRange,
@@ -263,7 +279,9 @@ class _FoodCostReportScreenState extends State<FoodCostReportScreen> {
 // ─────────────────────────────────────────────────────────────────────────
 
 class _FoodCostMarginTab extends StatelessWidget {
-  const _FoodCostMarginTab();
+  final List<RecipeCostReportRow> Function() rows;
+
+  const _FoodCostMarginTab({required this.rows});
 
   Color _foodCostColor(double pct) {
     if (pct < 30) return AppColors.success;
@@ -278,7 +296,7 @@ class _FoodCostMarginTab extends StatelessWidget {
         // Reads itemStore.items so this rebuilds when items change.
         // ignore: unused_local_variable
         final _ = itemStore.items.length;
-        final rows = RecipeReportService.foodCostReport();
+        final rows = this.rows();
 
         if (rows.isEmpty) {
           return const AppEmptyState(

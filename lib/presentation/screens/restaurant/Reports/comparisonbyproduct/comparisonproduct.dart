@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:billberrylite/util/restaurant/order_status_filter.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
+import 'package:mobx/mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:billberrylite/data/models/restaurant/db/pastordermodel_313.dart';
 import 'package:intl/intl.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
@@ -29,12 +31,6 @@ class ComparisonByProduct extends StatefulWidget {
 
 class _ComparisonByProductState extends State<ComparisonByProduct> {
   ComparisonPeriod _selectedPeriod = ComparisonPeriod.Today;
-
-  @override
-  void initState() {
-    super.initState();
-    pastOrderStore.loadPastOrders();
-  }
 
   /// A product comparison reaches back to its PREVIOUS window's start — that is
   /// the date the plan's history must cover.
@@ -136,11 +132,32 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
   int _selectedYear = DateTime.now().year;
   late final List<int> _years;
 
+  /// Computed once per data/year change and shared by the table and the export.
+  List<ProductComparisonData> _comparisonData = const [];
+  int _recalcCount = 0;
+  late final ReactionDisposer _dataReaction;
+
   @override
   void initState() {
     super.initState();
     _initializeYears();
+    // Fires once per MobX batch that touches the orders list or the loading
+    // flag — the same signals the Observer used to recompute on.
+    _dataReaction = reaction<bool>(
+      (_) {
+        pastOrderStore.pastOrders.length;
+        return pastOrderStore.isLoading;
+      },
+      (_) => _recalculate(),
+      equals: (previous, next) => false,
+    );
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _dataReaction();
+    super.dispose();
   }
 
   /// Only offer years the plan's history window can reach — the comparison also
@@ -156,183 +173,45 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
   }
 
   Future<void> _loadData() async {
+    final before = _recalcCount;
     await pastOrderStore.loadPastOrders();
-    if (mounted) setState(() {});
+    if (_recalcCount == before) _recalculate();
   }
 
-  List<ProductComparisonData> _calculateComparisonData() {
-    final allOrders = pastOrderStore.pastOrders.toList();
-    final now = DateTime.now();
-
-    DateTime currentStart, currentEnd, previousStart, previousEnd;
-    String currentLabel, previousLabel;
-
-    switch (widget.period) {
-      case ComparisonPeriod.Today:
-        currentStart = DateTime(now.year, now.month, now.day);
-        currentEnd = currentStart.add(const Duration(days: 1));
-        previousStart = currentStart.subtract(const Duration(days: 1));
-        previousEnd = currentStart;
-        currentLabel = 'Today';
-        previousLabel = 'Yesterday';
-        break;
-
-      case ComparisonPeriod.ThisWeek:
-        final weekDay = now.weekday;
-        currentStart = now.subtract(Duration(days: weekDay - 1));
-        currentStart = DateTime(currentStart.year, currentStart.month, currentStart.day);
-        currentEnd = currentStart.add(const Duration(days: 7));
-        previousStart = currentStart.subtract(const Duration(days: 7));
-        previousEnd = currentStart;
-        currentLabel = 'This Week';
-        previousLabel = 'Last Week';
-        break;
-
-      case ComparisonPeriod.MonthWise:
-        currentStart = DateTime(now.year, now.month, 1);
-        currentEnd = DateTime(now.year, now.month + 1, 1);
-        previousStart = DateTime(now.year, now.month - 1, 1);
-        previousEnd = currentStart;
-        currentLabel = DateFormat('MMMM yyyy').format(now);
-        previousLabel = DateFormat('MMMM yyyy').format(DateTime(now.year, now.month - 1, 1));
-        break;
-
-      case ComparisonPeriod.YearWise:
-        currentStart = DateTime(_selectedYear, 1, 1);
-        currentEnd = DateTime(_selectedYear + 1, 1, 1);
-        previousStart = DateTime(_selectedYear - 1, 1, 1);
-        previousEnd = DateTime(_selectedYear, 1, 1);
-        currentLabel = '$_selectedYear';
-        previousLabel = '${_selectedYear - 1}';
-        break;
-    }
-
-    // Maps to store quantities per item
-    Map<String, int> currentQuantities = {};
-    Map<String, int> previousQuantities = {};
-
-    // Plan data-scope: clamp the visible history window (reports.history_limit_days).
-    final cutoff = ReportHistoryWindow.cutoff;
-
-    for (final order in allOrders) {
-      final orderStatus = order.orderStatus?.toUpperCase() ?? '';
-      if (OrderStatusFilter.isExcludedFromRevenue(orderStatus)) continue;
-      if (order.orderAt == null) continue;
-      if (cutoff != null && order.orderAt!.isBefore(cutoff)) continue;
-
-      // Check if current period
-      if (order.orderAt!.isAfter(currentStart.subtract(const Duration(seconds: 1))) &&
-          order.orderAt!.isBefore(currentEnd)) {
-        for (final item in order.items) {
-          final effectiveQty = (item.quantity ?? 0) - (item.refundedQuantity ?? 0);
-          if (effectiveQty > 0) {
-            currentQuantities[item.title] = (currentQuantities[item.title] ?? 0) + effectiveQty;
-          }
-        }
-      }
-      // Check if previous period
-      else if (order.orderAt!.isAfter(previousStart.subtract(const Duration(seconds: 1))) &&
-          order.orderAt!.isBefore(previousEnd)) {
-        for (final item in order.items) {
-          final effectiveQty = (item.quantity ?? 0) - (item.refundedQuantity ?? 0);
-          if (effectiveQty > 0) {
-            previousQuantities[item.title] = (previousQuantities[item.title] ?? 0) + effectiveQty;
-          }
-        }
-      }
-    }
-
-    // Combine all unique products
-    final allProducts = {...currentQuantities.keys, ...previousQuantities.keys};
-
-    // Build comparison list
-    final List<ProductComparisonData> comparisonList = [];
-    for (final productName in allProducts) {
-      final currentQty = currentQuantities[productName] ?? 0;
-      final previousQty = previousQuantities[productName] ?? 0;
-      final difference = currentQty - previousQty;
-
-      // Calculate growth percentage.
-      // FIX 1: Use double.infinity as a sentinel for "New" (no previous data).
-      // Displaying 100% growth when previous=0 is mathematically wrong.
-      double growthPercentage = 0.0;
-      if (previousQty > 0) {
-        growthPercentage = ((currentQty - previousQty) / previousQty) * 100;
-      } else if (currentQty > 0) {
-        growthPercentage = double.infinity; // sentinel: product is new this period
-      }
-
-      comparisonList.add(ProductComparisonData(
-        productName: productName,
-        previousPeriodQty: previousQty,
-        currentPeriodQty: currentQty,
-        difference: difference,
-        growthPercentage: growthPercentage,
-        currentLabel: currentLabel,
-        previousLabel: previousLabel,
-      ));
-    }
-
-    // Sort by current period quantity (descending)
-    comparisonList.sort((a, b) => b.currentPeriodQty.compareTo(a.currentPeriodQty));
-
-    return comparisonList;
+  void _recalculate() {
+    if (!mounted || pastOrderStore.isLoading) return;
+    _recalcCount++;
+    setState(() {
+      _comparisonData = calculateProductComparison(
+        orders: pastOrderStore.pastOrders,
+        period: widget.period,
+        selectedYear: _selectedYear,
+        now: DateTime.now(),
+        cutoff: ReportHistoryWindow.cutoff,
+      );
+    });
   }
 
   Future<void> _exportReport() async {
-    final comparisonData = _calculateComparisonData();
+    final comparisonData = _comparisonData;
 
     if (comparisonData.isEmpty) {
       NotificationService.instance.showError('No data to export');
       return;
     }
 
-    final headers = [
-      'Product Name',
-      comparisonData.first.previousLabel,
-      comparisonData.first.currentLabel,
-      'Difference',
-      'Growth %'
-    ];
-
-    final data = comparisonData.map((product) => [
-      product.productName,
-      product.previousPeriodQty.toString(),
-      product.currentPeriodQty.toString(),
-      '${product.difference > 0 ? '+' : ''}${product.difference}',
-      product.growthPercentage.isInfinite
-          ? 'New'
-          : '${product.growthPercentage >= 0 ? '+' : ''}${product.growthPercentage.toStringAsFixed(1)}%',
-    ]).toList();
-
-    final totalCurrent = comparisonData.fold<int>(0, (sum, p) => sum + p.currentPeriodQty);
-    final totalPrevious = comparisonData.fold<int>(0, (sum, p) => sum + p.previousPeriodQty);
-    final totalDifference = totalCurrent - totalPrevious;
-    // FIX 2: Use 'New' when totalPrevious=0 — '+0.0%' is misleading when base is zero.
-    final overallGrowthStr = totalPrevious == 0
-        ? (totalCurrent > 0 ? 'New' : '0%')
-        : () {
-            final g = ((totalCurrent - totalPrevious) / totalPrevious) * 100;
-            return '${g >= 0 ? '+' : ''}${g.toStringAsFixed(1)}%';
-          }();
-
-    final summary = {
-      'Comparison Period': '${comparisonData.first.previousLabel} vs ${comparisonData.first.currentLabel}',
-      'Total Products': comparisonData.length.toString(),
-      'Total Previous Period': totalPrevious.toString(),
-      'Total Current Period': totalCurrent.toString(),
-      'Total Difference': '${totalDifference > 0 ? '+' : ''}$totalDifference',
-      'Overall Growth': overallGrowthStr,
-      'Generated': ReportExportService.formatDateTime(DateTime.now()),
-    };
+    final export = productComparisonExport(comparisonData);
 
     await ReportExportService.showExportDialog(
       context: context,
       fileName: 'product_comparison_${comparisonData.first.currentLabel.toLowerCase().replaceAll(' ', '_')}_${DateFormat('yyyyMMdd').format(DateTime.now())}',
       reportTitle: 'Product Comparison Report - ${comparisonData.first.previousLabel} vs ${comparisonData.first.currentLabel}',
-      headers: headers,
-      data: data,
-      summary: summary,
+      headers: export.headers,
+      data: export.rows,
+      summary: {
+        ...export.summary,
+        'Generated': ReportExportService.formatDateTime(DateTime.now()),
+      },
     );
   }
 
@@ -342,7 +221,7 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
       builder: (_) {
         if (pastOrderStore.isLoading) return const ReportLoading();
 
-        final comparisonData = _calculateComparisonData();
+        final comparisonData = _comparisonData;
 
         // Calculate summary metrics
         final totalProducts = comparisonData.length;
@@ -411,6 +290,7 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
                                 setState(() {
                                   _selectedYear = newValue;
                                 });
+                                _recalculate();
                               }
                             },
                           ),
@@ -587,10 +467,6 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
                                           : data.difference < 0
                                               ? Colors.red
                                               : Colors.grey;
-                                      String differenceText = data.difference > 0
-                                          ? '+${data.difference}'
-                                          : '${data.difference}';
-
                                       return DataRow(
                                         cells: [
                                           DataCell(
@@ -630,7 +506,7 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
                                                 borderRadius: BorderRadius.circular(12),
                                               ),
                                               child: Text(
-                                                differenceText,
+                                                data.differenceLabel,
                                                 style: GoogleFonts.poppins(
                                                   fontSize: AppResponsive.smallFontSize(context),
                                                   fontWeight: FontWeight.w700,
@@ -641,10 +517,7 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
                                           ),
                                           DataCell(
                                             Text(
-                                              // FIX 1 & 3: Show 'New' for sentinel; add + prefix for positive growth.
-                                              data.growthPercentage.isInfinite
-                                                  ? 'New'
-                                                  : '${data.growthPercentage >= 0 ? '+' : ''}${data.growthPercentage.toStringAsFixed(1)}%',
+                                              data.growthLabel,
                                               style: GoogleFonts.poppins(
                                                 fontSize: AppResponsive.smallFontSize(context),
                                                 fontWeight: FontWeight.w600,
@@ -670,8 +543,133 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
       },
     );
   }
+}
 
+/// Current vs previous period quantities per product.
+///
+/// A period's lower bound is `isAfter(start - 1s)`, so an order in the final
+/// second before [start] lands in that period. Kept deliberately — changing it
+/// would move orders between the two columns.
+List<ProductComparisonData> calculateProductComparison({
+  required Iterable<PastOrderModel> orders,
+  required ComparisonPeriod period,
+  required int selectedYear,
+  required DateTime now,
+  required DateTime? cutoff,
+}) {
+    final allOrders = orders;
 
+    DateTime currentStart, currentEnd, previousStart, previousEnd;
+    String currentLabel, previousLabel;
+
+    switch (period) {
+      case ComparisonPeriod.Today:
+        currentStart = DateTime(now.year, now.month, now.day);
+        currentEnd = currentStart.add(const Duration(days: 1));
+        previousStart = currentStart.subtract(const Duration(days: 1));
+        previousEnd = currentStart;
+        currentLabel = 'Today';
+        previousLabel = 'Yesterday';
+        break;
+
+      case ComparisonPeriod.ThisWeek:
+        final weekDay = now.weekday;
+        currentStart = now.subtract(Duration(days: weekDay - 1));
+        currentStart = DateTime(currentStart.year, currentStart.month, currentStart.day);
+        currentEnd = currentStart.add(const Duration(days: 7));
+        previousStart = currentStart.subtract(const Duration(days: 7));
+        previousEnd = currentStart;
+        currentLabel = 'This Week';
+        previousLabel = 'Last Week';
+        break;
+
+      case ComparisonPeriod.MonthWise:
+        currentStart = DateTime(now.year, now.month, 1);
+        currentEnd = DateTime(now.year, now.month + 1, 1);
+        previousStart = DateTime(now.year, now.month - 1, 1);
+        previousEnd = currentStart;
+        currentLabel = DateFormat('MMMM yyyy').format(now);
+        previousLabel = DateFormat('MMMM yyyy').format(DateTime(now.year, now.month - 1, 1));
+        break;
+
+      case ComparisonPeriod.YearWise:
+        currentStart = DateTime(selectedYear, 1, 1);
+        currentEnd = DateTime(selectedYear + 1, 1, 1);
+        previousStart = DateTime(selectedYear - 1, 1, 1);
+        previousEnd = DateTime(selectedYear, 1, 1);
+        currentLabel = '$selectedYear';
+        previousLabel = '${selectedYear - 1}';
+        break;
+    }
+
+    // Maps to store quantities per item
+    Map<String, int> currentQuantities = {};
+    Map<String, int> previousQuantities = {};
+
+    // [cutoff] is the plan data-scope clamp (reports.history_limit_days).
+    for (final order in allOrders) {
+      final orderStatus = order.orderStatus?.toUpperCase() ?? '';
+      if (OrderStatusFilter.isExcludedFromRevenue(orderStatus)) continue;
+      if (order.orderAt == null) continue;
+      if (cutoff != null && order.orderAt!.isBefore(cutoff)) continue;
+
+      // Check if current period
+      if (order.orderAt!.isAfter(currentStart.subtract(const Duration(seconds: 1))) &&
+          order.orderAt!.isBefore(currentEnd)) {
+        for (final item in order.items) {
+          final effectiveQty = (item.quantity ?? 0) - (item.refundedQuantity ?? 0);
+          if (effectiveQty > 0) {
+            currentQuantities[item.title] = (currentQuantities[item.title] ?? 0) + effectiveQty;
+          }
+        }
+      }
+      // Check if previous period
+      else if (order.orderAt!.isAfter(previousStart.subtract(const Duration(seconds: 1))) &&
+          order.orderAt!.isBefore(previousEnd)) {
+        for (final item in order.items) {
+          final effectiveQty = (item.quantity ?? 0) - (item.refundedQuantity ?? 0);
+          if (effectiveQty > 0) {
+            previousQuantities[item.title] = (previousQuantities[item.title] ?? 0) + effectiveQty;
+          }
+        }
+      }
+    }
+
+    // Combine all unique products
+    final allProducts = {...currentQuantities.keys, ...previousQuantities.keys};
+
+    // Build comparison list
+    final List<ProductComparisonData> comparisonList = [];
+    for (final productName in allProducts) {
+      final currentQty = currentQuantities[productName] ?? 0;
+      final previousQty = previousQuantities[productName] ?? 0;
+      final difference = currentQty - previousQty;
+
+      // Calculate growth percentage.
+      // FIX 1: Use double.infinity as a sentinel for "New" (no previous data).
+      // Displaying 100% growth when previous=0 is mathematically wrong.
+      double growthPercentage = 0.0;
+      if (previousQty > 0) {
+        growthPercentage = ((currentQty - previousQty) / previousQty) * 100;
+      } else if (currentQty > 0) {
+        growthPercentage = double.infinity; // sentinel: product is new this period
+      }
+
+      comparisonList.add(ProductComparisonData(
+        productName: productName,
+        previousPeriodQty: previousQty,
+        currentPeriodQty: currentQty,
+        difference: difference,
+        growthPercentage: growthPercentage,
+        currentLabel: currentLabel,
+        previousLabel: previousLabel,
+      ));
+    }
+
+    // Sort by current period quantity (descending)
+    comparisonList.sort((a, b) => b.currentPeriodQty.compareTo(a.currentPeriodQty));
+
+    return comparisonList;
 }
 
 class ProductComparisonData {
@@ -692,4 +690,69 @@ class ProductComparisonData {
     required this.currentLabel,
     required this.previousLabel,
   });
+
+  /// Shown in the table and written to the export — one definition for both.
+  String get differenceLabel => difference > 0 ? '+$difference' : '$difference';
+
+  /// 'New' for the no-previous-data sentinel; '+' prefix for positive growth.
+  String get growthLabel => growthPercentage.isInfinite
+      ? 'New'
+      : '${growthPercentage >= 0 ? '+' : ''}${growthPercentage.toStringAsFixed(1)}%';
+}
+
+class ProductComparisonExport {
+  final List<String> headers;
+  final List<List<String>> rows;
+
+  /// Everything except 'Generated', which the caller stamps at export time.
+  final Map<String, String> summary;
+
+  const ProductComparisonExport({
+    required this.headers,
+    required this.rows,
+    required this.summary,
+  });
+}
+
+/// Export payload for [data] — the same list, in the same order, the table shows.
+ProductComparisonExport productComparisonExport(List<ProductComparisonData> data) {
+  final headers = [
+    'Product Name',
+    data.first.previousLabel,
+    data.first.currentLabel,
+    'Difference',
+    'Growth %'
+  ];
+
+  final rows = data.map((product) => [
+    product.productName,
+    product.previousPeriodQty.toString(),
+    product.currentPeriodQty.toString(),
+    product.differenceLabel,
+    product.growthLabel,
+  ]).toList();
+
+  final totalCurrent = data.fold<int>(0, (sum, p) => sum + p.currentPeriodQty);
+  final totalPrevious = data.fold<int>(0, (sum, p) => sum + p.previousPeriodQty);
+  final totalDifference = totalCurrent - totalPrevious;
+  // 'New' when totalPrevious=0 — '+0.0%' is misleading when base is zero.
+  final overallGrowthStr = totalPrevious == 0
+      ? (totalCurrent > 0 ? 'New' : '0%')
+      : () {
+          final g = ((totalCurrent - totalPrevious) / totalPrevious) * 100;
+          return '${g >= 0 ? '+' : ''}${g.toStringAsFixed(1)}%';
+        }();
+
+  return ProductComparisonExport(
+    headers: headers,
+    rows: rows,
+    summary: {
+      'Comparison Period': '${data.first.previousLabel} vs ${data.first.currentLabel}',
+      'Total Products': data.length.toString(),
+      'Total Previous Period': totalPrevious.toString(),
+      'Total Current Period': totalCurrent.toString(),
+      'Total Difference': '${totalDifference > 0 ? '+' : ''}$totalDifference',
+      'Overall Growth': overallGrowthStr,
+    },
+  );
 }

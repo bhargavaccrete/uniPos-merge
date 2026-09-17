@@ -133,6 +133,14 @@ abstract class _SaleStore with Store {
     return await _saleRepository.getAllSales();
   }
 
+  /// Every sale in box order, uncopied — for single-pass report scans.
+  Iterable<SaleModel> salesInStorageOrder() =>
+      _saleRepository.salesInStorageOrder();
+
+  /// The sale with [saleId], read directly by key — no box copy.
+  SaleModel? saleInStorage(String saleId) =>
+      _saleRepository.saleInStorage(saleId);
+
   /// Get sale by ID
   @action
   Future<SaleModel?> getSaleById(String saleId) async {
