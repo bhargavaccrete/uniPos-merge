@@ -490,7 +490,7 @@ class _AddProductScreenState extends State<AddProductScreen>
   Future<bool> _updateRestaurantItem() async {
     try {
       // Get all items from store
-      await itemStore.loadItems();
+      await itemStore.ensureLoaded();
       final allItems = itemStore.items.toList();
 
       // Get the existing item to preserve fields not in the form
@@ -4308,7 +4308,7 @@ class _AddProductScreenState extends State<AddProductScreen>
                             await _showRetailFilterDialog();
                           } else {
                             // For restaurant, get items from store
-                            await itemStore.loadItems();
+                            await itemStore.ensureLoaded();
                             final items = itemStore.items.toList();
                             await _showRestaurantFilterDialog(items);
                           }

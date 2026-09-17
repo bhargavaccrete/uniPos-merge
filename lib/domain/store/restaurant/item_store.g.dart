@@ -271,6 +271,22 @@ mixin _$ItemStore on _ItemStore, Store {
         .run(() => super.updateStock(itemId, newQuantity));
   }
 
+  late final _$applyStockDeltaAsyncAction =
+      AsyncAction('_ItemStore.applyStockDelta', context: context);
+
+  @override
+  Future<double> applyStockDelta(
+      {required String itemId,
+      String? variantId,
+      required double delta,
+      double? lastPurchaseCost}) {
+    return _$applyStockDeltaAsyncAction.run(() => super.applyStockDelta(
+        itemId: itemId,
+        variantId: variantId,
+        delta: delta,
+        lastPurchaseCost: lastPurchaseCost));
+  }
+
   late final _$refreshAsyncAction =
       AsyncAction('_ItemStore.refresh', context: context);
 

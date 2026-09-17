@@ -3,6 +3,7 @@ import 'package:mobx/mobx.dart';
 import '../../../core/plan/entitlement_keys.dart';
 import '../../../core/plan/plan_enforcement.dart';
 import '../../../data/models/restaurant/db/itemmodel_302.dart';
+import '../../../data/models/restaurant/db/itemvariantemodel_312.dart';
 import '../../../data/repositories/restaurant/item_repository.dart';
 
 part 'item_store.g.dart';
@@ -14,7 +15,22 @@ abstract class _ItemStore with Store {
 
   _ItemStore(this._repository) {
     // Load items on initialization
-    loadItems();
+    _initialLoad = loadItems();
+  }
+
+  /// The constructor's load, kept so callers can await it.
+  late final Future<void> _initialLoad;
+  bool _hasLoaded = false;
+
+  /// Completes once items have loaded, without re-reading Hive.
+  ///
+  /// The store is lazy and its constructor load isn't awaited, so a caller
+  /// that reads `items` in the same turn it first touches the store sees an
+  /// empty list. If the initial load failed (`loadItems` records
+  /// `errorMessage`), this retries, as the explicit reload it replaces did.
+  Future<void> ensureLoaded() async {
+    await _initialLoad;
+    if (!_hasLoaded) await loadItems();
   }
 
   // ==================== OBSERVABLES ====================
@@ -139,6 +155,7 @@ abstract class _ItemStore with Store {
       final loadedItems = await _repository.getAllItems();
       items.clear();
       items.addAll(loadedItems);
+      _hasLoaded = true;
     } catch (e) {
       errorMessage = 'Failed to load items: $e';
     } finally {
@@ -306,6 +323,136 @@ abstract class _ItemStore with Store {
     } catch (e) {
       errorMessage = 'Failed to update stock: $e';
       return false;
+    }
+  }
+
+  /// Applies [delta] to an item's stock (or to one variant's when [variantId]
+  /// is given) and returns the resulting balance.
+  ///
+  /// Rebuilds the list entry rather than mutating the model, because mutating
+  /// a field on an object already inside an ObservableList is invisible to
+  /// MobX — the same reason `TableStore.updateTableStatus` replaces its entry.
+  /// This is what lets stock changes reach the UI without a full reload.
+  ///
+  /// Persists through the repository directly, NOT through [updateItem]: that
+  /// one is gated on `manageMenuItemsEdit`, and selling an item is not a menu
+  /// edit — routing stock through it would silently stop deducting stock on
+  /// plans without that permission.
+  ///
+  /// [lastPurchaseCost], when supplied, is written in the SAME update so a
+  /// caller never has to follow up with a second persist that could clobber
+  /// the stock it just wrote (production and GRN both need this).
+  ///
+  /// Mutations on the same item run one at a time, so each reads the balance
+  /// the previous one wrote — two concurrent sales cannot both start from the
+  /// same stock and lose a deduction. Different items do not wait on each
+  /// other.
+  ///
+  /// Persistence happens before the in-memory swap, so a failed write never
+  /// reports a balance that was not stored; the item is re-read from storage
+  /// and the error rethrown. Returns 0 when the item (or variant) is absent.
+  @action
+  Future<double> applyStockDelta({
+    required String itemId,
+    String? variantId,
+    required double delta,
+    double? lastPurchaseCost,
+  }) async {
+    // Queued synchronously, before any await, so a caller arriving mid-write
+    // always lines up behind this one.
+    final previous = _stockMutationTails[itemId] ?? Future<void>.value();
+    final run = previous.then((_) => _applyStockDeltaInOrder(
+          itemId: itemId,
+          variantId: variantId,
+          delta: delta,
+          lastPurchaseCost: lastPurchaseCost,
+        ));
+    // A failed mutation must not block the ones queued behind it.
+    final tail = run.then<void>((_) {}, onError: (Object _, StackTrace _) {});
+    _stockMutationTails[itemId] = tail;
+    try {
+      return await run;
+    } finally {
+      if (identical(_stockMutationTails[itemId], tail)) {
+        _stockMutationTails.remove(itemId);
+      }
+    }
+  }
+
+  /// Last queued stock mutation per item id. Sequencing state only — not
+  /// observable.
+  final Map<String, Future<void>> _stockMutationTails = {};
+
+  Future<double> _applyStockDeltaInOrder({
+    required String itemId,
+    String? variantId,
+    required double delta,
+    double? lastPurchaseCost,
+  }) async {
+    final current = getItemById(itemId);
+    if (current == null) return 0;
+
+    final double newBalance;
+    final Items updated;
+
+    if (variantId == null) {
+      newBalance = current.stockQuantity + delta;
+      updated = current.copyWith(
+        stockQuantity: newBalance,
+        lastPurchaseCost: lastPurchaseCost,
+        lastEditedTime: DateTime.now(),
+      );
+    } else {
+      final variants = current.variant;
+      if (variants == null) return 0;
+
+      double? matched;
+      final rebuilt = variants.map((v) {
+        if (v.variantId != variantId) return v;
+        matched = (v.stockQuantity ?? 0) + delta;
+        // Every field carried over. Dropping `trackInventory` here would
+        // silently switch that variant's stock tracking off.
+        return ItemVariante(
+          variantId: v.variantId,
+          price: v.price,
+          trackInventory: v.trackInventory,
+          stockQuantity: matched,
+        );
+      }).toList();
+
+      if (matched == null) return 0;
+      newBalance = matched!;
+      updated = current.copyWith(
+        variant: rebuilt,
+        lastPurchaseCost: lastPurchaseCost,
+        lastEditedTime: DateTime.now(),
+      );
+    }
+
+    try {
+      await _repository.updateItem(updated);
+    } catch (_) {
+      await _resyncItemFromStorage(itemId);
+      rethrow;
+    }
+
+    // Re-resolved after the write: a loadItems() that ran meanwhile rebuilds
+    // the list, so an index taken before the await could name another item.
+    final index = items.indexWhere((i) => i.id == itemId);
+    if (index != -1) items[index] = updated;
+    return newBalance;
+  }
+
+  /// After a failed write, mirror whatever storage actually holds — a partial
+  /// write (put succeeded, duplicate-key cleanup did not) leaves storage ahead
+  /// of memory, and the next delta must build on the stored balance.
+  Future<void> _resyncItemFromStorage(String itemId) async {
+    try {
+      final stored = await _repository.getItemById(itemId);
+      final index = items.indexWhere((i) => i.id == itemId);
+      if (stored != null && index != -1) items[index] = stored;
+    } catch (_) {
+      // Storage unreadable as well — keep the last known in-memory state.
     }
   }
 

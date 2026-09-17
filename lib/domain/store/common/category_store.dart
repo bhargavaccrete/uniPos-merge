@@ -16,7 +16,21 @@ abstract class _CategoryStore with Store {
 
   _CategoryStore(this._repository) {
     // Load categories on initialization
-    loadCategories();
+    _initialLoad = loadCategories();
+  }
+
+  /// The constructor's load, kept so callers can await it.
+  late final Future<void> _initialLoad;
+  bool _hasLoaded = false;
+
+  /// Completes once categories have loaded, without re-reading Hive.
+  ///
+  /// The store is lazy and its constructor load isn't awaited. If the initial
+  /// load failed (`loadCategories` records `errorMessage`), this retries, as
+  /// the explicit reload it replaces did.
+  Future<void> ensureLoaded() async {
+    await _initialLoad;
+    if (!_hasLoaded) await loadCategories();
   }
 
   // ==================== OBSERVABLES ====================
@@ -101,6 +115,7 @@ abstract class _CategoryStore with Store {
       if (AppConfig.isRestaurant) {
         await _loadCategoryItems();
       }
+      _hasLoaded = true;
     } catch (e) {
       errorMessage = 'Failed to load categories: $e';
     } finally {

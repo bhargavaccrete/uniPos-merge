@@ -76,15 +76,10 @@ class _StartorderState extends State<Startorder>
   /// table stores all keep their observable lists current on write, so
   /// reloading them here was duplicate work.
   void _refreshCurrentTab() {
-    // Refresh menu data when switching to menu tab
-    if (tabController.index == 0) {
-      // Kept: InventoryService deducts stock with `item.save()`, which bypasses
-      // ItemStore and never notifies MobX — without this the menu shows stale
-      // stock after a sale.
-      itemStore.loadItems();
-    }
+    // Menu tab (0) needs no reload: MenuScreen loads items on init, and every
+    // item write — stock included — goes through ItemStore.
     // Refresh orders when switching to orders tab
-    else if (tabController.index == 1) {
+    if (tabController.index == 1) {
       // Kept: captain-app edits go through HiveOrders.updateOrder, which writes
       // straight to the box and leaves orderStore's list stale.
       orderStore.loadOrders();

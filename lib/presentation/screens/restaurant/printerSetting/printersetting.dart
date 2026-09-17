@@ -111,11 +111,12 @@ class _PrintersettingState extends State<Printersetting> {
   }
 
   /// Restaurant keeps its entitlement-guarded named route for Add Printer.
+  // No reload on return: PrinterStore reloads after every save/delete/default.
   void _openAddPrinter() {
     Navigator.pushNamed(
       context,
       RouteNames.restaurantAddPrinter,
-    ).then((_) => printerStore.loadSavedPrinters());
+    );
   }
 
   // ── Bill format option ─────────────────────────────────────────────────────

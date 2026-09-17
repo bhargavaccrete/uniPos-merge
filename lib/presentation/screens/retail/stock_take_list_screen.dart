@@ -79,7 +79,6 @@ class _StockTakeListScreenState extends State<StockTakeListScreen> {
       context,
       MaterialPageRoute(builder: (_) => StockTakeScreen(takeId: take.takeId)),
     );
-    if (mounted) await stockTakeStore.loadTakes();
   }
 
   Future<void> _openTake(StockTakeModel take) async {
@@ -87,7 +86,6 @@ class _StockTakeListScreenState extends State<StockTakeListScreen> {
       context,
       MaterialPageRoute(builder: (_) => StockTakeScreen(takeId: take.takeId)),
     );
-    if (mounted) await stockTakeStore.loadTakes();
   }
 
   Future<void> _cancelTake(StockTakeModel take) async {

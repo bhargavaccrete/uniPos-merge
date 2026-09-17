@@ -261,12 +261,15 @@ abstract class _RestaurantPurchaseOrderStore with Store {
         final item = itemStore.getItemById(line.itemId);
         if (item == null) continue;
 
-        final newStock = item.stockQuantity + line.acceptedQty;
-        item.stockQuantity = newStock;
-        if (line.costPrice != null) {
-          item.lastPurchaseCost = line.costPrice;
-        }
-        await itemRepository.updateItem(item);
+        // Through the store so the ObservableList entry is replaced and MobX
+        // sees the receipt; stock and cost go in one write so neither can
+        // clobber the other. Re-resolves internally, so two GRN lines for the
+        // same item compound instead of both starting from `item`.
+        final newStock = await itemStore.applyStockDelta(
+          itemId: line.itemId,
+          delta: line.acceptedQty,
+          lastPurchaseCost: line.costPrice,
+        );
 
         await _stockMovementRepository.saveMovement(StockMovementModel(
           id: _uuid.v4(),
@@ -328,7 +331,6 @@ abstract class _RestaurantPurchaseOrderStore with Store {
 
       await loadPurchaseOrders();
       await loadGRNs();
-      await itemStore.loadItems();
 
       return grnItems;
     } finally {

@@ -405,8 +405,8 @@ class _MenuScreenState extends State<MenuScreen> {
 
     try {
       await Future.wait([
-        categoryStore.loadCategories(),
-        itemStore.loadItems(),
+        categoryStore.ensureLoaded(),
+        itemStore.ensureLoaded(),
         restaurantCartStore.loadCartItems(),
       ]).timeout(
         const Duration(seconds: 10),

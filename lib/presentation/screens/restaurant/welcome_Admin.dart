@@ -50,7 +50,7 @@ class _AdminWelcomeState extends State<AdminWelcome> {
     _loadStoreName();
 
     // Load items so the Inventory tile's low-stock badge is accurate on open.
-    itemStore.loadItems();
+    itemStore.ensureLoaded();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _checkDayStarted();
       await _startShiftIfNeeded();

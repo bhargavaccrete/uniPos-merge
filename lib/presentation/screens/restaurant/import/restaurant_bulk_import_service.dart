@@ -1146,7 +1146,7 @@ class RestaurantBulkImportService {
       variantGroups[itemName]!.add(row);
     }
 
-    await itemStore.loadItems();
+    // Items were loaded in _loadAllCaches and imported through ItemStore.
     final allItems = itemStore.items;
 
     for (var itemName in variantGroups.keys) {

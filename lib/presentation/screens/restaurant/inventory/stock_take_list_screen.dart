@@ -65,7 +65,6 @@ class _RestaurantStockTakeListScreenState
         builder: (_) => RestaurantStockTakeScreen(takeId: take.takeId),
       ),
     );
-    if (mounted) await restaurantStockTakeStore.loadTakes();
   }
 
   Future<void> _openTake(RestaurantStockTakeModel take) async {
@@ -75,7 +74,6 @@ class _RestaurantStockTakeListScreenState
         builder: (_) => RestaurantStockTakeScreen(takeId: take.takeId),
       ),
     );
-    if (mounted) await restaurantStockTakeStore.loadTakes();
   }
 
   Future<void> _cancelTake(RestaurantStockTakeModel take) async {

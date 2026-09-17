@@ -49,6 +49,7 @@ class _RestaurantSupplierListScreenState
     }
   }
 
+  // No reload on return: every supplier write in the store reloads the list.
   void _openSupplier(RestaurantSupplierModel supplier) {
     Navigator.push(
       context,
@@ -56,7 +57,7 @@ class _RestaurantSupplierListScreenState
         builder: (_) =>
             RestaurantSupplierDetailScreen(supplierId: supplier.supplierId),
       ),
-    ).then((_) => restaurantSupplierStore.loadSuppliers());
+    );
   }
 
   @override

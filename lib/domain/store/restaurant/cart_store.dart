@@ -83,7 +83,8 @@ abstract class _CartStore with Store {
               actualItem.variant!.isNotEmpty) {
             // Item has variants - check variant stock
             try {
-              await variantStore.loadVariants();
+              // Load only if not yet loaded (lazy store); writes keep it current.
+              if (variantStore.variants.isEmpty) await variantStore.loadVariants();
               final itemVariant = actualItem.variant!.firstWhere(
                 (v) {
                   final variantDetails = variantStore.variants.where((vd) => vd.id == v.variantId).firstOrNull;
@@ -181,7 +182,8 @@ abstract class _CartStore with Store {
               item.variant!.isNotEmpty) {
             // Item has variants - check variant stock
             try {
-              await variantStore.loadVariants();
+              // Load only if not yet loaded (lazy store); writes keep it current.
+              if (variantStore.variants.isEmpty) await variantStore.loadVariants();
               final itemVariant = item.variant!.firstWhere(
                 (v) {
                   final variantDetails = variantStore.variants.where((vd) => vd.id == v.variantId).firstOrNull;

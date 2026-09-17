@@ -426,9 +426,8 @@ class _ItemCard extends StatelessWidget {
           const Divider(height: 1, color: AppColors.divider),
           TextButton.icon(
             onPressed: () async {
+              // No reload after edit: itemStore.updateItem replaces the entry.
               await pushResponsive(context, EdititemScreen(items: item));
-              // Reload after edit
-              await itemStore.loadItems();
             },
             icon: Icon(
               Icons.edit_outlined,

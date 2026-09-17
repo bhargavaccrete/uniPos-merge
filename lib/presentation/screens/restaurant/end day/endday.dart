@@ -142,9 +142,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
       selectedDate = currentSession.startTime;
       final sessionId = currentSession.sessionId;
 
-      await pastOrderStore.loadPastOrders();
-      final pastOrders = pastOrderStore.pastOrders.toList();
-
+      // No past-order load here: generateEODReport loads them itself.
       final currentOpeningBalance = currentSession.openingCash;
 
       final report = await EODService.generateEODReport(

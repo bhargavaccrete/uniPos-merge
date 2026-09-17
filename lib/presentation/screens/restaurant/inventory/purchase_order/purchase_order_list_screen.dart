@@ -76,16 +76,13 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen> {
   }
 
   Future<void> _navigateToReceiving(RestaurantPurchaseOrderModel po) async {
-    final result = await Navigator.push<bool>(
+    // No reload on return: confirmGRN reloads purchase orders and GRNs itself.
+    await Navigator.push<bool>(
       context,
       MaterialPageRoute(
         builder: (_) => GoodsReceivingScreen(purchaseOrder: po),
       ),
     );
-    if (result == true) {
-      restaurantPurchaseOrderStore.loadPurchaseOrders();
-      restaurantPurchaseOrderStore.loadGRNs();
-    }
   }
 
   Future<void> _markSent(RestaurantPurchaseOrderModel po) async {

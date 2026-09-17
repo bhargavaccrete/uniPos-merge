@@ -100,8 +100,8 @@ class _MenuGridScreenState extends State<MenuGridScreen> {
     setState(() => _isLoadingData = true);
     try {
       await Future.wait([
-        categoryStore.loadCategories(),
-        itemStore.loadItems(),
+        categoryStore.ensureLoaded(),
+        itemStore.ensureLoaded(),
         restaurantCartStore.loadCartItems(),
       ]).timeout(
         const Duration(seconds: 10),

@@ -19,8 +19,10 @@ enum PosStockStatus { inStock, orderAvailable, outOfStock, notTracked }
 
 class InventoryService {
   static Future<void> deductStockForOrder(List<CartItem> cartItems) async {
-    await itemStore.loadItems();
-    await variantStore.loadVariants(); // Load variants for variant name lookup
+    await itemStore.ensureLoaded();
+    // Variant names are needed for lookup. Load only if not yet loaded: the
+    // store is lazy, and a server-side order can be its first caller.
+    if (variantStore.variants.isEmpty) await variantStore.loadVariants();
     final items = itemStore.items;
     final List<String> lowStockAlerts = [];
 
@@ -402,7 +404,7 @@ class InventoryService {
       throw Exception('${semiFinishedItem.name} has no recipe configured.');
     }
 
-    await itemStore.loadItems();
+    await itemStore.ensureLoaded();
     final items = itemStore.items;
     final requirements = ingredientQuantitiesFor(recipe, batchQty);
 
@@ -491,8 +493,6 @@ class InventoryService {
       }
     }
 
-    await _restoreItemStock(semiFinishedItem, batchQty);
-    final producedBalance = semiFinishedItem.stockQuantity;
     final producedMovementId = const Uuid().v4();
     // Cost per produced unit, from this batch's own recipe cost ÷ yield —
     // never a manually entered figure. Every downstream cost lookup (a
@@ -510,8 +510,14 @@ class InventoryService {
       }
       return ing.lastPurchaseCost ?? 0.0;
     });
-    semiFinishedItem.lastPurchaseCost = producedUnitCost;
-    await semiFinishedItem.save();
+    // Stock increase and the new unit cost are applied in ONE write. Done
+    // separately, `semiFinishedItem.save()` would write the pre-production
+    // stock back over the increase and silently lose the batch.
+    final producedBalance = await itemStore.applyStockDelta(
+      itemId: semiFinishedItem.id,
+      delta: batchQty,
+      lastPurchaseCost: producedUnitCost,
+    );
     await stockRepo.saveMovement(StockMovementModel(
       id: producedMovementId,
       timestamp: DateTime.now(),
@@ -547,14 +553,15 @@ class InventoryService {
       );
     }
 
-    await itemStore.loadItems();
     return production;
   }
 
+  /// Through the store so the ObservableList entry is replaced and MobX fires.
+  /// The balance is recomputed from the CURRENT store entry, so several lines
+  /// of the same item in one order compound correctly instead of each starting
+  /// from the same captured snapshot.
   static Future<double> _deductItemStock(Items item, double quantity) async {
-    item.stockQuantity = item.stockQuantity - quantity;
-    await item.save();
-    return item.stockQuantity;
+    return itemStore.applyStockDelta(itemId: item.id, delta: -quantity);
   }
 
 
@@ -563,12 +570,16 @@ class InventoryService {
   static Future<double> _deductVariantStock(Items item, CartItem cartItem) async {
     if (item.variant == null) return 0;
     try {
+      // Matched by NAME, exactly as before; only the id is handed on, so a
+      // stale captured list is harmless here (ids and prices don't move).
       final variant = item.variant!.firstWhere(
             (v) => _getVariantName(v.variantId) == cartItem.variantName,
       );
-      variant.stockQuantity = (variant.stockQuantity ?? 0) - cartItem.quantity.toDouble();
-      await item.save();
-      return variant.stockQuantity!;
+      return await itemStore.applyStockDelta(
+        itemId: item.id,
+        variantId: variant.variantId,
+        delta: -cartItem.quantity.toDouble(),
+      );
     } catch (e) {
       return 0;
     }
@@ -588,7 +599,7 @@ class InventoryService {
 
   // Stock checking before placing order: checkStockAvailability
   static Future<bool> checkStockAvailability(List<CartItem> cartItems) async {
-    await itemStore.loadItems();
+    await itemStore.ensureLoaded();
     final items = itemStore.items;
 
     // Group cart items by item name and variant to calculate total quantities
@@ -647,6 +658,14 @@ class InventoryService {
           final totalQuantity = itemVariantTotals[itemKey]![variantKey]!;
 
           if (variantKey != null) {
+            // Variant names resolve through variantStore. This item has
+            // variants, so an empty list can only mean the lazy store hasn't
+            // loaded yet.
+            if (item.variant != null &&
+                item.variant!.isNotEmpty &&
+                variantStore.variants.isEmpty) {
+              await variantStore.loadVariants();
+            }
             // Variant item - check variant stock
             if (!_checkVariantStockStrictWithQuantity(item, variantKey, totalQuantity)) {
               return false;
@@ -754,8 +773,8 @@ class InventoryService {
   /// Used when processing refunds and items need to be added back to inventory
   static Future<void> restoreStockForRefund(Map<CartItem, int> itemsToRestock) async {
     try {
-      await itemStore.loadItems();
-      await variantStore.loadVariants();
+      await itemStore.ensureLoaded();
+      if (variantStore.variants.isEmpty) await variantStore.loadVariants();
 
       // For logging each restock to the stock movement history.
       final stockRepo = StockMovementRepository();
@@ -819,12 +838,14 @@ class InventoryService {
         String? variantId;
         if (cartItem.variantName != null && existingItem.variant != null) {
           restoredQty = restockQuantity.toDouble();
-          await _restoreVariantStock(existingItem, cartItem, restockQuantity);
+          // Balance comes from the helper — re-reading `existingItem` would
+          // report the pre-restore figure into the movement row.
+          balanceAfter =
+              await _restoreVariantStock(existingItem, cartItem, restockQuantity);
           try {
-            final v = existingItem.variant!
-                .firstWhere((vv) => _getVariantName(vv.variantId) == cartItem.variantName);
-            variantId = v.variantId;
-            balanceAfter = v.stockQuantity ?? 0;
+            variantId = existingItem.variant!
+                .firstWhere((vv) => _getVariantName(vv.variantId) == cartItem.variantName)
+                .variantId;
           } catch (_) {}
         } else {
           // Handle regular items (non-variant)
@@ -837,8 +858,8 @@ class InventoryService {
           }
 
           restoredQty = quantityToRestore;
-          await _restoreItemStock(existingItem, quantityToRestore);
-          balanceAfter = existingItem.stockQuantity;
+          balanceAfter =
+              await _restoreItemStock(existingItem, quantityToRestore);
         }
 
         // Log the restock (void/refund) to the per-item stock history.
@@ -864,9 +885,6 @@ class InventoryService {
         await notificationStore.resolve(
           'low_stock', 'item', _lowStockSubjectId(existingItem.id, variantId));
       }
-
-      // Reload items to reflect changes in UI
-      await itemStore.loadItems();
 
     } catch (e) {
       rethrow;
@@ -897,7 +915,8 @@ class InventoryService {
       if (!ingredient.trackInventory) continue;
 
       final restoreQtyForLine = line.quantity;
-      await _restoreItemStock(ingredient, restoreQtyForLine);
+      final ingredientBalance =
+          await _restoreItemStock(ingredient, restoreQtyForLine);
 
       await stockRepo.saveMovement(StockMovementModel(
         id: const Uuid().v4(),
@@ -907,7 +926,7 @@ class InventoryService {
         itemName: ingredient.name,
         type: 'in',
         quantity: restoreQtyForLine,
-        balanceAfter: ingredient.stockQuantity,
+        balanceAfter: ingredientBalance,
         reason: 'Void / Refund return (recipe: ${recipeItem.name})',
         unit: ingredient.unit ?? (ingredient.isSoldByWeight ? 'kg' : 'pcs'),
         staffName: staffName,
@@ -919,26 +938,31 @@ class InventoryService {
     }
   }
 
-  /// Restore stock for a regular item (non-variant)
-  static Future<void> _restoreItemStock(Items item, double quantity) async {
-    final oldStock = item.stockQuantity;
-    item.stockQuantity = oldStock + quantity;
-    await item.save();
-
+  /// Restore stock for a regular item (non-variant). Returns the new balance —
+  /// callers must use it rather than re-reading the passed instance, which the
+  /// store's list replacement leaves stale.
+  static Future<double> _restoreItemStock(Items item, double quantity) async {
+    return itemStore.applyStockDelta(itemId: item.id, delta: quantity);
   }
 
-  /// Restore stock for a variant item
-  static Future<void> _restoreVariantStock(Items item, CartItem cartItem, int quantity) async {
+  /// Restore stock for a variant item. Returns the new balance for the matched
+  /// variant, or 0 when no variant matches (same no-op as before).
+  static Future<double> _restoreVariantStock(
+      Items item, CartItem cartItem, int quantity) async {
     if (item.variant == null) {
-      return;
+      return 0;
     }
 
     for (var variant in item.variant!) {
       if (_getVariantName(variant.variantId) == cartItem.variantName) {
-        variant.stockQuantity = (variant.stockQuantity ?? 0) + quantity;
-        await item.save();
-        break;
+        // First match only, as the original `break` did.
+        return itemStore.applyStockDelta(
+          itemId: item.id,
+          variantId: variant.variantId,
+          delta: quantity.toDouble(),
+        );
       }
     }
+    return 0;
   }
 }

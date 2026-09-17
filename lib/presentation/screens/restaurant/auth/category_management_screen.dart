@@ -39,7 +39,7 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen> {
     try {
       // Load data from stores
       await categoryStore.loadCategories();
-      await itemStore.loadItems();
+      await itemStore.ensureLoaded();
 
       // Get categories from store
       _categories = categoryStore.categories.toList();

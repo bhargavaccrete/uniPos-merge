@@ -101,7 +101,7 @@ class _ProductionScreenState extends State<ProductionScreen> {
       NotificationService.instance.showSuccess(
         'Produced ${_fmt(production.batchQty)} ${item.unit ?? "units"} of ${item.name}',
       );
-      // Re-sync the selection to the freshly reloaded items list so the
+      // Re-sync the selection to the store's updated items so the
       // ingredient stock numbers shown below reflect the new balances.
       Items? refreshed;
       try {

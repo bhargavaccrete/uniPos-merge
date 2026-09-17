@@ -42,11 +42,12 @@ class _RetailPrinterConnectionScreenState
     printerStore.loadSavedPrinters();
   }
 
+  // No reload on return: PrinterStore reloads after every save/delete/default.
   void _openAddPrinter() {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const AddPrinter(assignToRole: _role)),
-    ).then((_) => printerStore.loadSavedPrinters());
+    );
   }
 
   // WiFi is the fallback, so any new transport must be named explicitly here

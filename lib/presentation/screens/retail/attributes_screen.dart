@@ -172,7 +172,6 @@ class _AttributesScreenState extends State<AttributesScreen> {
     );
     if (!mounted) return;
     if (success) {
-      await _attributeStore.loadAttributes();
       NotificationService.instance.showSuccess('Attribute "$name" updated');
     } else {
       NotificationService.instance.showError(
@@ -199,7 +198,6 @@ class _AttributesScreenState extends State<AttributesScreen> {
     );
     if (!mounted) return;
     if (success) {
-      await _attributeStore.loadAttributes();
       NotificationService.instance.showSuccess(
         'Attribute "${attribute.name}" deleted',
       );
@@ -271,7 +269,6 @@ class _AttributesScreenState extends State<AttributesScreen> {
     );
     if (!mounted) return;
     if (success) {
-      await _attributeStore.loadAttributes();
       NotificationService.instance.showSuccess(
         'Value "${input.value}" updated',
       );
@@ -378,7 +375,6 @@ class _AttributesScreenState extends State<AttributesScreen> {
     final success = await _attributeStore.deleteValue(value.valueId);
     if (!mounted) return;
     if (success) {
-      await _attributeStore.loadAttributes();
       NotificationService.instance.showSuccess(
         'Value "${value.value}" deleted',
       );
