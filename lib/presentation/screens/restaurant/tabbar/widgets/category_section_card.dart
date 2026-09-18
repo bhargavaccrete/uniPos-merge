@@ -6,7 +6,6 @@ class _CategorySectionCard extends StatelessWidget {
   final bool initiallyExpanded;
   final ExpansibleController? controller;
   final GlobalKey cardKey;
-  final List<CartItem> cartItems;
   final void Function(Items) onItemTap;
   final void Function(Items) onToggleFavorite;
   final String Function(Items) formatStock;
@@ -17,7 +16,7 @@ class _CategorySectionCard extends StatelessWidget {
   /// supplies each grid cell — it's `_MenuScreenState._buildGridItemCard`, the
   /// same card the tablet layout uses, so both modes share one card.
   final bool gridView;
-  final Widget Function(Items item, List<CartItem> cartItems)? buildGridCard;
+  final Widget Function(Items item)? buildGridCard;
 
   const _CategorySectionCard({
     required this.category,
@@ -25,7 +24,6 @@ class _CategorySectionCard extends StatelessWidget {
     required this.initiallyExpanded,
     required this.controller,
     required this.cardKey,
-    required this.cartItems,
     required this.onItemTap,
     required this.onToggleFavorite,
     required this.formatStock,
@@ -117,36 +115,54 @@ class _CategorySectionCard extends StatelessWidget {
                   ),
                 ),
                 itemCount: searchFilteredItems.length,
-                itemBuilder: (_, i) =>
-                    buildGridCard!(searchFilteredItems[i], cartItems),
+                itemBuilder: (_, i) => buildGridCard!(searchFilteredItems[i]),
               )
             else
-              ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
+              // A Column, not a shrink-wrapped ListView. The section is
+              // already non-scrollable and builds every tile anyway, so the
+              // list bought nothing — but it wrapped each tile in
+              // AutomaticKeepAlive / KeepAlive / _SelectionKeepAlive /
+              // NotificationListener / KeyedSubtree and ran the children
+              // through a sliver viewport. That measured ~10 extra widgets per
+              // tile and ~18% of the frame on a large menu with every category
+              // expanded. Same children, same order, same padding, and the
+              // same spacing between tiles.
+              Padding(
                 padding: EdgeInsets.fromLTRB(
                   AppResponsive.mediumSpacing(context),
                   0,
                   AppResponsive.mediumSpacing(context),
                   AppResponsive.mediumSpacing(context),
                 ),
-                itemCount: searchFilteredItems.length,
-                separatorBuilder: (_, __) =>
-                    SizedBox(height: AppResponsive.smallSpacing(context)),
-                itemBuilder: (context, itemIndex) {
-                  final item = searchFilteredItems[itemIndex];
-                  return _ItemListTile(
-                    key: ValueKey('${item.id}_${item.isFavorite}'),
-                    item: item,
-                    onTap: () => onItemTap(item),
-                    onToggleFavorite: () => onToggleFavorite(item),
-                    formatStock: formatStock,
-                    getStockStatus: getStockStatus,
-                    cartEntries: cartItems
-                        .where((c) => c.productId == item.id)
-                        .toList(),
-                  );
-                },
+                child: Column(
+                  children: [
+                    for (var itemIndex = 0;
+                        itemIndex < searchFilteredItems.length;
+                        itemIndex++) ...[
+                      // Between tiles only — exactly where separatorBuilder
+                      // put it.
+                      if (itemIndex > 0)
+                        SizedBox(height: AppResponsive.smallSpacing(context)),
+                      // Kept from the ListView this replaced: it wrapped every
+                      // child in a RepaintBoundary, and dropping that made the
+                      // section repaint as one layer (measurably worse paint).
+                      RepaintBoundary(
+                        child: _ItemListTile(
+                          key: ValueKey(
+                            '${searchFilteredItems[itemIndex].id}_'
+                            '${searchFilteredItems[itemIndex].isFavorite}',
+                          ),
+                          item: searchFilteredItems[itemIndex],
+                          onTap: () => onItemTap(searchFilteredItems[itemIndex]),
+                          onToggleFavorite: () =>
+                              onToggleFavorite(searchFilteredItems[itemIndex]),
+                          formatStock: formatStock,
+                          getStockStatus: getStockStatus,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
           ],
         ),

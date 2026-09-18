@@ -1216,10 +1216,7 @@ class _TakeawayState extends State<Takeaway> {
     // Order fully cancelled — nothing left to edit; leave the screen.
     if (orderEmpty) {
       if (mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => Startorder()),
-          (route) => false,
-        );
+        returnToStartOrder(context);
         NotificationService.instance.showSuccess(
           'Order cancelled — no items left',
         );
@@ -1538,10 +1535,7 @@ class _TakeawayState extends State<Takeaway> {
 
     if (mounted) {
       Navigator.of(context).pop(); // Pop the dialog first
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => Startorder()),
-        (Route<dynamic> route) => false,
-      );
+      returnToStartOrder(context);
       NotificationService.instance.showSuccess('Order Placed Successfully');
 
       // ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Order Placed Successfully')));
@@ -1915,10 +1909,7 @@ class _TakeawayState extends State<Takeaway> {
     await clearCart();
 
     if (mounted) {
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => Startorder()),
-        (Route<dynamic> route) => false,
-      );
+      returnToStartOrder(context);
 
       final msgParts = <String>[];
       if (hasNewItems && newAddedKotNumber != null)
@@ -3453,10 +3444,7 @@ class _TakeawayState extends State<Takeaway> {
   }
 
   void _navigateToHome() {
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (context) => const Startorder()),
-      (Route<dynamic> route) => false,
-    );
+    returnToStartOrder(context);
   }
 
   /// Shared success dialog for both newly placed and settled orders.

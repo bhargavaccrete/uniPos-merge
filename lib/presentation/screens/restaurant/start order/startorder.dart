@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/plan/plan_enforcement.dart';
 import '../../../../core/plan/entitlement_keys.dart';
+import '../../../../core/routes/routes_name.dart';
 import '../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../util/color.dart';
 import '../../../../util/common/app_responsive.dart';
@@ -15,6 +16,44 @@ import '../tabbar/menu.dart';
 import '../../../../util/restaurant/staticswitch.dart';
 import '../tabbar/order.dart';
 import '../tabbar/table.dart';
+
+/// Go back to the Start Order screen after an order is finished.
+///
+/// Prefers the instance ALREADY on the stack. Rebuilding it
+/// (`pushAndRemoveUntil` with a fresh `Startorder`) threw away the live Menu
+/// tab, so every completed order paid for a full menu rebuild — reload the
+/// stores, re-open every category, "Preparing menu…" again. Popping back keeps
+/// the menu exactly as it was; only the cart it shows has been cleared.
+///
+/// Falls back to the old rebuild when Start Order is not on the stack (e.g. a
+/// flow that was entered directly), so no caller can end up nowhere.
+void returnToStartOrder(BuildContext context) {
+  final navigator = Navigator.of(context);
+  Route<dynamic>? existing;
+  if (navigator.canPop()) {
+    navigator.popUntil((route) {
+      if (route.settings.name == RouteNames.restaurantStartOrder) {
+        existing = route;
+      }
+      return existing != null || route.isFirst;
+    });
+    final anchor = existing;
+    if (anchor != null) {
+      // The old `pushAndRemoveUntil(..., (route) => false)` left Start Order as
+      // the ONLY route, so Back exited the app rather than returning to the
+      // dashboard. Same end state here — the difference is that the screen
+      // itself is reused instead of rebuilt.
+      while (navigator.canPop()) {
+        navigator.removeRouteBelow(anchor);
+      }
+      return;
+    }
+  }
+  navigator.pushAndRemoveUntil(
+    MaterialPageRoute(builder: (_) => const Startorder()),
+    (route) => false,
+  );
+}
 
 class Startorder extends StatefulWidget {
   final OrderModel? existingOrder;
@@ -42,6 +81,11 @@ class _StartorderState extends State<Startorder>
       : 2;
   DateTime? _lastBackPress;
   int _previousTabIndex = 0;
+
+  /// Bumped on every return to the Menu tab. The menu is kept alive (rebuilding
+  /// it re-staged the whole list), so it needs telling when to re-apply what a
+  /// rebuild used to do: re-read the cart, clear the search, scroll to top.
+  int _menuRevisitTick = 0;
 
   @override
   void initState() {
@@ -76,6 +120,9 @@ class _StartorderState extends State<Startorder>
   /// table stores all keep their observable lists current on write, so
   /// reloading them here was duplicate work.
   void _refreshCurrentTab() {
+    if (tabController.index == 0) {
+      _menuRevisitTick++;
+    }
     // Menu tab (0) needs no reload: MenuScreen loads items on init, and every
     // item write — stock included — goes through ItemStore.
     // Refresh orders when switching to orders tab
@@ -436,6 +483,7 @@ class _StartorderState extends State<Startorder>
                     builder: (context, __, ___) => MenuScreen(
                       tableIdForNewOrder: _tableIdForCurrentSession,
                       isForAddingItem: widget.isForAddingItem ?? false,
+                      tabRevisitTick: _menuRevisitTick,
                     ),
                   ),
                   Order(),

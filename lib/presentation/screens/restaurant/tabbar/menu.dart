@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:billberrylite/presentation/screens/restaurant/start%20order/cart/cart.dart';
@@ -14,6 +15,7 @@ import '../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../data/models/common/categorymodel_300.dart';
 import '../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
+import '../../../../domain/store/restaurant/cart_store.dart' show ProductCartState;
 import '../../../../domain/services/restaurant/inventory_service.dart';
 import '../../../../util/restaurant/staticswitch.dart';
 import '../../../widget/componets/restaurant/componets/Button.dart';
@@ -94,18 +96,33 @@ class MenuScreen extends StatefulWidget {
   final OrderModel? existingOrder;
   final bool isForAddingItem;
 
+  /// Bumped by the host tab bar each time the user comes BACK to the menu tab.
+  /// The screen is kept alive now, so this is what re-applies the things the
+  /// old rebuild-on-return used to do (see `didUpdateWidget`).
+  final int tabRevisitTick;
+
   const MenuScreen({
     super.key,
     this.existingOrder,
     this.isForAddingItem = false,
     this.tableIdForNewOrder,
+    this.tabRevisitTick = 0,
   });
 
   @override
   State<MenuScreen> createState() => _MenuScreenState();
 }
 
-class _MenuScreenState extends State<MenuScreen> {
+class _MenuScreenState extends State<MenuScreen>
+    with AutomaticKeepAliveClientMixin {
+  // The Menu lives in a TabBarView, which disposes a tab when you leave it.
+  // Without this, coming back from Orders or Tables re-created the whole
+  // screen: reload, re-stage every section, "Preparing menu…" again. Keeping
+  // it alive means the tab is exactly as you left it — including scroll
+  // position and which categories are open.
+  @override
+  bool get wantKeepAlive => true;
+
   // Sentinel category id for the "Favorites" tab.
   static const String _kFavorites = '__favorites__';
   int _scrollRequestId = 0;
@@ -147,7 +164,6 @@ class _MenuScreenState extends State<MenuScreen> {
     List<dynamic> renderedCategories,
     String query,
     String lowerQuery,
-    List<CartItem> cartItems,
   ) {
     // A sentinel, not '' — the key maps are shared with real categories and an
     // empty id is a plausible value for legacy data.
@@ -179,10 +195,11 @@ class _MenuScreenState extends State<MenuScreen> {
     return _CategorySectionCard(
       category: Category(id: uncategorisedId, name: 'Uncategorized'),
       searchFilteredItems: orphans,
-      initiallyExpanded: query.isNotEmpty || AppSettings.keepCategoriesOpen,
+      initiallyExpanded:
+          (query.isNotEmpty || AppSettings.keepCategoriesOpen) &&
+              _opensImmediately(uncategorisedId, orphans.length),
       controller: _expansionControllers[uncategorisedId],
       cardKey: _categoryKeys[uncategorisedId]!,
-      cartItems: cartItems,
       onItemTap: _handleItemTap,
       onToggleFavorite: _toggleFavorite,
       formatStock: _formatStockDisplay,
@@ -196,7 +213,6 @@ class _MenuScreenState extends State<MenuScreen> {
     List<Items> visibleItems,
     String query,
     String lowerQuery,
-    List<CartItem> cartItems,
   ) {
     var favItems = visibleItems.where((i) => i.isFavorite).toList();
     if (query.isNotEmpty) {
@@ -232,8 +248,11 @@ class _MenuScreenState extends State<MenuScreen> {
         child: ExpansionTile(
           controller: _expansionControllers[_kFavorites],
           // Collapsed by default — opens on tap, during search, or when the
-          // "Keep Categories Open" setting is on (all sections start expanded).
-          initiallyExpanded: query.isNotEmpty || AppSettings.keepCategoriesOpen,
+          // "Keep Categories Open" setting is on. Staged like every other
+          // section, so a long favourites list cannot block the first frame.
+          initiallyExpanded:
+              (query.isNotEmpty || AppSettings.keepCategoriesOpen) &&
+                  _opensImmediately(_kFavorites, favItems.length),
           leading: Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
@@ -289,8 +308,7 @@ class _MenuScreenState extends State<MenuScreen> {
                   ),
                 ),
                 itemCount: favItems.length,
-                itemBuilder: (_, i) =>
-                    _buildGridItemCard(favItems[i], cartItems),
+                itemBuilder: (_, i) => _buildGridItemCard(favItems[i]),
               )
             else
               ListView.separated(
@@ -308,9 +326,6 @@ class _MenuScreenState extends State<MenuScreen> {
                     onToggleFavorite: () => _toggleFavorite(item),
                     formatStock: _formatStockDisplay,
                     getStockStatus: _getStockStatus,
-                    cartEntries: cartItems
-                        .where((c) => c.productId == item.id)
-                        .toList(),
                   );
                 },
               ),
@@ -348,51 +363,189 @@ class _MenuScreenState extends State<MenuScreen> {
     });
   }
 
-  /// Instantly expand/collapse every section when "Keep Categories Open" is
-  /// toggled. Without this the change only shows after leaving and re-entering
-  /// the screen, because `initiallyExpanded` applies to a tile only on its first
-  /// build and the section list lives inside a MobX Observer that doesn't track
-  /// the (ValueNotifier-backed) settings.
-  void _onSettingsChanged() {
-    final keepOpen = AppSettings.keepCategoriesOpen;
-    if (keepOpen == _lastKeepOpen) return;
-    _lastKeepOpen = keepOpen;
-    // An active search already force-expands everything — don't fight it.
-    if (query.isNotEmpty) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      for (final controller in _expansionControllers.values) {
-        try {
-          keepOpen ? controller.expand() : controller.collapse();
-        } catch (_) {
-          // Tile not attached yet (off-screen) — it adopts the state via
-          // `initiallyExpanded` when first built.
+  // ═══════════════════════════════════════════════════════════════════════
+  // STAGED SECTION EXPANSION
+  //
+  // "Keep Categories Open" (and an active search) means EVERY section is open,
+  // and an open section builds and lays out all of its tiles. Doing that for
+  // the whole menu in one frame is what froze the screen for seconds on a
+  // large menu — the first usable frame had to pay for every item at once.
+  //
+  // The sections still all open and the list stays eager; they just open a
+  // couple per frame instead of all at once. The shell (search field, category
+  // strip, section headers) is up on the first frame and stays responsive
+  // while the rest fills in behind it.
+  // ═══════════════════════════════════════════════════════════════════════
+
+  // Budgets are in ITEMS, not sections: what a frame costs is the number of
+  // tiles it builds, and sections vary from 3 items to 60. Counting sections
+  // made a 200-item menu take one frame per category for no reason, while a
+  // single huge category could still overshoot.
+
+  /// Items worth of sections rendered already-open in the first frame —
+  /// roughly what fits on screen.
+  static const int _kItemsOpenOnFirstFrame = 40;
+
+  /// Items opened per frame after that. At least one section always opens, so
+  /// a category larger than this cannot stall the queue.
+  static const int _kItemsOpenedPerFrame = 60;
+
+  /// Below this many items the whole menu just opens at once: staging costs a
+  /// frame per batch plus an expansion animation per section, and on a small
+  /// menu that machinery takes LONGER than simply building everything. Measured
+  /// at 200 items — staged and unstaged both landed around a second, all of it
+  /// staging overhead rather than tile building.
+  static const int _kStageAboveItemCount = 300;
+
+  /// Whether the current fill is staged. False on a small menu, which then
+  /// shows no loader and does not freeze the list.
+  bool _stagedFill = false;
+
+  /// Item count per section id, filled in as sections build. Only used to size
+  /// the batches.
+  final Map<String, int> _sectionItemCounts = {};
+
+  /// Section ids still waiting to be opened, in render order.
+  final List<String> _expansionQueue = [];
+
+  /// Bumped whenever the expansion INTENT changes (search typed or cleared,
+  /// Keep Categories Open toggled, section list changed). A drain callback
+  /// carrying an older token is stale and exits — this is what cancels
+  /// in-flight staging instead of letting two runs fight each other.
+  int _expansionToken = 0;
+  bool _drainScheduled = false;
+
+  /// True while sections are still being opened. Driven by the drain, and
+  /// listened to ONLY by the overlay and the scroll physics — a `setState`
+  /// here would rebuild every tile on screen, which is the cost this whole
+  /// mechanism exists to avoid.
+  final ValueNotifier<bool> _stagingSections = ValueNotifier<bool>(false);
+
+  /// True while a scroll gesture is in flight. Opening a section during a
+  /// scroll is what makes the list feel like it catches — the work lands on
+  /// the same frames that should be moving the viewport. The queue simply
+  /// waits; [ScrollEndNotification] restarts it.
+  bool _scrollInProgress = false;
+
+  /// The current expansion intent, so the section build can tell a real change
+  /// from an ordinary rebuild (a cart change must not restart staging).
+  String _expansionSignature = '';
+
+  /// Items accounted for so far in this section build, in render order, so the
+  /// first screenful renders already-open and the rest is staged.
+  int _itemsBudgetUsed = 0;
+
+  bool _opensImmediately(String sectionId, int itemCount) {
+    _sectionItemCounts[sectionId] = itemCount;
+    if (!_stagedFill) return true;
+    if (_itemsBudgetUsed >= _kItemsOpenOnFirstFrame) return false;
+    _itemsBudgetUsed += itemCount;
+    return true;
+  }
+
+  /// Called from the section build with the section ids in RENDER order.
+  ///
+  /// The ids are passed in rather than read from `_expansionControllers`: on a
+  /// fresh open those controllers are created further down in this same build,
+  /// so reading them here queued nothing and every section past the first two
+  /// stayed shut. A queued id whose controller does not exist yet is fine —
+  /// the drain runs post-frame, by which time the section has been built.
+  void _syncSectionExpansion(
+    bool expanding,
+    List<String> sectionIds, {
+    required bool staged,
+  }) {
+    // Keyed on WHETHER a search is active and WHICH sections are rendered —
+    // deliberately not on the query text. With the raw query in here, every
+    // keystroke counted as a new intent: staging restarted, every section was
+    // re-queued for an `expand()` that was already a no-op, and the
+    // "Preparing menu…" pill plus the frozen list flashed back on each
+    // character. Hashing the id LIST rather than its length matters: as
+    // matches change, one section can drop out while another appears, leaving
+    // the count identical — and a section that appeared would never be queued.
+    final signature = '$expanding|$staged|${query.isEmpty}|'
+        '${Object.hashAll(sectionIds)}';
+    if (signature == _expansionSignature) return;
+    _expansionSignature = signature;
+
+    // Cancel whatever was still being staged for the previous intent.
+    _expansionToken++;
+    _expansionQueue.clear();
+
+    if (!expanding) {
+      _stagingSections.value = false;
+      // Collapsing is cheap — an ExpansionTile drops its children — so it can
+      // happen in one go.
+      final token = _expansionToken;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || token != _expansionToken) return;
+        for (final controller in _expansionControllers.values) {
+          try {
+            controller.collapse();
+          } catch (_) {
+            // Not attached yet — `initiallyExpanded` covers it.
+          }
         }
+      });
+      return;
+    }
+
+    // Render order. The first few are already open via `initiallyExpanded`,
+    // and expanding an open tile is a no-op.
+    _stagedFill = staged;
+    _expansionQueue.addAll(sectionIds);
+    _scheduleExpansionDrain();
+  }
+
+  void _scheduleExpansionDrain() {
+    if (_drainScheduled || _expansionQueue.isEmpty) return;
+    _drainScheduled = true;
+    // The loader and the frozen list are only for a staged fill; a small menu
+    // opens in one go and never shows them.
+    _stagingSections.value = _stagedFill;
+    final token = _expansionToken;
+    // A post-frame callback only runs if a frame actually happens, and a batch
+    // can be all no-ops (the first sections are already open), which schedules
+    // no animation and therefore no frame. Ask for one so the chain cannot
+    // stall with sections still queued. Idempotent — not a timer, and not a
+    // rebuild.
+    WidgetsBinding.instance.ensureVisualUpdate();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _drainScheduled = false;
+      if (!mounted || token != _expansionToken) return;
+      // Scrolling — leave the queue alone; ScrollEndNotification resumes it.
+      if (_scrollInProgress) return;
+      var itemsOpened = 0;
+      while (_expansionQueue.isNotEmpty &&
+          (!_stagedFill ||
+              itemsOpened == 0 ||
+              itemsOpened < _kItemsOpenedPerFrame)) {
+        final id = _expansionQueue.removeAt(0);
+        try {
+          _expansionControllers[id]?.expand();
+        } catch (_) {
+          // Tile not attached yet — it adopts the state when first built.
+        }
+        itemsOpened += _sectionItemCounts[id] ?? 1;
+      }
+      if (_expansionQueue.isNotEmpty) {
+        _scheduleExpansionDrain();
+      } else {
+        _stagingSections.value = false;
       }
     });
   }
 
-  /// Expand all category sections while a search is active (collapse when
-  /// cleared). Scheduled from build() so it runs AFTER the search results have
-  /// been laid out — only then are the tiles attached to their controllers.
-  /// `initiallyExpanded` alone doesn't work: it applies only on a tile's first
-  /// build, so sections already on screen stay collapsed when the search starts.
-  String _lastExpandQuery = '';
-  void _syncSearchExpansion() {
-    if (query == _lastExpandQuery) return;
-    final expanding = query.isNotEmpty || AppSettings.keepCategoriesOpen;
-    _lastExpandQuery = query;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      for (final controller in _expansionControllers.values) {
-        try {
-          expanding ? controller.expand() : controller.collapse();
-        } catch (_) {
-          // Tile not attached yet (off-screen) — it picks up the state via
-          // `initiallyExpanded` when first built.
-        }
-      }
-    });
+  /// Keep Categories Open toggled: rebuild so the section build re-evaluates
+  /// the intent and stages the work. The expansion is NOT done here any more —
+  /// opening every section at once is what froze the menu.
+  void _onSettingsChanged() {
+    final keepOpen = AppSettings.keepCategoriesOpen;
+    if (keepOpen == _lastKeepOpen) return;
+    _lastKeepOpen = keepOpen;
+    // An active search already forces everything open — don't fight it.
+    if (query.isNotEmpty) return;
+    if (mounted) setState(() {});
   }
 
   Future<void> _loadData({bool force = false}) async {
@@ -427,9 +580,29 @@ class _MenuScreenState extends State<MenuScreen> {
     }
   }
 
+  /// The screen used to be rebuilt from scratch on every tab return, which
+  /// re-read the cart, cleared the search and put the list back at the top.
+  /// It is kept alive now (rebuilding it cost a full menu re-stage), so those
+  /// three effects are reproduced here instead — none of them rebuild the
+  /// section list.
+  ///
+  /// Driven by [MenuScreen.tabRevisitTick] rather than by visibility: a route
+  /// pushed on top of the menu (the cart) also hides it, and coming back from
+  /// THAT never reset anything.
+  @override
+  void didUpdateWidget(covariant MenuScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.tabRevisitTick != oldWidget.tabRevisitTick) {
+      restaurantCartStore.loadCartItems();
+      if (_searchController.text.isNotEmpty) _searchController.clear();
+      if (_listScrollController.hasClients) _listScrollController.jumpTo(0);
+    }
+  }
+
   @override
   void dispose() {
     AppSettings.settingsNotifier.removeListener(_onSettingsChanged);
+    _stagingSections.dispose();
     _searchController.dispose();
     _searchFocusNode.dispose();
     _listScrollController.dispose();
@@ -720,6 +893,7 @@ class _MenuScreenState extends State<MenuScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // AutomaticKeepAliveClientMixin
     final size = MediaQuery.of(context).size;
     final isTablet = !AppResponsive.isMobile(context);
 
@@ -736,242 +910,322 @@ class _MenuScreenState extends State<MenuScreen> {
 
     return Stack(
       children: [
-        Observer(
-          builder: (_) {
-            final hasItems = restaurantCartStore.cartItems.isNotEmpty;
-            return Padding(
-              padding: EdgeInsets.only(top: 10, bottom: hasItems ? 80 : 0),
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 5,
-                    ),
-                    child: AppTextField(
-                      controller: _searchController,
-                      focusNode: _searchFocusNode,
-                      hint: 'Search Items',
-                      icon: Icons.search_rounded,
-                    ),
-                  ),
+        // NOT wrapped in an Observer. The only cart-dependent part of this
+        // column is the bottom reserve for the cart bar, and that now has its
+        // own Observer at the end of the column — observing the cart here
+        // rebuilt the search field, the category strip and every category
+        // section on each add/quantity/remove.
+        Padding(
+          padding: const EdgeInsets.only(top: 10),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
+                child: AppTextField(
+                  controller: _searchController,
+                  focusNode: _searchFocusNode,
+                  hint: 'Search Items',
+                  icon: Icons.search_rounded,
+                ),
+              ),
 
-                  // Horizontal category quick-nav strip — replaces the category FAB
-                  Observer(
-                    builder: (_) {
-                      final enabledItems = itemStore.items
-                          .where((i) => i.isEnabled && i.sellsAtPos)
-                          .toList();
-                      final cats = categoryStore.categoriesWithItems(
-                        enabledItems,
-                      );
-                      // Show a Favorites pill first, but only when there are
-                      // favorites to jump to (mirrors hiding empty categories).
-                      final hasFav = enabledItems.any((i) => i.isFavorite);
-                      return _HorizontalCategoryStrip(
-                        categories: cats,
-                        hasFavorites: hasFav,
-                        activeCategory: activeCategory,
-                        onCategorySelected: _selectStripCategory,
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 4),
+              // Horizontal category quick-nav strip — replaces the category FAB
+              Observer(
+                builder: (_) {
+                  final enabledItems = itemStore.items
+                      .where((i) => i.isEnabled && i.sellsAtPos)
+                      .toList();
+                  final cats = categoryStore.categoriesWithItems(
+                    enabledItems,
+                  );
+                  // Show a Favorites pill first, but only when there are
+                  // favorites to jump to (mirrors hiding empty categories).
+                  final hasFav = enabledItems.any((i) => i.isFavorite);
+                  return _HorizontalCategoryStrip(
+                    categories: cats,
+                    hasFavorites: hasFav,
+                    activeCategory: activeCategory,
+                    onCategorySelected: _selectStripCategory,
+                  );
+                },
+              ),
+              const SizedBox(height: 4),
 
-                  // Collapsible Category Sections
-                  Expanded(
-                    child: _isLoadingData
-                        ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                CircularProgressIndicator(
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    AppColors.primary,
-                                  ),
+              // Collapsible Category Sections
+              Expanded(
+                child: _isLoadingData
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            CircularProgressIndicator(
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                AppColors.primary,
+                              ),
+                            ),
+                            SizedBox(height: 16),
+                            Text(
+                              'Loading menu...',
+                              style: GoogleFonts.poppins(
+                                fontSize: AppResponsive.bodyFontSize(
+                                  context,
                                 ),
-                                SizedBox(height: 16),
-                                Text(
-                                  'Loading menu...',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: AppResponsive.bodyFontSize(
-                                      context,
-                                    ),
+                                color: AppColors.textSecondary,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : Observer(
+                        builder: (_) {
+                          final allCategories = categoryStore.categories;
+
+                          if (allCategories.isEmpty) {
+                            return Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.category_outlined,
+                                    size: 64,
                                     color: AppColors.textSecondary,
-                                    fontWeight: FontWeight.w500,
                                   ),
+                                  SizedBox(height: 16),
+                                  Text(
+                                    'No Categories Found',
+                                    style: GoogleFonts.poppins(
+                                      fontSize:
+                                          AppResponsive.subheadingFontSize(
+                                            context,
+                                          ),
+                                      color: AppColors.textSecondary,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+
+                          final allItems = itemStore.items;
+                          final visibleItems = allItems
+                              .where(
+                                (item) => item.isEnabled && item.sellsAtPos,
+                              )
+                              .toList();
+                          final lowerQuery = query.toLowerCase();
+                          // Deliberately NO cart read here. Each item tile
+                          // observes its own cart state
+                          // (`cartStateFor(item.id)`), so a lazily-built
+                          // tile still tracks add/remove/qty without this
+                          // Observer — and the sections around it — having
+                          // to rebuild for every cart write.
+
+                          // Hide categories with no items — the order screen only
+                          // needs categories you can actually pick from.
+                          final categories = categoryStore
+                              .categoriesWithItems(visibleItems);
+
+                          // Sections open a couple per frame from here
+                          // (see STAGED SECTION EXPANSION).
+                          final sectionsExpand =
+                              query.isNotEmpty || AppSettings.keepCategoriesOpen;
+                          // Small menu: skip the staging entirely.
+                          final stagedFill =
+                              visibleItems.length > _kStageAboveItemCount;
+                          _stagedFill = stagedFill;
+                          _itemsBudgetUsed = 0;
+                          // Render order: favourites, the categories, then the
+                          // uncategorised bucket. The two sentinels are queued
+                          // unconditionally — if that section isn't showing,
+                          // opening it is a no-op.
+                          _syncSectionExpansion(sectionsExpand, staged: stagedFill, [
+                            _kFavorites,
+                            ...categories.map<String>((c) => c.id),
+                            '__uncategorised__',
+                          ]);
+
+                          // Searching but nothing matches → empty state instead
+                          // of a blank scroll area.
+                          if (query.isNotEmpty &&
+                              !visibleItems.any(
+                                (item) =>
+                                    item.name.toLowerCase().contains(
+                                      lowerQuery,
+                                    ) ||
+                                    (item.itemCode != null &&
+                                        item.itemCode!
+                                            .toLowerCase()
+                                            .contains(lowerQuery)),
+                              )) {
+                            return const AppEmptyState(
+                              icon: Icons.search_off_rounded,
+                              title: 'No items found',
+                              message: 'Try a different search term.',
+                            );
+                          }
+
+                          final sectionList = NotificationListener<ScrollNotification>(
+                            // Hold the staged opening while the user is
+                            // actually scrolling, then pick it up again.
+                            onNotification: (notification) {
+                              if (notification is ScrollStartNotification) {
+                                _scrollInProgress = true;
+                              } else if (notification
+                                      is ScrollEndNotification ||
+                                  notification is UserScrollNotification &&
+                                      notification.direction ==
+                                          ScrollDirection.idle) {
+                                if (_scrollInProgress) {
+                                  _scrollInProgress = false;
+                                  _scheduleExpansionDrain();
+                                }
+                              }
+                              return false;
+                            },
+                            child: SingleChildScrollView(
+                            controller: _listScrollController,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 5,
+                            ),
+                            child: Column(
+                              children: [
+                                _buildFavoritesSection(
+                                  visibleItems,
+                                  query,
+                                  lowerQuery,
+                                ),
+                                ...categories.map((category) {
+                                  if (!_categoryKeys.containsKey(
+                                    category.id,
+                                  )) {
+                                    _categoryKeys[category.id] =
+                                        GlobalKey();
+                                  }
+                                  if (!_expansionControllers.containsKey(
+                                    category.id,
+                                  )) {
+                                    _expansionControllers[category.id] =
+                                        ExpansibleController();
+                                  }
+
+                                  final categoryItems = visibleItems
+                                      .where(
+                                        (item) =>
+                                            item.categoryOfItem ==
+                                            category.id,
+                                      )
+                                      .toList();
+
+                                  final searchFilteredItems = query.isEmpty
+                                      ? categoryItems
+                                      : categoryItems.where((item) {
+                                          return item.name
+                                                  .toLowerCase()
+                                                  .contains(lowerQuery) ||
+                                              (item.itemCode != null &&
+                                                  item.itemCode!
+                                                      .toLowerCase()
+                                                      .contains(
+                                                        lowerQuery,
+                                                      ));
+                                        }).toList();
+
+                                  // Don't show empty categories when searching
+                                  if (query.isNotEmpty &&
+                                      searchFilteredItems.isEmpty) {
+                                    return const SizedBox.shrink();
+                                  }
+
+                                  return _CategorySectionCard(
+                                    category: category,
+                                    searchFilteredItems:
+                                        searchFilteredItems,
+                                    // Only the first sections render open in
+                                    // the first frame; the staged drain opens
+                                    // the rest.
+                                    initiallyExpanded: sectionsExpand &&
+                                        _opensImmediately(category.id,
+                                            searchFilteredItems.length),
+                                    controller:
+                                        _expansionControllers[category.id],
+                                    cardKey: _categoryKeys[category.id]!,
+                                    onItemTap: _handleItemTap,
+                                    onToggleFavorite: _toggleFavorite,
+                                    formatStock: _formatStockDisplay,
+                                    getStockStatus: _getStockStatus,
+                                    // Opt-in grid mode (was the separate
+                                    // MenuGridScreen) — mobile only; tablet has
+                                    // its own grid layout.
+                                    gridView: AppSettings.menuGridView,
+                                    buildGridCard: _buildGridItemCard,
+                                  );
+                                }).toList(),
+                                _buildUncategorisedSection(
+                                  visibleItems,
+                                  categories,
+                                  query,
+                                  lowerQuery,
                                 ),
                               ],
                             ),
-                          )
-                        : Observer(
-                            builder: (_) {
-                              final allCategories = categoryStore.categories;
+                          ),
+                          );
 
-                              if (allCategories.isEmpty) {
-                                return Center(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.category_outlined,
-                                        size: 64,
-                                        color: AppColors.textSecondary,
-                                      ),
-                                      SizedBox(height: 16),
-                                      Text(
-                                        'No Categories Found',
-                                        style: GoogleFonts.poppins(
-                                          fontSize:
-                                              AppResponsive.subheadingFontSize(
-                                                context,
-                                              ),
-                                          color: AppColors.textSecondary,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ],
+                          // While the sections are still opening, hold the
+                          // list still and say so. Scrolling mid-fill is what
+                          // felt like a stutter, and a frozen list also lets
+                          // the queue run at full speed instead of yielding to
+                          // the gesture.
+                          //
+                          // `child:` is the already-built list, handed through
+                          // untouched — the tiles are NOT rebuilt when this
+                          // flips.
+                          return ValueListenableBuilder<bool>(
+                            valueListenable: _stagingSections,
+                            child: sectionList,
+                            builder: (context, staging, child) {
+                              if (!staging) return child!;
+                              return Stack(
+                                children: [
+                                  AbsorbPointer(
+                                    child: ScrollConfiguration(
+                                      behavior:
+                                          const _FrozenScrollBehavior(),
+                                      child: child!,
+                                    ),
                                   ),
-                                );
-                              }
-
-                              final allItems = itemStore.items;
-                              final visibleItems = allItems
-                                  .where(
-                                    (item) => item.isEnabled && item.sellsAtPos,
-                                  )
-                                  .toList();
-                              final lowerQuery = query.toLowerCase();
-                              // Snapshot the cart HERE (synchronously, inside the
-                              // Observer) so the cards react to add/remove/qty —
-                              // ListView item builders run lazily and wouldn't track.
-                              final cartItems = restaurantCartStore.cartItems
-                                  .toList();
-
-                              // Hide categories with no items — the order screen only
-                              // needs categories you can actually pick from.
-                              final categories = categoryStore
-                                  .categoriesWithItems(visibleItems);
-
-                              // Auto-open category sections while searching (runs
-                              // post-frame, once per query change).
-                              _syncSearchExpansion();
-
-                              // Searching but nothing matches → empty state instead
-                              // of a blank scroll area.
-                              if (query.isNotEmpty &&
-                                  !visibleItems.any(
-                                    (item) =>
-                                        item.name.toLowerCase().contains(
-                                          lowerQuery,
-                                        ) ||
-                                        (item.itemCode != null &&
-                                            item.itemCode!
-                                                .toLowerCase()
-                                                .contains(lowerQuery)),
-                                  )) {
-                                return const AppEmptyState(
-                                  icon: Icons.search_off_rounded,
-                                  title: 'No items found',
-                                  message: 'Try a different search term.',
-                                );
-                              }
-
-                              return SingleChildScrollView(
-                                controller: _listScrollController,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 5,
-                                ),
-                                child: Column(
-                                  children: [
-                                    _buildFavoritesSection(
-                                      visibleItems,
-                                      query,
-                                      lowerQuery,
-                                      cartItems,
+                                  Positioned(
+                                    left: 0,
+                                    right: 0,
+                                    bottom: 16,
+                                    child: Center(
+                                      child: _buildPreparingBanner(context),
                                     ),
-                                    ...categories.map((category) {
-                                      if (!_categoryKeys.containsKey(
-                                        category.id,
-                                      )) {
-                                        _categoryKeys[category.id] =
-                                            GlobalKey();
-                                      }
-                                      if (!_expansionControllers.containsKey(
-                                        category.id,
-                                      )) {
-                                        _expansionControllers[category.id] =
-                                            ExpansibleController();
-                                      }
-
-                                      final categoryItems = visibleItems
-                                          .where(
-                                            (item) =>
-                                                item.categoryOfItem ==
-                                                category.id,
-                                          )
-                                          .toList();
-
-                                      final searchFilteredItems = query.isEmpty
-                                          ? categoryItems
-                                          : categoryItems.where((item) {
-                                              return item.name
-                                                      .toLowerCase()
-                                                      .contains(lowerQuery) ||
-                                                  (item.itemCode != null &&
-                                                      item.itemCode!
-                                                          .toLowerCase()
-                                                          .contains(
-                                                            lowerQuery,
-                                                          ));
-                                            }).toList();
-
-                                      // Don't show empty categories when searching
-                                      if (query.isNotEmpty &&
-                                          searchFilteredItems.isEmpty) {
-                                        return const SizedBox.shrink();
-                                      }
-
-                                      return _CategorySectionCard(
-                                        category: category,
-                                        searchFilteredItems:
-                                            searchFilteredItems,
-                                        initiallyExpanded:
-                                            query.isNotEmpty ||
-                                            AppSettings.keepCategoriesOpen,
-                                        controller:
-                                            _expansionControllers[category.id],
-                                        cardKey: _categoryKeys[category.id]!,
-                                        cartItems: cartItems,
-                                        onItemTap: _handleItemTap,
-                                        onToggleFavorite: _toggleFavorite,
-                                        formatStock: _formatStockDisplay,
-                                        getStockStatus: _getStockStatus,
-                                        // Opt-in grid mode (was the separate
-                                        // MenuGridScreen) — mobile only; tablet has
-                                        // its own grid layout.
-                                        gridView: AppSettings.menuGridView,
-                                        buildGridCard: _buildGridItemCard,
-                                      );
-                                    }).toList(),
-                                    _buildUncategorisedSection(
-                                      visibleItems,
-                                      categories,
-                                      query,
-                                      lowerQuery,
-                                      cartItems,
-                                    ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               );
                             },
-                          ),
-                  ),
-                ],
+                          );
+                        },
+                      ),
               ),
-            );
-          },
+
+              // Room for the cart bar that floats over this column. Its
+              // own Observer: a cart change resizes this spacer instead of
+              // rebuilding the column above it.
+              Observer(
+                builder: (_) => SizedBox(
+                  height: restaurantCartStore.cartItems.isEmpty ? 0 : 80,
+                ),
+              ),
+            ],
+          ),
         ),
 
         // Fixed Cart Bar at Bottom
@@ -1097,9 +1351,8 @@ class _MenuScreenState extends State<MenuScreen> {
                       builder: (_) {
                         final hasItems =
                             restaurantCartStore.cartItems.isNotEmpty;
-                        // Tracked cart snapshot for the in-cart badges/highlight.
-                        final cartItems = restaurantCartStore.cartItems
-                            .toList();
+                        // No cart snapshot: each grid card observes its own
+                        // in-cart badge state (see `_buildGridItemCard`).
                         final allItems = itemStore.items;
                         var filteredItems = allItems
                             .where((item) => item.isEnabled && item.sellsAtPos)
@@ -1185,10 +1438,7 @@ class _MenuScreenState extends State<MenuScreen> {
                                     ),
                                 itemCount: filteredItems.length,
                                 itemBuilder: (context, index) =>
-                                    _buildGridItemCard(
-                                      filteredItems[index],
-                                      cartItems,
-                                    ),
+                                    _buildGridItemCard(filteredItems[index]),
                               );
                             },
                           ),
@@ -1626,236 +1876,16 @@ class _MenuScreenState extends State<MenuScreen> {
     );
   }
 
-  Widget _buildGridItemCard(Items item, List<CartItem> cartItems) {
+  Widget _buildGridItemCard(Items item) {
     final stockStatus = _getStockStatus(item);
-    final isDisabled = stockStatus == StockStatus.outOfStock;
-    // Cart entries for this item (snapshot tracked at the grid Observer top).
-    final cartEntries = cartItems.where((c) => c.productId == item.id).toList();
-    final int cartQty = cartEntries.fold<int>(0, (s, c) => s + c.quantity);
-    final bool inCart = cartQty > 0;
-
-    return ValueListenableBuilder<Map<String, bool>>(
-      valueListenable: AppSettings.settingsNotifier,
-      builder: (context, _, __) {
-        final showImage = AppSettings.showItemImage;
-        final showPrice = AppSettings.showItemPrice;
-
-        return GestureDetector(
-          onTap: isDisabled ? null : () => _handleItemTap(item),
-          child: Stack(
-            children: [
-              Container(
-                decoration: BoxDecoration(
-                  color: isDisabled
-                      ? AppColors.surfaceMedium.withOpacity(0.5)
-                      : inCart
-                      ? AppColors.primary.withOpacity(0.04)
-                      : AppColors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  // In-cart items stay calm: a thin accent border + the small green
-                  // "in cart" pill mark them, instead of a heavy fill/glow.
-                  border: Border.all(
-                    color: inCart
-                        ? AppColors.primary.withOpacity(0.45)
-                        : (isDisabled
-                              ? AppColors.divider
-                              : AppColors.divider.withOpacity(0.5)),
-                    width: 1,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Item Image — conditionally shown
-                    if (showImage)
-                      Expanded(
-                        flex: 3,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: AppColors.surfaceMedium,
-                            borderRadius: BorderRadius.vertical(
-                              top: Radius.circular(16),
-                            ),
-                          ),
-                          child: Center(child: _buildItemImageForGrid(item)),
-                        ),
-                      ),
-
-                    // Item Details
-                    Expanded(
-                      flex: showImage ? 2 : 1,
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                  children: [
-                                    if (item.isVeg != null) ...[
-                                      _buildVegIndicator(item.isVeg),
-                                      const SizedBox(width: 6),
-                                    ],
-                                    Expanded(
-                                      child: Text(
-                                        (item.itemCode != null &&
-                                                item.itemCode!.isNotEmpty)
-                                            ? '${item.itemCode} ${item.name}'
-                                            : item.name,
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: GoogleFonts.poppins(
-                                          fontSize: AppResponsive.bodyFontSize(
-                                            context,
-                                          ),
-                                          fontWeight: FontWeight.w600,
-                                          color: isDisabled
-                                              ? AppColors.textSecondary
-                                              : AppColors.textPrimary,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                if (showPrice)
-                                  Text(
-                                    _getPriceDisplayForGrid(item),
-                                    style: GoogleFonts.poppins(
-                                      fontSize: AppResponsive.bodyFontSize(
-                                        context,
-                                      ),
-                                      fontWeight: FontWeight.w700,
-                                      color: AppColors.primary,
-                                    ),
-                                  ),
-                                if (!isDisabled)
-                                  Stack(
-                                    clipBehavior: Clip.none,
-                                    children: [
-                                      Container(
-                                        padding: EdgeInsets.all(8),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.primary,
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                        ),
-                                        child: Icon(
-                                          Icons.add,
-                                          color: AppColors.white,
-                                          size: 16,
-                                        ),
-                                      ),
-                                      if (inCart)
-                                        Positioned(
-                                          top: -7,
-                                          right: -7,
-                                          child: Container(
-                                            padding: const EdgeInsets.all(3),
-                                            constraints: const BoxConstraints(
-                                              minWidth: 18,
-                                              minHeight: 18,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: AppColors.accent,
-                                              shape: BoxShape.circle,
-                                              border: Border.all(
-                                                color: Colors.white,
-                                                width: 1.5,
-                                              ),
-                                            ),
-                                            child: Text(
-                                              '$cartQty',
-                                              textAlign: TextAlign.center,
-                                              style: GoogleFonts.poppins(
-                                                fontSize: 9,
-                                                fontWeight: FontWeight.w700,
-                                                color: Colors.white,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Positioned(top: 6, right: 6, child: _favStar(item)),
-              // "In cart" pill at the top-left mirrors the favourite star.
-              if (inCart)
-                Positioned(
-                  top: 6,
-                  left: 6,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 7,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.success,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.check_circle_rounded,
-                          size: 11,
-                          color: Colors.white,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          _gridCartLabel(cartEntries, cartQty),
-                          style: GoogleFonts.poppins(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        );
-      },
+    return _GridItemCard(
+      item: item,
+      isDisabled: stockStatus == StockStatus.outOfStock,
+      priceLabel: _getPriceDisplayForGrid(item),
+      onTap: _handleItemTap,
+      buildImage: _buildItemImageForGrid,
+      favStar: _favStar,
     );
-  }
-
-  /// Short cart label for the grid pill: total qty, or variant breakdown when
-  /// the item was added with variants (e.g. "Large ×2, Regular ×1").
-  String _gridCartLabel(List<CartItem> entries, int qty) {
-    final hasVariants = entries.any((c) => (c.variantName ?? '').isNotEmpty);
-    if (!hasVariants) return 'In cart · $qty';
-    return entries
-        .map(
-          (c) =>
-              '${(c.variantName ?? '').isNotEmpty ? c.variantName : 'Regular'} ×${c.quantity}',
-        )
-        .join(', ');
   }
 
   Widget _buildItemImageForGrid(Items item) {
@@ -2006,6 +2036,45 @@ class _MenuScreenState extends State<MenuScreen> {
     _scrollToCategoryWhenStable(categoryId, currentId);
   }
 
+  /// Shown while the remaining categories are still opening.
+  Widget _buildPreparingBanner(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: AppResponsive.mediumSpacing(context),
+        vertical: AppResponsive.smallSpacing(context),
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(10),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 8),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+            ),
+          ),
+          SizedBox(width: AppResponsive.smallSpacing(context)),
+          Text(
+            'Preparing menu…',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.smallFontSize(context),
+              fontWeight: FontWeight.w500,
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildCartBar(BuildContext context) {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 15, vertical: 12),
@@ -2121,19 +2190,271 @@ class _MenuScreenState extends State<MenuScreen> {
   }
 }
 
+/// One item card in the menu GRID (tablet's grid, and mobile's opt-in "Menu
+/// Grid View").
+///
+/// A [StatelessObserverWidget] so the card's element carries its own MobX
+/// reaction: grid item builders run lazily, outside any enclosing `Observer`,
+/// so the card has to track the cart itself — and doing it here rather than in
+/// a nested `Observer` keeps it to one element per card.
+class _GridItemCard extends StatelessObserverWidget {
+  const _GridItemCard({
+    required this.item,
+    required this.isDisabled,
+    required this.priceLabel,
+    required this.onTap,
+    required this.buildImage,
+    required this.favStar,
+  });
+
+  final Items item;
+  final bool isDisabled;
+  final String priceLabel;
+  final void Function(Items) onTap;
+  final Widget Function(Items) buildImage;
+  final Widget Function(Items) favStar;
+
+  @override
+  Widget build(BuildContext context) {
+    // Read HERE, in the tracked build, so the card reacts to ITS item going
+    // in and out of the cart without the menu around it rebuilding. Same
+    // reason `_ItemListTile` is a StatefulObserverWidget.
+    final cart = restaurantCartStore.cartStateFor(item.id).value;
+    final int cartQty = cart.quantity;
+    final bool inCart = cart.inCart;
+
+    return ValueListenableBuilder<Map<String, bool>>(
+      valueListenable: AppSettings.settingsNotifier,
+      builder: (context, _, __) {
+        final showImage = AppSettings.showItemImage;
+        final showPrice = AppSettings.showItemPrice;
+
+        return GestureDetector(
+          onTap: isDisabled ? null : () => onTap(item),
+          child: Stack(
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  color: isDisabled
+                      ? AppColors.surfaceMedium.withOpacity(0.5)
+                      : inCart
+                      ? AppColors.primary.withOpacity(0.04)
+                      : AppColors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  // In-cart items stay calm: a thin accent border + the small green
+                  // "in cart" pill mark them, instead of a heavy fill/glow.
+                  border: Border.all(
+                    color: inCart
+                        ? AppColors.primary.withOpacity(0.45)
+                        : (isDisabled
+                              ? AppColors.divider
+                              : AppColors.divider.withOpacity(0.5)),
+                    width: 1,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Item Image — conditionally shown
+                    if (showImage)
+                      Expanded(
+                        flex: 3,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceMedium,
+                            borderRadius: BorderRadius.vertical(
+                              top: Radius.circular(16),
+                            ),
+                          ),
+                          child: Center(child: buildImage(item)),
+                        ),
+                      ),
+
+                    // Item Details
+                    Expanded(
+                      flex: showImage ? 2 : 1,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    if (item.isVeg != null) ...[
+                                      _buildVegIndicator(item.isVeg),
+                                      const SizedBox(width: 6),
+                                    ],
+                                    Expanded(
+                                      child: Text(
+                                        (item.itemCode != null &&
+                                                item.itemCode!.isNotEmpty)
+                                            ? '${item.itemCode} ${item.name}'
+                                            : item.name,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: GoogleFonts.poppins(
+                                          fontSize: AppResponsive.bodyFontSize(
+                                            context,
+                                          ),
+                                          fontWeight: FontWeight.w600,
+                                          color: isDisabled
+                                              ? AppColors.textSecondary
+                                              : AppColors.textPrimary,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                if (showPrice)
+                                  Text(
+                                    priceLabel,
+                                    style: GoogleFonts.poppins(
+                                      fontSize: AppResponsive.bodyFontSize(
+                                        context,
+                                      ),
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                if (!isDisabled)
+                                  Stack(
+                                    clipBehavior: Clip.none,
+                                    children: [
+                                      Container(
+                                        padding: EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.primary,
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                        ),
+                                        child: Icon(
+                                          Icons.add,
+                                          color: AppColors.white,
+                                          size: 16,
+                                        ),
+                                      ),
+                                      if (inCart)
+                                        Positioned(
+                                          top: -7,
+                                          right: -7,
+                                          child: Container(
+                                            padding: const EdgeInsets.all(3),
+                                            constraints: const BoxConstraints(
+                                              minWidth: 18,
+                                              minHeight: 18,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.accent,
+                                              shape: BoxShape.circle,
+                                              border: Border.all(
+                                                color: Colors.white,
+                                                width: 1.5,
+                                              ),
+                                            ),
+                                            child: Text(
+                                              '$cartQty',
+                                              textAlign: TextAlign.center,
+                                              style: GoogleFonts.poppins(
+                                                fontSize: 9,
+                                                fontWeight: FontWeight.w700,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Positioned(top: 6, right: 6, child: favStar(item)),
+              // "In cart" pill at the top-left mirrors the favourite star.
+              if (inCart)
+                Positioned(
+                  top: 6,
+                  left: 6,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.success,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.check_circle_rounded,
+                          size: 11,
+                          color: Colors.white,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _cartLabel(cart),
+                          style: GoogleFonts.poppins(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+        );
+      },
+    );
+  }
+
+  /// Short cart label for the grid pill: total qty, or variant breakdown when
+  /// the item was added with variants (e.g. "Large ×2, Regular ×1").
+  String _cartLabel(ProductCartState cart) {
+    if (cart.variantBreakdown.isEmpty) return 'In cart · ${cart.quantity}';
+    return cart.variantBreakdown.join(', ');
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // ITEM LIST TILE
 // ═══════════════════════════════════════════════════════════════════════════
-class _ItemListTile extends StatefulWidget {
+/// A [StatefulObserverWidget], not a plain one wrapped in an `Observer`: the
+/// tile's own element carries the MobX reaction, so per-tile cart reactivity
+/// costs no extra element in a list that can mount a thousand tiles at once.
+class _ItemListTile extends StatefulObserverWidget {
   final Items item;
   final VoidCallback onTap;
   final VoidCallback onToggleFavorite;
   final String Function(Items) formatStock;
   final StockStatus Function(Items) getStockStatus;
 
-  /// Cart entries for THIS item (matched by productId). Drives the in-cart
-  /// quantity badge, highlight, and per-variant "in cart" summary.
-  final List<CartItem> cartEntries;
   const _ItemListTile({
     super.key,
     required this.item,
@@ -2141,7 +2462,6 @@ class _ItemListTile extends StatefulWidget {
     required this.onToggleFavorite,
     required this.formatStock,
     required this.getStockStatus,
-    this.cartEntries = const [],
   });
 
   @override
@@ -2155,11 +2475,13 @@ class _ItemListTileState extends State<_ItemListTile> {
   Widget build(BuildContext context) {
     final stockStatus = widget.getStockStatus(widget.item);
     final isDisabled = stockStatus == StockStatus.outOfStock;
-    final int cartQty = widget.cartEntries.fold<int>(
-      0,
-      (s, c) => s + c.quantity,
-    );
-    final bool inCart = cartQty > 0;
+
+    // Read HERE, in the tracked build, so this tile — and only this tile —
+    // rebuilds when its own cart state changes. `cartStateFor` is derived per
+    // product, so adding a different item leaves this tile alone.
+    final cart = restaurantCartStore.cartStateFor(widget.item.id).value;
+    final int cartQty = cart.quantity;
+    final bool inCart = cart.inCart;
 
     return ValueListenableBuilder<Map<String, bool>>(
       valueListenable: AppSettings.settingsNotifier,
@@ -2274,24 +2596,34 @@ class _ItemListTileState extends State<_ItemListTile> {
                       // In-cart summary: total qty, or per-variant breakdown.
                       if (inCart) ...[
                         const SizedBox(height: 6),
-                        _buildCartSummary(),
+                        _buildCartSummary(cart),
                       ],
                     ],
                   ),
                 ),
-                InkWell(
-                  onTap: widget.onToggleFavorite,
-                  borderRadius: BorderRadius.circular(20),
-                  child: Padding(
-                    padding: const EdgeInsets.all(6),
-                    child: Icon(
-                      widget.item.isFavorite
-                          ? Icons.star_rounded
-                          : Icons.star_border_rounded,
-                      size: 22,
-                      color: widget.item.isFavorite
-                          ? Colors.amber
-                          : AppColors.textSecondary,
+                // GestureDetector, not InkWell: the ink response pulled Focus,
+                // Actions and its own ink internals into EVERY tile (~11
+                // widgets each), which is the single heaviest thing a tile
+                // built. Same tap target — `opaque` keeps the 6px padding
+                // tappable the way the ink response did — same icon, same
+                // button semantics; only the ripple is gone. Matches the
+                // grid card's star (`_favStar`), which already works this way.
+                Semantics(
+                  button: true,
+                  child: GestureDetector(
+                    onTap: widget.onToggleFavorite,
+                    behavior: HitTestBehavior.opaque,
+                    child: Padding(
+                      padding: const EdgeInsets.all(6),
+                      child: Icon(
+                        widget.item.isFavorite
+                            ? Icons.star_rounded
+                            : Icons.star_border_rounded,
+                        size: 22,
+                        color: widget.item.isFavorite
+                            ? Colors.amber
+                            : AppColors.textSecondary,
+                      ),
                     ),
                   ),
                 ),
@@ -2360,22 +2692,10 @@ class _ItemListTileState extends State<_ItemListTile> {
   }
 
   /// Compact in-cart summary: "2 in cart" or per-variant "Large ×2, Regular ×1".
-  Widget _buildCartSummary() {
-    final hasVariants = widget.cartEntries.any(
-      (c) => (c.variantName ?? '').isNotEmpty,
-    );
-    final String label;
-    if (hasVariants) {
-      label = widget.cartEntries
-          .map(
-            (c) =>
-                '${(c.variantName ?? '').isNotEmpty ? c.variantName : 'Regular'} ×${c.quantity}',
-          )
-          .join(', ');
-    } else {
-      final qty = widget.cartEntries.fold<int>(0, (s, c) => s + c.quantity);
-      label = '$qty in cart';
-    }
+  Widget _buildCartSummary(ProductCartState cart) {
+    final label = cart.variantBreakdown.isEmpty
+        ? '${cart.quantity} in cart'
+        : cart.variantBreakdown.join(', ');
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
@@ -2472,6 +2792,17 @@ class _ItemListTileState extends State<_ItemListTile> {
       ),
     );
   }
+}
+
+/// Freezes a scroll view without rebuilding it: the list widget stays the same
+/// instance (so its tiles are not rebuilt) and only the inherited behaviour
+/// changes while the menu is filling in.
+class _FrozenScrollBehavior extends ScrollBehavior {
+  const _FrozenScrollBehavior();
+
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) =>
+      const NeverScrollableScrollPhysics();
 }
 
 class _HorizontalCategoryStrip extends StatefulWidget {

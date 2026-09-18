@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:mobx/mobx.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../data/models/restaurant/db/cartmodel_308.dart';
@@ -6,6 +7,43 @@ import '../../../domain/services/restaurant/notification_service.dart';
 import '../../../domain/services/restaurant/inventory_service.dart';
 
 part 'cart_store.g.dart';
+
+/// What the menu needs to know about ONE product's presence in the cart.
+///
+/// Compared by value, which is the whole point: the per-product derivation in
+/// [_CartStore.cartStateFor] only notifies its observers when the value it
+/// produces actually differs, so a cart write rebuilds the tiles of the item
+/// that changed rather than every tile on the menu.
+@immutable
+class ProductCartState {
+  /// Total units of this product across every cart line.
+  final int quantity;
+
+  /// One "Large ×2" label per cart line, in cart order — empty when none of
+  /// the lines carries a variant name, which is what tells the menu to show a
+  /// plain count instead of a breakdown.
+  final List<String> variantBreakdown;
+
+  const ProductCartState({
+    required this.quantity,
+    required this.variantBreakdown,
+  });
+
+  static const ProductCartState empty =
+      ProductCartState(quantity: 0, variantBreakdown: <String>[]);
+
+  bool get inCart => quantity > 0;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ProductCartState &&
+          other.quantity == quantity &&
+          listEquals(other.variantBreakdown, variantBreakdown);
+
+  @override
+  int get hashCode => Object.hash(quantity, Object.hashAll(variantBreakdown));
+}
 
 class CartStoreRes = _CartStore with _$CartStoreRes;
 
@@ -40,6 +78,47 @@ abstract class _CartStore with Store {
 
   @computed
   bool get isNotEmpty => cartItems.isNotEmpty;
+
+  /// One memoised derivation per product id. Sequencing/derivation state only
+  /// — never a cached value: each entry re-reads [cartItems] when asked.
+  final Map<String, Computed<ProductCartState>> _productCartStates = {};
+
+  /// This product's cart state, as a MobX derivation an item tile can observe
+  /// on its own.
+  ///
+  /// Every cart write invalidates every entry here, but MobX only notifies the
+  /// observers whose value CHANGED, so adding one item rebuilds that item's
+  /// tiles instead of the category sections around them. Reading the whole
+  /// `cartItems` list inside a tile would defeat that — the list is one
+  /// observable, so every reader of it reacts to every cart write.
+  Computed<ProductCartState> cartStateFor(String productId) =>
+      _productCartStates.putIfAbsent(
+        productId,
+        () => Computed(
+          () => _cartStateOf(productId),
+          name: 'CartStoreRes.cartStateFor($productId)',
+        ),
+      );
+
+  ProductCartState _cartStateOf(String productId) {
+    var quantity = 0;
+    var hasVariantLine = false;
+    final labels = <String>[];
+    for (final line in cartItems) {
+      if (line.productId != productId) continue;
+      quantity += line.quantity;
+      final variantName = line.variantName ?? '';
+      if (variantName.isNotEmpty) hasVariantLine = true;
+      labels.add('${variantName.isNotEmpty ? variantName : 'Regular'} ×${line.quantity}');
+    }
+    if (quantity == 0) return ProductCartState.empty;
+    return ProductCartState(
+      quantity: quantity,
+      // Mirrors what the menu showed before: a breakdown only once some line
+      // of this product was added with a variant.
+      variantBreakdown: hasVariantLine ? labels : const <String>[],
+    );
+  }
 
   // Actions
   @action

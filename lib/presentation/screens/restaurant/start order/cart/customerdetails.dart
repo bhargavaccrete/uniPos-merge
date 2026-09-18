@@ -1996,11 +1996,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
 
   void _navigateToHome() {
     if (!mounted) return;
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (context) => const Startorder()),
-      (Route<dynamic> route) => false,
-    );
+    returnToStartOrder(context);
   }
 
   Future<void> clearCart() async {
