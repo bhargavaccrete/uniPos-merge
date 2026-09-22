@@ -44,6 +44,15 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
   bool _saving = false;
 
   @override
+  void initState() {
+    super.initState();
+    // RestaurantSupplierStore never self-loads, so the picker would be empty
+    // when this screen is reached without the Suppliers list having been
+    // opened first. Cheap: a Hive read off an already-open box.
+    restaurantSupplierStore.loadSuppliers();
+  }
+
+  @override
   void dispose() {
     _notesController.dispose();
     super.dispose();
@@ -116,7 +125,7 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
           icon: Icons.storefront_rounded,
           body: SizedBox(
             width: double.maxFinite,
-            child: restaurantPurchaseOrderStore.suppliers.isEmpty
+            child: restaurantSupplierStore.suppliers.isEmpty
                 ? const AppEmptyState(
                     dense: true,
                     icon: Icons.storefront_outlined,
@@ -125,12 +134,12 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
                   )
                 : ListView.separated(
                     shrinkWrap: true,
-                    itemCount: restaurantPurchaseOrderStore.suppliers.length,
+                    itemCount: restaurantSupplierStore.suppliers.length,
                     separatorBuilder: (_, __) =>
                         const Divider(height: 1, color: AppColors.divider),
                     itemBuilder: (context, index) {
                       final supplier =
-                          restaurantPurchaseOrderStore.suppliers[index];
+                          restaurantSupplierStore.suppliers[index];
                       final isSelected =
                           _selectedSupplier?.supplierId == supplier.supplierId;
                       return ListTile(
@@ -309,7 +318,7 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
                           return;
                         }
 
-                        final supplier = await restaurantPurchaseOrderStore
+                        final supplier = await restaurantSupplierStore
                             .addSupplier(
                               name: name,
                               phone: phone.isEmpty ? null : phone,

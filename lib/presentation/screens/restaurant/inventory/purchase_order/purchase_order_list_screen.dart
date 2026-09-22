@@ -193,14 +193,10 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen> {
                     maxWidth: AppResponsive.maxContentWidth(context),
                     alignment: Alignment.topCenter,
                     child: pos.isEmpty
-                        ? AppEmptyState(
+                        ? const AppEmptyState(
                             icon: Icons.assignment_outlined,
                             title: 'No purchase orders yet',
                             message: 'Create your first PO using the + button',
-                            action: appEmptyStateAction(
-                              label: 'Create Purchase Order',
-                              onPressed: _navigateToAdd,
-                            ),
                           )
                         : ListView.builder(
                             padding: AppResponsive.padding(context),

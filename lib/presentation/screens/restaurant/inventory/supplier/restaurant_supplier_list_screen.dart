@@ -140,15 +140,11 @@ class _RestaurantSupplierListScreenState
                     maxWidth: AppResponsive.maxContentWidth(context),
                     alignment: Alignment.topCenter,
                     child: all.isEmpty
-                        ? AppEmptyState(
+                        ? const AppEmptyState(
                             icon: Icons.people_alt_rounded,
                             title: 'No suppliers yet',
                             message:
-                                'Add the suppliers you buy raw materials from, then raise purchase orders against them.',
-                            action: appEmptyStateAction(
-                              label: 'Add Supplier',
-                              onPressed: _addSupplier,
-                            ),
+                                'Add the suppliers you buy raw materials from using the Add Supplier button, then raise purchase orders against them.',
                           )
                         : visible.isEmpty
                         ? const AppEmptyState(

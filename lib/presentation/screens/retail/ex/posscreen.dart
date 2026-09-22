@@ -175,15 +175,31 @@ class RetailPosScreen extends StatefulWidget {
 
 class _RetailPosScreenState extends State<RetailPosScreen> {
   final TextEditingController _searchController = TextEditingController();
-  List<ProductModel> _searchResults = [];
-  bool _showSearchResults = false;
+
+  /// Search hits, and the category filter, as NOTIFIERS rather than `setState`
+  /// fields.
+  ///
+  /// Both only affect the search/browse pane, but `setState` rebuilds the whole
+  /// POS — the tab strip, every visible cart line (each one ~470 lines of
+  /// widget code) and the summary — on every keystroke, every chip tap and
+  /// every add to cart (which calls [_clearSearch]). Re-creating the cart-side
+  /// `Observer`s that way re-runs their builders too, so being observers buys
+  /// them no protection from a parent rebuild. Driving the left pane from a
+  /// notifier keeps the right pane out of these three paths entirely.
+  ///
+  /// "Show results" is DERIVED from this list being non-empty — the same rule
+  /// the old `_showSearchResults` field was assigned, so a query that matches
+  /// nothing still falls back to the browse pane.
+  final ValueNotifier<List<ProductModel>> _searchResults =
+      ValueNotifier<List<ProductModel>>(const []);
+
+  /// Category filter for the browse pane. Null means "All".
+  final ValueNotifier<String?> _browseCategoryId = ValueNotifier<String?>(null);
+
   bool _isInitialized = false;
   bool _isScannerActive = false;
   String? _lastScannedBarcode;
   DateTime? _lastScanTime;
-
-  /// Category filter for the browse pane. Null means "All".
-  String? _browseCategoryId;
 
   MobileScannerController? _scannerController;
 
@@ -548,32 +564,24 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _searchResults.dispose();
+    _browseCategoryId.dispose();
     _scannerController?.dispose();
     super.dispose();
   }
 
   Future<void> _onSearchChanged(String query) async {
     if (query.isEmpty) {
-      setState(() {
-        _searchResults = [];
-        _showSearchResults = false;
-      });
+      _searchResults.value = const [];
       return;
     }
 
-    final results = await productStore.searchProducts(query);
-    setState(() {
-      _searchResults = results;
-      _showSearchResults = results.isNotEmpty;
-    });
+    _searchResults.value = await productStore.searchProducts(query);
   }
 
   void _clearSearch() {
     _searchController.clear();
-    setState(() {
-      _searchResults = [];
-      _showSearchResults = false;
-    });
+    _searchResults.value = const [];
   }
 
   /// Gate on expired goods, asked once per add.
@@ -1037,19 +1045,40 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
     );
   }
 
+  /// Mobile is one column, so search results genuinely replace the cart here —
+  /// but the summary below still has nothing to do with them, so it stays
+  /// OUTSIDE the builder.
   Widget _buildMobileLayout(BuildContext context) {
     return Column(
       children: [
         _buildSearchBarWithScanner(context),
-        if (!_showSearchResults) _buildTabBar(),
-        if (_showSearchResults)
-          _buildSearchResults()
-        else ...[
-          if (_isScannerActive) _buildScannerContainer(),
-          Expanded(child: _buildCartTable(context)),
-        ],
+        Expanded(
+          child: _buildSearchOrElse(
+            (context) => Column(
+              children: [
+                _buildTabBar(),
+                if (_isScannerActive) _buildScannerContainer(),
+                Expanded(child: _buildCartTable(context)),
+              ],
+            ),
+          ),
+        ),
         _buildSimpleSummary(context),
       ],
+    );
+  }
+
+  /// Search hits when there are any, [otherwise] when there are not.
+  ///
+  /// The ONE place the search notifier is listened to. Callers put it under an
+  /// [Expanded] — the results list fills whatever box it is handed rather than
+  /// returning an `Expanded` of its own, so the same builder drops into a pane
+  /// (tablet/desktop) or into the main column (mobile).
+  Widget _buildSearchOrElse(WidgetBuilder otherwise) {
+    return ValueListenableBuilder<List<ProductModel>>(
+      valueListenable: _searchResults,
+      builder: (context, results, _) =>
+          results.isEmpty ? otherwise(context) : _buildSearchResults(results),
     );
   }
 
@@ -1061,15 +1090,14 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
           child: Column(
             children: [
               _buildSearchBarWithScanner(context),
-              if (_showSearchResults)
-                _buildSearchResults()
-              else
-                Expanded(
-                  child: Container(
+              Expanded(
+                child: _buildSearchOrElse(
+                  (context) => Container(
                     color: AppColors.white,
                     child: _buildBrowsePane(context),
                   ),
                 ),
+              ),
             ],
           ),
         ),
@@ -1126,10 +1154,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
                   thickness: 0.5,
                   color: AppColors.divider,
                 ),
-                if (_showSearchResults)
-                  _buildSearchResults()
-                else
-                  Expanded(child: _buildBrowsePane(context)),
+                Expanded(child: _buildSearchOrElse(_buildBrowsePane)),
               ],
             ),
           ),
@@ -1370,29 +1395,44 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Expanded(
-            // AppTextField also routes through the on-screen VisualKeyboard
-            // when that setting is on — the raw field here never did, so
-            // retail cashiers silently lost a feature restaurant has.
-            child: AppTextField(
-              controller: _searchController,
-              hint: 'Search product or enter barcode...',
-              icon: Icons.search,
-              onChanged: _onSearchChanged,
-              onFieldSubmitted: (value) async {
-                if (value.isNotEmpty) {
-                  await _handleBarcodeScanned(value);
-                }
-              },
-              suffixIcon: _searchController.text.isNotEmpty
-                  ? IconButton(
-                      icon: Icon(
-                        Icons.clear,
-                        color: AppColors.textSecondary,
-                        size: AppResponsive.smallIconSize(context),
-                      ),
-                      onPressed: _clearSearch,
-                    )
-                  : null,
+            // Driven by the CONTROLLER, not by screen state: the clear button
+            // used to appear only because _onSearchChanged called setState, and
+            // that setState is exactly what this pass removed. A
+            // TextEditingController is itself a ValueNotifier, so the field
+            // tracks its own text.
+            //
+            // The whole field is rebuilt rather than just the icon, because
+            // `suffixIcon` must stay NULL when there is no text — a non-null
+            // placeholder would reserve Material's 48x48 suffix box and eat
+            // that much width off an empty search bar.
+            child: ValueListenableBuilder<TextEditingValue>(
+              valueListenable: _searchController,
+              builder: (context, value, _) =>
+                  // AppTextField also routes through the on-screen
+                  // VisualKeyboard when that setting is on — the raw field here
+                  // never did, so retail cashiers silently lost a feature
+                  // restaurant has.
+                  AppTextField(
+                    controller: _searchController,
+                    hint: 'Search product or enter barcode...',
+                    icon: Icons.search,
+                    onChanged: _onSearchChanged,
+                    onFieldSubmitted: (submitted) async {
+                      if (submitted.isNotEmpty) {
+                        await _handleBarcodeScanned(submitted);
+                      }
+                    },
+                    suffixIcon: value.text.isEmpty
+                        ? null
+                        : IconButton(
+                            icon: Icon(
+                              Icons.clear,
+                              color: AppColors.textSecondary,
+                              size: AppResponsive.smallIconSize(context),
+                            ),
+                            onPressed: _clearSearch,
+                          ),
+                  ),
             ),
           ),
           SizedBox(width: AppResponsive.smallSpacing(context)),
@@ -1419,56 +1459,57 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
     );
   }
 
-  Widget _buildSearchResults() {
-    return Expanded(
-      child: Container(
-        color: AppColors.white,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: AppResponsive.padding(context).left,
-                vertical: AppResponsive.smallSpacing(context),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    '${_searchResults.length} products found',
+  /// Takes its [results] rather than reading the notifier, so the one listener
+  /// in [_buildSearchOrElse] stays the only subscription. Returns a plain box,
+  /// NOT an `Expanded` — the caller decides how it is sized.
+  Widget _buildSearchResults(List<ProductModel> results) {
+    return Container(
+      color: AppColors.white,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: AppResponsive.padding(context).left,
+              vertical: AppResponsive.smallSpacing(context),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '${results.length} products found',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.smallFontSize(context),
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                TextButton(
+                  onPressed: _clearSearch,
+                  child: Text(
+                    'Back to Cart',
                     style: GoogleFonts.poppins(
                       fontSize: AppResponsive.smallFontSize(context),
-                      color: AppColors.textSecondary,
+                      color: AppColors.primary,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                  TextButton(
-                    onPressed: _clearSearch,
-                    child: Text(
-                      'Back to Cart',
-                      style: GoogleFonts.poppins(
-                        fontSize: AppResponsive.smallFontSize(context),
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-            const Divider(height: 1, thickness: 0.5, color: AppColors.divider),
-            Expanded(
-              child: ListView.builder(
-                padding: AppResponsive.cardPadding(context),
-                itemCount: _searchResults.length,
-                itemBuilder: (context, index) {
-                  final product = _searchResults[index];
-                  return _buildProductSearchItem(product);
-                },
-              ),
+          ),
+          const Divider(height: 1, thickness: 0.5, color: AppColors.divider),
+          Expanded(
+            child: ListView.builder(
+              padding: AppResponsive.cardPadding(context),
+              itemCount: results.length,
+              itemBuilder: (context, index) {
+                final product = results[index];
+                return _buildProductSearchItem(product);
+              },
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -1666,16 +1707,29 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
             .where((c) => usedIds.contains(c.id))
             .toList();
 
-        final visible = _browseCategoryId == null
-            ? products.toList()
-            : products.where((p) => p.category == _browseCategoryId).toList();
+        // The filter sits INSIDE the Observer: a chip tap then rebuilds only
+        // this strip and grid, not the catalogue scan above it and not the cart
+        // pane beside it. Catalogue edits still land, because they rebuild the
+        // Observer, which rebuilds this.
+        return ValueListenableBuilder<String?>(
+          valueListenable: _browseCategoryId,
+          builder: (context, categoryId, _) {
+            final visible = categoryId == null
+                ? products.toList()
+                : products.where((p) => p.category == categoryId).toList();
 
-        return Column(
-          children: [
-            _buildBrowseChips(context, categories),
-            const Divider(height: 1, thickness: 0.5, color: AppColors.divider),
-            Expanded(child: _buildBrowseGrid(context, visible)),
-          ],
+            return Column(
+              children: [
+                _buildBrowseChips(context, categories, categoryId),
+                const Divider(
+                  height: 1,
+                  thickness: 0.5,
+                  color: AppColors.divider,
+                ),
+                Expanded(child: _buildBrowseGrid(context, visible)),
+              ],
+            );
+          },
         );
       },
     );
@@ -1683,15 +1737,19 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
 
   /// Category filter strip. Deliberately styled like the cart tab chips —
   /// same radius, padding and 160px cap — so the two strips read as one family.
-  Widget _buildBrowseChips(BuildContext context, List<Category> categories) {
+  Widget _buildBrowseChips(
+    BuildContext context,
+    List<Category> categories,
+    String? selectedId,
+  ) {
     Widget chip(String label, String? id) {
-      final selected = _browseCategoryId == id;
+      final selected = selectedId == id;
       return Padding(
         padding: const EdgeInsets.only(right: 6),
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            onTap: () => setState(() => _browseCategoryId = id),
+            onTap: () => _browseCategoryId.value = id,
             borderRadius: BorderRadius.circular(10),
             child: Container(
               constraints: const BoxConstraints(maxWidth: 160),

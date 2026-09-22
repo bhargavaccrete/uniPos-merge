@@ -42,8 +42,13 @@ class RestaurantGRNItemModel extends HiveObject {
   @HiveField(9)
   final double? costPrice; // per unit, becomes item.lastPurchaseCost
 
+  /// What the supplier invoices for this line: `receivedQty * costPrice` —
+  /// everything delivered, damaged units included. Damaged value is recovered
+  /// afterwards through a return credit note or a settled claim, never by
+  /// shrinking the original bill, so this must stay the BILLED figure and not
+  /// the accepted one. See [acceptedAmount] for inventory value.
   @HiveField(10)
-  final double? totalAmount; // acceptedQty * costPrice
+  final double? totalAmount;
 
   @HiveField(11)
   final String? remarks;
@@ -101,7 +106,7 @@ class RestaurantGRNItemModel extends HiveObject {
       acceptedQty: acceptedQty,
       damagedQty: damagedQty,
       costPrice: costPrice,
-      totalAmount: costPrice != null ? acceptedQty * costPrice : null,
+      totalAmount: costPrice != null ? receivedQty * costPrice : null,
       remarks: remarks,
       createdAt: DateTime.now().toIso8601String(),
       damagedHandling: damagedHandling,
@@ -110,6 +115,15 @@ class RestaurantGRNItemModel extends HiveObject {
 
   double get shortageQty => orderedQty - receivedQty;
   double get goodQty => receivedQty - (damagedQty ?? 0);
+
+  /// Value of the units that actually entered stock. This is inventory value,
+  /// NOT what the supplier is owed — see [totalAmount] for that. The two
+  /// differ by exactly `damagedQty * costPrice`.
+  double get acceptedAmount => acceptedQty * (costPrice ?? 0);
+
+  /// Value of the damaged units — the amount a return credit note or a
+  /// settled claim recovers from the supplier balance.
+  double get damagedAmount => (damagedQty ?? 0) * (costPrice ?? 0);
 
   Map<String, dynamic> toMap() => {
         'grnItemId': grnItemId,

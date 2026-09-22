@@ -2,7 +2,6 @@ import 'package:mobx/mobx.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:billberrylite/core/di/service_locator.dart';
-import 'package:billberrylite/data/models/restaurant/db/restaurant_supplier_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/restaurant_supplier_ledger_entry_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/restaurant_purchase_order_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/restaurant_purchase_order_item_model.dart';
@@ -54,9 +53,11 @@ abstract class _RestaurantPurchaseOrderStore with Store {
 
   // ==================== OBSERVABLES ====================
 
-  @observable
-  ObservableList<RestaurantSupplierModel> suppliers =
-      ObservableList<RestaurantSupplierModel>();
+  // NOTE: suppliers are NOT mirrored here. This store used to keep its own
+  // ObservableList copy, refreshed only by its own inline "add supplier",
+  // so a supplier created from the Suppliers screen never appeared in the
+  // Add PO picker. RestaurantSupplierStore.suppliers is the single source
+  // of truth — read it directly.
 
   @observable
   ObservableList<RestaurantPurchaseOrderModel> purchaseOrders =
@@ -72,7 +73,6 @@ abstract class _RestaurantPurchaseOrderStore with Store {
   String? errorMessage;
 
   _RestaurantPurchaseOrderStore() {
-    loadSuppliers();
     loadPurchaseOrders();
     loadGRNs();
   }
@@ -80,15 +80,14 @@ abstract class _RestaurantPurchaseOrderStore with Store {
   // ==================== LOADERS ====================
 
   @action
-  Future<void> loadSuppliers() async {
-    final loaded = restaurantSupplierRepository.getAllSuppliers();
-    suppliers.clear();
-    suppliers.addAll(loaded);
-  }
-
-  @action
   Future<void> loadPurchaseOrders() async {
-    final loaded = restaurantPurchaseOrderRepository.getAllPurchaseOrders();
+    // Newest first. The box returns insertion order, so without this a reload
+    // (screen open, GRN confirm) pushed the newest PO to the BOTTOM, undoing
+    // the `insert(0, po)` that createPurchaseOrder does. Same ordering rule
+    // and the same ISO-8601 string compare the repository already uses for
+    // getPurchaseOrdersBySupplier.
+    final loaded = restaurantPurchaseOrderRepository.getAllPurchaseOrders()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     purchaseOrders.clear();
     purchaseOrders.addAll(loaded);
   }
@@ -98,31 +97,6 @@ abstract class _RestaurantPurchaseOrderStore with Store {
     final loaded = restaurantGrnRepository.getAllGRNs();
     grns.clear();
     grns.addAll(loaded);
-  }
-
-  // ==================== SUPPLIERS ====================
-
-  /// Inline "add supplier" from the Add PO screen.
-  ///
-  /// Delegates to [RestaurantSupplierStore] so there is a single creation path —
-  /// that store owns opening-balance handling and the ledger's `opening` row.
-  @action
-  Future<RestaurantSupplierModel> addSupplier({
-    required String name,
-    String? phone,
-    String? address,
-    String? gstNumber,
-    double openingBalance = 0,
-  }) async {
-    final supplier = await restaurantSupplierStore.addSupplier(
-      name: name,
-      phone: phone,
-      address: address,
-      gstNumber: gstNumber,
-      openingBalance: openingBalance,
-    );
-    await loadSuppliers();
-    return supplier;
   }
 
   // ==================== PURCHASE ORDERS ====================
@@ -217,8 +191,15 @@ abstract class _RestaurantPurchaseOrderStore with Store {
           lines.fold<double>(0, (sum, l) => sum + l.orderedQty);
       final totalReceivedQty =
           lines.fold<double>(0, (sum, l) => sum + l.receivedQty);
+      // BILLABLE, not accepted: the supplier invoices for everything they
+      // delivered, damaged units included. Accruing only the accepted value
+      // under-states the payable, and a return credit note or a settled claim
+      // — both of which credit `damagedQty * costPrice` — then pushes the
+      // balance BELOW what is actually owed. Receiving 10 of which 2 are
+      // damaged must accrue 10 and credit 2, leaving 8; accruing 8 and
+      // crediting 2 left 6. Retail bills received for the same reason.
       final totalAmount = lines.fold<double>(
-          0, (sum, l) => sum + (l.acceptedQty * (l.costPrice ?? 0)));
+          0, (sum, l) => sum + (l.receivedQty * (l.costPrice ?? 0)));
 
       final grn = RestaurantGRNModel.create(
         poId: poId,

@@ -118,29 +118,13 @@ class _RestaurantStockTakeListScreenState
                 child: CircularProgressIndicator(color: AppColors.primary),
               );
             } else if (takes.isEmpty) {
-              content = AppEmptyState(
+              content = const AppEmptyState(
                 icon: Icons.fact_check_outlined,
                 title: 'No stock takes yet',
                 message:
                     'Count your raw materials and apply the variances '
-                    'in one go, instead of correcting items one at a time.',
-                action: ElevatedButton.icon(
-                  onPressed: _startTake,
-                  icon: const Icon(Icons.add),
-                  label: const Text('Start Stock Take'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: AppColors.white,
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 13,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
+                    'in one go, instead of correcting items one at a time. '
+                    'Start one with the New Count button.',
               );
             } else {
               content = ListView.builder(
@@ -189,19 +173,17 @@ class _RestaurantStockTakeListScreenState
           },
         ),
       ),
-      floatingActionButton: Observer(
-        builder: (context) => restaurantStockTakeStore.takes.isEmpty
-            ? const SizedBox.shrink()
-            : FloatingActionButton.extended(
-                onPressed: _startTake,
-                backgroundColor: AppColors.primary,
-                foregroundColor: AppColors.white,
-                icon: const Icon(Icons.add),
-                label: Text(
-                  'New Count',
-                  style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
-                ),
-              ),
+      // Always visible — it is the only way to start a count now that the
+      // empty state no longer carries its own button.
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _startTake,
+        backgroundColor: AppColors.primary,
+        foregroundColor: AppColors.white,
+        icon: const Icon(Icons.add),
+        label: Text(
+          'New Count',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+        ),
       ),
     );
   }

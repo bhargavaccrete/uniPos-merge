@@ -18,22 +18,6 @@ mixin _$RestaurantPurchaseOrderStore on _RestaurantPurchaseOrderStore, Store {
               name: '_RestaurantPurchaseOrderStore.receivablePOs'))
           .value;
 
-  late final _$suppliersAtom =
-      Atom(name: '_RestaurantPurchaseOrderStore.suppliers', context: context);
-
-  @override
-  ObservableList<RestaurantSupplierModel> get suppliers {
-    _$suppliersAtom.reportRead();
-    return super.suppliers;
-  }
-
-  @override
-  set suppliers(ObservableList<RestaurantSupplierModel> value) {
-    _$suppliersAtom.reportWrite(value, super.suppliers, () {
-      super.suppliers = value;
-    });
-  }
-
   late final _$purchaseOrdersAtom = Atom(
       name: '_RestaurantPurchaseOrderStore.purchaseOrders', context: context);
 
@@ -98,15 +82,6 @@ mixin _$RestaurantPurchaseOrderStore on _RestaurantPurchaseOrderStore, Store {
     });
   }
 
-  late final _$loadSuppliersAsyncAction = AsyncAction(
-      '_RestaurantPurchaseOrderStore.loadSuppliers',
-      context: context);
-
-  @override
-  Future<void> loadSuppliers() {
-    return _$loadSuppliersAsyncAction.run(() => super.loadSuppliers());
-  }
-
   late final _$loadPurchaseOrdersAsyncAction = AsyncAction(
       '_RestaurantPurchaseOrderStore.loadPurchaseOrders',
       context: context);
@@ -123,25 +98,6 @@ mixin _$RestaurantPurchaseOrderStore on _RestaurantPurchaseOrderStore, Store {
   @override
   Future<void> loadGRNs() {
     return _$loadGRNsAsyncAction.run(() => super.loadGRNs());
-  }
-
-  late final _$addSupplierAsyncAction = AsyncAction(
-      '_RestaurantPurchaseOrderStore.addSupplier',
-      context: context);
-
-  @override
-  Future<RestaurantSupplierModel> addSupplier(
-      {required String name,
-      String? phone,
-      String? address,
-      String? gstNumber,
-      double openingBalance = 0}) {
-    return _$addSupplierAsyncAction.run(() => super.addSupplier(
-        name: name,
-        phone: phone,
-        address: address,
-        gstNumber: gstNumber,
-        openingBalance: openingBalance));
   }
 
   late final _$createPurchaseOrderAsyncAction = AsyncAction(
@@ -212,7 +168,6 @@ mixin _$RestaurantPurchaseOrderStore on _RestaurantPurchaseOrderStore, Store {
   @override
   String toString() {
     return '''
-suppliers: ${suppliers},
 purchaseOrders: ${purchaseOrders},
 grns: ${grns},
 isLoading: ${isLoading},

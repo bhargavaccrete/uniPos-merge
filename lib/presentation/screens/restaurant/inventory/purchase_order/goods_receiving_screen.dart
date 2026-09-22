@@ -790,8 +790,11 @@ class _GoodsReceivingScreenState extends State<GoodsReceivingScreen> {
                         ),
                       ),
                     ),
+                  // Billed value — everything received, damaged included.
+                  // Matches what confirming this GRN accrues against the
+                  // supplier, so the line and the balance can't disagree.
                   Text(
-                    formatMoney(line.acceptedQty * line.costPrice),
+                    formatMoney(line.receivedQty * line.costPrice),
                     style: GoogleFonts.poppins(
                       fontSize: AppResponsive.bodyFontSize(context),
                       fontWeight: FontWeight.w600,

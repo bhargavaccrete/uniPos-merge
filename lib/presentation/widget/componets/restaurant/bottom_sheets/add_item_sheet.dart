@@ -27,6 +27,7 @@ import 'veg_selector_sheet.dart';
 import 'widgets/category_selector_button.dart';
 import 'widgets/tax_selector_button.dart';
 import 'widgets/inventory_toggle.dart';
+import 'widgets/product_type_selector.dart';
 import 'widgets/selling_method_selector.dart'
     show SellingMethodSheet, SellingMethodButton;
 
@@ -560,42 +561,7 @@ class _AddItemSheetState extends State<AddItemSheet> {
 
   // ── Product Type selector ─────────────────────────────────────────────────
 
-  static const List<
-    ({String type, IconData icon, Color color, String label, String desc})
-  >
-  _productTypeOptions = [
-    (
-      type: ProductType.finishedGood,
-      icon: Icons.inventory_2_rounded,
-      color: AppColors.info,
-      label: 'Finished Good',
-      desc: 'Ready to sell as-is',
-    ),
-    (
-      type: ProductType.recipeBased,
-      icon: Icons.lunch_dining_rounded,
-      color: AppColors.accent,
-      label: 'Recipe-Based',
-      desc: 'Assembled from a recipe when sold',
-    ),
-    (
-      type: ProductType.rawMaterial,
-      icon: Icons.grass_rounded,
-      color: AppColors.success,
-      label: 'Raw Material',
-      desc: 'Ingredient — bought & stocked',
-    ),
-    (
-      type: ProductType.semiFinished,
-      icon: Icons.soup_kitchen_rounded,
-      color: AppColors.secondary,
-      label: 'Semi-Finished',
-      desc: 'Prepped in batches',
-    ),
-  ];
-
   Widget _buildProductTypeSelector() {
-    final hasRecipe = ProductType.hasRecipe(_formState.productType);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -618,157 +584,14 @@ class _AddItemSheetState extends State<AddItemSheet> {
           ],
         ),
         SizedBox(height: AppResponsive.smallSpacing(context)),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            const gap = 10.0;
-            final cardWidth = (constraints.maxWidth - gap) / 2;
-            return Wrap(
-              spacing: gap,
-              runSpacing: gap,
-              children: _productTypeOptions
-                  .map(
-                    (o) =>
-                        SizedBox(width: cardWidth, child: _productTypeCard(o)),
-                  )
-                  .toList(),
-            );
-          },
+        // Shared with edit_item.dart so Add and Edit can't drift apart.
+        // The recipe hint is this sheet's own: it has no recipe builder.
+        ProductTypeSelector(
+          selectedType: _formState.productType,
+          onChanged: (type) => setState(() => _formState.setProductType(type)),
+          showRecipeHint: true,
         ),
-        if (hasRecipe) ...[
-          SizedBox(height: AppResponsive.mediumSpacing(context)),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  AppColors.accent.withValues(alpha: 0.12),
-                  AppColors.accent.withValues(alpha: 0.04),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(
-                AppResponsive.borderRadius(context),
-              ),
-              border: Border.all(
-                color: AppColors.accent.withValues(alpha: 0.25),
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.auto_awesome_rounded,
-                  size: AppResponsive.smallIconSize(context),
-                  color: AppColors.accent,
-                ),
-                SizedBox(width: AppResponsive.smallSpacing(context)),
-                Expanded(
-                  child: Text(
-                    'Save the item first, then open it to build its recipe (ingredients, yield & live food cost).',
-                    style: GoogleFonts.poppins(
-                      fontSize: AppResponsive.captionFontSize(context),
-                      color: AppColors.textPrimary,
-                      height: 1.3,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ],
-    );
-  }
-
-  Widget _productTypeCard(
-    ({String type, IconData icon, Color color, String label, String desc}) o,
-  ) {
-    final bool selected = _formState.productType == o.type;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(
-          AppResponsive.borderRadius(context),
-        ),
-        onTap: () => setState(() => _formState.setProductType(o.type)),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          padding: const EdgeInsets.all(11),
-          decoration: BoxDecoration(
-            color: selected
-                ? o.color.withValues(alpha: 0.10)
-                : AppColors.surfaceLight,
-            borderRadius: BorderRadius.circular(
-              AppResponsive.borderRadius(context),
-            ),
-            border: Border.all(
-              color: selected ? o.color : AppColors.divider,
-              width: selected ? 1.5 : 1,
-            ),
-            boxShadow: selected
-                ? [
-                    BoxShadow(
-                      color: o.color.withValues(alpha: 0.18),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ]
-                : null,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(7),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          o.color,
-                          Color.lerp(o.color, Colors.black, 0.2) ?? o.color,
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(9),
-                    ),
-                    child: Icon(o.icon, size: 15, color: Colors.white),
-                  ),
-                  const Spacer(),
-                  Icon(
-                    selected
-                        ? Icons.check_circle_rounded
-                        : Icons.circle_outlined,
-                    size: AppResponsive.smallIconSize(context),
-                    color: selected ? o.color : AppColors.divider,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 9),
-              Text(
-                o.label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.poppins(
-                  fontSize: AppResponsive.smallFontSize(context),
-                  fontWeight: FontWeight.w700,
-                  color: selected ? o.color : AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                o.desc,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.poppins(
-                  fontSize: 10.5,
-                  height: 1.25,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 

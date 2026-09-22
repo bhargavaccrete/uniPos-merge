@@ -31,6 +31,7 @@ import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sh
 import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/widgets/category_selector_button.dart';
 import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/widgets/tax_selector_button.dart';
 import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/widgets/inventory_toggle.dart';
+import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/widgets/product_type_selector.dart';
 import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/image_picker_sheet.dart';
 import '../../../../../data/models/restaurant/db/choicemodel_306.dart';
 import '../../../../../data/models/restaurant/db/extramodel_303.dart';
@@ -44,7 +45,6 @@ import '../../../../../data/models/restaurant/db/variantmodel_305.dart';
 import '../../../../../data/models/restaurant/db/product_type.dart';
 import '../../../../../data/models/restaurant/db/recipe_model.dart';
 import '../../../../widget/componets/restaurant/recipe_builder_widget.dart';
-import '../../../../widget/componets/restaurant/componets/dropdown.dart';
 
 // Helper class to hold all the data needed for the screen
 class EditScreenData {
@@ -798,14 +798,10 @@ class _EdititemScreenState extends State<EdititemScreen> {
             if (PlanEnforce.allows(EntKeys.inventory)) ...[
               _buildSectionHeader('Product Type', Icons.category_rounded),
               SizedBox(height: AppResponsive.largeSpacing(context)),
-              Dropdown(
-                items: ProductType.all.map(ProductType.displayName).toList(),
-                selectedItem: ProductType.displayName(_productType),
-                onChanged: (label) {
-                  final type = ProductType.all.firstWhere(
-                    (t) => ProductType.displayName(t) == label,
-                    orElse: () => ProductType.finishedGood,
-                  );
+              // Same control as the quick-add sheet — see ProductTypeSelector.
+              ProductTypeSelector(
+                selectedType: _productType,
+                onChanged: (type) {
                   setState(() {
                     _productType = type;
                     // Switching away from a recipe type drops the in-progress
