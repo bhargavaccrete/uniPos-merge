@@ -7,6 +7,8 @@ import 'package:billberrylite/presentation/widget/componets/common/app_dialog.da
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/common/list_sort_button.dart';
+import 'package:billberrylite/domain/services/common/list_sort_service.dart';
 import 'package:billberrylite/data/models/restaurant/db/toppingmodel_304.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/util/images.dart';
@@ -1161,39 +1163,55 @@ class _ExtraTabState extends State<ExtraTab>
 
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      body: Column(
-        children: [
-          // Modern Search Bar
-          Padding(
-            padding: AppResponsive.padding(context),
-            child: AppTextField(
-              controller: _searchController,
-              hint: 'Search extras…',
-              icon: Icons.search_rounded,
-              suffixIcon: query.isNotEmpty
-                  ? IconButton(
-                      icon: Icon(
-                        Icons.clear,
-                        color: Colors.grey,
-                        size: AppResponsive.iconSize(context),
+      body: ListenableBuilder(
+        listenable: ListSortService.instance,
+        builder: (context, _) => Column(
+          children: [
+            // Modern Search Bar
+            Padding(
+              padding: AppResponsive.padding(context),
+              // IntrinsicHeight + stretch sizes the sort button to match
+              // AppTextField's height without hardcoding it.
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: AppTextField(
+                        controller: _searchController,
+                        hint: 'Search extras…',
+                        icon: Icons.search_rounded,
+                        suffixIcon: query.isNotEmpty
+                            ? IconButton(
+                                icon: Icon(
+                                  Icons.clear,
+                                  color: Colors.grey,
+                                  size: AppResponsive.iconSize(context),
+                                ),
+                                onPressed: () {
+                                  _searchController.clear();
+                                },
+                              )
+                            : null,
                       ),
-                      onPressed: () {
-                        _searchController.clear();
-                      },
-                    )
-                  : null,
+                    ),
+                    SizedBox(width: AppResponsive.smallSpacing(context)),
+                    const ListSortButton(list: SortableList.extras),
+                  ],
+                ),
+              ),
             ),
-          ),
 
-          // Extras List
-          Expanded(
-            child: isTablet
-                ? _buildTabletLayout(size)
-                : _buildMobileLayout(size),
-          ),
+            // Extras List
+            Expanded(
+              child: isTablet
+                  ? _buildTabletLayout(size)
+                  : _buildMobileLayout(size),
+            ),
 
-          if (_canAddExtra) _buildAddButton(),
-        ],
+            if (_canAddExtra) _buildAddButton(),
+          ],
+        ),
       ),
     );
   }
@@ -1261,15 +1279,25 @@ class _ExtraTabState extends State<ExtraTab>
     );
   }
 
+  /// Both layouts route through here, so the sort is applied once. Extra's
+  /// name field is `Ename`, which the generic sorter handles via the
+  /// caller-supplied accessor — no model change needed.
   List<Extramodel> _getFilteredExtras() {
     final allExtras = extraStore.extras.toList();
-    return query.isEmpty
+    final filtered = query.isEmpty
         ? allExtras
         : allExtras.where((extra) {
             final name = extra.Ename.toLowerCase();
             final queryLower = query.toLowerCase();
             return name.contains(queryLower);
           }).toList();
+
+    return applySort(
+      filtered,
+      ListSortService.instance.optionFor(SortableList.extras),
+      nameOf: (extra) => extra.Ename,
+      createdAtOf: (extra) => extra.createdTime,
+    );
   }
 
   Widget _buildEmptyState(double height) {

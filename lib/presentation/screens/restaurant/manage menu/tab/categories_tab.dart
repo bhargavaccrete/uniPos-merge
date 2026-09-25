@@ -7,6 +7,8 @@ import 'package:billberrylite/core/plan/entitlement_keys.dart';
 import 'package:billberrylite/core/plan/plan_guard.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/add_category_dialog.dart';
+import 'package:billberrylite/presentation/widget/componets/common/list_sort_button.dart';
+import 'package:billberrylite/domain/services/common/list_sort_service.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
@@ -75,40 +77,56 @@ class _CategoryTabState extends State<CategoryTab>
 
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      body: Column(
-        children: [
-          // Modern Search Bar
-          Padding(
-            padding: AppResponsive.padding(context),
-            child: AppTextField(
-              controller: _searchController,
-              hint: 'Search categories…',
-              icon: Icons.search_rounded,
-              suffixIcon: query.isNotEmpty
-                  ? IconButton(
-                      icon: Icon(
-                        Icons.clear,
-                        color: Colors.grey,
-                        size: AppResponsive.iconSize(context),
+      body: ListenableBuilder(
+        listenable: ListSortService.instance,
+        builder: (context, _) => Column(
+          children: [
+            // Modern Search Bar
+            Padding(
+              padding: AppResponsive.padding(context),
+              // IntrinsicHeight + stretch sizes the sort button to match
+              // AppTextField's height without hardcoding it.
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: AppTextField(
+                        controller: _searchController,
+                        hint: 'Search categories…',
+                        icon: Icons.search_rounded,
+                        suffixIcon: query.isNotEmpty
+                            ? IconButton(
+                                icon: Icon(
+                                  Icons.clear,
+                                  color: Colors.grey,
+                                  size: AppResponsive.iconSize(context),
+                                ),
+                                onPressed: () {
+                                  _searchController.clear();
+                                },
+                              )
+                            : null,
                       ),
-                      onPressed: () {
-                        _searchController.clear();
-                      },
-                    )
-                  : null,
+                    ),
+                    SizedBox(width: AppResponsive.smallSpacing(context)),
+                    const ListSortButton(list: SortableList.categories),
+                  ],
+                ),
+              ),
             ),
-          ),
 
-          // Categories List
-          Expanded(
-            child: isTablet
-                ? _buildTabletLayout(size)
-                : _buildMobileLayout(size),
-          ),
+            // Categories List
+            Expanded(
+              child: isTablet
+                  ? _buildTabletLayout(size)
+                  : _buildMobileLayout(size),
+            ),
 
-          // Add Category Button — admin/manager (plan enforced on tap).
-          if (_canEdit) _buildAddButton(),
-        ],
+            // Add Category Button — admin/manager (plan enforced on tap).
+            if (_canEdit) _buildAddButton(),
+          ],
+        ),
       ),
     );
   }
@@ -188,14 +206,25 @@ class _CategoryTabState extends State<CategoryTab>
     );
   }
 
+  /// Both layouts route through here, so the sort is applied once. The sort
+  /// is read from the service rather than passed in because this helper has
+  /// two call sites and the surrounding `ListenableBuilder` already
+  /// guarantees a rebuild when the preference changes.
   List<Category> _getFilteredCategories(List<Category> categories) {
-    return query.isEmpty
+    final filtered = query.isEmpty
         ? categories
         : categories.where((cat) {
             final name = cat.name.toLowerCase();
             final queryLower = query.toLowerCase();
             return name.contains(queryLower);
           }).toList();
+
+    return applySort(
+      filtered,
+      ListSortService.instance.optionFor(SortableList.categories),
+      nameOf: (cat) => cat.name,
+      createdAtOf: (cat) => cat.createdTime,
+    );
   }
 
   Widget _buildEmptyState(double height) {

@@ -184,10 +184,10 @@ class _RawMaterialTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Raw Material always persists a real Stock Unit (independent of Selling
-    // Method, which doesn't apply to it and is never set for it) — only
-    // 'piece' is a whole-count unit; kg/gm/liter/ml can carry fractional
-    // stock after a production deduction and must show decimals.
+    // Raw Material always persists a real unit (By Unit stores 'piece', By
+    // Weight its chosen unit) — only 'piece' is a whole-count unit; kg/gm/
+    // liter/ml can carry fractional stock after a production deduction and
+    // must show decimals.
     final normalizedUnit = normalizeItemUnit(item.unit);
     final unit = normalizedUnit ?? item.unit ?? 'pcs';
     final showDecimals = normalizedUnit != null && normalizedUnit != 'piece';

@@ -193,15 +193,16 @@ class AddItemFormState extends ChangeNotifier {
       imageBytes: selectedImage,
       isVeg: vegCategory,
       isSoldByWeight: sellingMethod == SellingMethod.byWeight,
-      // Raw Material/Semi-Finished: this is a stock-keeping unit, independent
-      // of Selling Method (which doesn't apply to an unsellable ingredient),
-      // so it's always persisted. Finished Good/Recipe-Based keep the
-      // original by-weight-only condition, unchanged.
-      unit:
-          (productType == ProductType.rawMaterial ||
-              productType == ProductType.semiFinished)
+      // By Weight carries the chosen unit. By Unit means whole pieces — spelled
+      // out as 'piece' for Raw Material/Semi-Finished because the inventory
+      // screens decide whole-vs-decimal counting from this field, and left null
+      // for Finished Good/Recipe-Based exactly as before.
+      unit: sellingMethod == SellingMethod.byWeight
           ? selectedUnit
-          : (sellingMethod == SellingMethod.byWeight ? selectedUnit : null),
+          : ((productType == ProductType.rawMaterial ||
+                    productType == ProductType.semiFinished)
+                ? 'piece'
+                : null),
       // Item-level stock only for simple items; variant items track per variant.
       stockQuantity: (trackInventory && selectedVariants.isEmpty)
           ? (double.tryParse(stockController.text.trim()) ?? 0.0)

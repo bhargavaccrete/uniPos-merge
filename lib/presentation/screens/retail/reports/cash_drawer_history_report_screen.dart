@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 
 import 'package:billberrylite/domain/services/common/report_export_service.dart';
 import 'package:billberrylite/domain/services/retail/report_service.dart';
-import 'package:billberrylite/presentation/screens/retail/reports/report_page_scaffold.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_page_scaffold.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_status_pill.dart';
 import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
 import 'package:billberrylite/presentation/widget/componets/common/report_summary_card.dart';

@@ -23,6 +23,7 @@ import 'low_stock_screen.dart';
 import 'recipes_screen.dart';
 import 'raw_materials_screen.dart';
 import 'purchase_order/purchase_order_list_screen.dart';
+import 'purchase_order/restaurant_grn_list_screen.dart';
 import 'supplier/restaurant_supplier_list_screen.dart';
 import 'production_screen.dart';
 import 'food_cost_report_screen.dart';
@@ -86,11 +87,10 @@ class _ManageInventoryState extends State<ManageInventory> {
   static const _uncategorizedId = '__uncategorized__';
 
   /// Whether [item]'s stock can carry a fractional quantity, based on its
-  /// actual Stock Unit — only 'piece' (or no unit at all) is a whole-count
-  /// unit. `isSoldByWeight` is a POS Selling Method concept that doesn't
-  /// apply to Raw Material/Semi-Finished and is never set for them, so it
-  /// can't be used to decide this (it silently rounded away real fractional
-  /// deductions, e.g. 0.20 kg used from stock, for every Raw Material).
+  /// actual unit — only 'piece' (or no unit at all) is a whole-count unit.
+  /// The unit is the authority here, not `isSoldByWeight`: legacy items
+  /// carry a real unit with no flag set, and reading the flag silently
+  /// rounded away real fractional deductions (e.g. 0.20 kg used from stock).
   bool _allowsDecimals(Items item) {
     final normalized = normalizeItemUnit(item.unit);
     return normalized != null && normalized != 'piece';
@@ -1251,6 +1251,16 @@ class _ManageInventoryState extends State<ManageInventory> {
       onTap: () => Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const PurchaseOrderListScreen()),
+      ),
+    ),
+    (
+      title: 'Goods Received',
+      subtitle: 'Confirmed receipts against POs',
+      icon: Icons.inventory_rounded,
+      color: AppColors.success,
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const RestaurantGRNListScreen()),
       ),
     ),
     (

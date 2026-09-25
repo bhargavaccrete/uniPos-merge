@@ -7,6 +7,8 @@ import 'package:billberrylite/presentation/widget/componets/common/app_dialog.da
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/common/list_sort_button.dart';
+import 'package:billberrylite/domain/services/common/list_sort_service.dart';
 import 'package:billberrylite/data/models/restaurant/db/variantmodel_305.dart';
 import 'package:billberrylite/util/images.dart';
 import 'package:uuid/uuid.dart';
@@ -339,39 +341,55 @@ class _VariantTabState extends State<VariantTab>
 
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      body: Column(
-        children: [
-          // Modern Search Bar
-          Padding(
-            padding: AppResponsive.padding(context),
-            child: AppTextField(
-              controller: searchController,
-              hint: 'Search variants…',
-              icon: Icons.search_rounded,
-              suffixIcon: query.isNotEmpty
-                  ? IconButton(
-                      icon: Icon(
-                        Icons.clear,
-                        color: Colors.grey,
-                        size: AppResponsive.iconSize(context),
+      body: ListenableBuilder(
+        listenable: ListSortService.instance,
+        builder: (context, _) => Column(
+          children: [
+            // Modern Search Bar
+            Padding(
+              padding: AppResponsive.padding(context),
+              // IntrinsicHeight + stretch sizes the sort button to match
+              // AppTextField's height without hardcoding it.
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: AppTextField(
+                        controller: searchController,
+                        hint: 'Search variants…',
+                        icon: Icons.search_rounded,
+                        suffixIcon: query.isNotEmpty
+                            ? IconButton(
+                                icon: Icon(
+                                  Icons.clear,
+                                  color: Colors.grey,
+                                  size: AppResponsive.iconSize(context),
+                                ),
+                                onPressed: () {
+                                  searchController.clear();
+                                },
+                              )
+                            : null,
                       ),
-                      onPressed: () {
-                        searchController.clear();
-                      },
-                    )
-                  : null,
+                    ),
+                    SizedBox(width: AppResponsive.smallSpacing(context)),
+                    const ListSortButton(list: SortableList.variants),
+                  ],
+                ),
+              ),
             ),
-          ),
 
-          // Variants List
-          Expanded(
-            child: isTablet
-                ? _buildTabletLayout(size)
-                : _buildMobileLayout(size),
-          ),
+            // Variants List
+            Expanded(
+              child: isTablet
+                  ? _buildTabletLayout(size)
+                  : _buildMobileLayout(size),
+            ),
 
-          if (_canAddVariant) _buildAddButton(),
-        ],
+            if (_canAddVariant) _buildAddButton(),
+          ],
+        ),
       ),
     );
   }
@@ -440,15 +458,23 @@ class _VariantTabState extends State<VariantTab>
     );
   }
 
+  /// Both layouts route through here, so the sort is applied once.
   List<VariantModel> _getFilteredVariants() {
     final allvariante = variantStore.variants.toList();
-    return query.isEmpty
+    final filtered = query.isEmpty
         ? allvariante
         : allvariante.where((variant) {
             final name = variant.name.toLowerCase();
             final queryLower = query.toLowerCase();
             return name.contains(queryLower);
           }).toList();
+
+    return applySort(
+      filtered,
+      ListSortService.instance.optionFor(SortableList.variants),
+      nameOf: (variant) => variant.name,
+      createdAtOf: (variant) => variant.createdTime,
+    );
   }
 
   Widget _buildEmptyState(double height) {

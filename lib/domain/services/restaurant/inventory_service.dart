@@ -163,7 +163,8 @@ class InventoryService {
 
   /// Shared by every stock deduction path (direct item, variant, and
   /// recipe-ingredient cascade): writes the audit-trail movement row and
-  /// raises/resolves the low-stock notification for [item].
+  /// collects the in-app low-stock toast lines for [item]. The persisted
+  /// notification is reconciled by `LowStockSyncService`, not raised here.
   static Future<void> _logMovementAndAlert({
     required StockMovementRepository stockRepo,
     required Items item,
@@ -195,33 +196,17 @@ class InventoryService {
 
     if (type != 'out') return; // low-stock alerts only make sense for deductions
 
+    // These strings are the IN-APP toast shown right after the order ("Low
+    // Stock - Paneer: 2 left"). The PERSISTED notification is no longer raised
+    // here — LowStockSyncService reconciles the whole set off ItemStore, which
+    // also covers the seven other paths that move stock and never had a hook.
+    // "Out of stock" is a hard fact and shows even with alerts switched off;
+    // only the "N left" warning respects the flag. Unchanged from before.
     final lowAlertsOn = item.lowStockAlertEnabled && AppSettings.lowStockAlertsEnabled;
-    final subjectId = _lowStockSubjectId(item.id, variantId);
     if (balanceAfter <= 0) {
       lowStockAlerts.add("$label is out of stock");
-      if (lowAlertsOn) {
-        await notificationStore.raiseEvent(
-          eventCode: 'low_stock',
-          subjectType: 'item',
-          subjectId: subjectId,
-          data: {'name': label, 'remaining': 0, 'unit': item.unit ?? 'units'},
-        );
-      }
     } else if (lowAlertsOn && balanceAfter <= item.effectiveLowStockThreshold) {
       lowStockAlerts.add("$label: ${balanceAfter.toStringAsFixed(0)} ${item.unit ?? "units"} left");
-      await notificationStore.raiseEvent(
-        eventCode: 'low_stock',
-        subjectType: 'item',
-        subjectId: subjectId,
-        data: {
-          'name': label,
-          'remaining': balanceAfter,
-          'unit': item.unit ?? 'units',
-        },
-      );
-    } else {
-      // Stock healthy again — retire any prior low-stock notification.
-      await notificationStore.resolve('low_stock', 'item', subjectId);
     }
   }
 
@@ -466,30 +451,15 @@ class InventoryService {
       ));
       movementIds.add(movementId);
 
+      // In-app toast only; the persisted event is reconciled by
+      // LowStockSyncService off the ItemStore write this deduction made.
       final lowAlertsOn = ingredient.lowStockAlertEnabled && AppSettings.lowStockAlertsEnabled;
-      final subjectId = _lowStockSubjectId(ingredient.id, null);
       if (stockAfter <= 0) {
         lowStockAlerts.add('${ingredient.name} is out of stock');
-        if (lowAlertsOn) {
-          await notificationStore.raiseEvent(
-            eventCode: 'low_stock',
-            subjectType: 'item',
-            subjectId: subjectId,
-            data: {'name': ingredient.name, 'remaining': 0, 'unit': ingredient.unit ?? 'units'},
-          );
-        }
       } else if (lowAlertsOn && stockAfter <= ingredient.effectiveLowStockThreshold) {
         lowStockAlerts.add(
           '${ingredient.name}: ${stockAfter.toStringAsFixed(0)} ${ingredient.unit ?? "units"} left',
         );
-        await notificationStore.raiseEvent(
-          eventCode: 'low_stock',
-          subjectType: 'item',
-          subjectId: subjectId,
-          data: {'name': ingredient.name, 'remaining': stockAfter, 'unit': ingredient.unit ?? 'units'},
-        );
-      } else {
-        await notificationStore.resolve('low_stock', 'item', subjectId);
       }
     }
 
@@ -592,10 +562,6 @@ class InventoryService {
       return '';
     }
   }
-
-  // Per-variant identity so variants of one item don't share a notification.
-  static String _lowStockSubjectId(String itemId, String? variantId) =>
-      variantId != null ? '$itemId:$variantId' : itemId;
 
   // Stock checking before placing order: checkStockAvailability
   static Future<bool> checkStockAvailability(List<CartItem> cartItems) async {
@@ -881,9 +847,8 @@ class InventoryService {
           unitCost: existingItem.lastPurchaseCost,
         ));
 
-        // Restock raises stock back up — retire any low-stock notification.
-        await notificationStore.resolve(
-          'low_stock', 'item', _lowStockSubjectId(existingItem.id, variantId));
+        // Restock raises stock back up; LowStockSyncService retires the
+        // notification off the ItemStore write above.
       }
 
     } catch (e) {
@@ -934,7 +899,8 @@ class InventoryService {
         unitCost: ingredient.lastPurchaseCost,
       ));
 
-      await notificationStore.resolve('low_stock', 'item', _lowStockSubjectId(ingredient.id, null));
+      // Ingredient stock went back up; LowStockSyncService retires the
+      // notification off the ItemStore write above.
     }
   }
 

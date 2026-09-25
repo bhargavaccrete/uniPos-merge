@@ -129,6 +129,39 @@ mixin _$RestaurantPurchaseOrderStore on _RestaurantPurchaseOrderStore, Store {
     return _$markPOSentAsyncAction.run(() => super.markPOSent(poId));
   }
 
+  late final _$updatePurchaseOrderAsyncAction = AsyncAction(
+      '_RestaurantPurchaseOrderStore.updatePurchaseOrder',
+      context: context);
+
+  @override
+  Future<RestaurantPurchaseOrderModel?> updatePurchaseOrder(
+      {required String poId,
+      required String supplierId,
+      String? supplierName,
+      required String expectedDeliveryDate,
+      String? notes,
+      required List<
+              ({String itemId, String itemName, double? price, double qty})>
+          lines}) {
+    return _$updatePurchaseOrderAsyncAction.run(() => super.updatePurchaseOrder(
+        poId: poId,
+        supplierId: supplierId,
+        supplierName: supplierName,
+        expectedDeliveryDate: expectedDeliveryDate,
+        notes: notes,
+        lines: lines));
+  }
+
+  late final _$deletePurchaseOrderAsyncAction = AsyncAction(
+      '_RestaurantPurchaseOrderStore.deletePurchaseOrder',
+      context: context);
+
+  @override
+  Future<bool> deletePurchaseOrder(String poId) {
+    return _$deletePurchaseOrderAsyncAction
+        .run(() => super.deletePurchaseOrder(poId));
+  }
+
   late final _$confirmGRNAsyncAction =
       AsyncAction('_RestaurantPurchaseOrderStore.confirmGRN', context: context);
 

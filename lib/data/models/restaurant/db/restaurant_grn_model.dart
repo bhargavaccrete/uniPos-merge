@@ -78,7 +78,12 @@ class RestaurantGRNModel extends HiveObject {
     required this.updatedAt,
   });
 
+  /// [grnNumber] is minted by `RestaurantGRNRepository.generateGRNNumber()`
+  /// and passed in, rather than generated here: the shared
+  /// `DocumentNumberService` writes a counter to Hive, so it is async and
+  /// cannot run inside a synchronous factory.
   factory RestaurantGRNModel.create({
+    required String grnNumber,
     required String poId,
     required String poNumber,
     required String supplierId,
@@ -94,7 +99,7 @@ class RestaurantGRNModel extends HiveObject {
     final now = DateTime.now().toIso8601String();
     return RestaurantGRNModel(
       grnId: _uuid.v4(),
-      grnNumber: _generateGrnNumber(),
+      grnNumber: grnNumber,
       poId: poId,
       poNumber: poNumber,
       supplierId: supplierId,
@@ -109,14 +114,6 @@ class RestaurantGRNModel extends HiveObject {
       createdAt: now,
       updatedAt: now,
     );
-  }
-
-  static String _generateGrnNumber() {
-    final now = DateTime.now();
-    final datePart =
-        '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
-    final suffix = now.millisecondsSinceEpoch.toString().substring(8);
-    return 'GRN-$datePart-$suffix';
   }
 
   RestaurantGRNStatus get statusEnum => RestaurantGRNStatus.values.firstWhere(

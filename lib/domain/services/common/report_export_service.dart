@@ -132,7 +132,19 @@ Future<Uint8List> _buildPdfBytes(Map<String, dynamic> params) async {
           ),
           cellStyle: pw.TextStyle(font: font, fontSize: 9),
           headerDecoration: const pw.BoxDecoration(color: PdfColors.blue),
-          cellHeight: 25,
+          // NO fixed cellHeight. It used to be 25, which is a hard height, not
+          // a minimum — so the moment a value wrapped to a second line it
+          // overflowed its box and printed down over the row beneath it.
+          // Padding gives the same breathing room while letting a row grow to
+          // fit whatever it holds.
+          cellPadding: const pw.EdgeInsets.symmetric(
+            horizontal: 4,
+            vertical: 6,
+          ),
+          headerPadding: const pw.EdgeInsets.symmetric(
+            horizontal: 4,
+            vertical: 8,
+          ),
           cellAlignments: {
             for (int i = 0; i < headers.length; i++)
               i: i == headers.length - 1
@@ -473,7 +485,16 @@ class ReportExportService {
         summaryMap = summary.map((k, v) => MapEntry(k, v.toString()));
       }
 
-      final format = pageFormat ?? PdfPageFormat.a4;
+      // A4 portrait leaves 531pt between the margins. Split across the 7-11
+      // columns the purchasing reports carry, that is ~50pt a column — about
+      // eight characters at 9pt — so supplier names, dates and money all
+      // wrapped, and the table read as broken. Landscape gives 778pt, which
+      // is the difference between wrapping every row and wrapping none.
+      //
+      // Only a default: a caller that names its own format (a thermal roll,
+      // say) still wins.
+      final format = pageFormat ??
+          (headers.length > 6 ? PdfPageFormat.a4.landscape : PdfPageFormat.a4);
 
       // ── Run heavy work in isolate ────────────────────────────────────
       final bytes = await compute(_buildPdfBytes, <String, dynamic>{

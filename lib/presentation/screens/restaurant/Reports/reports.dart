@@ -95,21 +95,68 @@ class _ReportsScreenState extends State<ReportsScreen> {
         alignment: Alignment.topCenter,
         child: SingleChildScrollView(
           padding: AppResponsive.padding(context),
-          child: GridView.count(
-            shrinkWrap: true,
-            physics: NeverScrollableScrollPhysics(),
-            crossAxisCount: AppResponsive.gridColumns(
-              context,
-              mobile: 2,
-              tablet: 3,
-              desktop: 4,
-            ),
-            crossAxisSpacing: AppResponsive.gridSpacing(context),
-            mainAxisSpacing: AppResponsive.gridSpacing(context),
-            childAspectRatio: AppResponsive.gridAspectRatio(context),
+          // Grouped into sections rather than one wall of tiles. Each section
+          // is its own shrink-wrapped grid inside a Column; none of them
+          // scrolls — the SingleChildScrollView above owns that.
+          //
+          // All tiles are still SHOWN whatever the plan says; tapping one that
+          // is not granted opens the upgrade blocker (see _buildReportCard).
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // All report tiles are shown; tapping a tile not in the plan
-              // shows the upgrade blocker (handled in _buildReportCard).
+              _sectionHeader('Sales & Operations'),
+              _grid(_salesTiles(isTablet)),
+              _sectionHeader('Purchasing'),
+              _grid(_purchasingTiles(isTablet)),
+              _sectionHeader('Inventory'),
+              _grid(_inventoryTiles(isTablet)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Section label above each grid.
+  Widget _sectionHeader(String title) {
+    return Padding(
+      padding: EdgeInsets.only(
+        top: AppResponsive.mediumSpacing(context),
+        bottom: AppResponsive.smallSpacing(context),
+      ),
+      child: Text(
+        title,
+        style: GoogleFonts.poppins(
+          fontSize: AppResponsive.bodyFontSize(context),
+          fontWeight: FontWeight.w600,
+          color: AppColors.textSecondary,
+          letterSpacing: 0.3,
+        ),
+      ),
+    );
+  }
+
+  /// One section grid. Same geometry for every section, so the tiles line up
+  /// across section boundaries instead of each group sizing itself.
+  Widget _grid(List<Widget> tiles) {
+    return GridView.count(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisCount: AppResponsive.gridColumns(
+        context,
+        mobile: 2,
+        tablet: 3,
+        desktop: 4,
+      ),
+      crossAxisSpacing: AppResponsive.gridSpacing(context),
+      mainAxisSpacing: AppResponsive.gridSpacing(context),
+      childAspectRatio: AppResponsive.gridAspectRatio(context),
+      children: tiles,
+    );
+  }
+
+  List<Widget> _salesTiles(bool isTablet) {
+    return [
               _buildReportCard(
                 icon: Icons.shopping_bag_outlined,
                 title: 'Total Sale',
@@ -330,10 +377,142 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 isTablet: isTablet,
                 entitlementKey: EntKeys.reportsAttendance,
               ),
-            ],
-          ),
-        ),
-      ),
-    );
+
+              // layout regression can't be mistaken for a report bug.
+    ];
   }
+
+  /// Purchasing — the supplier/PO/GRN chain. All nine are gated by their own
+  /// `reports.*` key, which the manifest must grant.
+  List<Widget> _purchasingTiles(bool isTablet) {
+    return [
+              _buildReportCard(
+                icon: Icons.assessment_outlined,
+                title: 'Purchase Summary',
+                onTap: () => Navigator.pushNamed(
+                  context,
+                  RouteNames.restaurantReportsPurchaseSummary,
+                ),
+                iconColor: AppColors.primary,
+                isTablet: isTablet,
+                entitlementKey: EntKeys.reportsPurchaseSummary,
+              ),
+              _buildReportCard(
+                icon: Icons.receipt_long_rounded,
+                title: 'GRN Report',
+                onTap: () => Navigator.pushNamed(
+                  context,
+                  RouteNames.restaurantReportsGrn,
+                ),
+                iconColor: AppColors.success,
+                isTablet: isTablet,
+                entitlementKey: EntKeys.reportsGrn,
+              ),
+              _buildReportCard(
+                icon: Icons.local_shipping_rounded,
+                title: 'Supplier-wise Purchases',
+                onTap: () => Navigator.pushNamed(
+                  context,
+                  RouteNames.restaurantReportsSupplierPurchase,
+                ),
+                iconColor: Colors.indigo,
+                isTablet: isTablet,
+                entitlementKey: EntKeys.reportsSupplierPurchase,
+              ),
+              _buildReportCard(
+                icon: Icons.hourglass_top_rounded,
+                title: 'Pending Purchase Orders',
+                onTap: () => Navigator.pushNamed(
+                  context,
+                  RouteNames.restaurantReportsPoPending,
+                ),
+                iconColor: AppColors.warning,
+                isTablet: isTablet,
+                entitlementKey: EntKeys.reportsPoStatus,
+              ),
+              _buildReportCard(
+                icon: Icons.incomplete_circle_rounded,
+                title: 'Partially Received Orders',
+                onTap: () => Navigator.pushNamed(
+                  context,
+                  RouteNames.restaurantReportsPoPartial,
+                ),
+                iconColor: Colors.orange,
+                isTablet: isTablet,
+                entitlementKey: EntKeys.reportsPoStatus,
+              ),
+              _buildReportCard(
+                icon: Icons.check_circle_outline_rounded,
+                title: 'Completed Orders',
+                onTap: () => Navigator.pushNamed(
+                  context,
+                  RouteNames.restaurantReportsPoCompleted,
+                ),
+                iconColor: Colors.green,
+                isTablet: isTablet,
+                entitlementKey: EntKeys.reportsPoStatus,
+              ),
+              _buildReportCard(
+                icon: Icons.report_gmailerrorred_rounded,
+                title: 'Damaged Items',
+                onTap: () => Navigator.pushNamed(
+                  context,
+                  RouteNames.restaurantReportsDamagedItems,
+                ),
+                iconColor: AppColors.danger,
+                isTablet: isTablet,
+                entitlementKey: EntKeys.reportsDamagedItems,
+              ),
+              _buildReportCard(
+                icon: Icons.assignment_return_rounded,
+                title: 'Purchase Returns',
+                onTap: () => Navigator.pushNamed(
+                  context,
+                  RouteNames.restaurantReportsPurchaseReturn,
+                ),
+                iconColor: Colors.blueGrey,
+                isTablet: isTablet,
+                entitlementKey: EntKeys.reportsPurchaseReturn,
+              ),
+              _buildReportCard(
+                icon: Icons.account_balance_rounded,
+                title: 'Supplier Statement',
+                onTap: () => Navigator.pushNamed(
+                  context,
+                  RouteNames.restaurantReportsSupplierStatement,
+                ),
+                iconColor: Colors.deepOrange,
+                isTablet: isTablet,
+                entitlementKey: EntKeys.reportsSupplierStatement,
+              ),
+    ];
+  }
+
+  List<Widget> _inventoryTiles(bool isTablet) {
+    return [
+              _buildReportCard(
+                icon: Icons.tune_rounded,
+                title: 'Stock Adjustments',
+                onTap: () => Navigator.pushNamed(
+                  context,
+                  RouteNames.restaurantReportsStockAdjustment,
+                ),
+                iconColor: Colors.brown,
+                isTablet: isTablet,
+                entitlementKey: EntKeys.reportsStockAdjustment,
+              ),
+              _buildReportCard(
+                icon: Icons.warning_amber_rounded,
+                title: 'Low Stock Report',
+                onTap: () => Navigator.pushNamed(
+                  context,
+                  RouteNames.restaurantReportsLowStock,
+                ),
+                iconColor: AppColors.warning,
+                isTablet: isTablet,
+                entitlementKey: EntKeys.reportsLowStock,
+              ),
+    ];
+  }
+
 }

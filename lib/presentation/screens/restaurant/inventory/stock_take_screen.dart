@@ -80,7 +80,15 @@ class _RestaurantStockTakeScreenState extends State<RestaurantStockTakeScreen> {
     return itemStore.items
         .where((item) {
           if (!item.trackInventory) return false;
-          if (!(item.isRawMaterial || item.isSemiFinished)) return false;
+          // Anything holding physical stock can be counted — Raw Material,
+          // Semi-Finished and Finished Good alike. A bottled drink sits on a
+          // shelf and goes missing exactly like a sack of flour; excluding it
+          // meant a whole product type could never be reconciled.
+          //
+          // Recipe-Based stays out: `resolvePhysicalStock` forces it to
+          // `trackInventory: false`, so the guard above already drops it, and
+          // counting a dish would double-count its ingredients.
+          if (item.isRecipeBased) return false;
           if (counted.contains(item.id)) return false;
           return item.name.toLowerCase().contains(query);
         })
@@ -91,10 +99,10 @@ class _RestaurantStockTakeScreenState extends State<RestaurantStockTakeScreen> {
   String _unitOf(Items item) =>
       normalizeItemUnit(item.unit) ?? item.unit ?? 'pcs';
 
-  /// Whether [item]'s count can be fractional, based on its actual Stock
-  /// Unit — only 'piece' (or no unit at all) is a whole-count unit.
-  /// `isSoldByWeight` doesn't apply to Raw Material/Semi-Finished (the only
-  /// types counted here) and is never set for them, so it can't decide this.
+  /// Whether [item]'s count can be fractional, based on its actual unit —
+  /// only 'piece' (or no unit at all) is a whole-count unit. The unit is the
+  /// authority here, not `isSoldByWeight`: legacy Raw Material/Semi-Finished
+  /// items (the only types counted here) carry a unit with no flag set.
   bool _allowsDecimal(Items item) {
     final normalized = normalizeItemUnit(item.unit);
     return normalized != null && normalized != 'piece';
@@ -483,7 +491,14 @@ class _RestaurantStockTakeScreenState extends State<RestaurantStockTakeScreen> {
         borderRadius: BorderRadius.circular(6),
       ),
       child: Text(
-        item.isRawMaterial ? 'Raw' : 'Semi',
+        // Three types reach this list now, so the old binary
+        // `isRawMaterial ? 'Raw' : 'Semi'` would have labelled every bottled
+        // drink "Semi".
+        item.isRawMaterial
+            ? 'Raw'
+            : item.isSemiFinished
+                ? 'Semi'
+                : 'Finished',
         style: GoogleFonts.poppins(
           fontSize: AppResponsive.captionFontSize(context),
           fontWeight: FontWeight.w700,

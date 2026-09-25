@@ -15,29 +15,26 @@ class SellingMethodResult {
 
 // ── Bottom-sheet picker ─────────────────────────────────────────────────────
 
+/// One picker for every Product Type. There used to be a `unitOnly` variant
+/// that hid the method cards for Raw Material / Semi-Finished and showed a
+/// bare "Stock Unit" chip list instead — so the same decision looked like two
+/// different controls depending on the type selected above it. Now every type
+/// answers the same question the same way, with **By Unit meaning the item is
+/// measured in `piece`** and By Weight revealing the unit chips.
 class SellingMethodSheet extends StatefulWidget {
   final SellingMethod currentMethod;
   final String currentUnit;
-
-  /// When true, this is really a "Stock Unit" picker for a back-of-house item
-  /// (Raw Material / Semi-Finished) — the By Unit/By Weight method cards are
-  /// skipped and the unit chips (same list, same widget) render directly,
-  /// since Selling Method is a POS-sale concept that doesn't apply to an
-  /// unsellable ingredient.
-  final bool unitOnly;
 
   const SellingMethodSheet({
     super.key,
     required this.currentMethod,
     required this.currentUnit,
-    this.unitOnly = false,
   });
 
   static Future<SellingMethodResult?> show(
     BuildContext context, {
     required SellingMethod currentMethod,
     required String currentUnit,
-    bool unitOnly = false,
   }) async {
     return showModalBottomSheet<SellingMethodResult>(
       context: context,
@@ -52,7 +49,6 @@ class SellingMethodSheet extends StatefulWidget {
       builder: (_) => SellingMethodSheet(
         currentMethod: currentMethod,
         currentUnit: currentUnit,
-        unitOnly: unitOnly,
       ),
     );
   }
@@ -74,11 +70,6 @@ class _SellingMethodSheetState extends State<SellingMethodSheet> {
     // Clamp to a supported value so legacy units don't crash the dropdown.
     _unit = normalizeItemUnit(widget.currentUnit) ?? _units.first;
   }
-
-  OutlineInputBorder _border(Color c) => OutlineInputBorder(
-    borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
-    borderSide: BorderSide(color: c),
-  );
 
   @override
   Widget build(BuildContext context) {
@@ -131,16 +122,14 @@ class _SellingMethodSheetState extends State<SellingMethodSheet> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      widget.unitOnly ? 'Stock Unit' : 'Selling Method',
+                      'Selling Method',
                       style: GoogleFonts.poppins(
                         fontSize: AppResponsive.subheadingFontSize(context),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     Text(
-                      widget.unitOnly
-                          ? 'What unit is this item measured and stocked in?'
-                          : 'How is this item measured?',
+                      'How is this item measured?',
                       style: GoogleFonts.poppins(
                         fontSize: AppResponsive.smallFontSize(context),
                         color: Colors.grey.shade500,
@@ -158,27 +147,24 @@ class _SellingMethodSheetState extends State<SellingMethodSheet> {
           ),
           SizedBox(height: AppResponsive.largeSpacing(context)),
 
-          // ── Method cards (skipped in Stock Unit mode — Selling Method is
-          // a POS-sale concept that doesn't apply to an unsellable item) ──
-          if (!widget.unitOnly) ...[
-            _methodCard(
-              method: SellingMethod.byUnit,
-              label: 'By Unit',
-              subtitle: 'Sold as individual pieces (e.g. burger, pizza)',
-              icon: Icons.countertops_outlined,
-            ),
-            SizedBox(height: AppResponsive.smallSpacing(context)),
-            _methodCard(
-              method: SellingMethod.byWeight,
-              label: 'By Weight',
-              subtitle: 'Sold by measurable quantity (e.g. kg, litre)',
-              icon: Icons.scale_outlined,
-            ),
-          ],
+          // ── Method cards — shown for every Product Type ──────────────
+          _methodCard(
+            method: SellingMethod.byUnit,
+            label: 'By Unit',
+            subtitle: 'Counted in whole pieces (e.g. burger, can, packet)',
+            icon: Icons.countertops_outlined,
+          ),
+          SizedBox(height: AppResponsive.smallSpacing(context)),
+          _methodCard(
+            method: SellingMethod.byWeight,
+            label: 'By Weight',
+            subtitle: 'Measured quantity (e.g. kg, litre)',
+            icon: Icons.scale_outlined,
+          ),
 
-          // ── Unit selector — shown for Weight, or unconditionally in
-          // Stock Unit mode ────────────────────────────────────────────
-          if (widget.unitOnly || _method == SellingMethod.byWeight) ...[
+          // ── Unit selector — only By Weight needs one; By Unit always
+          // means 'piece' ──────────────────────────────────────────────
+          if (_method == SellingMethod.byWeight) ...[
             SizedBox(height: AppResponsive.mediumSpacing(context)),
             _unitChips(),
           ],
@@ -220,8 +206,7 @@ class _SellingMethodSheetState extends State<SellingMethodSheet> {
     );
   }
 
-  /// The unit-chip row — identical whether reached via "By Weight" or via
-  /// Stock Unit mode. Extracted so neither gate duplicates this widget.
+  /// The unit-chip row, shown once By Weight is picked.
   Widget _unitChips() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -375,28 +360,19 @@ class SellingMethodButton extends StatelessWidget {
   final String unit;
   final VoidCallback onTap;
 
-  /// See [SellingMethodSheet.unitOnly] — Raw Material/Semi-Finished show this
-  /// as a plain "Stock Unit" picker instead of a Selling Method picker.
-  final bool unitOnly;
-
   const SellingMethodButton({
     super.key,
     required this.method,
     required this.unit,
     required this.onTap,
-    this.unitOnly = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final isByWeight = method == SellingMethod.byWeight;
-    final title = unitOnly ? 'Stock Unit' : 'Selling Method';
-    final label = unitOnly
-        ? unit
-        : (isByWeight ? 'By Weight · $unit' : 'By Unit');
-    final icon = unitOnly
-        ? Icons.straighten_outlined
-        : (isByWeight ? Icons.scale_outlined : Icons.countertops_outlined);
+    const title = 'Selling Method';
+    final label = isByWeight ? 'By Weight · $unit' : 'By Unit · piece';
+    final icon = isByWeight ? Icons.scale_outlined : Icons.countertops_outlined;
 
     return InkWell(
       onTap: onTap,

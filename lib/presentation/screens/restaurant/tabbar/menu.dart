@@ -14,8 +14,11 @@ import '../../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../data/models/common/categorymodel_300.dart';
 import '../../../../data/models/restaurant/db/ordermodel_309.dart';
+import '../../../../domain/services/common/list_sort_service.dart';
+import '../../../widget/componets/common/list_sort_button.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
-import '../../../../domain/store/restaurant/cart_store.dart' show ProductCartState;
+import '../../../../domain/store/restaurant/cart_store.dart'
+    show ProductCartState;
 import '../../../../domain/services/restaurant/inventory_service.dart';
 import '../../../../util/restaurant/staticswitch.dart';
 import '../../../widget/componets/restaurant/componets/Button.dart';
@@ -152,6 +155,33 @@ class _MenuScreenState extends State<MenuScreen>
   }
 
   /// Mobile "Favorites" section pinned at the top of the category list.
+  // ── Sort (shared by every layout on this screen) ──────────────────────────
+  //
+  // One preference, `SortableList.posMenu`, drives both the category order and
+  // the item order inside each section, so the quick-nav strip and the
+  // sections below it can never disagree.
+
+  ListSortOption get _sort =>
+      ListSortService.instance.optionFor(SortableList.posMenu);
+
+  List<Category> _sortCategories(List<Category> categories) => applySort(
+    categories,
+    _sort,
+    nameOf: (c) => c.name,
+    createdAtOf: (c) => c.createdTime,
+  );
+
+  /// Sort the menu's item list ONCE, right where it is filtered down to what
+  /// is sellable. Every other list on this screen — per-category sections,
+  /// favourites, the uncategorised bucket — is derived from it with `.where`,
+  /// which preserves order, so they all inherit the sort from this one call.
+  List<Items> _sortItems(List<Items> items) => applySort(
+    items,
+    _sort,
+    nameOf: (i) => i.name,
+    createdAtOf: (i) => i.createdTime,
+  );
+
   /// Items belonging to no surviving category.
   ///
   /// Deleting a category re-parents its items rather than destroying them, so
@@ -197,7 +227,7 @@ class _MenuScreenState extends State<MenuScreen>
       searchFilteredItems: orphans,
       initiallyExpanded:
           (query.isNotEmpty || AppSettings.keepCategoriesOpen) &&
-              _opensImmediately(uncategorisedId, orphans.length),
+          _opensImmediately(uncategorisedId, orphans.length),
       controller: _expansionControllers[uncategorisedId],
       cardKey: _categoryKeys[uncategorisedId]!,
       onItemTap: _handleItemTap,
@@ -252,7 +282,7 @@ class _MenuScreenState extends State<MenuScreen>
           // section, so a long favourites list cannot block the first frame.
           initiallyExpanded:
               (query.isNotEmpty || AppSettings.keepCategoriesOpen) &&
-                  _opensImmediately(_kFavorites, favItems.length),
+              _opensImmediately(_kFavorites, favItems.length),
           leading: Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
@@ -463,7 +493,8 @@ class _MenuScreenState extends State<MenuScreen>
     // character. Hashing the id LIST rather than its length matters: as
     // matches change, one section can drop out while another appears, leaving
     // the count identical — and a section that appeared would never be queued.
-    final signature = '$expanding|$staged|${query.isEmpty}|'
+    final signature =
+        '$expanding|$staged|${query.isEmpty}|'
         '${Object.hashAll(sectionIds)}';
     if (signature == _expansionSignature) return;
     _expansionSignature = signature;
@@ -924,33 +955,51 @@ class _MenuScreenState extends State<MenuScreen>
                   horizontal: 10,
                   vertical: 5,
                 ),
-                child: AppTextField(
-                  controller: _searchController,
-                  focusNode: _searchFocusNode,
-                  hint: 'Search Items',
-                  icon: Icons.search_rounded,
+                // The sort button listens to ListSortService itself, so this
+                // header stays outside any sort listener — see ListSortButton.
+                child: IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        child: AppTextField(
+                          controller: _searchController,
+                          focusNode: _searchFocusNode,
+                          hint: 'Search Items',
+                          icon: Icons.search_rounded,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const ListSortButton(list: SortableList.posMenu),
+                    ],
+                  ),
                 ),
               ),
 
               // Horizontal category quick-nav strip — replaces the category FAB
-              Observer(
-                builder: (_) {
-                  final enabledItems = itemStore.items
-                      .where((i) => i.isEnabled && i.sellsAtPos)
-                      .toList();
-                  final cats = categoryStore.categoriesWithItems(
-                    enabledItems,
-                  );
-                  // Show a Favorites pill first, but only when there are
-                  // favorites to jump to (mirrors hiding empty categories).
-                  final hasFav = enabledItems.any((i) => i.isFavorite);
-                  return _HorizontalCategoryStrip(
-                    categories: cats,
-                    hasFavorites: hasFav,
-                    activeCategory: activeCategory,
-                    onCategorySelected: _selectStripCategory,
-                  );
-                },
+              ListenableBuilder(
+                listenable: ListSortService.instance,
+                builder: (context, _) => Observer(
+                  builder: (_) {
+                    final enabledItems = itemStore.items
+                        .where((i) => i.isEnabled && i.sellsAtPos)
+                        .toList();
+                    // Sorted so the strip's pill order matches the section
+                    // order below it — they are two views of one list.
+                    final cats = _sortCategories(
+                      categoryStore.categoriesWithItems(enabledItems),
+                    );
+                    // Show a Favorites pill first, but only when there are
+                    // favorites to jump to (mirrors hiding empty categories).
+                    final hasFav = enabledItems.any((i) => i.isFavorite);
+                    return _HorizontalCategoryStrip(
+                      categories: cats,
+                      hasFavorites: hasFav,
+                      activeCategory: activeCategory,
+                      onCategorySelected: _selectStripCategory,
+                    );
+                  },
+                ),
               ),
               const SizedBox(height: 4),
 
@@ -970,9 +1019,7 @@ class _MenuScreenState extends State<MenuScreen>
                             Text(
                               'Loading menu...',
                               style: GoogleFonts.poppins(
-                                fontSize: AppResponsive.bodyFontSize(
-                                  context,
-                                ),
+                                fontSize: AppResponsive.bodyFontSize(context),
                                 color: AppColors.textSecondary,
                                 fontWeight: FontWeight.w500,
                               ),
@@ -980,239 +1027,258 @@ class _MenuScreenState extends State<MenuScreen>
                           ],
                         ),
                       )
-                    : Observer(
-                        builder: (_) {
-                          final allCategories = categoryStore.categories;
+                    : ListenableBuilder(
+                        // Scoped to the section list only — the header above
+                        // stays out of it, and the sort changes rarely (a user
+                        // pick, plus one notification when prefs load).
+                        listenable: ListSortService.instance,
+                        builder: (context, _) => Observer(
+                          builder: (_) {
+                            final allCategories = categoryStore.categories;
 
-                          if (allCategories.isEmpty) {
-                            return Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.category_outlined,
-                                    size: 64,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                  SizedBox(height: 16),
-                                  Text(
-                                    'No Categories Found',
-                                    style: GoogleFonts.poppins(
-                                      fontSize:
-                                          AppResponsive.subheadingFontSize(
-                                            context,
-                                          ),
+                            if (allCategories.isEmpty) {
+                              return Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.category_outlined,
+                                      size: 64,
                                       color: AppColors.textSecondary,
-                                      fontWeight: FontWeight.w500,
                                     ),
-                                  ),
-                                ],
+                                    SizedBox(height: 16),
+                                    Text(
+                                      'No Categories Found',
+                                      style: GoogleFonts.poppins(
+                                        fontSize:
+                                            AppResponsive.subheadingFontSize(
+                                              context,
+                                            ),
+                                        color: AppColors.textSecondary,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }
+
+                            final allItems = itemStore.items;
+                            // Sorted here once — favourites, every category
+                            // section and the uncategorised bucket all derive
+                            // from this list via `.where`, which keeps order.
+                            final visibleItems = _sortItems(
+                              allItems
+                                  .where(
+                                    (item) => item.isEnabled && item.sellsAtPos,
+                                  )
+                                  .toList(),
+                            );
+                            final lowerQuery = query.toLowerCase();
+                            // Deliberately NO cart read here. Each item tile
+                            // observes its own cart state
+                            // (`cartStateFor(item.id)`), so a lazily-built
+                            // tile still tracks add/remove/qty without this
+                            // Observer — and the sections around it — having
+                            // to rebuild for every cart write.
+
+                            // Hide categories with no items — the order screen only
+                            // needs categories you can actually pick from.
+                            final categories = _sortCategories(
+                              categoryStore.categoriesWithItems(visibleItems),
+                            );
+
+                            // Sections open a couple per frame from here
+                            // (see STAGED SECTION EXPANSION).
+                            final sectionsExpand =
+                                query.isNotEmpty ||
+                                AppSettings.keepCategoriesOpen;
+                            // Small menu: skip the staging entirely.
+                            final stagedFill =
+                                visibleItems.length > _kStageAboveItemCount;
+                            _stagedFill = stagedFill;
+                            _itemsBudgetUsed = 0;
+                            // Render order: favourites, the categories, then the
+                            // uncategorised bucket. The two sentinels are queued
+                            // unconditionally — if that section isn't showing,
+                            // opening it is a no-op.
+                            _syncSectionExpansion(
+                              sectionsExpand,
+                              staged: stagedFill,
+                              [
+                                _kFavorites,
+                                ...categories.map<String>((c) => c.id),
+                                '__uncategorised__',
+                              ],
+                            );
+
+                            // Searching but nothing matches → empty state instead
+                            // of a blank scroll area.
+                            if (query.isNotEmpty &&
+                                !visibleItems.any(
+                                  (item) =>
+                                      item.name.toLowerCase().contains(
+                                        lowerQuery,
+                                      ) ||
+                                      (item.itemCode != null &&
+                                          item.itemCode!.toLowerCase().contains(
+                                            lowerQuery,
+                                          )),
+                                )) {
+                              return const AppEmptyState(
+                                icon: Icons.search_off_rounded,
+                                title: 'No items found',
+                                message: 'Try a different search term.',
+                              );
+                            }
+
+                            final sectionList = NotificationListener<ScrollNotification>(
+                              // Hold the staged opening while the user is
+                              // actually scrolling, then pick it up again.
+                              onNotification: (notification) {
+                                if (notification is ScrollStartNotification) {
+                                  _scrollInProgress = true;
+                                } else if (notification
+                                        is ScrollEndNotification ||
+                                    notification is UserScrollNotification &&
+                                        notification.direction ==
+                                            ScrollDirection.idle) {
+                                  if (_scrollInProgress) {
+                                    _scrollInProgress = false;
+                                    _scheduleExpansionDrain();
+                                  }
+                                }
+                                return false;
+                              },
+                              child: SingleChildScrollView(
+                                controller: _listScrollController,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 5,
+                                ),
+                                child: Column(
+                                  children: [
+                                    _buildFavoritesSection(
+                                      visibleItems,
+                                      query,
+                                      lowerQuery,
+                                    ),
+                                    ...categories.map((category) {
+                                      if (!_categoryKeys.containsKey(
+                                        category.id,
+                                      )) {
+                                        _categoryKeys[category.id] =
+                                            GlobalKey();
+                                      }
+                                      if (!_expansionControllers.containsKey(
+                                        category.id,
+                                      )) {
+                                        _expansionControllers[category.id] =
+                                            ExpansibleController();
+                                      }
+
+                                      final categoryItems = visibleItems
+                                          .where(
+                                            (item) =>
+                                                item.categoryOfItem ==
+                                                category.id,
+                                          )
+                                          .toList();
+
+                                      final searchFilteredItems = query.isEmpty
+                                          ? categoryItems
+                                          : categoryItems.where((item) {
+                                              return item.name
+                                                      .toLowerCase()
+                                                      .contains(lowerQuery) ||
+                                                  (item.itemCode != null &&
+                                                      item.itemCode!
+                                                          .toLowerCase()
+                                                          .contains(
+                                                            lowerQuery,
+                                                          ));
+                                            }).toList();
+
+                                      // Don't show empty categories when searching
+                                      if (query.isNotEmpty &&
+                                          searchFilteredItems.isEmpty) {
+                                        return const SizedBox.shrink();
+                                      }
+
+                                      return _CategorySectionCard(
+                                        category: category,
+                                        searchFilteredItems:
+                                            searchFilteredItems,
+                                        // Only the first sections render open in
+                                        // the first frame; the staged drain opens
+                                        // the rest.
+                                        initiallyExpanded:
+                                            sectionsExpand &&
+                                            _opensImmediately(
+                                              category.id,
+                                              searchFilteredItems.length,
+                                            ),
+                                        controller:
+                                            _expansionControllers[category.id],
+                                        cardKey: _categoryKeys[category.id]!,
+                                        onItemTap: _handleItemTap,
+                                        onToggleFavorite: _toggleFavorite,
+                                        formatStock: _formatStockDisplay,
+                                        getStockStatus: _getStockStatus,
+                                        // Opt-in grid mode (was the separate
+                                        // MenuGridScreen) — mobile only; tablet has
+                                        // its own grid layout.
+                                        gridView: AppSettings.menuGridView,
+                                        buildGridCard: _buildGridItemCard,
+                                      );
+                                    }).toList(),
+                                    _buildUncategorisedSection(
+                                      visibleItems,
+                                      categories,
+                                      query,
+                                      lowerQuery,
+                                    ),
+                                  ],
+                                ),
                               ),
                             );
-                          }
 
-                          final allItems = itemStore.items;
-                          final visibleItems = allItems
-                              .where(
-                                (item) => item.isEnabled && item.sellsAtPos,
-                              )
-                              .toList();
-                          final lowerQuery = query.toLowerCase();
-                          // Deliberately NO cart read here. Each item tile
-                          // observes its own cart state
-                          // (`cartStateFor(item.id)`), so a lazily-built
-                          // tile still tracks add/remove/qty without this
-                          // Observer — and the sections around it — having
-                          // to rebuild for every cart write.
-
-                          // Hide categories with no items — the order screen only
-                          // needs categories you can actually pick from.
-                          final categories = categoryStore
-                              .categoriesWithItems(visibleItems);
-
-                          // Sections open a couple per frame from here
-                          // (see STAGED SECTION EXPANSION).
-                          final sectionsExpand =
-                              query.isNotEmpty || AppSettings.keepCategoriesOpen;
-                          // Small menu: skip the staging entirely.
-                          final stagedFill =
-                              visibleItems.length > _kStageAboveItemCount;
-                          _stagedFill = stagedFill;
-                          _itemsBudgetUsed = 0;
-                          // Render order: favourites, the categories, then the
-                          // uncategorised bucket. The two sentinels are queued
-                          // unconditionally — if that section isn't showing,
-                          // opening it is a no-op.
-                          _syncSectionExpansion(sectionsExpand, staged: stagedFill, [
-                            _kFavorites,
-                            ...categories.map<String>((c) => c.id),
-                            '__uncategorised__',
-                          ]);
-
-                          // Searching but nothing matches → empty state instead
-                          // of a blank scroll area.
-                          if (query.isNotEmpty &&
-                              !visibleItems.any(
-                                (item) =>
-                                    item.name.toLowerCase().contains(
-                                      lowerQuery,
-                                    ) ||
-                                    (item.itemCode != null &&
-                                        item.itemCode!
-                                            .toLowerCase()
-                                            .contains(lowerQuery)),
-                              )) {
-                            return const AppEmptyState(
-                              icon: Icons.search_off_rounded,
-                              title: 'No items found',
-                              message: 'Try a different search term.',
+                            // While the sections are still opening, hold the
+                            // list still and say so. Scrolling mid-fill is what
+                            // felt like a stutter, and a frozen list also lets
+                            // the queue run at full speed instead of yielding to
+                            // the gesture.
+                            //
+                            // `child:` is the already-built list, handed through
+                            // untouched — the tiles are NOT rebuilt when this
+                            // flips.
+                            return ValueListenableBuilder<bool>(
+                              valueListenable: _stagingSections,
+                              child: sectionList,
+                              builder: (context, staging, child) {
+                                if (!staging) return child!;
+                                return Stack(
+                                  children: [
+                                    AbsorbPointer(
+                                      child: ScrollConfiguration(
+                                        behavior: const _FrozenScrollBehavior(),
+                                        child: child!,
+                                      ),
+                                    ),
+                                    Positioned(
+                                      left: 0,
+                                      right: 0,
+                                      bottom: 16,
+                                      child: Center(
+                                        child: _buildPreparingBanner(context),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
                             );
-                          }
-
-                          final sectionList = NotificationListener<ScrollNotification>(
-                            // Hold the staged opening while the user is
-                            // actually scrolling, then pick it up again.
-                            onNotification: (notification) {
-                              if (notification is ScrollStartNotification) {
-                                _scrollInProgress = true;
-                              } else if (notification
-                                      is ScrollEndNotification ||
-                                  notification is UserScrollNotification &&
-                                      notification.direction ==
-                                          ScrollDirection.idle) {
-                                if (_scrollInProgress) {
-                                  _scrollInProgress = false;
-                                  _scheduleExpansionDrain();
-                                }
-                              }
-                              return false;
-                            },
-                            child: SingleChildScrollView(
-                            controller: _listScrollController,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 5,
-                            ),
-                            child: Column(
-                              children: [
-                                _buildFavoritesSection(
-                                  visibleItems,
-                                  query,
-                                  lowerQuery,
-                                ),
-                                ...categories.map((category) {
-                                  if (!_categoryKeys.containsKey(
-                                    category.id,
-                                  )) {
-                                    _categoryKeys[category.id] =
-                                        GlobalKey();
-                                  }
-                                  if (!_expansionControllers.containsKey(
-                                    category.id,
-                                  )) {
-                                    _expansionControllers[category.id] =
-                                        ExpansibleController();
-                                  }
-
-                                  final categoryItems = visibleItems
-                                      .where(
-                                        (item) =>
-                                            item.categoryOfItem ==
-                                            category.id,
-                                      )
-                                      .toList();
-
-                                  final searchFilteredItems = query.isEmpty
-                                      ? categoryItems
-                                      : categoryItems.where((item) {
-                                          return item.name
-                                                  .toLowerCase()
-                                                  .contains(lowerQuery) ||
-                                              (item.itemCode != null &&
-                                                  item.itemCode!
-                                                      .toLowerCase()
-                                                      .contains(
-                                                        lowerQuery,
-                                                      ));
-                                        }).toList();
-
-                                  // Don't show empty categories when searching
-                                  if (query.isNotEmpty &&
-                                      searchFilteredItems.isEmpty) {
-                                    return const SizedBox.shrink();
-                                  }
-
-                                  return _CategorySectionCard(
-                                    category: category,
-                                    searchFilteredItems:
-                                        searchFilteredItems,
-                                    // Only the first sections render open in
-                                    // the first frame; the staged drain opens
-                                    // the rest.
-                                    initiallyExpanded: sectionsExpand &&
-                                        _opensImmediately(category.id,
-                                            searchFilteredItems.length),
-                                    controller:
-                                        _expansionControllers[category.id],
-                                    cardKey: _categoryKeys[category.id]!,
-                                    onItemTap: _handleItemTap,
-                                    onToggleFavorite: _toggleFavorite,
-                                    formatStock: _formatStockDisplay,
-                                    getStockStatus: _getStockStatus,
-                                    // Opt-in grid mode (was the separate
-                                    // MenuGridScreen) — mobile only; tablet has
-                                    // its own grid layout.
-                                    gridView: AppSettings.menuGridView,
-                                    buildGridCard: _buildGridItemCard,
-                                  );
-                                }).toList(),
-                                _buildUncategorisedSection(
-                                  visibleItems,
-                                  categories,
-                                  query,
-                                  lowerQuery,
-                                ),
-                              ],
-                            ),
-                          ),
-                          );
-
-                          // While the sections are still opening, hold the
-                          // list still and say so. Scrolling mid-fill is what
-                          // felt like a stutter, and a frozen list also lets
-                          // the queue run at full speed instead of yielding to
-                          // the gesture.
-                          //
-                          // `child:` is the already-built list, handed through
-                          // untouched — the tiles are NOT rebuilt when this
-                          // flips.
-                          return ValueListenableBuilder<bool>(
-                            valueListenable: _stagingSections,
-                            child: sectionList,
-                            builder: (context, staging, child) {
-                              if (!staging) return child!;
-                              return Stack(
-                                children: [
-                                  AbsorbPointer(
-                                    child: ScrollConfiguration(
-                                      behavior:
-                                          const _FrozenScrollBehavior(),
-                                      child: child!,
-                                    ),
-                                  ),
-                                  Positioned(
-                                    left: 0,
-                                    right: 0,
-                                    bottom: 16,
-                                    child: Center(
-                                      child: _buildPreparingBanner(context),
-                                    ),
-                                  ),
-                                ],
-                              );
-                            },
-                          );
-                        },
+                          },
+                        ),
                       ),
               ),
 
@@ -1263,61 +1329,75 @@ class _MenuScreenState extends State<MenuScreen>
             color: AppColors.white,
             border: Border(right: BorderSide(color: AppColors.divider)),
           ),
-          child: Observer(
-            builder: (_) {
-              final enabledItems = itemStore.items
-                  .where((i) => i.isEnabled && i.sellsAtPos)
-                  .toList();
-              final allCategories = categoryStore.categoriesWithItems(
-                enabledItems,
-              );
-              return Column(
-                children: [
-                  // Search Bar
-                  Padding(
-                    padding: const EdgeInsets.all(12.0),
-                    child: AppTextField(
-                      controller: _searchController,
-                      hint: 'Search items…',
-                      icon: Icons.search_rounded,
+          child: ListenableBuilder(
+            listenable: ListSortService.instance,
+            builder: (context, _) => Observer(
+              builder: (_) {
+                final enabledItems = itemStore.items
+                    .where((i) => i.isEnabled && i.sellsAtPos)
+                    .toList();
+                final allCategories = _sortCategories(
+                  categoryStore.categoriesWithItems(enabledItems),
+                );
+                return Column(
+                  children: [
+                    // Search Bar
+                    Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: IntrinsicHeight(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(
+                              child: AppTextField(
+                                controller: _searchController,
+                                hint: 'Search items…',
+                                icon: Icons.search_rounded,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const ListSortButton(list: SortableList.posMenu),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
 
-                  // Favorites Button (pinned at top)
-                  _buildCategoryButton(
-                    icon: Icons.star_rounded,
-                    label: 'Favorites',
-                    isSelected: activeCategory == _kFavorites,
-                    onTap: () => setState(() => activeCategory = _kFavorites),
-                  ),
-
-                  // All Items Button
-                  _buildCategoryButton(
-                    icon: Icons.grid_view,
-                    label: 'All Items',
-                    isSelected: activeCategory == null,
-                    onTap: () => setState(() => activeCategory = null),
-                  ),
-
-                  // Category List
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: allCategories.length,
-                      itemBuilder: (context, index) {
-                        final category = allCategories[index];
-                        return _buildCategoryButton(
-                          icon: Icons.folder_outlined,
-                          label: category.name,
-                          isSelected: activeCategory == category.id,
-                          onTap: () =>
-                              setState(() => activeCategory = category.id),
-                        );
-                      },
+                    // Favorites Button (pinned at top)
+                    _buildCategoryButton(
+                      icon: Icons.star_rounded,
+                      label: 'Favorites',
+                      isSelected: activeCategory == _kFavorites,
+                      onTap: () => setState(() => activeCategory = _kFavorites),
                     ),
-                  ),
-                ],
-              );
-            },
+
+                    // All Items Button
+                    _buildCategoryButton(
+                      icon: Icons.grid_view,
+                      label: 'All Items',
+                      isSelected: activeCategory == null,
+                      onTap: () => setState(() => activeCategory = null),
+                    ),
+
+                    // Category List
+                    Expanded(
+                      child: ListView.builder(
+                        itemCount: allCategories.length,
+                        itemBuilder: (context, index) {
+                          final category = allCategories[index];
+                          return _buildCategoryButton(
+                            icon: Icons.folder_outlined,
+                            label: category.name,
+                            isSelected: activeCategory == category.id,
+                            onTap: () =>
+                                setState(() => activeCategory = category.id),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
           ),
         ),
 
@@ -1347,103 +1427,115 @@ class _MenuScreenState extends State<MenuScreen>
                 )
               : Stack(
                   children: [
-                    Observer(
-                      builder: (_) {
-                        final hasItems =
-                            restaurantCartStore.cartItems.isNotEmpty;
-                        // No cart snapshot: each grid card observes its own
-                        // in-cart badge state (see `_buildGridItemCard`).
-                        final allItems = itemStore.items;
-                        var filteredItems = allItems
-                            .where((item) => item.isEnabled && item.sellsAtPos)
-                            .toList();
-
-                        if (activeCategory == _kFavorites) {
-                          filteredItems = filteredItems
-                              .where((item) => item.isFavorite)
-                              .toList();
-                        } else if (activeCategory != null) {
-                          filteredItems = filteredItems
-                              .where(
-                                (item) => item.categoryOfItem == activeCategory,
-                              )
-                              .toList();
-                        }
-
-                        if (query.isNotEmpty) {
-                          final lowerQuery = query.toLowerCase();
-                          filteredItems = filteredItems
-                              .where(
-                                (item) =>
-                                    item.name.toLowerCase().contains(
-                                      lowerQuery,
-                                    ) ||
-                                    (item.itemCode != null &&
-                                        item.itemCode!.toLowerCase().contains(
-                                          lowerQuery,
-                                        )),
-                              )
-                              .toList();
-                        }
-
-                        if (filteredItems.isEmpty) {
-                          return AppEmptyState(
-                            icon: Icons.search_off_rounded,
-                            title: 'No items found',
-                            message: query.isNotEmpty
-                                ? 'Try a different search term.'
-                                : 'No items in this category yet.',
+                    ListenableBuilder(
+                      listenable: ListSortService.instance,
+                      builder: (context, _) => Observer(
+                        builder: (_) {
+                          final hasItems =
+                              restaurantCartStore.cartItems.isNotEmpty;
+                          // No cart snapshot: each grid card observes its own
+                          // in-cart badge state (see `_buildGridItemCard`).
+                          final allItems = itemStore.items;
+                          // Sorted once here; the category/favourite/search
+                          // narrowing below is all `.where`, which keeps order.
+                          var filteredItems = _sortItems(
+                            allItems
+                                .where(
+                                  (item) => item.isEnabled && item.sellsAtPos,
+                                )
+                                .toList(),
                           );
-                        }
 
-                        final isDesktop = AppResponsive.isDesktop(context);
-                        final aspectRatio = AppResponsive.getValue(
-                          context,
-                          mobile: 0.75,
-                          tablet: 0.70,
-                          // Ignored on desktop — mainAxisExtent pins the height there instead.
-                          desktop: 0.75,
-                        );
+                          if (activeCategory == _kFavorites) {
+                            filteredItems = filteredItems
+                                .where((item) => item.isFavorite)
+                                .toList();
+                          } else if (activeCategory != null) {
+                            filteredItems = filteredItems
+                                .where(
+                                  (item) =>
+                                      item.categoryOfItem == activeCategory,
+                                )
+                                .toList();
+                          }
 
-                        return Padding(
-                          padding: EdgeInsets.only(
-                            bottom: (hasItems && !showCartPane) ? 80 : 16,
-                          ),
-                          // Measures the grid pane, not the screen. Only the
-                          // bottom padding sits above this, so maxWidth is the
-                          // true width the cells divide up.
-                          child: LayoutBuilder(
-                            builder: (context, constraints) {
-                              final gridColumns = isDesktop
-                                  ? menuGridColumnsForPane(constraints.maxWidth)
-                                  : AppResponsive.gridColumns(
-                                      context,
-                                      mobile: 2,
-                                      tablet: 3,
-                                      desktop: 4,
-                                    );
-                              return GridView.builder(
-                                padding: const EdgeInsets.all(16),
-                                gridDelegate:
-                                    SliverGridDelegateWithFixedCrossAxisCount(
-                                      crossAxisCount: gridColumns,
-                                      crossAxisSpacing: 16,
-                                      mainAxisSpacing: 16,
-                                      // Absolute height on desktop — see
-                                      // kMenuItemCardHeightDesktop.
-                                      mainAxisExtent: isDesktop
-                                          ? kMenuItemCardHeightDesktop
-                                          : null,
-                                      childAspectRatio: aspectRatio,
-                                    ),
-                                itemCount: filteredItems.length,
-                                itemBuilder: (context, index) =>
-                                    _buildGridItemCard(filteredItems[index]),
-                              );
-                            },
-                          ),
-                        );
-                      },
+                          if (query.isNotEmpty) {
+                            final lowerQuery = query.toLowerCase();
+                            filteredItems = filteredItems
+                                .where(
+                                  (item) =>
+                                      item.name.toLowerCase().contains(
+                                        lowerQuery,
+                                      ) ||
+                                      (item.itemCode != null &&
+                                          item.itemCode!.toLowerCase().contains(
+                                            lowerQuery,
+                                          )),
+                                )
+                                .toList();
+                          }
+
+                          if (filteredItems.isEmpty) {
+                            return AppEmptyState(
+                              icon: Icons.search_off_rounded,
+                              title: 'No items found',
+                              message: query.isNotEmpty
+                                  ? 'Try a different search term.'
+                                  : 'No items in this category yet.',
+                            );
+                          }
+
+                          final isDesktop = AppResponsive.isDesktop(context);
+                          final aspectRatio = AppResponsive.getValue(
+                            context,
+                            mobile: 0.75,
+                            tablet: 0.70,
+                            // Ignored on desktop — mainAxisExtent pins the height there instead.
+                            desktop: 0.75,
+                          );
+
+                          return Padding(
+                            padding: EdgeInsets.only(
+                              bottom: (hasItems && !showCartPane) ? 80 : 16,
+                            ),
+                            // Measures the grid pane, not the screen. Only the
+                            // bottom padding sits above this, so maxWidth is the
+                            // true width the cells divide up.
+                            child: LayoutBuilder(
+                              builder: (context, constraints) {
+                                final gridColumns = isDesktop
+                                    ? menuGridColumnsForPane(
+                                        constraints.maxWidth,
+                                      )
+                                    : AppResponsive.gridColumns(
+                                        context,
+                                        mobile: 2,
+                                        tablet: 3,
+                                        desktop: 4,
+                                      );
+                                return GridView.builder(
+                                  padding: const EdgeInsets.all(16),
+                                  gridDelegate:
+                                      SliverGridDelegateWithFixedCrossAxisCount(
+                                        crossAxisCount: gridColumns,
+                                        crossAxisSpacing: 16,
+                                        mainAxisSpacing: 16,
+                                        // Absolute height on desktop — see
+                                        // kMenuItemCardHeightDesktop.
+                                        mainAxisExtent: isDesktop
+                                            ? kMenuItemCardHeightDesktop
+                                            : null,
+                                        childAspectRatio: aspectRatio,
+                                      ),
+                                  itemCount: filteredItems.length,
+                                  itemBuilder: (context, index) =>
+                                      _buildGridItemCard(filteredItems[index]),
+                                );
+                              },
+                            ),
+                          );
+                        },
+                      ),
                     ),
 
                     // Fixed Cart Bar at Bottom — only when the cart is not
@@ -2427,8 +2519,8 @@ class _GridItemCard extends StatelessObserverWidget {
                     ),
                   ),
                 ),
-              ],
-            ),
+            ],
+          ),
         );
       },
     );

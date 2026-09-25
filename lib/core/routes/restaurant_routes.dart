@@ -9,6 +9,15 @@ import 'package:billberrylite/presentation/screens/restaurant/Reports/refundDeta
 import 'package:billberrylite/presentation/screens/restaurant/Reports/salesbyCategory/salesbycategory.dart';
 import 'package:billberrylite/presentation/screens/restaurant/Reports/salesbyItem/salesbyitem.dart';
 import 'package:billberrylite/presentation/screens/restaurant/Reports/totalsales/totalsales.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Reports/purchase/restaurant_damaged_items_report_screen.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Reports/purchase/restaurant_grn_report_screen.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Reports/purchase/restaurant_low_stock_report_screen.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Reports/purchase/restaurant_purchase_return_report_screen.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Reports/purchase/restaurant_stock_adjustment_report_screen.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Reports/purchase/restaurant_supplier_statement_report_screen.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Reports/purchase/restaurant_purchase_order_status_report_screen.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Reports/purchase/restaurant_purchase_summary_report_screen.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Reports/purchase/restaurant_supplier_wise_purchase_report_screen.dart';
 import 'package:billberrylite/presentation/screens/restaurant/Settings/data_generator_screen.dart';
 import 'package:billberrylite/presentation/screens/common/attendance/staff_attendance_screen.dart';
 import 'package:billberrylite/presentation/screens/common/attendance/attendance_report_screen.dart';
@@ -64,6 +73,7 @@ import 'package:billberrylite/presentation/screens/restaurant/online%20Order/mis
 
 // Restaurant - Inventory
 import 'package:billberrylite/presentation/screens/restaurant/inventory/manage_Inventory.dart';
+import 'package:billberrylite/presentation/screens/restaurant/inventory/low_stock_screen.dart';
 
 // Restaurant - Staff
 import 'package:billberrylite/presentation/screens/common/staff/manage_staff_screen.dart';
@@ -228,6 +238,14 @@ class RestaurantRoutes {
       EntKeys.inventory,
     ),
 
+    // Same role + entitlement as the Inventory hub it lives under, so reaching
+    // it from a notification can't bypass a gate the hub would have applied.
+    RouteNames.restaurantLowStock: _guard(
+      const LowStockScreen(),
+      'inventory',
+      EntKeys.inventory,
+    ),
+
     // Restaurant - Staff
     RouteNames.restaurantStaff: _guard(
       const ManageStaffScreen(),
@@ -272,6 +290,65 @@ class RestaurantRoutes {
       const Totalsales(),
       'reports',
       EntKeys.reportsTotalSale,
+    ),
+
+    // ── Purchasing reports ──────────────────────────────────────────────
+    // All three PO-status routes share EntKeys.reportsPoStatus: they are
+    // named constructors of one screen over one dataset.
+    RouteNames.restaurantReportsPurchaseSummary: _guard(
+      const RestaurantPurchaseSummaryReportScreen(),
+      'reports',
+      EntKeys.reportsPurchaseSummary,
+    ),
+    RouteNames.restaurantReportsSupplierPurchase: _guard(
+      const RestaurantSupplierWisePurchaseReportScreen(),
+      'reports',
+      EntKeys.reportsSupplierPurchase,
+    ),
+    RouteNames.restaurantReportsPoPending: _guard(
+      const RestaurantPurchaseOrderStatusReportScreen.pending(),
+      'reports',
+      EntKeys.reportsPoStatus,
+    ),
+    RouteNames.restaurantReportsPoPartial: _guard(
+      const RestaurantPurchaseOrderStatusReportScreen.partiallyReceived(),
+      'reports',
+      EntKeys.reportsPoStatus,
+    ),
+    RouteNames.restaurantReportsPoCompleted: _guard(
+      const RestaurantPurchaseOrderStatusReportScreen.completed(),
+      'reports',
+      EntKeys.reportsPoStatus,
+    ),
+    RouteNames.restaurantReportsGrn: _guard(
+      const RestaurantGRNReportScreen(),
+      'reports',
+      EntKeys.reportsGrn,
+    ),
+    RouteNames.restaurantReportsDamagedItems: _guard(
+      const RestaurantDamagedItemsReportScreen(),
+      'reports',
+      EntKeys.reportsDamagedItems,
+    ),
+    RouteNames.restaurantReportsPurchaseReturn: _guard(
+      const RestaurantPurchaseReturnReportScreen(),
+      'reports',
+      EntKeys.reportsPurchaseReturn,
+    ),
+    RouteNames.restaurantReportsStockAdjustment: _guard(
+      const RestaurantStockAdjustmentReportScreen(),
+      'reports',
+      EntKeys.reportsStockAdjustment,
+    ),
+    RouteNames.restaurantReportsLowStock: _guard(
+      const RestaurantLowStockReportScreen(),
+      'reports',
+      EntKeys.reportsLowStock,
+    ),
+    RouteNames.restaurantReportsSupplierStatement: _guard(
+      const RestaurantSupplierStatementReportScreen(),
+      'reports',
+      EntKeys.reportsSupplierStatement,
     ),
     RouteNames.restaurantReportsSalesBYItem: _guard(
       Salesbyitem(),

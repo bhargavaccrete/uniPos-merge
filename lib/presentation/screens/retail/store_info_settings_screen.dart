@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
 import 'package:billberrylite/core/config/food_license_rule.dart';
+import 'package:billberrylite/core/config/postal_code_rule.dart';
 import 'package:billberrylite/core/config/tax_id_rule.dart';
 import 'package:billberrylite/domain/services/restaurant/day_management_service.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
@@ -435,11 +436,20 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
                           Expanded(
                             child: _buildTextField(
                               controller: _pincodeController,
-                              label: 'Pincode',
+                              // Follows the saved country — this screen runs
+                              // after setup, so BusinessDetails.country is set.
+                              label: PostalCodeRule.label,
                               icon: Icons.pin_drop,
-                              hint: '400001',
-                              keyboardType: TextInputType.number,
-                              maxLength: 6,
+                              hint: PostalCodeRule.hint,
+                              keyboardType: PostalCodeRule.digitsOnly
+                                  ? TextInputType.number
+                                  : TextInputType.text,
+                              maxLength: PostalCodeRule.maxLength,
+                              inputFormatters: PostalCodeRule.digitsOnly
+                                  ? [FilteringTextInputFormatter.digitsOnly]
+                                  : null,
+                              textCapitalization: TextCapitalization.characters,
+                              validator: PostalCodeRule.validate,
                             ),
                           ),
                         ],

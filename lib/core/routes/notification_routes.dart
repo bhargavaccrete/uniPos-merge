@@ -20,9 +20,13 @@ class NotificationRoutes {
       ? RouteNames.notifications
       : RouteNames.restaurantNotifications;
 
+  /// Both modes land on the list that can actually restock, not on a hub.
+  /// Restaurant used to point at `restaurantInventory` because the low-stock
+  /// screen had no named route — it was only reachable by a push from inside
+  /// the hub, so a tap left you one step short of the fix.
   static String? get lowStock => AppConfig.isRetail
       ? RouteNames.stockAlerts
-      : RouteNames.restaurantInventory;
+      : RouteNames.restaurantLowStock;
 
   /// Retail-only: restaurant does not raise `expiry_alert`.
   static String? get expiry =>

@@ -8,6 +8,8 @@ import 'package:billberrylite/domain/services/common/notification_service.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_empty_state.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/common/list_sort_button.dart';
+import 'package:billberrylite/domain/services/common/list_sort_service.dart';
 import 'package:billberrylite/presentation/widget/componets/common/dialog_dispose_scope.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:billberrylite/presentation/widget/componets/common/row_action_button.dart';
@@ -68,12 +70,26 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen>
 
   /// MUST be read inside an Observer — this is what registers the MobX
   /// dependency on the category list.
+  ///
+  /// The single funnel for both the list and the grid, so sorting here covers
+  /// every layout. `applySort` copies before sorting, which matters: the
+  /// no-search branch used to hand back the store's own `ObservableList`.
   List<Category> get _filteredCategories {
-    if (_searchQuery.isEmpty) return categoryStore.categories;
-    final query = _searchQuery.toLowerCase();
-    return categoryStore.categories
-        .where((cat) => cat.name.toLowerCase().contains(query))
-        .toList();
+    final filtered = _searchQuery.isEmpty
+        ? categoryStore.categories.toList()
+        : categoryStore.categories
+              .where(
+                (cat) =>
+                    cat.name.toLowerCase().contains(_searchQuery.toLowerCase()),
+              )
+              .toList();
+
+    return applySort(
+      filtered,
+      ListSortService.instance.optionFor(SortableList.retailCategories),
+      nameOf: (cat) => cat.name,
+      createdAtOf: (cat) => cat.createdTime,
+    );
   }
 
   @override
@@ -113,65 +129,68 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen>
 
   // ==================== BODY ====================
   Widget _buildBody(BuildContext context) {
-    return Observer(
-      builder: (context) {
-        if (categoryStore.isLoading) {
-          return const Center(child: CircularProgressIndicator());
-        }
+    return ListenableBuilder(
+      listenable: ListSortService.instance,
+      builder: (context, _) => Observer(
+        builder: (context) {
+          if (categoryStore.isLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-        final categories = _filteredCategories;
-        if (categories.isEmpty) return _buildEmptyState();
+          final categories = _filteredCategories;
+          if (categories.isEmpty) return _buildEmptyState();
 
-        // Phones read better as a list; wider screens fit a card grid.
-        if (AppResponsive.isMobile(context)) {
-          return ListView.builder(
+          // Phones read better as a list; wider screens fit a card grid.
+          if (AppResponsive.isMobile(context)) {
+            return ListView.builder(
+              padding: EdgeInsets.fromLTRB(
+                _gutter,
+                AppResponsive.mediumSpacing(context),
+                _gutter,
+                88,
+              ),
+              itemCount: categories.length,
+              itemBuilder: (context, index) =>
+                  _buildCategoryCard(categories[index]),
+            );
+          }
+
+          final columns = AppResponsive.gridColumns(
+            context,
+            mobile: 1,
+            tablet: 2,
+            desktop: 3,
+          );
+          final spacing = AppResponsive.getValue(
+            context,
+            mobile: 16.0,
+            tablet: 16.0,
+            desktop: 24.0,
+          );
+          return GridView.builder(
             padding: EdgeInsets.fromLTRB(
               _gutter,
               AppResponsive.mediumSpacing(context),
               _gutter,
               88,
             ),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: columns,
+              crossAxisSpacing: spacing,
+              mainAxisSpacing: spacing,
+              childAspectRatio: AppResponsive.getValue(
+                context,
+                mobile: 2.4,
+                tablet: 2.4,
+                desktop: 2.2,
+              ),
+            ),
             itemCount: categories.length,
             itemBuilder: (context, index) =>
                 _buildCategoryCard(categories[index]),
           );
-        }
-
-        final columns = AppResponsive.gridColumns(
-          context,
-          mobile: 1,
-          tablet: 2,
-          desktop: 3,
-        );
-        final spacing = AppResponsive.getValue(
-          context,
-          mobile: 16.0,
-          tablet: 16.0,
-          desktop: 24.0,
-        );
-        return GridView.builder(
-          padding: EdgeInsets.fromLTRB(
-            _gutter,
-            AppResponsive.mediumSpacing(context),
-            _gutter,
-            88,
-          ),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: columns,
-            crossAxisSpacing: spacing,
-            mainAxisSpacing: spacing,
-            childAspectRatio: AppResponsive.getValue(
-              context,
-              mobile: 2.4,
-              tablet: 2.4,
-              desktop: 2.2,
-            ),
-          ),
-          itemCount: categories.length,
-          itemBuilder: (context, index) =>
-              _buildCategoryCard(categories[index]),
-        );
-      },
+        },
+      ),
     );
   }
 
@@ -214,24 +233,37 @@ class _CategoryManagementScreenState extends State<CategoryManagementScreen>
         _gutter,
         AppResponsive.largeSpacing(context),
       ),
-      child: AppTextField(
-        controller: _searchController,
-        hint: 'Search categories...',
-        icon: Icons.search_rounded,
-        // Only offered once there is something to clear.
-        suffixIcon: _searchQuery.isEmpty
-            ? null
-            : IconButton(
-                icon: Icon(
-                  Icons.close_rounded,
-                  color: AppColors.textSecondary,
-                  size: AppResponsive.iconSize(context),
-                ),
-                tooltip: 'Clear search',
-                visualDensity: VisualDensity.compact,
-                onPressed: _clearSearch,
+      // IntrinsicHeight + stretch sizes the sort button to match
+      // AppTextField's height without hardcoding it.
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: AppTextField(
+                controller: _searchController,
+                hint: 'Search categories...',
+                icon: Icons.search_rounded,
+                // Only offered once there is something to clear.
+                suffixIcon: _searchQuery.isEmpty
+                    ? null
+                    : IconButton(
+                        icon: Icon(
+                          Icons.close_rounded,
+                          color: AppColors.textSecondary,
+                          size: AppResponsive.iconSize(context),
+                        ),
+                        tooltip: 'Clear search',
+                        visualDensity: VisualDensity.compact,
+                        onPressed: _clearSearch,
+                      ),
+                onChanged: (value) => setState(() => _searchQuery = value),
               ),
-        onChanged: (value) => setState(() => _searchQuery = value),
+            ),
+            SizedBox(width: AppResponsive.smallSpacing(context)),
+            const ListSortButton(list: SortableList.retailCategories),
+          ],
+        ),
       ),
     );
   }

@@ -53,11 +53,14 @@ void main() {
   group('A. restaurant routes and severities are unchanged', () {
     setUp(useRestaurant);
 
-    test('low_stock → restaurant inventory, warning', () {
+    // Was `restaurantInventory` (the hub). A low-stock tap now lands on the
+    // Low Stock list itself, which is the screen that can restock — matching
+    // how retail has always routed its own low-stock events.
+    test('low_stock → restaurant low-stock list, warning', () {
       final v = NotificationPresenter.present(
         event('low_stock', {'name': 'Paneer', 'remaining': 2, 'unit': 'kg'}),
       );
-      expect(v.route, RouteNames.restaurantInventory);
+      expect(v.route, RouteNames.restaurantLowStock);
       expect(v.severity, AlertSeverity.warning);
       expect(v.channelId, NotificationChannels.lowStock);
       expect(v.title, 'Low Stock');

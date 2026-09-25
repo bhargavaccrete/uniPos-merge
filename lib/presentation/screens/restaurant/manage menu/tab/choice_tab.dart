@@ -8,6 +8,8 @@ import 'package:billberrylite/presentation/widget/componets/common/app_dialog.da
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/common/list_sort_button.dart';
+import 'package:billberrylite/domain/services/common/list_sort_service.dart';
 import 'package:billberrylite/data/models/restaurant/db/choicemodel_306.dart';
 import 'package:billberrylite/data/models/restaurant/db/choiceoptionmodel_307.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
@@ -738,39 +740,55 @@ class _ChoiceTabState extends State<ChoiceTab>
 
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      body: Column(
-        children: [
-          // Modern Search Bar
-          Padding(
-            padding: AppResponsive.padding(context),
-            child: AppTextField(
-              controller: searchController,
-              hint: 'Search choices…',
-              icon: Icons.search_rounded,
-              suffixIcon: query.isNotEmpty
-                  ? IconButton(
-                      icon: Icon(
-                        Icons.clear,
-                        color: Colors.grey,
-                        size: AppResponsive.iconSize(context),
+      body: ListenableBuilder(
+        listenable: ListSortService.instance,
+        builder: (context, _) => Column(
+          children: [
+            // Modern Search Bar
+            Padding(
+              padding: AppResponsive.padding(context),
+              // IntrinsicHeight + stretch sizes the sort button to match
+              // AppTextField's height without hardcoding it.
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: AppTextField(
+                        controller: searchController,
+                        hint: 'Search choices…',
+                        icon: Icons.search_rounded,
+                        suffixIcon: query.isNotEmpty
+                            ? IconButton(
+                                icon: Icon(
+                                  Icons.clear,
+                                  color: Colors.grey,
+                                  size: AppResponsive.iconSize(context),
+                                ),
+                                onPressed: () {
+                                  searchController.clear();
+                                },
+                              )
+                            : null,
                       ),
-                      onPressed: () {
-                        searchController.clear();
-                      },
-                    )
-                  : null,
+                    ),
+                    SizedBox(width: AppResponsive.smallSpacing(context)),
+                    const ListSortButton(list: SortableList.choices),
+                  ],
+                ),
+              ),
             ),
-          ),
 
-          // Choices List
-          Expanded(
-            child: isTablet
-                ? _buildTabletLayout(size)
-                : _buildMobileLayout(size),
-          ),
+            // Choices List
+            Expanded(
+              child: isTablet
+                  ? _buildTabletLayout(size)
+                  : _buildMobileLayout(size),
+            ),
 
-          if (_canAddChoice) _buildAddButton(),
-        ],
+            if (_canAddChoice) _buildAddButton(),
+          ],
+        ),
       ),
     );
   }
@@ -836,15 +854,23 @@ class _ChoiceTabState extends State<ChoiceTab>
     );
   }
 
+  /// Both layouts route through here, so the sort is applied once.
   List<ChoicesModel> _getFilteredChoices() {
     final allchoice = choiceStore.choices.toList();
-    return query.isEmpty
+    final filtered = query.isEmpty
         ? allchoice
         : allchoice.where((choice) {
             final name = choice.name.toLowerCase();
             final queryLower = query.toLowerCase();
             return name.contains(queryLower);
           }).toList();
+
+    return applySort(
+      filtered,
+      ListSortService.instance.optionFor(SortableList.choices),
+      nameOf: (choice) => choice.name,
+      createdAtOf: (choice) => choice.createdTime,
+    );
   }
 
   Widget _buildEmptyState(double height) {

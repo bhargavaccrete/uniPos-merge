@@ -12,7 +12,9 @@ import 'package:billberrylite/data/models/restaurant/db/itemmodel_302.dart';
 import 'package:billberrylite/data/models/common/categorymodel_300.dart';
 import 'package:billberrylite/presentation/screens/restaurant/manage%20menu/tab/edit_item.dart'
     show EdititemScreen;
+import 'package:billberrylite/presentation/widget/componets/common/list_sort_button.dart';
 import 'package:billberrylite/presentation/widget/componets/restaurant/componets/bottomsheet.dart';
+import 'package:billberrylite/domain/services/common/list_sort_service.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/util/images.dart';
 import '../../../../../util/restaurant/audit_trail_helper.dart';
@@ -124,72 +126,99 @@ class _AllTabState extends State<ItemsTab> with AutomaticKeepAliveClientMixin {
 
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      body: Column(
-        children: [
-          // Modern Search Bar
-          Padding(
-            padding: AppResponsive.padding(context),
-            child: AppTextField(
-              controller: searchController,
-              hint: 'Search items…',
-              icon: Icons.search_rounded,
-              suffixIcon: query.isNotEmpty
-                  ? IconButton(
-                      icon: Icon(
-                        Icons.clear,
-                        color: Colors.grey,
-                        size: AppResponsive.iconSize(context),
+      // Rebuilds both the sort button's label and the list order when the
+      // stored preference arrives or the user picks a new one.
+      body: ListenableBuilder(
+        listenable: ListSortService.instance,
+        builder: (context, _) {
+          final sort = ListSortService.instance.optionFor(SortableList.items);
+          return Column(
+            children: [
+              // Modern Search Bar
+              Padding(
+                padding: AppResponsive.padding(context),
+                // IntrinsicHeight + stretch sizes the sort button to match
+                // AppTextField's height without hardcoding it.
+                child: IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        child: AppTextField(
+                          controller: searchController,
+                          hint: 'Search items…',
+                          icon: Icons.search_rounded,
+                          suffixIcon: query.isNotEmpty
+                              ? IconButton(
+                                  icon: Icon(
+                                    Icons.clear,
+                                    color: Colors.grey,
+                                    size: AppResponsive.iconSize(context),
+                                  ),
+                                  onPressed: () {
+                                    searchController.clear();
+                                  },
+                                )
+                              : null,
+                        ),
                       ),
-                      onPressed: () {
-                        searchController.clear();
-                      },
-                    )
-                  : null,
-            ),
-          ),
+                      SizedBox(width: AppResponsive.smallSpacing(context)),
+                      const ListSortButton(list: SortableList.items),
+                    ],
+                  ),
+                ),
+              ),
 
-          // Items List
-          Expanded(
-            child: isTablet
-                ? _buildTabletLayout(size)
-                : _buildMobileLayout(size),
-          ),
+              // Items List
+              Expanded(
+                child: isTablet
+                    ? _buildTabletLayout(size, sort)
+                    : _buildMobileLayout(size, sort),
+              ),
 
-          // Bottom Sheet Menu — Add Item bar (admin/manager + add entitlement).
-          if (_canAddItem)
-            BottomsheetMenu(
-              onCategorySelected: (category) {
-                setState(() {});
-              },
-              onItemAdded: () {
-                NotificationService.instance.showSuccess(
-                  'Item added successfully!',
-                );
-              },
-            ),
-        ],
+              // Bottom Sheet Menu — Add Item bar (admin/manager + add entitlement).
+              if (_canAddItem)
+                BottomsheetMenu(
+                  onCategorySelected: (category) {
+                    setState(() {});
+                  },
+                  onItemAdded: () {
+                    NotificationService.instance.showSuccess(
+                      'Item added successfully!',
+                    );
+                  },
+                ),
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _buildMobileLayout(Size size) {
+  Widget _buildMobileLayout(Size size, ListSortOption sort) {
     return Observer(
       builder: (_) {
         final allItem = itemStore.items.toList();
         final categorybox = categoryStore.categories;
 
-        // Filter items by search query and selected category
-        final filteredItems = allItem.where((item) {
-          final matchesQuery =
-              query.isEmpty ||
-              item.name.toLowerCase().contains(query.toLowerCase()) ||
-              (item.itemCode != null &&
-                  item.itemCode!.toLowerCase().contains(query.toLowerCase()));
-          final matchesCategory =
-              widget.selectedCategory == null ||
-              item.categoryOfItem == widget.selectedCategory;
-          return matchesQuery && matchesCategory;
-        }).toList();
+        // Filter items by search query and selected category, then order them
+        // by the tab's chosen sort.
+        final filteredItems = applySort(
+          allItem.where((item) {
+            final matchesQuery =
+                query.isEmpty ||
+                item.name.toLowerCase().contains(query.toLowerCase()) ||
+                (item.itemCode != null &&
+                    item.itemCode!.toLowerCase().contains(query.toLowerCase()));
+            final matchesCategory =
+                widget.selectedCategory == null ||
+                item.categoryOfItem == widget.selectedCategory;
+            return matchesQuery && matchesCategory;
+          }).toList(),
+          sort,
+          nameOf: (item) => item.name,
+          createdAtOf: (item) => item.createdTime,
+        );
 
         if (filteredItems.isEmpty) {
           return Center(
@@ -408,24 +437,30 @@ class _AllTabState extends State<ItemsTab> with AutomaticKeepAliveClientMixin {
     );
   }
 
-  Widget _buildTabletLayout(Size size) {
+  Widget _buildTabletLayout(Size size, ListSortOption sort) {
     return Observer(
       builder: (_) {
         final allItem = itemStore.items.toList();
         final categorybox = categoryStore.categories;
 
-        // Filter items by search query and selected category
-        final filteredItems = allItem.where((item) {
-          final matchesQuery =
-              query.isEmpty ||
-              item.name.toLowerCase().contains(query.toLowerCase()) ||
-              (item.itemCode != null &&
-                  item.itemCode!.toLowerCase().contains(query.toLowerCase()));
-          final matchesCategory =
-              widget.selectedCategory == null ||
-              item.categoryOfItem == widget.selectedCategory;
-          return matchesQuery && matchesCategory;
-        }).toList();
+        // Filter items by search query and selected category, then order them
+        // by the tab's chosen sort.
+        final filteredItems = applySort(
+          allItem.where((item) {
+            final matchesQuery =
+                query.isEmpty ||
+                item.name.toLowerCase().contains(query.toLowerCase()) ||
+                (item.itemCode != null &&
+                    item.itemCode!.toLowerCase().contains(query.toLowerCase()));
+            final matchesCategory =
+                widget.selectedCategory == null ||
+                item.categoryOfItem == widget.selectedCategory;
+            return matchesQuery && matchesCategory;
+          }).toList(),
+          sort,
+          nameOf: (item) => item.name,
+          createdAtOf: (item) => item.createdTime,
+        );
 
         if (filteredItems.isEmpty) {
           return Center(

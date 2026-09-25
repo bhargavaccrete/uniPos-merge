@@ -71,6 +71,23 @@ class EntKeys {
   static const reportsPerformanceStatistics = 'reports.performance_statistics';
   static const reportsPaymentMode = 'reports.payment_mode';
 
+  // Purchasing reports. Mirrors retail's `retail.reports.*` strings minus the
+  // prefix, matching the existing reports.attendance <-> retail.reports.
+  // attendance symmetry.
+  //
+  // ONE key for all three PO-status tiles — they are named constructors of a
+  // single screen over the same data, so granting Pending but not Completed
+  // would be indefensible.
+  static const reportsPurchaseSummary = 'reports.purchase_summary';
+  static const reportsSupplierPurchase = 'reports.supplier_purchase';
+  static const reportsPoStatus = 'reports.po_status';
+  static const reportsGrn = 'reports.grn';
+  static const reportsDamagedItems = 'reports.damaged_items';
+  static const reportsPurchaseReturn = 'reports.purchase_return';
+  static const reportsStockAdjustment = 'reports.stock_adjustment';
+  static const reportsLowStock = 'reports.low_stock';
+  static const reportsSupplierStatement = 'reports.supplier_statement';
+
   // ── Actions ──────────────────────────────────────────────────────────────────
   static const billingInvoiceCreate = 'billing.invoice.create';
   static const billingInvoiceEdit = 'billing.invoice.edit';
@@ -168,6 +185,29 @@ const Map<String, Object> kEntitlementDefaults = {
   EntKeys.reportsCashDrawerHistory: false,
   EntKeys.reportsPerformanceStatistics: false,
   EntKeys.reportsPaymentMode: false,
+
+  // Purchasing reports — TRUE, unlike every other report key, and deliberately.
+  //
+  // The server does not know these keys at all: they were added with the
+  // reports and no manifest has ever sent them. `Entitlements.can` resolves
+  // `_map[key] ?? kEntitlementDefaults[key]`, so a `false` here would hide a
+  // shipped, working feature on every licensed shop to satisfy a contract the
+  // backend has not entered into yet. `true` means "allowed until the server
+  // has an opinion".
+  //
+  // **Nothing needs changing when the backend does ship them** — a manifest
+  // value always wins over the catalog, so the day these keys appear in a
+  // manifest they start governing, grant or deny, with no code edit. At that
+  // point flip these to `false` so the catalog mirrors the server again.
+  EntKeys.reportsPurchaseSummary: true,
+  EntKeys.reportsSupplierPurchase: true,
+  EntKeys.reportsPoStatus: true,
+  EntKeys.reportsGrn: true,
+  EntKeys.reportsDamagedItems: true,
+  EntKeys.reportsPurchaseReturn: true,
+  EntKeys.reportsStockAdjustment: true,
+  EntKeys.reportsLowStock: true,
+  EntKeys.reportsSupplierStatement: true,
 
   // Actions
   EntKeys.billingInvoiceCreate: false,

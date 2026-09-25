@@ -114,7 +114,8 @@ abstract class _RestaurantPurchaseOrderStore with Store {
       errorMessage = null;
 
       final poId = _uuid.v4();
-      final poNumber = restaurantPurchaseOrderRepository.generatePONumber();
+      final poNumber =
+          await restaurantPurchaseOrderRepository.generatePONumber();
 
       final totalItems = lines.fold<double>(0, (sum, l) => sum + l.qty);
       final estimatedTotal =
@@ -162,15 +163,128 @@ abstract class _RestaurantPurchaseOrderStore with Store {
     purchaseOrders[index] = updated;
   }
 
+  /// Rewrites a DRAFT purchase order in place. Returns the updated PO, or
+  /// null when the order may no longer be edited.
+  ///
+  /// Takes [poId] rather than a model because the caller holds a snapshot
+  /// captured when the card was tapped — re-reading here means the draft-only
+  /// rule is enforced against current state, not against what another screen
+  /// saw a minute ago.
+  ///
+  /// The draft check MUST stay in this store, not only in the UI. Line rows
+  /// are deleted and recreated (the item model has no copyWith), which mints
+  /// fresh poItemIds — and RestaurantGRNItemModel.poItemId points at those.
+  /// Editing a PO that had receipts against it would leave every GRN line
+  /// pointing at a key nothing queries: the receipts stay in the box but
+  /// getTotalReceivedQtyForPOItem silently returns 0 for all of them.
+  @action
+  Future<RestaurantPurchaseOrderModel?> updatePurchaseOrder({
+    required String poId,
+    required String supplierId,
+    String? supplierName,
+    required String expectedDeliveryDate,
+    String? notes,
+    required List<PurchaseOrderLine> lines,
+  }) async {
+    final existing =
+        restaurantPurchaseOrderRepository.getPurchaseOrderById(poId);
+    if (existing == null || !existing.canEdit) return null;
+    // Belt and braces: a draft can't have receipts today (confirmGRN needs
+    // canReceive), so this only fires on data written by an older build.
+    if (restaurantGrnRepository.getGRNsByPOId(poId).isNotEmpty) return null;
+
+    try {
+      isLoading = true;
+      errorMessage = null;
+
+      // Same folds as createPurchaseOrder. totalItems is summed QUANTITY, not
+      // a line count — the GRN rollup compares received qty against it, so
+      // lines.length here would close a 500kg PO after 3 units arrived.
+      final totalItems = lines.fold<double>(0, (sum, l) => sum + l.qty);
+      final estimatedTotal =
+          lines.fold<double>(0, (sum, l) => sum + (l.qty * (l.price ?? 0)));
+
+      // Built explicitly rather than via copyWith: copyWith coalesces with
+      // `notes ?? this.notes`, so clearing the notes field would silently keep
+      // the old note. poId / poNumber / createdAt / status are carried over —
+      // the number is what a human quotes, and a preserved createdAt keeps the
+      // newest-first list ordering unchanged by an edit.
+      final updated = RestaurantPurchaseOrderModel(
+        poId: existing.poId,
+        poNumber: existing.poNumber,
+        supplierId: supplierId,
+        supplierName: supplierName,
+        expectedDeliveryDate: expectedDeliveryDate,
+        totalItems: totalItems,
+        estimatedTotal: estimatedTotal,
+        status: existing.status,
+        notes: notes,
+        createdAt: existing.createdAt,
+        updatedAt: DateTime.now().toIso8601String(),
+      );
+
+      // Rows before header. Hive has no transaction, so if the line loop
+      // throws part-way the header still describes the OLD totals rather than
+      // advertising figures for rows that were never written.
+      await restaurantPurchaseOrderItemRepository.deleteItemsByPOId(poId);
+      for (final line in lines) {
+        final poItem = RestaurantPurchaseOrderItemModel.create(
+          poId: poId,
+          itemId: line.itemId,
+          itemName: line.itemName,
+          orderedQty: line.qty,
+          estimatedPrice: line.price,
+        );
+        await restaurantPurchaseOrderItemRepository.saveItem(poItem);
+      }
+      await restaurantPurchaseOrderRepository.savePurchaseOrder(updated);
+
+      final index = purchaseOrders.indexWhere((p) => p.poId == poId);
+      if (index != -1) purchaseOrders[index] = updated;
+      return updated;
+    } finally {
+      isLoading = false;
+    }
+  }
+
+  /// Permanently removes a DRAFT purchase order and its line rows.
+  /// Returns false when the guard rejects.
+  @action
+  Future<bool> deletePurchaseOrder(String poId) async {
+    if (!canDeletePurchaseOrder(poId)) return false;
+
+    // Items first, header second — the inverse of retail's order, deliberately.
+    // A failure between the two then leaves a header with no lines: visible in
+    // the list and re-deletable. The other way round leaves orphan item rows
+    // keyed by a poId nothing queries, which accumulate invisibly forever.
+    await restaurantPurchaseOrderItemRepository.deleteItemsByPOId(poId);
+    await restaurantPurchaseOrderRepository.deletePurchaseOrder(poId);
+    purchaseOrders.removeWhere((p) => p.poId == poId);
+    return true;
+  }
+
+  /// Draft-only AND nothing received against it: a GRN stores poId, so
+  /// deleting the PO would orphan the receiving history and the stock it
+  /// already moved.
+  ///
+  /// Synchronous — unlike retail's, because both reads here are. Reads
+  /// repositories rather than observables, so it needs no @action.
+  bool canDeletePurchaseOrder(String poId) {
+    final po = restaurantPurchaseOrderRepository.getPurchaseOrderById(poId);
+    if (po == null || !po.canEdit) return false;
+    return restaurantGrnRepository.getGRNsByPOId(poId).isEmpty;
+  }
+
   // ==================== GOODS RECEIVING (GRN) ====================
 
   /// Confirms a goods receipt against [poId] — the ONLY place raw-material
   /// stock increments (mirrors retail's `confirmGRN`, but atomic here: it
   /// creates and saves the GRN + its items AND moves stock in one action).
   ///
-  /// Note: unlike the ordered-item id, the GRN's own id/number are generated
-  /// by [RestaurantGRNModel.create] itself (like [RestaurantPurchaseOrderModel]
-  /// generates via the repository) — so this only needs the PO context and
+  /// Note: the GRN's own id is generated by [RestaurantGRNModel.create], but
+  /// its NUMBER is minted here from the repository's shared
+  /// `DocumentNumberService` counter — that writes to Hive, so it cannot run
+  /// inside a synchronous factory. This still only needs the PO context and
   /// the collected receiving lines, not a pre-made grnId.
   @action
   Future<List<RestaurantGRNItemModel>> confirmGRN({
@@ -202,6 +316,7 @@ abstract class _RestaurantPurchaseOrderStore with Store {
           0, (sum, l) => sum + (l.receivedQty * (l.costPrice ?? 0)));
 
       final grn = RestaurantGRNModel.create(
+        grnNumber: await restaurantGrnRepository.generateGRNNumber(),
         poId: poId,
         poNumber: poNumber,
         supplierId: supplierId,

@@ -4,7 +4,9 @@ import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:lottie/lottie.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/common/list_sort_button.dart';
 import 'package:billberrylite/presentation/widget/componets/restaurant/componets/bottomsheet.dart';
+import 'package:billberrylite/domain/services/common/list_sort_service.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
@@ -63,576 +65,633 @@ class _AllTabState extends State<AllTab> with AutomaticKeepAliveClientMixin {
 
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      body: Column(
-        children: [
-          // Modern Search Bar
-          Padding(
-            padding: AppResponsive.padding(context),
-            child: AppTextField(
-              controller: searchController,
-              hint: 'Search categories or items…',
-              icon: Icons.search_rounded,
-              suffixIcon: query.isNotEmpty
-                  ? IconButton(
-                      icon: Icon(
-                        Icons.clear,
-                        color: Colors.grey,
-                        size: AppResponsive.iconSize(context),
+      body: ListenableBuilder(
+        listenable: ListSortService.instance,
+        builder: (context, _) => Column(
+          children: [
+            // Modern Search Bar
+            Padding(
+              padding: AppResponsive.padding(context),
+              // IntrinsicHeight + stretch sizes the sort button to match
+              // AppTextField's height without hardcoding it.
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: AppTextField(
+                        controller: searchController,
+                        hint: 'Search categories or items…',
+                        icon: Icons.search_rounded,
+                        suffixIcon: query.isNotEmpty
+                            ? IconButton(
+                                icon: Icon(
+                                  Icons.clear,
+                                  color: Colors.grey,
+                                  size: AppResponsive.iconSize(context),
+                                ),
+                                onPressed: () {
+                                  searchController.clear();
+                                },
+                              )
+                            : null,
                       ),
-                      onPressed: () {
-                        searchController.clear();
-                      },
-                    )
-                  : null,
+                    ),
+                    SizedBox(width: AppResponsive.smallSpacing(context)),
+                    const ListSortButton(list: SortableList.all),
+                  ],
+                ),
+              ),
             ),
-          ),
 
-          // Content Area
-          Expanded(
-            child: Observer(
-              builder: (_) {
-                final allCategories = categoryStore.categories.toList();
-                final allItems = itemStore.items.toList();
-                final allVariants = variantStore.variants.toList();
+            // Content Area
+            Expanded(
+              child: Observer(
+                builder: (_) {
+                  final sort = ListSortService.instance.optionFor(
+                    SortableList.all,
+                  );
+                  final allCategories = categoryStore.categories.toList();
+                  final allItems = itemStore.items.toList();
+                  final allVariants = variantStore.variants.toList();
 
-                // Build per-category item map, filtered by search when active
-                final Map<String, List<Items>> categoryItemsMap = {};
-                if (query.isEmpty) {
-                  for (var category in allCategories) {
-                    categoryItemsMap[category.id] = allItems
-                        .where((item) => item.categoryOfItem == category.id)
-                        .toList();
-                  }
-                } else {
-                  final queryLower = query.toLowerCase();
-                  for (var category in allCategories) {
-                    final catItems = allItems
-                        .where((item) => item.categoryOfItem == category.id)
-                        .toList();
-                    final catNameMatches = category.name.toLowerCase().contains(
-                      queryLower,
-                    );
-                    if (catNameMatches) {
-                      // Category name matches — show all its items
-                      categoryItemsMap[category.id] = catItems;
-                    } else {
-                      // Show category only if it has items matching the query
-                      final matchingItems = catItems
-                          .where(
-                            (item) =>
-                                item.name.toLowerCase().contains(queryLower) ||
-                                (item.itemCode != null &&
-                                    item.itemCode!.toLowerCase().contains(
-                                      queryLower,
-                                    )),
-                          )
+                  // The chosen sort applies at BOTH levels here — the category
+                  // cards and the items listed inside each one.
+                  List<Items> sortItems(List<Items> rows) => applySort(
+                    rows,
+                    sort,
+                    nameOf: (item) => item.name,
+                    createdAtOf: (item) => item.createdTime,
+                  );
+
+                  // Build per-category item map, filtered by search when active
+                  final Map<String, List<Items>> categoryItemsMap = {};
+                  if (query.isEmpty) {
+                    for (var category in allCategories) {
+                      categoryItemsMap[category.id] = sortItems(
+                        allItems
+                            .where((item) => item.categoryOfItem == category.id)
+                            .toList(),
+                      );
+                    }
+                  } else {
+                    final queryLower = query.toLowerCase();
+                    for (var category in allCategories) {
+                      final catItems = allItems
+                          .where((item) => item.categoryOfItem == category.id)
                           .toList();
-                      if (matchingItems.isNotEmpty) {
-                        categoryItemsMap[category.id] = matchingItems;
+                      final catNameMatches = category.name
+                          .toLowerCase()
+                          .contains(queryLower);
+                      if (catNameMatches) {
+                        // Category name matches — show all its items
+                        categoryItemsMap[category.id] = sortItems(catItems);
+                      } else {
+                        // Show category only if it has items matching the query
+                        final matchingItems = catItems
+                            .where(
+                              (item) =>
+                                  item.name.toLowerCase().contains(
+                                    queryLower,
+                                  ) ||
+                                  (item.itemCode != null &&
+                                      item.itemCode!.toLowerCase().contains(
+                                        queryLower,
+                                      )),
+                            )
+                            .toList();
+                        if (matchingItems.isNotEmpty) {
+                          categoryItemsMap[category.id] = sortItems(
+                            matchingItems,
+                          );
+                        }
                       }
                     }
                   }
-                }
 
-                final filtercat = query.isEmpty
-                    ? allCategories
-                    : allCategories
-                          .where((cat) => categoryItemsMap.containsKey(cat.id))
-                          .toList();
-
-                if (filtercat.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Lottie.asset(
-                          AppImages.notfoundanimation,
-                          height: height * 0.25,
-                        ),
-                        SizedBox(height: AppResponsive.largeSpacing(context)),
-                        Text(
-                          query.isEmpty
-                              ? 'No Categories Found!'
-                              : 'No matching results',
-                          style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.subheadingFontSize(context),
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey.shade700,
-                          ),
-                        ),
-                        SizedBox(height: AppResponsive.smallSpacing(context)),
-                        Text(
-                          'Start by adding categories to organize your menu',
-                          style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.smallFontSize(context),
-                            color: Colors.grey.shade500,
-                          ),
-                        ),
-                      ],
-                    ),
+                  final filtercat = applySort(
+                    query.isEmpty
+                        ? allCategories
+                        : allCategories
+                              .where(
+                                (cat) => categoryItemsMap.containsKey(cat.id),
+                              )
+                              .toList(),
+                    sort,
+                    nameOf: (cat) => cat.name,
+                    createdAtOf: (cat) => cat.createdTime,
                   );
-                }
 
-                return ListView.builder(
-                  padding: AppResponsive.padding(context),
-                  itemCount: filtercat.length,
-                  itemBuilder: (context, index) {
-                    final cat = filtercat[index];
-                    final items = categoryItemsMap[cat.id] ?? [];
-
-                    // Create or get key for this category
-                    if (!_categoryKeys.containsKey(cat.id)) {
-                      _categoryKeys[cat.id] = GlobalKey();
-                    }
-
-                    return Card(
-                      key: _categoryKeys[cat.id],
-                      margin: EdgeInsets.only(
-                        bottom: AppResponsive.mediumSpacing(context),
-                      ),
-                      elevation: 2,
-                      color: AppColors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(
-                          AppResponsive.borderRadius(context),
-                        ),
-                      ),
-                      child: Theme(
-                        data: Theme.of(
-                          context,
-                        ).copyWith(dividerColor: Colors.transparent),
-                        child: ExpansionTile(
-                          childrenPadding: EdgeInsets.only(bottom: 12),
-                          leading: Container(
-                            padding: EdgeInsets.all(
-                              AppResponsive.smallSpacing(context),
+                  if (filtercat.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Lottie.asset(
+                            AppImages.notfoundanimation,
+                            height: height * 0.25,
+                          ),
+                          SizedBox(height: AppResponsive.largeSpacing(context)),
+                          Text(
+                            query.isEmpty
+                                ? 'No Categories Found!'
+                                : 'No matching results',
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.subheadingFontSize(
+                                context,
+                              ),
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey.shade700,
                             ),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(
-                                AppResponsive.smallBorderRadius(context),
+                          ),
+                          SizedBox(height: AppResponsive.smallSpacing(context)),
+                          Text(
+                            'Start by adding categories to organize your menu',
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.smallFontSize(context),
+                              color: Colors.grey.shade500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return ListView.builder(
+                    padding: AppResponsive.padding(context),
+                    itemCount: filtercat.length,
+                    itemBuilder: (context, index) {
+                      final cat = filtercat[index];
+                      final items = categoryItemsMap[cat.id] ?? [];
+
+                      // Create or get key for this category
+                      if (!_categoryKeys.containsKey(cat.id)) {
+                        _categoryKeys[cat.id] = GlobalKey();
+                      }
+
+                      return Card(
+                        key: _categoryKeys[cat.id],
+                        margin: EdgeInsets.only(
+                          bottom: AppResponsive.mediumSpacing(context),
+                        ),
+                        elevation: 2,
+                        color: AppColors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(
+                            AppResponsive.borderRadius(context),
+                          ),
+                        ),
+                        child: Theme(
+                          data: Theme.of(
+                            context,
+                          ).copyWith(dividerColor: Colors.transparent),
+                          child: ExpansionTile(
+                            childrenPadding: EdgeInsets.only(bottom: 12),
+                            leading: Container(
+                              padding: EdgeInsets.all(
+                                AppResponsive.smallSpacing(context),
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(
+                                  AppResponsive.smallBorderRadius(context),
+                                ),
+                              ),
+                              child: Icon(
+                                Icons.restaurant_menu,
+                                color: AppColors.primary,
+                                size: AppResponsive.iconSize(context),
                               ),
                             ),
-                            child: Icon(
-                              Icons.restaurant_menu,
-                              color: AppColors.primary,
-                              size: AppResponsive.iconSize(context),
-                            ),
-                          ),
-                          title: Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  cat.name,
-                                  style: GoogleFonts.poppins(
-                                    fontSize: AppResponsive.bodyFontSize(
-                                      context,
+                            title: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    cat.name,
+                                    style: GoogleFonts.poppins(
+                                      fontSize: AppResponsive.bodyFontSize(
+                                        context,
+                                      ),
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.textPrimary,
                                     ),
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.textPrimary,
                                   ),
                                 ),
-                              ),
-                              if (items.isNotEmpty) ...[
-                                SizedBox(
-                                  width: AppResponsive.smallSpacing(context),
-                                ),
-                                () {
-                                  final allEnabled = items.every(
-                                    (i) => i.isEnabled,
-                                  );
-                                  final fg = allEnabled
-                                      ? Colors.orange.shade700
-                                      : Colors.green.shade700;
-                                  return GestureDetector(
-                                    onTap: () =>
-                                        _bulkToggleCategory(cat.id, items),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: allEnabled
-                                            ? Colors.orange.shade50
-                                            : Colors.green.shade50,
-                                        borderRadius: BorderRadius.circular(20),
-                                        border: Border.all(
+                                if (items.isNotEmpty) ...[
+                                  SizedBox(
+                                    width: AppResponsive.smallSpacing(context),
+                                  ),
+                                  () {
+                                    final allEnabled = items.every(
+                                      (i) => i.isEnabled,
+                                    );
+                                    final fg = allEnabled
+                                        ? Colors.orange.shade700
+                                        : Colors.green.shade700;
+                                    return GestureDetector(
+                                      onTap: () =>
+                                          _bulkToggleCategory(cat.id, items),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 4,
+                                        ),
+                                        decoration: BoxDecoration(
                                           color: allEnabled
-                                              ? Colors.orange.shade200
-                                              : Colors.green.shade200,
+                                              ? Colors.orange.shade50
+                                              : Colors.green.shade50,
+                                          borderRadius: BorderRadius.circular(
+                                            20,
+                                          ),
+                                          border: Border.all(
+                                            color: allEnabled
+                                                ? Colors.orange.shade200
+                                                : Colors.green.shade200,
+                                          ),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              allEnabled
+                                                  ? Icons
+                                                        .visibility_off_outlined
+                                                  : Icons.visibility_outlined,
+                                              size: 13,
+                                              color: fg,
+                                            ),
+                                            // const SizedBox(width: 4),
+                                            // Text(
+                                            //   allEnabled ? 'Disable All' : 'Enable All',
+                                            //   style: GoogleFonts.poppins(
+                                            //     fontSize: 11,
+                                            //     fontWeight: FontWeight.w600,
+                                            //     color: fg,
+                                            //   ),
+                                            // ),
+                                          ],
                                         ),
                                       ),
+                                    );
+                                  }(),
+                                ],
+                              ],
+                            ),
+                            subtitle: Text(
+                              '${items.length} items',
+                              style: GoogleFonts.poppins(
+                                fontSize: AppResponsive.smallFontSize(context),
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                            children: items.isEmpty
+                                ? [
+                                    Padding(
+                                      padding: EdgeInsets.all(20),
                                       child: Row(
-                                        mainAxisSize: MainAxisSize.min,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
                                         children: [
                                           Icon(
-                                            allEnabled
-                                                ? Icons.visibility_off_outlined
-                                                : Icons.visibility_outlined,
-                                            size: 13,
-                                            color: fg,
+                                            Icons.inventory_2_outlined,
+                                            color: Colors.grey,
+                                            size: AppResponsive.iconSize(
+                                              context,
+                                            ),
                                           ),
-                                          // const SizedBox(width: 4),
-                                          // Text(
-                                          //   allEnabled ? 'Disable All' : 'Enable All',
-                                          //   style: GoogleFonts.poppins(
-                                          //     fontSize: 11,
-                                          //     fontWeight: FontWeight.w600,
-                                          //     color: fg,
-                                          //   ),
-                                          // ),
+                                          SizedBox(
+                                            width: AppResponsive.smallSpacing(
+                                              context,
+                                            ),
+                                          ),
+                                          Text(
+                                            "No items in this category",
+                                            style: GoogleFonts.poppins(
+                                              fontSize:
+                                                  AppResponsive.bodyFontSize(
+                                                    context,
+                                                  ),
+                                              color: Colors.grey.shade600,
+                                            ),
+                                          ),
                                         ],
                                       ),
                                     ),
-                                  );
-                                }(),
-                              ],
-                            ],
-                          ),
-                          subtitle: Text(
-                            '${items.length} items',
-                            style: GoogleFonts.poppins(
-                              fontSize: AppResponsive.smallFontSize(context),
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                          children: items.isEmpty
-                              ? [
-                                  Padding(
-                                    padding: EdgeInsets.all(20),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.inventory_2_outlined,
-                                          color: Colors.grey,
-                                          size: AppResponsive.iconSize(context),
+                                  ]
+                                : items.map((item) {
+                                    return Container(
+                                      margin: EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 6,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.white,
+                                        borderRadius: BorderRadius.circular(
+                                          AppResponsive.borderRadius(context),
                                         ),
-                                        SizedBox(
-                                          width: AppResponsive.smallSpacing(
-                                            context,
+                                        border: Border.all(
+                                          color: AppColors.divider.withOpacity(
+                                            0.5,
                                           ),
                                         ),
-                                        Text(
-                                          "No items in this category",
-                                          style: GoogleFonts.poppins(
-                                            fontSize:
-                                                AppResponsive.bodyFontSize(
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withOpacity(
+                                              0.03,
+                                            ),
+                                            blurRadius:
+                                                AppResponsive.shadowBlurRadius(
                                                   context,
                                                 ),
-                                            color: Colors.grey.shade600,
+                                            offset: Offset(0, 2),
                                           ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ]
-                              : items.map((item) {
-                                  return Container(
-                                    margin: EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 6,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.white,
-                                      borderRadius: BorderRadius.circular(
-                                        AppResponsive.borderRadius(context),
+                                        ],
                                       ),
-                                      border: Border.all(
-                                        color: AppColors.divider.withOpacity(
-                                          0.5,
-                                        ),
-                                      ),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withOpacity(0.03),
-                                          blurRadius:
-                                              AppResponsive.shadowBlurRadius(
-                                                context,
-                                              ),
-                                          offset: Offset(0, 2),
-                                        ),
-                                      ],
-                                    ),
-                                    child: Column(
-                                      children: [
-                                        // Item Header
-                                        Padding(
-                                          padding: EdgeInsets.all(14),
-                                          child: Row(
-                                            children: [
-                                              // Item Icon
-                                              Container(
-                                                width: 46,
-                                                height: 46,
-                                                decoration: BoxDecoration(
-                                                  color:
-                                                      AppColors.surfaceMedium,
-                                                  borderRadius:
-                                                      BorderRadius.circular(
-                                                        AppResponsive.borderRadius(
-                                                          context,
-                                                        ),
-                                                      ),
-                                                ),
-                                                child: Center(
-                                                  child: Icon(
-                                                    Icons.restaurant_menu,
-                                                    color:
-                                                        AppColors.textSecondary,
-                                                    size:
-                                                        AppResponsive.iconSize(
-                                                          context,
-                                                        ),
-                                                  ),
-                                                ),
-                                              ),
-                                              SizedBox(
-                                                width:
-                                                    AppResponsive.mediumSpacing(
-                                                      context,
-                                                    ),
-                                              ),
-
-                                              // Item Info
-                                              Expanded(
-                                                child: Column(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
-                                                      item.name,
-                                                      maxLines: 1,
-                                                      overflow:
-                                                          TextOverflow.ellipsis,
-                                                      style: GoogleFonts.poppins(
-                                                        fontSize:
-                                                            AppResponsive.bodyFontSize(
-                                                              context,
-                                                            ),
-                                                        fontWeight:
-                                                            FontWeight.w600,
-                                                        color: AppColors
-                                                            .textPrimary,
-                                                      ),
-                                                    ),
-                                                    SizedBox(height: 6),
-                                                    Text(
-                                                      "${CurrencyHelper.currentSymbol}${item.price != null ? DecimalSettings.formatAmount(item.price!) : "N/A"}",
-                                                      style: GoogleFonts.poppins(
-                                                        fontSize:
-                                                            AppResponsive.bodyFontSize(
-                                                              context,
-                                                            ),
-                                                        fontWeight:
-                                                            FontWeight.w700,
-                                                        color:
-                                                            AppColors.primary,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-
-                                              // Status Toggle
-                                              Transform.scale(
-                                                scale: 0.9,
-                                                child: Switch(
-                                                  activeColor: Colors.white,
-                                                  activeTrackColor:
-                                                      Colors.green,
-                                                  inactiveThumbColor:
-                                                      Colors.white70,
-                                                  inactiveTrackColor:
-                                                      Colors.red.shade300,
-                                                  value: item.isEnabled,
-                                                  onChanged:
-                                                      (bool value) async {
-                                                        await itemStore
-                                                            .toggleItemStatus(
-                                                              item.id,
-                                                            );
-                                                      },
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-
-                                        // Variants Section
-                                        if (item.variant != null &&
-                                            item.variant!.isNotEmpty)
-                                          Container(
-                                            padding: EdgeInsets.symmetric(
-                                              horizontal: 16,
-                                              vertical: 12,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: Colors.grey.shade50,
-                                              borderRadius: BorderRadius.only(
-                                                bottomLeft: Radius.circular(
-                                                  AppResponsive.borderRadius(
-                                                    context,
-                                                  ),
-                                                ),
-                                                bottomRight: Radius.circular(
-                                                  AppResponsive.borderRadius(
-                                                    context,
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
+                                      child: Column(
+                                        children: [
+                                          // Item Header
+                                          Padding(
+                                            padding: EdgeInsets.all(14),
+                                            child: Row(
                                               children: [
-                                                Row(
-                                                  children: [
-                                                    Icon(
-                                                      Icons.tune,
-                                                      size: 14,
-                                                      color: AppColors.primary,
+                                                // Item Icon
+                                                Container(
+                                                  width: 46,
+                                                  height: 46,
+                                                  decoration: BoxDecoration(
+                                                    color:
+                                                        AppColors.surfaceMedium,
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          AppResponsive.borderRadius(
+                                                            context,
+                                                          ),
+                                                        ),
+                                                  ),
+                                                  child: Center(
+                                                    child: Icon(
+                                                      Icons.restaurant_menu,
+                                                      color: AppColors
+                                                          .textSecondary,
+                                                      size:
+                                                          AppResponsive.iconSize(
+                                                            context,
+                                                          ),
                                                     ),
-                                                    SizedBox(width: 6),
-                                                    Text(
-                                                      "Variants (${item.variant!.length})",
-                                                      style: GoogleFonts.poppins(
-                                                        fontSize:
-                                                            AppResponsive.smallFontSize(
-                                                              context,
-                                                            ),
-                                                        fontWeight:
-                                                            FontWeight.w600,
-                                                        color:
-                                                            AppColors.primary,
-                                                      ),
-                                                    ),
-                                                  ],
+                                                  ),
                                                 ),
                                                 SizedBox(
-                                                  height:
-                                                      AppResponsive.smallSpacing(
+                                                  width:
+                                                      AppResponsive.mediumSpacing(
                                                         context,
                                                       ),
                                                 ),
-                                                ...item.variant!.map((variant) {
-                                                  final variantData =
-                                                      allVariants.firstWhere(
-                                                        (v) =>
-                                                            v.id ==
-                                                            variant.variantId,
-                                                        orElse: () =>
-                                                            VariantModel(
-                                                              id: variant
-                                                                  .variantId,
-                                                              name: 'Unknown',
-                                                            ),
-                                                      );
-                                                  return Container(
-                                                    margin: EdgeInsets.only(
-                                                      bottom: 6,
-                                                    ),
-                                                    padding:
-                                                        EdgeInsets.symmetric(
-                                                          horizontal: 12,
-                                                          vertical: 8,
+
+                                                // Item Info
+                                                Expanded(
+                                                  child: Column(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
+                                                    children: [
+                                                      Text(
+                                                        item.name,
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                        style: GoogleFonts.poppins(
+                                                          fontSize:
+                                                              AppResponsive.bodyFontSize(
+                                                                context,
+                                                              ),
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                          color: AppColors
+                                                              .textPrimary,
                                                         ),
-                                                    decoration: BoxDecoration(
-                                                      color: AppColors.white,
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                            AppResponsive.smallBorderRadius(
-                                                              context,
-                                                            ),
-                                                          ),
-                                                      border: Border.all(
-                                                        color: AppColors.divider
-                                                            .withOpacity(0.5),
                                                       ),
-                                                    ),
-                                                    child: Row(
-                                                      mainAxisAlignment:
-                                                          MainAxisAlignment
-                                                              .spaceBetween,
-                                                      children: [
-                                                        Row(
-                                                          children: [
-                                                            Container(
-                                                              width: 6,
-                                                              height: 6,
-                                                              decoration: BoxDecoration(
-                                                                color: AppColors
-                                                                    .primary,
-                                                                shape: BoxShape
-                                                                    .circle,
+                                                      SizedBox(height: 6),
+                                                      Text(
+                                                        "${CurrencyHelper.currentSymbol}${item.price != null ? DecimalSettings.formatAmount(item.price!) : "N/A"}",
+                                                        style: GoogleFonts.poppins(
+                                                          fontSize:
+                                                              AppResponsive.bodyFontSize(
+                                                                context,
                                                               ),
-                                                            ),
-                                                            SizedBox(
-                                                              width:
-                                                                  AppResponsive.smallSpacing(
-                                                                    context,
-                                                                  ),
-                                                            ),
-                                                            Text(
-                                                              variantData.name,
-                                                              style: GoogleFonts.poppins(
-                                                                fontSize:
-                                                                    AppResponsive.smallFontSize(
-                                                                      context,
-                                                                    ),
-                                                                color: Colors
-                                                                    .grey
-                                                                    .shade700,
-                                                              ),
-                                                            ),
-                                                          ],
+                                                          fontWeight:
+                                                              FontWeight.w700,
+                                                          color:
+                                                              AppColors.primary,
                                                         ),
-                                                        Text(
-                                                          "${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(variant.price)}",
-                                                          style: GoogleFonts.poppins(
-                                                            fontSize:
-                                                                AppResponsive.smallFontSize(
-                                                                  context,
-                                                                ),
-                                                            fontWeight:
-                                                                FontWeight.w600,
-                                                            color:
-                                                                Colors.black87,
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  );
-                                                }).toList(),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+
+                                                // Status Toggle
+                                                Transform.scale(
+                                                  scale: 0.9,
+                                                  child: Switch(
+                                                    activeColor: Colors.white,
+                                                    activeTrackColor:
+                                                        Colors.green,
+                                                    inactiveThumbColor:
+                                                        Colors.white70,
+                                                    inactiveTrackColor:
+                                                        Colors.red.shade300,
+                                                    value: item.isEnabled,
+                                                    onChanged:
+                                                        (bool value) async {
+                                                          await itemStore
+                                                              .toggleItemStatus(
+                                                                item.id,
+                                                              );
+                                                        },
+                                                  ),
+                                                ),
                                               ],
                                             ),
                                           ),
-                                      ],
-                                    ),
-                                  );
-                                }).toList(),
-                        ),
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
-          ),
 
-          // Bottom Sheet Menu
-          if (_canEdit)
-            BottomsheetMenu(
-              onItemAdded: () {
-                // Show success feedback
-                NotificationService.instance.showSuccess(
-                  'Item added successfully!',
-                );
-              },
+                                          // Variants Section
+                                          if (item.variant != null &&
+                                              item.variant!.isNotEmpty)
+                                            Container(
+                                              padding: EdgeInsets.symmetric(
+                                                horizontal: 16,
+                                                vertical: 12,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: Colors.grey.shade50,
+                                                borderRadius: BorderRadius.only(
+                                                  bottomLeft: Radius.circular(
+                                                    AppResponsive.borderRadius(
+                                                      context,
+                                                    ),
+                                                  ),
+                                                  bottomRight: Radius.circular(
+                                                    AppResponsive.borderRadius(
+                                                      context,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Row(
+                                                    children: [
+                                                      Icon(
+                                                        Icons.tune,
+                                                        size: 14,
+                                                        color:
+                                                            AppColors.primary,
+                                                      ),
+                                                      SizedBox(width: 6),
+                                                      Text(
+                                                        "Variants (${item.variant!.length})",
+                                                        style: GoogleFonts.poppins(
+                                                          fontSize:
+                                                              AppResponsive.smallFontSize(
+                                                                context,
+                                                              ),
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                          color:
+                                                              AppColors.primary,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  SizedBox(
+                                                    height:
+                                                        AppResponsive.smallSpacing(
+                                                          context,
+                                                        ),
+                                                  ),
+                                                  ...item.variant!.map((
+                                                    variant,
+                                                  ) {
+                                                    final variantData =
+                                                        allVariants.firstWhere(
+                                                          (v) =>
+                                                              v.id ==
+                                                              variant.variantId,
+                                                          orElse: () =>
+                                                              VariantModel(
+                                                                id: variant
+                                                                    .variantId,
+                                                                name: 'Unknown',
+                                                              ),
+                                                        );
+                                                    return Container(
+                                                      margin: EdgeInsets.only(
+                                                        bottom: 6,
+                                                      ),
+                                                      padding:
+                                                          EdgeInsets.symmetric(
+                                                            horizontal: 12,
+                                                            vertical: 8,
+                                                          ),
+                                                      decoration: BoxDecoration(
+                                                        color: AppColors.white,
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              AppResponsive.smallBorderRadius(
+                                                                context,
+                                                              ),
+                                                            ),
+                                                        border: Border.all(
+                                                          color: AppColors
+                                                              .divider
+                                                              .withOpacity(0.5),
+                                                        ),
+                                                      ),
+                                                      child: Row(
+                                                        mainAxisAlignment:
+                                                            MainAxisAlignment
+                                                                .spaceBetween,
+                                                        children: [
+                                                          Row(
+                                                            children: [
+                                                              Container(
+                                                                width: 6,
+                                                                height: 6,
+                                                                decoration: BoxDecoration(
+                                                                  color: AppColors
+                                                                      .primary,
+                                                                  shape: BoxShape
+                                                                      .circle,
+                                                                ),
+                                                              ),
+                                                              SizedBox(
+                                                                width:
+                                                                    AppResponsive.smallSpacing(
+                                                                      context,
+                                                                    ),
+                                                              ),
+                                                              Text(
+                                                                variantData
+                                                                    .name,
+                                                                style: GoogleFonts.poppins(
+                                                                  fontSize:
+                                                                      AppResponsive.smallFontSize(
+                                                                        context,
+                                                                      ),
+                                                                  color: Colors
+                                                                      .grey
+                                                                      .shade700,
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                          Text(
+                                                            "${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(variant.price)}",
+                                                            style: GoogleFonts.poppins(
+                                                              fontSize:
+                                                                  AppResponsive.smallFontSize(
+                                                                    context,
+                                                                  ),
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w600,
+                                                              color: Colors
+                                                                  .black87,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    );
+                                                  }).toList(),
+                                                ],
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    );
+                                  }).toList(),
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
             ),
-        ],
+
+            // Bottom Sheet Menu
+            if (_canEdit)
+              BottomsheetMenu(
+                onItemAdded: () {
+                  // Show success feedback
+                  NotificationService.instance.showSuccess(
+                    'Item added successfully!',
+                  );
+                },
+              ),
+          ],
+        ),
       ),
     );
   }

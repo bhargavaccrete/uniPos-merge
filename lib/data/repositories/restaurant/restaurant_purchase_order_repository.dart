@@ -1,9 +1,12 @@
 import 'package:hive/hive.dart';
 import 'package:billberrylite/core/constants/hive_box_names.dart';
+import '../../../domain/services/common/document_number_service.dart';
 import '../../models/restaurant/db/restaurant_purchase_order_model.dart';
 import '../../models/restaurant/db/restaurant_purchase_order_item_model.dart';
 
 class RestaurantPurchaseOrderRepository {
+  final _numbers = DocumentNumberService();
+
   Box<RestaurantPurchaseOrderModel> get _box =>
       Hive.box<RestaurantPurchaseOrderModel>(HiveBoxNames.restaurantPurchaseOrders);
 
@@ -25,16 +28,18 @@ class RestaurantPurchaseOrderRepository {
     await _box.delete(id);
   }
 
-  /// `PO-YYYYMMDD-XXX`, matching retail's numbering convention.
-  String generatePONumber() {
-    final now = DateTime.now();
-    final datePart =
-        '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
-    final todayCount = _box.values
-        .where((po) => po.poNumber.startsWith('PO-$datePart'))
-        .length;
-    final seq = (todayCount + 1).toString().padLeft(3, '0');
-    return 'PO-$datePart-$seq';
+  /// `PO-00001` — one continuous series per FINANCIAL year, via the shared
+  /// [DocumentNumberService], exactly as retail's PurchaseOrderRepository does.
+  ///
+  /// This used to embed the date as `PO-YYYYMMDD-NNN`, which restarted the
+  /// sequence at 001 every morning — roughly 300 separate series a year
+  /// instead of one. The counter is stored, not derived by counting rows, so
+  /// deleting a draft can never hand its number to the next order.
+  Future<String> generatePONumber() {
+    return _numbers.next(
+      'PO',
+      isTaken: (number) => _box.values.any((po) => po.poNumber == number),
+    );
   }
 }
 

@@ -500,6 +500,7 @@ void main() {
       final s = await makeSupplier();
       final grnRepo = RestaurantGRNRepository();
       await grnRepo.saveGRN(RestaurantGRNModel.create(
+        grnNumber: 'GRN-00001',
         poId: 'po-1',
         poNumber: 'PO-001',
         supplierId: s.supplierId,
@@ -646,6 +647,7 @@ void main() {
         ),
       );
       final grn = RestaurantGRNModel.create(
+        grnNumber: 'GRN-00001',
         poId: 'po-1',
         poNumber: 'PO-001',
         supplierId: 'sup-1',

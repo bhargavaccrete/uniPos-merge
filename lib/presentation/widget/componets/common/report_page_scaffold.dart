@@ -30,8 +30,8 @@ class ReportExportData {
   });
 }
 
-/// Shared shell for every range-based retail report — purchasing and sales
-/// alike.
+/// Shared shell for every range-based report — retail and restaurant,
+/// purchasing and sales alike.
 ///
 /// They all need the same machinery — period selection, custom date range,
 /// loading, empty state, summary band, table, pagination and export — and
@@ -85,6 +85,17 @@ class ReportPageScaffold extends StatefulWidget {
   /// Base file name; the period and date are appended.
   final String exportFileName;
 
+  /// Whether the period filter bar is shown and a date window is passed to
+  /// [loader].
+  ///
+  /// False for reports that answer "what is true right now" rather than "what
+  /// happened in a period" — outstanding purchase orders, for example. Asking
+  /// those a date question is worse than useless: an order sent last month and
+  /// still undelivered would drop out of the default This Month view precisely
+  /// when chasing it matters most. With this false, [loader] is always called
+  /// with `(null, null)`.
+  final bool showDateRange;
+
   const ReportPageScaffold({
     super.key,
     required this.title,
@@ -101,6 +112,7 @@ class ReportPageScaffold extends StatefulWidget {
     this.rowUnit = 'rows',
     this.exportData,
     required this.exportFileName,
+    this.showDateRange = true,
   });
 
   @override
@@ -130,6 +142,8 @@ class _ReportPageScaffoldState extends State<ReportPageScaffold> {
   /// the following day, and a custom end date gets +1 day for the same reason.
   /// Without that the last day of a range silently drops out.
   (DateTime?, DateTime?) get _bounds {
+    // No date dimension: the loader sees the whole book.
+    if (!widget.showDateRange) return (null, null);
     if (_period == ReportPeriod.custom) {
       if (_customStart == null || _customEnd == null) return (null, null);
       final start = DateTime(
@@ -187,12 +201,14 @@ class _ReportPageScaffoldState extends State<ReportPageScaffold> {
     await ReportExportService.showExportDialog(
       context: context,
       fileName:
-          '${widget.exportFileName}_${_period.name.toLowerCase()}_${DateFormat('yyyyMMdd').format(DateTime.now())}',
+          '${widget.exportFileName}_'
+          '${widget.showDateRange ? _period.name.toLowerCase() : 'all'}_'
+          '${DateFormat('yyyyMMdd').format(DateTime.now())}',
       reportTitle: widget.title,
       headers: payload.headers,
       data: payload.rows,
       summary: {
-        'Report Period': _periodLabel,
+        'Report Period': widget.showDateRange ? _periodLabel : 'All time',
         ...payload.summary,
         'Generated': ReportExportService.formatDateTime(DateTime.now()),
       },
@@ -208,12 +224,14 @@ class _ReportPageScaffoldState extends State<ReportPageScaffold> {
         child: Column(
           children: [
             AppResponsive.verticalSpace(context, size: SpacingSize.small),
-            ReportPeriodFilterBar(
-              selected: _period,
-              onSelected: _onPeriodChanged,
-              featureNoun: widget.featureNoun,
-            ),
-            AppResponsive.verticalSpace(context, size: SpacingSize.small),
+            if (widget.showDateRange) ...[
+              ReportPeriodFilterBar(
+                selected: _period,
+                onSelected: _onPeriodChanged,
+                featureNoun: widget.featureNoun,
+              ),
+              AppResponsive.verticalSpace(context, size: SpacingSize.small),
+            ],
             Expanded(child: _buildContent()),
           ],
         ),
@@ -222,7 +240,9 @@ class _ReportPageScaffoldState extends State<ReportPageScaffold> {
   }
 
   Widget _buildContent() {
-    if (_period == ReportPeriod.custom) return _buildCustomRange();
+    if (widget.showDateRange && _period == ReportPeriod.custom) {
+      return _buildCustomRange();
+    }
     if (_isLoading) return const ReportLoading();
     if (_rows.isEmpty) return _emptyState();
     return ReportBody(child: _buildReport());

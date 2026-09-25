@@ -12,11 +12,14 @@ import 'package:billberrylite/presentation/screens/restaurant/inventory/purchase
 import 'package:billberrylite/presentation/screens/restaurant/inventory/purchase_order/goods_receiving_screen.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_empty_state.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/row_action_button.dart';
 import 'package:billberrylite/presentation/widget/componets/common/gradient_hero_header.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/util/common/quantity_format.dart';
 
 /// Restaurant Purchase Orders list — status badges, tap for a detail sheet,
 /// "Mark Sent" / "Receive" actions. See docs/inventory_recipe_system_plan.md §6.2.
@@ -59,19 +62,65 @@ String poStatusLabel(RestaurantPOStatus status) {
 }
 
 class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen> {
+  final TextEditingController _searchController = TextEditingController();
+
+  /// null = All.
+  RestaurantPOStatus? _statusFilter;
+
   @override
   void initState() {
     super.initState();
     restaurantSupplierStore.loadSuppliers();
   }
 
-  Future<void> _navigateToAdd() async {
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  /// Opens the PO form — create when [po] is null, edit otherwise.
+  Future<void> _navigateToPOForm({RestaurantPurchaseOrderModel? po}) async {
     final result = await Navigator.push<bool>(
       context,
-      MaterialPageRoute(builder: (_) => const AddPurchaseOrderScreen()),
+      MaterialPageRoute(builder: (_) => AddPurchaseOrderScreen(purchaseOrder: po)),
     );
     if (result == true) {
       restaurantPurchaseOrderStore.loadPurchaseOrders();
+    }
+  }
+
+  Future<void> _deletePO(RestaurantPurchaseOrderModel po) async {
+    if (!restaurantPurchaseOrderStore.canDeletePurchaseOrder(po.poId)) {
+      await showAppErrorDialog(
+        context: context,
+        title: "Can't delete ${po.poNumber}",
+        message: 'Only draft orders with no goods received can be deleted.',
+      );
+      return;
+    }
+
+    final confirmed = await showAppConfirmDialog(
+      context: context,
+      title: 'Delete ${po.poNumber}?',
+      message:
+          'The order and its items are removed permanently. This cannot be undone.',
+      confirmLabel: 'Delete',
+      accent: AppColors.danger,
+      icon: Icons.delete_outline,
+    );
+    if (!confirmed || !mounted) return;
+
+    final deleted = await restaurantPurchaseOrderStore.deletePurchaseOrder(
+      po.poId,
+    );
+    if (!mounted) return;
+    if (deleted) {
+      NotificationService.instance.showSuccess('${po.poNumber} deleted');
+    } else {
+      NotificationService.instance.showError(
+        '${po.poNumber} could not be deleted',
+      );
     }
   }
 
@@ -149,16 +198,47 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen> {
           builder: (context) {
             final pos = restaurantPurchaseOrderStore.purchaseOrders.toList();
 
-            final openCount = pos
-                .where(
-                  (p) =>
-                      p.statusEnum == RestaurantPOStatus.sent ||
-                      p.statusEnum == RestaurantPOStatus.partiallyReceived,
-                )
-                .length;
-            final draftCount = pos
-                .where((p) => p.statusEnum == RestaurantPOStatus.draft)
-                .length;
+            // One pass feeds both the hero stats and the filter pills.
+            // statusEnum is a firstWhere over the enum values on every call,
+            // so a single switch beats five chained .where()s.
+            var draftCount = 0;
+            var sentCount = 0;
+            var partialCount = 0;
+            var completedCount = 0;
+            for (final p in pos) {
+              switch (p.statusEnum) {
+                case RestaurantPOStatus.draft:
+                  draftCount++;
+                case RestaurantPOStatus.sent:
+                  sentCount++;
+                case RestaurantPOStatus.partiallyReceived:
+                  partialCount++;
+                case RestaurantPOStatus.completed:
+                  completedCount++;
+                case RestaurantPOStatus.cancelled:
+                  // Nothing in restaurant code ever writes this status, so it
+                  // gets no pill. A legacy record still shows under "All",
+                  // which is why the four counts may not sum to pos.length.
+                  break;
+              }
+            }
+            final openCount = sentCount + partialCount;
+
+            // Status + text in one pass over the already-materialized list —
+            // no repository round-trip, so an edit or delete shows up
+            // immediately. Same rule the return / claim registers use.
+            final query = _searchController.text.trim().toLowerCase();
+            final visible = (_statusFilter == null && query.isEmpty)
+                ? pos
+                : pos.where((p) {
+                    if (_statusFilter != null && p.statusEnum != _statusFilter) {
+                      return false;
+                    }
+                    if (query.isEmpty) return true;
+                    return p.poNumber.toLowerCase().contains(query) ||
+                        (p.supplierName?.toLowerCase().contains(query) ??
+                            false);
+                  }).toList();
 
             return Column(
               children: [
@@ -186,23 +266,68 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen> {
                     ),
                   ],
                 ),
+                // Search + pills, in the white band the return / claim
+                // registers use. Only rendered once there is something to
+                // filter — an empty search box over "No purchase orders yet"
+                // is noise, as are five zero-count pills.
+                if (pos.isNotEmpty)
+                  Container(
+                    color: AppColors.white,
+                    padding: EdgeInsets.fromLTRB(
+                      AppResponsive.padding(context).left,
+                      AppResponsive.mediumSpacing(context),
+                      AppResponsive.padding(context).right,
+                      AppResponsive.mediumSpacing(context),
+                    ),
+                    child: AppResponsive.constrainedContent(
+                      context: context,
+                      maxWidth: AppResponsive.maxContentWidth(context),
+                      alignment: Alignment.topCenter,
+                      child: Column(
+                        children: [
+                          AppTextField(
+                            controller: _searchController,
+                            hint: 'Search by PO number or supplier...',
+                            icon: Icons.search_rounded,
+                            onChanged: (_) => setState(() {}),
+                            suffixIcon: _searchController.text.isNotEmpty
+                                ? IconButton(
+                                    icon: Icon(
+                                      Icons.clear,
+                                      size: AppResponsive.smallIconSize(context),
+                                    ),
+                                    onPressed: () {
+                                      _searchController.clear();
+                                      setState(() {});
+                                    },
+                                  )
+                                : null,
+                          ),
+                          SizedBox(height: AppResponsive.mediumSpacing(context)),
+                          _buildStatusFilter(
+                            all: pos.length,
+                            draft: draftCount,
+                            sent: sentCount,
+                            partial: partialCount,
+                            completed: completedCount,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 // Hero stays full-bleed; only the card list narrows.
                 Expanded(
                   child: AppResponsive.constrainedContent(
                     context: context,
                     maxWidth: AppResponsive.maxContentWidth(context),
                     alignment: Alignment.topCenter,
-                    child: pos.isEmpty
-                        ? const AppEmptyState(
-                            icon: Icons.assignment_outlined,
-                            title: 'No purchase orders yet',
-                            message: 'Create your first PO using the + button',
-                          )
+                    child: visible.isEmpty
+                        ? _buildEmptyState()
                         : ListView.builder(
                             padding: AppResponsive.padding(context),
-                            itemCount: pos.length,
+                            itemCount: visible.length,
                             itemBuilder: (context, index) =>
-                                _buildPOCard(pos[index]),
+                                _buildPOCard(visible[index]),
                           ),
                   ),
                 ),
@@ -211,11 +336,117 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen> {
           },
         ),
         floatingActionButton: FloatingActionButton(
-          onPressed: _navigateToAdd,
+          onPressed: () => _navigateToPOForm(),
           backgroundColor: AppColors.primary,
           child: const Icon(Icons.add, color: Colors.white),
         ),
       ),
+    );
+  }
+
+  /// Status pills. Copied from the purchase-return / supplier-claim list
+  /// screens so the three registers filter identically: equal-width on
+  /// tablet and desktop, horizontally scrollable on mobile.
+  Widget _buildStatusFilter({
+    required int all,
+    required int draft,
+    required int sent,
+    required int partial,
+    required int completed,
+  }) {
+    // Not const, unlike the reference — the counts are runtime values. They
+    // are baked into the label so _statusChip's child stays a single Text and
+    // keeps working inside FittedBox; a separate count badge would need a Row,
+    // which scales badly under scaleDown.
+    final options = <(String, RestaurantPOStatus?)>[
+      ('All ($all)', null),
+      ('Draft ($draft)', RestaurantPOStatus.draft),
+      ('Sent ($sent)', RestaurantPOStatus.sent),
+      ('Partial ($partial)', RestaurantPOStatus.partiallyReceived),
+      ('Completed ($completed)', RestaurantPOStatus.completed),
+    ];
+
+    final height = AppResponsive.getValue(
+      context,
+      mobile: 34.0,
+      tablet: 40.0,
+      desktop: 44.0,
+    );
+    final gap = AppResponsive.smallSpacing(context);
+
+    if (!AppResponsive.isMobile(context)) {
+      return SizedBox(
+        height: height,
+        child: Row(
+          children: [
+            for (var i = 0; i < options.length; i++) ...[
+              if (i > 0) SizedBox(width: gap),
+              Expanded(child: _statusChip(options[i].$1, options[i].$2)),
+            ],
+          ],
+        ),
+      );
+    }
+
+    return SizedBox(
+      height: height,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: options.length,
+        separatorBuilder: (_, _) => SizedBox(width: gap),
+        itemBuilder: (context, index) =>
+            _statusChip(options[index].$1, options[index].$2),
+      ),
+    );
+  }
+
+  Widget _statusChip(String label, RestaurantPOStatus? status) {
+    final selected = _statusFilter == status;
+
+    return GestureDetector(
+      onTap: () => setState(() => _statusFilter = status),
+      child: Container(
+        alignment: Alignment.center,
+        padding: EdgeInsets.symmetric(
+          horizontal: AppResponsive.mediumSpacing(context),
+        ),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primary : AppColors.white,
+          borderRadius: BorderRadius.circular(
+            AppResponsive.smallBorderRadius(context),
+          ),
+          border: Border.all(
+            color: selected ? AppColors.primary : AppColors.divider,
+          ),
+        ),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            label,
+            maxLines: 1,
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.smallFontSize(context),
+              fontWeight: FontWeight.w600,
+              color: selected ? AppColors.white : AppColors.textSecondary,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    final searching = _searchController.text.trim().isNotEmpty;
+    final filtering = _statusFilter != null || searching;
+
+    return AppEmptyState(
+      icon: filtering
+          ? (searching ? Icons.search_off_rounded : Icons.filter_alt_off_rounded)
+          : Icons.assignment_outlined,
+      title: filtering ? 'No purchase orders match' : 'No purchase orders yet',
+      message: filtering
+          ? 'Try a different search or status filter.'
+          : 'Create your first PO using the + button',
     );
   }
 
@@ -278,6 +509,27 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen> {
                       ),
                     ),
                   ),
+                  // Draft-only, using the model's own guard. Visible buttons
+                  // rather than an overflow menu, matching RowActionButton's
+                  // stated convention for full-width rows. Non-draft cards
+                  // reserve no placeholder width — dead space on most cards
+                  // costs more than the title-width difference.
+                  if (po.canEdit) ...[
+                    SizedBox(width: AppResponsive.smallSpacing(context)),
+                    RowActionButton(
+                      icon: Icons.edit_outlined,
+                      color: AppColors.info,
+                      tooltip: 'Edit PO',
+                      onTap: () => _navigateToPOForm(po: po),
+                    ),
+                    const SizedBox(width: 6),
+                    RowActionButton(
+                      icon: Icons.delete_outline_rounded,
+                      color: AppColors.danger,
+                      tooltip: 'Delete PO',
+                      onTap: () => _deletePO(po),
+                    ),
+                  ],
                 ],
               ),
               SizedBox(height: AppResponsive.smallSpacing(context)),
@@ -301,9 +553,13 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen> {
                     'Delivery: ${_formatDate(po.expectedDeliveryDate)}',
                     AppColors.textSecondary,
                   ),
+                  // "Qty", not "items": totalItems stores the summed ordered
+                  // QUANTITY across lines, so 10kg cheese + 10 buns is 20 —
+                  // a size indicator, never a line count. formatQty kills the
+                  // trailing .0 that a whole double would otherwise print.
                   _metaItem(
                     Icons.inventory_2,
-                    '${po.totalItems} items',
+                    'Qty ${formatQty(po.totalItems)}',
                     AppColors.info,
                   ),
                   if (po.estimatedTotal > 0)
@@ -547,7 +803,7 @@ class _PODetailSheetState extends State<_PODetailSheet> {
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
-                                      'Qty: ${item.orderedQty}'
+                                      'Qty: ${formatQty(item.orderedQty)}'
                                       '${item.estimatedPrice != null ? ' @ ${formatMoney(item.estimatedPrice!)}' : ''}',
                                       style: GoogleFonts.poppins(
                                         fontSize: AppResponsive.smallFontSize(
@@ -653,11 +909,9 @@ String buildWhatsAppPOMessage({
     final itemDetail = allItems.where((i) => i.id == item.itemId).firstOrNull;
     final unit = itemDetail?.unit ?? '';
     final unitStr = unit.isNotEmpty ? ' $unit' : '';
-    final qty = item.orderedQty;
-    final cleanQty = qty == qty.toInt()
-        ? qty.toInt().toString()
-        : qty.toString();
-    buffer.writeln('- ${item.itemName} — Qty: $cleanQty$unitStr');
+    buffer.writeln(
+      '- ${item.itemName} — Qty: ${formatQty(item.orderedQty)}$unitStr',
+    );
   }
   buffer.writeln();
   buffer.writeln('Estimated Total: ${formatMoney(po.estimatedTotal)}');

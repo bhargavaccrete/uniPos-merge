@@ -38,10 +38,10 @@ class _LowStockScreenState extends State<LowStockScreen> {
   String _unitOf(Items item) =>
       normalizeItemUnit(item.unit) ?? item.unit ?? 'pcs';
 
-  /// Whether [item]'s quantity can be fractional, based on its actual Stock
-  /// Unit — only 'piece' (or no unit at all) is a whole-count unit.
-  /// `isSoldByWeight` doesn't apply to Raw Material/Semi-Finished and is
-  /// never set for them, so it can't decide this.
+  /// Whether [item]'s quantity can be fractional, based on its actual unit —
+  /// only 'piece' (or no unit at all) is a whole-count unit. The unit is the
+  /// authority here, not `isSoldByWeight`: legacy Raw Material/Semi-Finished
+  /// items carry a unit with no flag set.
   bool _allowsDecimals(Items item) {
     final normalized = normalizeItemUnit(item.unit);
     return normalized != null && normalized != 'piece';

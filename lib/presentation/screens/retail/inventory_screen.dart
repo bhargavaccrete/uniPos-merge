@@ -13,6 +13,8 @@ import 'package:billberrylite/domain/store/retail/product_store.dart';
 import 'package:billberrylite/domain/services/common/notification_service.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/common/list_sort_button.dart';
+import 'package:billberrylite/domain/services/common/list_sort_service.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_empty_state.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
@@ -131,7 +133,7 @@ class _InventoryScreenState extends State<InventoryScreen>
     String categoryLabel(ProductModel p) =>
         categoryStore.displayNameFor(p.category);
 
-    return productStore.products
+    final rows = productStore.products
         .where((product) {
           if (_searchQuery.isEmpty) return true;
           final categoryName = categoryLabel(product).toLowerCase();
@@ -167,6 +169,17 @@ class _InventoryScreenState extends State<InventoryScreen>
           );
         })
         .toList();
+
+    // Sorted at the single funnel, so the list and the grid can't disagree.
+    // `createdAt` is an ISO-8601 STRING on ProductModel, not a DateTime —
+    // tryParse returns null for a legacy/unparseable value, which applySort
+    // already sinks to the bottom rather than treating as epoch-zero.
+    return applySort(
+      rows,
+      ListSortService.instance.optionFor(SortableList.retailProducts),
+      nameOf: (row) => row.product.productName,
+      createdAtOf: (row) => DateTime.tryParse(row.product.createdAt),
+    );
   }
 
   Future<void> _openProductByBarcode(String barcode) async {
@@ -482,24 +495,27 @@ class _InventoryScreenState extends State<InventoryScreen>
       88,
     );
 
-    return Observer(
-      builder: (context) {
-        final rows = _visibleRows();
+    return ListenableBuilder(
+      listenable: ListSortService.instance,
+      builder: (context, _) => Observer(
+        builder: (context) {
+          final rows = _visibleRows();
 
-        if (rows.isEmpty) return _buildEmptyState();
+          if (rows.isEmpty) return _buildEmptyState();
 
-        return GridView.builder(
-          padding: padding,
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: columns,
-            crossAxisSpacing: spacing,
-            mainAxisSpacing: spacing,
-            mainAxisExtent: cellHeight,
-          ),
-          itemCount: rows.length,
-          itemBuilder: (context, index) => _buildProductGridCard(rows[index]),
-        );
-      },
+          return GridView.builder(
+            padding: padding,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: columns,
+              crossAxisSpacing: spacing,
+              mainAxisSpacing: spacing,
+              mainAxisExtent: cellHeight,
+            ),
+            itemCount: rows.length,
+            itemBuilder: (context, index) => _buildProductGridCard(rows[index]),
+          );
+        },
+      ),
     );
   }
 
@@ -611,25 +627,28 @@ class _InventoryScreenState extends State<InventoryScreen>
       return const Center(child: CircularProgressIndicator());
     }
 
-    return Observer(
-      builder: (context) {
-        final rows = _visibleRows();
+    return ListenableBuilder(
+      listenable: ListSortService.instance,
+      builder: (context, _) => Observer(
+        builder: (context) {
+          final rows = _visibleRows();
 
-        if (rows.isEmpty) return _buildEmptyState();
+          if (rows.isEmpty) return _buildEmptyState();
 
-        return ListView.builder(
-          // Bottom pad clears the host's FAB, matching the Categories tab —
-          // without it the last product card sits under the + button.
-          padding: EdgeInsets.fromLTRB(
-            _gutter,
-            AppResponsive.mediumSpacing(context),
-            _gutter,
-            88,
-          ),
-          itemCount: rows.length,
-          itemBuilder: (context, index) => _buildProductCard(rows[index]),
-        );
-      },
+          return ListView.builder(
+            // Bottom pad clears the host's FAB, matching the Categories tab —
+            // without it the last product card sits under the + button.
+            padding: EdgeInsets.fromLTRB(
+              _gutter,
+              AppResponsive.mediumSpacing(context),
+              _gutter,
+              88,
+            ),
+            itemCount: rows.length,
+            itemBuilder: (context, index) => _buildProductCard(rows[index]),
+          );
+        },
+      ),
     );
   }
 
@@ -797,54 +816,67 @@ class _InventoryScreenState extends State<InventoryScreen>
         _gutter,
         AppResponsive.largeSpacing(context),
       ),
-      child: AppTextField(
-        controller: _searchController,
-        hint: 'Search by name or scan barcode...',
-        icon: Icons.search_rounded,
-        suffixIcon: Row(
-          mainAxisSize: MainAxisSize.min,
+      // IntrinsicHeight + stretch sizes the sort button to match
+      // AppTextField's height without hardcoding it.
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Only offered once there is something to clear.
-            if (_searchQuery.isNotEmpty)
-              IconButton(
-                icon: Icon(
-                  Icons.close_rounded,
-                  color: AppColors.textSecondary,
-                  size: AppResponsive.iconSize(context),
-                ),
-                tooltip: 'Clear search',
-                visualDensity: VisualDensity.compact,
-                onPressed: _clearSearch,
-              ),
-            IconButton(
-              icon: Icon(
-                Icons.qr_code_scanner,
-                color: AppColors.primary,
-                size: AppResponsive.iconSize(context),
-              ),
-              tooltip: 'Scan barcode',
-              visualDensity: VisualDensity.compact,
-              onPressed: () async {
-                final String? barcode = await Navigator.push<String>(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const ScannerScreen(),
-                  ),
-                );
-                if (barcode == null || !mounted) return;
-                await _openProductByBarcode(barcode);
-              },
-            ),
+            Expanded(child: _buildSearchField()),
+            SizedBox(width: AppResponsive.smallSpacing(context)),
+            const ListSortButton(list: SortableList.retailProducts),
           ],
         ),
-        onChanged: (value) {
-          setState(() => _searchQuery = value.toLowerCase());
-        },
-        onFieldSubmitted: (value) async {
-          if (value.isEmpty) return;
-          await _openProductByBarcode(value);
-        },
       ),
+    );
+  }
+
+  Widget _buildSearchField() {
+    return AppTextField(
+      controller: _searchController,
+      hint: 'Search by name or scan barcode...',
+      icon: Icons.search_rounded,
+      suffixIcon: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Only offered once there is something to clear.
+          if (_searchQuery.isNotEmpty)
+            IconButton(
+              icon: Icon(
+                Icons.close_rounded,
+                color: AppColors.textSecondary,
+                size: AppResponsive.iconSize(context),
+              ),
+              tooltip: 'Clear search',
+              visualDensity: VisualDensity.compact,
+              onPressed: _clearSearch,
+            ),
+          IconButton(
+            icon: Icon(
+              Icons.qr_code_scanner,
+              color: AppColors.primary,
+              size: AppResponsive.iconSize(context),
+            ),
+            tooltip: 'Scan barcode',
+            visualDensity: VisualDensity.compact,
+            onPressed: () async {
+              final String? barcode = await Navigator.push<String>(
+                context,
+                MaterialPageRoute(builder: (context) => const ScannerScreen()),
+              );
+              if (barcode == null || !mounted) return;
+              await _openProductByBarcode(barcode);
+            },
+          ),
+        ],
+      ),
+      onChanged: (value) {
+        setState(() => _searchQuery = value.toLowerCase());
+      },
+      onFieldSubmitted: (value) async {
+        if (value.isEmpty) return;
+        await _openProductByBarcode(value);
+      },
     );
   }
 

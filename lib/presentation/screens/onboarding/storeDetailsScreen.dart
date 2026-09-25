@@ -8,6 +8,8 @@ import '../../../presentation/widget/componets/common/location_dropdown_field.da
 import '../../../presentation/widget/componets/retail/retail_store_type_field.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/config/food_license_rule.dart';
+import '../../../core/config/phone_rule.dart';
+import '../../../core/config/postal_code_rule.dart';
 import '../../../core/config/tax_id_rule.dart';
 import '../../../domain/services/common/notification_service.dart';
 import '../../../util/common/country_state_city_data.dart';
@@ -763,19 +765,14 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
 
   // ── Phone validation ──────────────────────────────────────────────────────────
 
-  /// Validates the store phone number. Returns an error string to show under
-  /// the field, or null when the value is acceptable.
+  /// Validates the store phone number against the CURRENTLY selected country.
   ///
-  /// The keyboard already restricts input to digits and caps length at 10,
-  /// so this is the final gate before the form is allowed to advance.
-  String? _validatePhone(String? v) {
-    final value = (v ?? '').trim();
-    if (value.isEmpty) return 'Phone is required';
-    if (!RegExp(r'^\d{10}$').hasMatch(value)) {
-      return 'Enter a valid 10-digit number';
-    }
-    return null;
-  }
+  /// Reads `_countryController` rather than `PhoneRule`'s saved-country
+  /// getters: the country is chosen on this very screen and isn't persisted
+  /// until the step completes, so the saved value is still blank here and
+  /// would fall back to India.
+  String? _validatePhone(String? v) =>
+      PhoneRule.validateFor(_countryController.text, v);
 
   String? _validateEmail(String? v) {
     if (v == null || v.isEmpty) return 'Email is required';
@@ -785,12 +782,11 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
     return null;
   }
 
-  String? _validatePincode(String? v) {
-    final t = (v ?? '').trim();
-    if (t.isEmpty) return 'Pincode is required';
-    if (t.length != 6) return 'Pincode must be 6 digits';
-    return null;
-  }
+  /// Validates the postal code against the CURRENTLY selected country — same
+  /// reason as [_validatePhone]: the country is chosen on this screen and is
+  /// not persisted until Continue, so the saved-country getters read blank.
+  String? _validatePincode(String? v) =>
+      PostalCodeRule.validateFor(_countryController.text, v);
 
   String? _validateGstin(String? v) =>
       TaxIdRule.validateFor(_countryController.text, v);
@@ -812,15 +808,20 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
     if (AppConfig.isRetail && !widget.store.hasRetailStoreType) {
       return (focus: null, message: 'Please choose what you sell');
     }
+    // Country is checked BEFORE phone even though it sits lower on the form —
+    // dependency order beats reading order here. The phone rule is derived
+    // from the country, so demanding a country-shaped number before the
+    // country is known produces a message the user cannot act on ("must be
+    // exactly 10 digits" for a store that is not in India).
+    if (_countryController.text.trim().isEmpty) {
+      return (focus: null, message: 'Country is required');
+    }
     final phoneErr = _validatePhone(_phoneController.text);
     if (phoneErr != null) return (focus: _phoneFocus, message: phoneErr);
     final emailErr = _validateEmail(_emailController.text);
     if (emailErr != null) return (focus: _emailFocus, message: emailErr);
     if (_addressController.text.trim().isEmpty) {
       return (focus: _addressFocus, message: 'Address is required');
-    }
-    if (_countryController.text.trim().isEmpty) {
-      return (focus: null, message: 'Country is required');
     }
     if (_stateController.text.trim().isEmpty) {
       return (focus: null, message: 'State is required');
@@ -865,11 +866,16 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
               textInputAction: TextInputAction.next,
               onFieldSubmitted: (_) => _emailFocus.requestFocus(),
               label: 'Phone Number',
-              hint: '9876543210',
               icon: Icons.phone_rounded,
               required: true,
               keyboardType: TextInputType.phone,
-              maxLength: 10,
+              // All three follow the Country dropdown further down this form,
+              // exactly as the GSTIN field below already follows it. While the
+              // country is still unchosen these stay permissive (7–15) rather
+              // than assuming India — the field is ABOVE the dropdown, so a
+              // 10-digit demand would fire before the question was asked.
+              hint: PhoneRule.hintFor(_countryController.text),
+              maxLength: PhoneRule.maxLengthFor(_countryController.text),
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               onChanged: (v) => widget.store.setPhone(v),
               validator: _validatePhone,
@@ -962,13 +968,32 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
                   focusNode: _pincodeFocus,
                   textInputAction: TextInputAction.next,
                   onFieldSubmitted: (_) => _foodLicenseFocus.requestFocus(),
-                  label: 'Pincode',
-                  hint: 'e.g. 382355',
+                  // Label, cap, alphabet and even whether it is required all
+                  // follow the Country dropdown — a UK postcode contains
+                  // letters, and a few countries have none at all.
+                  label: PostalCodeRule.labelFor(_countryController.text),
+                  hint: PostalCodeRule.hintFor(_countryController.text),
                   icon: Icons.pin_drop_rounded,
-                  required: true,
-                  keyboardType: TextInputType.number,
-                  maxLength: 6,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  required: PostalCodeRule.isRequiredFor(
+                    _countryController.text,
+                  ),
+                  keyboardType:
+                      PostalCodeRule.digitsOnlyFor(_countryController.text)
+                      ? TextInputType.number
+                      : TextInputType.text,
+                  maxLength: PostalCodeRule.maxLengthFor(
+                    _countryController.text,
+                  ),
+                  // Only applied where the code really is numeric: a
+                  // digits-only filter silently swallows the letters in
+                  // "SW1A 1AA" and reads as a broken keyboard.
+                  inputFormatters:
+                      PostalCodeRule.digitsOnlyFor(_countryController.text)
+                      ? [FilteringTextInputFormatter.digitsOnly]
+                      : null,
+                  // Postcodes are conventionally uppercase; a keyboard hint
+                  // only, it does not transform what is already typed.
+                  textCapitalization: TextCapitalization.characters,
                   onChanged: (v) => widget.store.setPincode(v),
                   validator: _validatePincode,
                 ),

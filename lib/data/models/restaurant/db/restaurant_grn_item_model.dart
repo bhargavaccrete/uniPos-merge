@@ -125,6 +125,27 @@ class RestaurantGRNItemModel extends HiveObject {
   /// settled claim recovers from the supplier balance.
   double get damagedAmount => (damagedQty ?? 0) * (costPrice ?? 0);
 
+  /// Human label for a stored `damagedHandling` value.
+  ///
+  /// Static because the Goods Receiving screen holds the raw string on its own
+  /// draft line, before any model exists. One switch, both callers — so the
+  /// receiving screen and the Damaged Items report can never print different
+  /// words for the same stored value.
+  static String handlingDisplayOf(String? handling) {
+    switch (handling) {
+      case 'returnToSupplier':
+        return 'Return to Supplier';
+      case 'keepForClaim':
+        return 'Keep for Claim';
+      case 'writeOff':
+        return 'Write Off';
+      default:
+        return handling ?? '';
+    }
+  }
+
+  String get damagedHandlingDisplay => handlingDisplayOf(damagedHandling);
+
   Map<String, dynamic> toMap() => {
         'grnItemId': grnItemId,
         'grnId': grnId,

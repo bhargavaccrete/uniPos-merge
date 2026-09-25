@@ -5,6 +5,7 @@ import '../../../core/plan/plan_enforcement.dart';
 import '../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../data/models/restaurant/db/itemvariantemodel_312.dart';
 import '../../../data/repositories/restaurant/item_repository.dart';
+import '../../services/restaurant/low_stock_sync_service.dart';
 
 part 'item_store.g.dart';
 
@@ -202,6 +203,8 @@ abstract class _ItemStore with Store {
       await _repository.addItem(item);
       items.add(item);
 
+      // A new item can arrive already below its low-stock level.
+      LowStockSyncService.scheduleSync();
       return true;
     } catch (e) {
       errorMessage = 'Failed to add item: $e';
@@ -247,6 +250,10 @@ abstract class _ItemStore with Store {
         items.add(item);
       }
 
+      // Covers every manual path: Edit Item's stock box, its low-stock
+      // threshold and alert toggle, plus StockAdjustService's add/adjust,
+      // which both write through here.
+      LowStockSyncService.scheduleSync();
       return true;
     } catch (e) {
       errorMessage = 'Failed to update item: $e';
@@ -273,6 +280,8 @@ abstract class _ItemStore with Store {
       // Remove from local list
       items.removeWhere((i) => i.id == itemId);
 
+      // A deleted item must not keep an alert in the bell pointing at nothing.
+      LowStockSyncService.scheduleSync();
       return true;
     } catch (e) {
       errorMessage = 'Failed to delete item: $e';
@@ -319,6 +328,7 @@ abstract class _ItemStore with Store {
         );
       }
 
+      LowStockSyncService.scheduleSync();
       return true;
     } catch (e) {
       errorMessage = 'Failed to update stock: $e';
@@ -376,6 +386,10 @@ abstract class _ItemStore with Store {
       if (identical(_stockMutationTails[itemId], tail)) {
         _stockMutationTails.remove(itemId);
       }
+      // The POS sale deduction, recipe-ingredient cascade, void/refund restore
+      // and goods-receiving all land here. In `finally` so a failed delta
+      // still reconciles against whatever actually got written.
+      LowStockSyncService.scheduleSync();
     }
   }
 

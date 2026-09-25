@@ -173,13 +173,20 @@ class _EdititemScreenState extends State<EdititemScreen> {
     selectedTaxRate = widget.items.taxRate;
     selectedTaxIds = List<String>.from(widget.items.taxIds ?? const []);
 
-    // ✅ ADDED: Initialize selling method based on existing item
-    _sellingMethod = widget.items.isSoldByWeight == true
+    // Selling Method from what's stored. Clamp the unit to a supported value
+    // (kItemUnits) — imported/legacy items may carry an unsupported one, which
+    // would crash the DropdownButton.
+    // A back-of-house item saved under the old split UI has a Stock Unit but
+    // no isSoldByWeight flag (that picker never set one), so a stored measured
+    // unit counts as By Weight — otherwise reopening a kg raw material would
+    // silently re-save it as pieces.
+    final storedUnit = normalizeItemUnit(widget.items.unit);
+    _sellingMethod =
+        (widget.items.isSoldByWeight == true ||
+            (storedUnit != null && storedUnit != 'piece'))
         ? SellingMethod.byWeight
         : SellingMethod.byUnit;
-    // Clamp to a supported value (kItemUnits); imported/legacy items may carry
-    // an unsupported unit, which would crash the DropdownButton.
-    _selectedUnit = normalizeItemUnit(widget.items.unit) ?? kItemUnits.first;
+    _selectedUnit = storedUnit ?? kItemUnits.first;
 
     selectedFilter = widget.items.trackInventory == true ? 'YES' : 'NO';
     allowOutOfStockFilter = widget.items.allowOrderWhenOutOfStock == true
@@ -485,15 +492,16 @@ class _EdititemScreenState extends State<EdititemScreen> {
         extraConstraints: extraConstraints.isNotEmpty ? extraConstraints : null,
         allowOrderWhenOutOfStock: allowOutOfStockFilter.toLowerCase() == 'yes',
         isSoldByWeight: _sellingMethod == SellingMethod.byWeight,
-        // Raw Material/Semi-Finished: a stock-keeping unit, independent of
-        // Selling Method (a POS-sale concept that doesn't apply to them), so
-        // it's always persisted. Finished Good/Recipe-Based keep the original
-        // by-weight-only condition, unchanged.
-        unit:
-            (_productType == ProductType.rawMaterial ||
-                _productType == ProductType.semiFinished)
+        // By Weight carries the chosen unit. By Unit means whole pieces —
+        // spelled out as 'piece' for Raw Material/Semi-Finished because the
+        // inventory screens decide whole-vs-decimal counting from this field,
+        // and left null for Finished Good/Recipe-Based exactly as before.
+        unit: _sellingMethod == SellingMethod.byWeight
             ? _selectedUnit
-            : (_sellingMethod == SellingMethod.byWeight ? _selectedUnit : null),
+            : ((_productType == ProductType.rawMaterial ||
+                      _productType == ProductType.semiFinished)
+                  ? 'piece'
+                  : null),
         itemCode: itemCode,
         productType: _productType,
         isEnabled: _isEnabled,
@@ -730,28 +738,15 @@ class _EdititemScreenState extends State<EdititemScreen> {
             ),
             SizedBox(height: AppResponsive.extraLargeSpacing(context)),
 
-            // Selling Method Section — Raw Material/Semi-Finished get a plain
-            // Stock Unit picker instead (they aren't sold, so Selling Method
-            // doesn't apply).
-            if (_productType == ProductType.rawMaterial ||
-                _productType == ProductType.semiFinished) ...[
-              _buildSectionHeader('Stock Unit', Icons.straighten_outlined),
-              SizedBox(height: AppResponsive.largeSpacing(context)),
-              SellingMethodButton(
-                method: _sellingMethod,
-                unit: _selectedUnit,
-                unitOnly: true,
-                onTap: _selectStockUnit,
-              ),
-            ] else ...[
-              _buildSectionHeader('Selling Method', Icons.scale),
-              SizedBox(height: AppResponsive.largeSpacing(context)),
-              SellingMethodButton(
-                method: _sellingMethod,
-                unit: _selectedUnit,
-                onTap: _selectSellingMethod,
-              ),
-            ],
+            // Selling Method — the same header, button and sheet for every
+            // Product Type. See SellingMethodSheet.
+            _buildSectionHeader('Selling Method', Icons.scale),
+            SizedBox(height: AppResponsive.largeSpacing(context)),
+            SellingMethodButton(
+              method: _sellingMethod,
+              unit: _selectedUnit,
+              onTap: _selectSellingMethod,
+            ),
             SizedBox(height: AppResponsive.extraLargeSpacing(context)),
 
             // Price
@@ -1055,21 +1050,6 @@ class _EdititemScreenState extends State<EdititemScreen> {
     }
   }
 
-  /// Raw Material/Semi-Finished's stock-keeping unit — independent of
-  /// Selling Method, which stays a pure POS-sale concept for menu types.
-  Future<void> _selectStockUnit() async {
-    FocusScope.of(context).unfocus();
-    final result = await SellingMethodSheet.show(
-      context,
-      currentMethod: _sellingMethod,
-      currentUnit: _selectedUnit,
-      unitOnly: true,
-    );
-    if (result != null) {
-      setState(() => _selectedUnit = result.unit);
-    }
-  }
-
   Future<void> _selectVeg() async {
     FocusScope.of(context).unfocus();
     final result = await VegSelectorSheet.show(
@@ -1142,16 +1122,11 @@ class _EdititemScreenState extends State<EdititemScreen> {
 
   // ── Inventory sub-fields (mirror the Add Item sheet) ────────────────────────
 
-  /// The unit to show next to a stock quantity field. Raw Material/
-  /// Semi-Finished always use their Stock Unit (independent of Selling
-  /// Method, which they don't show); Finished Good/Recipe-Based keep the
-  /// original by-weight-only condition, unchanged.
+  /// The unit to show next to a stock quantity field. One rule for every
+  /// Product Type now that they all answer the same Selling Method question:
+  /// By Weight carries its chosen unit, By Unit is always whole pieces.
   String _unitLabel() {
-    final isBackOfHouse =
-        _productType == ProductType.rawMaterial ||
-        _productType == ProductType.semiFinished;
-    if (isBackOfHouse) return _selectedUnit;
-    return _sellingMethod == SellingMethod.byWeight ? _selectedUnit : 'pcs';
+    return _sellingMethod == SellingMethod.byWeight ? _selectedUnit : 'piece';
   }
 
   Widget _buildCurrentStockField() {

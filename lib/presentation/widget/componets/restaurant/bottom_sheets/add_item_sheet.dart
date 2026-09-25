@@ -452,9 +452,6 @@ class _AddItemSheetState extends State<AddItemSheet> {
 
   List<Widget> _formFields() {
     final isRecipeBased = _formState.productType == ProductType.recipeBased;
-    final isBackOfHouse =
-        _formState.productType == ProductType.rawMaterial ||
-        _formState.productType == ProductType.semiFinished;
     return [
       // Product Type drives every other field below it, so it's the first
       // decision the user makes.
@@ -473,9 +470,8 @@ class _AddItemSheetState extends State<AddItemSheet> {
       SizedBox(height: AppResponsive.mediumSpacing(context)),
       _buildEnabledToggle(),
       SizedBox(height: AppResponsive.largeSpacing(context)),
-      // Raw Material/Semi-Finished aren't sold, so Selling Method (a POS
-      // concept) is replaced by a plain Stock Unit picker.
-      isBackOfHouse ? _buildStockUnitSelector() : _buildSellingMethodSelector(),
+      // One picker for every Product Type — see SellingMethodSheet.
+      _buildSellingMethodSelector(),
       SizedBox(height: AppResponsive.mediumSpacing(context)),
       _buildPriceField(),
       SizedBox(height: AppResponsive.mediumSpacing(context)),
@@ -746,30 +742,6 @@ class _AddItemSheetState extends State<AddItemSheet> {
     );
   }
 
-  Future<void> _selectStockUnit() async {
-    FocusScope.of(context).unfocus();
-    final result = await SellingMethodSheet.show(
-      context,
-      currentMethod: _formState.sellingMethod,
-      currentUnit: _formState.selectedUnit,
-      unitOnly: true,
-    );
-    if (result != null) {
-      setState(() => _formState.setUnit(result.unit));
-    }
-  }
-
-  /// Raw Material/Semi-Finished's stock-keeping unit — independent of
-  /// Selling Method, which stays a pure POS-sale concept for menu types.
-  Widget _buildStockUnitSelector() {
-    return SellingMethodButton(
-      method: _formState.sellingMethod,
-      unit: _formState.selectedUnit,
-      unitOnly: true,
-      onTap: _selectStockUnit,
-    );
-  }
-
   Widget _buildSellDirectlyAtPosToggle() {
     final isRaw = _formState.productType == ProductType.rawMaterial;
     final title = isRaw ? 'Sell directly at POS' : 'Show on POS Menu';
@@ -905,18 +877,13 @@ class _AddItemSheetState extends State<AddItemSheet> {
     );
   }
 
-  /// The unit to show next to a stock quantity field. Raw Material/
-  /// Semi-Finished always use their Stock Unit (independent of Selling
-  /// Method, which they don't show); Finished Good/Recipe-Based keep the
-  /// original by-weight-only condition, unchanged.
+  /// The unit to show next to a stock quantity field. One rule for every
+  /// Product Type now that they all answer the same Selling Method question:
+  /// By Weight carries its chosen unit, By Unit is always whole pieces.
   String _unitLabel() {
-    final isBackOfHouse =
-        _formState.productType == ProductType.rawMaterial ||
-        _formState.productType == ProductType.semiFinished;
-    if (isBackOfHouse) return _formState.selectedUnit;
     return _formState.sellingMethod == SellingMethod.byWeight
         ? _formState.selectedUnit
-        : 'pcs';
+        : 'piece';
   }
 
   Widget _buildCurrentStockField() {

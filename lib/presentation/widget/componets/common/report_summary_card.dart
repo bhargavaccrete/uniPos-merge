@@ -30,10 +30,19 @@ class ReportSummaryCard extends StatelessWidget {
     final isMobile = AppResponsive.isMobile(context);
 
     return Container(
-      padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 10.0, tablet: 16.0, desktop: 20.0)),
+      padding: EdgeInsets.all(
+        AppResponsive.getValue(
+          context,
+          mobile: 10.0,
+          tablet: 16.0,
+          desktop: 20.0,
+        ),
+      ),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: AppColors.divider, width: 0.5),
         boxShadow: [
           BoxShadow(
@@ -65,11 +74,22 @@ class ReportSummaryCard extends StatelessWidget {
                 child: Text(
                   title,
                   style: GoogleFonts.poppins(
-                    fontSize: AppResponsive.getValue(context, mobile: 10.0, tablet: 12.0, desktop: 13.0),
+                    fontSize: AppResponsive.getValue(
+                      context,
+                      mobile: 10.0,
+                      tablet: 12.0,
+                      desktop: 13.0,
+                    ),
                     fontWeight: FontWeight.w500,
                     color: AppColors.textSecondary,
                   ),
-                  maxLines: 1,
+                  // Two lines, not one. Three cards across a ~360dp phone leave
+                  // each title about 60dp once padding and the icon are taken
+                  // out, so a single line ellipsised nearly every heading in the
+                  // reports to its first word — "Total Outstanding" read
+                  // "Total Outs…". The row sits in an IntrinsicHeight, so the
+                  // cards still grow together and stay flush.
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
@@ -82,7 +102,12 @@ class ReportSummaryCard extends StatelessWidget {
             child: Text(
               value,
               style: GoogleFonts.poppins(
-                fontSize: AppResponsive.getValue(context, mobile: 14.0, tablet: 18.0, desktop: 20.0),
+                fontSize: AppResponsive.getValue(
+                  context,
+                  mobile: 14.0,
+                  tablet: 18.0,
+                  desktop: 20.0,
+                ),
                 fontWeight: FontWeight.w700,
                 color: AppColors.textPrimary,
               ),
@@ -93,10 +118,17 @@ class ReportSummaryCard extends StatelessWidget {
             SizedBox(height: isMobile ? 2 : 4),
             Text(
               subtitle!,
-              maxLines: 1,
+              // Same reason as the title — "carrying a balance" was rendering
+              // as "carrying a bala…".
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: GoogleFonts.poppins(
-                fontSize: AppResponsive.getValue(context, mobile: 10.0, tablet: 11.0, desktop: 12.0),
+                fontSize: AppResponsive.getValue(
+                  context,
+                  mobile: 10.0,
+                  tablet: 11.0,
+                  desktop: 12.0,
+                ),
                 color: AppColors.textSecondary,
               ),
             ),

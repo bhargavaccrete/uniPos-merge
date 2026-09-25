@@ -5,8 +5,10 @@ import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:billberrylite/core/config/phone_rule.dart';
+import 'package:billberrylite/data/models/restaurant/db/product_type.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/data/models/restaurant/db/itemmodel_302.dart';
+import 'package:billberrylite/data/models/restaurant/db/restaurant_purchase_order_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/restaurant_supplier_model.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
@@ -15,14 +17,21 @@ import 'package:billberrylite/presentation/widget/componets/common/app_text_fiel
 import 'package:billberrylite/presentation/widget/componets/common/dialog_dispose_scope.dart';
 import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/row_action_button.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/util/common/quantity_format.dart';
 
-/// Create a restaurant raw-material Purchase Order — supplier, expected
-/// delivery date, and a dynamic list of Raw Material lines (qty + estimated
-/// price). See docs/inventory_recipe_system_plan.md §6.2.
+/// Create or edit a restaurant Purchase Order — supplier,
+/// expected delivery date, and a dynamic list of order lines (qty +
+/// estimated price). See docs/inventory_recipe_system_plan.md §6.2.
+///
+/// Pass [purchaseOrder] to edit an existing order. Only DRAFT orders are ever
+/// passed in — the store re-checks and refuses anything else.
 class AddPurchaseOrderScreen extends StatefulWidget {
-  const AddPurchaseOrderScreen({super.key});
+  final RestaurantPurchaseOrderModel? purchaseOrder;
+
+  const AddPurchaseOrderScreen({super.key, this.purchaseOrder});
 
   @override
   State<AddPurchaseOrderScreen> createState() => _AddPurchaseOrderScreenState();
@@ -42,6 +51,9 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
   final TextEditingController _notesController = TextEditingController();
   final List<_POLine> _lines = [];
   bool _saving = false;
+  bool _loadingExisting = false;
+
+  bool get isEditing => widget.purchaseOrder != null;
 
   @override
   void initState() {
@@ -50,6 +62,67 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
     // when this screen is reached without the Suppliers list having been
     // opened first. Cheap: a Hive read off an already-open box.
     restaurantSupplierStore.loadSuppliers();
+
+    if (isEditing) {
+      _loadingExisting = true;
+      _loadExistingPO();
+    }
+  }
+
+  /// Rebuilds the form from a saved PO. Nothing here writes to Hive — the
+  /// original rows stay untouched until Save, so backing out is lossless.
+  Future<void> _loadExistingPO() async {
+    final po = widget.purchaseOrder!;
+
+    await restaurantSupplierStore.loadSuppliers();
+    final supplier = restaurantSupplierStore.suppliers
+        .where((s) => s.supplierId == po.supplierId)
+        .firstOrNull;
+
+    // itemStore.loadItems() genuinely awaits a repository read, so items can
+    // still be empty on a cold start. ensureLoaded is the sanctioned wait.
+    await itemStore.ensureLoaded();
+
+    final rows = restaurantPurchaseOrderItemRepository.getItemsByPOId(po.poId);
+    final lines = <_POLine>[];
+    final missing = <String>[];
+    for (final row in rows) {
+      final item = itemStore.getItemById(row.itemId);
+      if (item == null) {
+        // The item was deleted since the PO was written. Drop the line
+        // rather than blocking the edit — the order must stay fixable — and
+        // name it from the denormalized itemName, which is what that column is
+        // for. Nothing is persisted until the user presses Save.
+        missing.add(row.itemName ?? row.itemId);
+        continue;
+      }
+      lines.add(
+        _POLine(item: item, qty: row.orderedQty, price: row.estimatedPrice),
+      );
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _selectedSupplier = supplier;
+      _expectedDeliveryDate =
+          DateTime.tryParse(po.expectedDeliveryDate) ?? _expectedDeliveryDate;
+      _notesController.text = po.notes ?? '';
+      _lines
+        ..clear()
+        ..addAll(lines);
+      _loadingExisting = false;
+    });
+
+    if (missing.isNotEmpty) {
+      NotificationService.instance.showError(
+        '${missing.length} line(s) removed — ${missing.join(', ')} no longer exist',
+      );
+    }
+    if (supplier == null) {
+      NotificationService.instance.showError(
+        "This order's supplier no longer exists — pick a supplier before saving",
+      );
+    }
   }
 
   @override
@@ -59,11 +132,17 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
   }
 
   Future<void> _pickDeliveryDate() async {
+    final now = DateTime.now();
+    // An edited draft can carry a delivery date that has already passed, and
+    // showDatePicker asserts when initialDate < firstDate. Widen the floor to
+    // the loaded date instead of clamping it forward, so the picker opens on
+    // the date the order actually holds rather than silently jumping to today.
+    final first = _expectedDeliveryDate.isBefore(now) ? _expectedDeliveryDate : now;
     final picked = await showDatePicker(
       context: context,
       initialDate: _expectedDeliveryDate,
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      firstDate: first,
+      lastDate: now.add(const Duration(days: 365)),
     );
     if (picked != null) {
       setState(() => _expectedDeliveryDate = picked);
@@ -80,29 +159,61 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
     }
     if (_lines.isEmpty) {
       NotificationService.instance.showError(
-        'Please add at least one raw material line',
+        'Please add at least one item line',
       );
       return;
     }
 
     setState(() => _saving = true);
     try {
+      final supplierId = _selectedSupplier!.supplierId;
+      final supplierName = _selectedSupplier!.name;
+      final deliveryDate = _expectedDeliveryDate.toIso8601String();
+      final notes = _notesController.text.trim().isEmpty
+          ? null
+          : _notesController.text.trim();
+      final lines = [
+        for (final line in _lines)
+          (
+            itemId: line.item.id,
+            itemName: line.item.name,
+            qty: line.qty,
+            price: line.price,
+          ),
+      ];
+
+      if (isEditing) {
+        final updated = await restaurantPurchaseOrderStore.updatePurchaseOrder(
+          poId: widget.purchaseOrder!.poId,
+          supplierId: supplierId,
+          supplierName: supplierName,
+          expectedDeliveryDate: deliveryDate,
+          notes: notes,
+          lines: lines,
+        );
+
+        if (!mounted) return;
+        if (updated == null) {
+          // The order was sent or received from somewhere else while this form
+          // was open. Stay put rather than popping as though it saved.
+          NotificationService.instance.showError(
+            'This purchase order can no longer be edited — it may have been sent or received',
+          );
+          return;
+        }
+        Navigator.pop(context, true);
+        NotificationService.instance.showSuccess(
+          'Purchase order ${updated.poNumber} updated',
+        );
+        return;
+      }
+
       final po = await restaurantPurchaseOrderStore.createPurchaseOrder(
-        supplierId: _selectedSupplier!.supplierId,
-        supplierName: _selectedSupplier!.name,
-        expectedDeliveryDate: _expectedDeliveryDate.toIso8601String(),
-        notes: _notesController.text.trim().isEmpty
-            ? null
-            : _notesController.text.trim(),
-        lines: [
-          for (final line in _lines)
-            (
-              itemId: line.item.id,
-              itemName: line.item.name,
-              qty: line.qty,
-              price: line.price,
-            ),
-        ],
+        supplierId: supplierId,
+        supplierName: supplierName,
+        expectedDeliveryDate: deliveryDate,
+        notes: notes,
+        lines: lines,
       );
 
       if (!mounted) return;
@@ -360,13 +471,23 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
     );
   }
 
-  void _showAddLineSheet() {
+  /// Opens the line sheet — appends when [index] is null, replaces that line
+  /// in place otherwise.
+  void _showLineSheet({int? index}) {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) =>
-          _AddLineSheet(onAdd: (line) => setState(() => _lines.add(line))),
+      builder: (_) => _LineSheet(
+        initial: index == null ? null : _lines[index],
+        onSubmit: (line) => setState(() {
+          if (index == null) {
+            _lines.add(line);
+          } else {
+            _lines[index] = line;
+          }
+        }),
+      ),
     );
   }
 
@@ -382,10 +503,10 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
       child: Scaffold(
         backgroundColor: AppColors.surfaceLight,
         appBar: buildPrimaryAppBar(
-          title: 'Create Purchase Order',
+          title: isEditing ? 'Edit Purchase Order' : 'Create Purchase Order',
           actions: [
             TextButton(
-              onPressed: _saving ? null : _save,
+              onPressed: (_saving || _loadingExisting) ? null : _save,
               child: Text(
                 'Save',
                 style: GoogleFonts.poppins(
@@ -397,7 +518,14 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
             const SizedBox(width: 4),
           ],
         ),
-        body: CustomScrollView(
+        // While an existing PO is being read the form would otherwise render
+        // "Select Supplier *" and "No lines added" for a frame, which reads as
+        // data loss on an order that plainly has both.
+        body: _loadingExisting
+            ? const Center(
+                child: CircularProgressIndicator(color: AppColors.primary),
+              )
+            : CustomScrollView(
           slivers: [
             SliverToBoxAdapter(
               child: Container(
@@ -593,7 +721,7 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'Raw Material Lines',
+                        'Order Lines',
                         style: GoogleFonts.poppins(
                           fontSize: AppResponsive.subheadingFontSize(context),
                           fontWeight: FontWeight.w600,
@@ -617,7 +745,7 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
                     child: AppEmptyState(
                       icon: Icons.inventory_2_outlined,
                       title: 'No lines added',
-                      message: 'Tap the + button to add a raw material line.',
+                      message: 'Tap the + button to add an item line.',
                     ),
                   )
                 : SliverPadding(
@@ -637,7 +765,7 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
           ],
         ),
         floatingActionButton: FloatingActionButton(
-          onPressed: _showAddLineSheet,
+          onPressed: () => _showLineSheet(),
           backgroundColor: AppColors.primary,
           child: const Icon(Icons.add, color: Colors.white),
         ),
@@ -689,7 +817,7 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
-                          'Qty: ${line.qty} ${line.item.unit ?? ''}',
+                          'Qty: ${formatQtyWithUnit(line.qty, line.item.unit)}',
                           style: GoogleFonts.poppins(
                             fontSize: AppResponsive.smallFontSize(context),
                             fontWeight: FontWeight.w600,
@@ -712,6 +840,7 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
             ),
             const SizedBox(width: 8),
             Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 if (line.price != null)
                   Text(
@@ -722,13 +851,27 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
                       color: AppColors.success,
                     ),
                   ),
-                IconButton(
-                  icon: Icon(
-                    Icons.delete_outline,
-                    color: AppColors.danger,
-                    size: AppResponsive.iconSize(context),
-                  ),
-                  onPressed: () => setState(() => _lines.removeAt(index)),
+                const SizedBox(height: 6),
+                // Edit re-opens the same sheet pre-filled and replaces the line
+                // in place, so changing a quantity no longer means deleting the
+                // line and re-entering its price.
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    RowActionButton(
+                      icon: Icons.edit_outlined,
+                      color: AppColors.info,
+                      tooltip: 'Edit line',
+                      onTap: () => _showLineSheet(index: index),
+                    ),
+                    const SizedBox(width: 6),
+                    RowActionButton(
+                      icon: Icons.delete_outline,
+                      color: AppColors.danger,
+                      tooltip: 'Remove line',
+                      onTap: () => setState(() => _lines.removeAt(index)),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -739,21 +882,44 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
   }
 }
 
-/// Bottom-sheet to pick a Raw Material item plus qty/estimated price for one
+/// Bottom-sheet to pick a purchasable item plus qty/estimated price for one
 /// PO line — same interaction shape as the Extras/Toppings picker.
-class _AddLineSheet extends StatefulWidget {
-  final ValueChanged<_POLine> onAdd;
+///
+/// Serves add and edit both: pass [initial] to pre-fill it, and [onSubmit]
+/// then carries the revised line back for the caller to put in place.
+class _LineSheet extends StatefulWidget {
+  final ValueChanged<_POLine> onSubmit;
 
-  const _AddLineSheet({required this.onAdd});
+  /// The line being edited, or null when adding a new one.
+  final _POLine? initial;
+
+  const _LineSheet({required this.onSubmit, this.initial});
 
   @override
-  State<_AddLineSheet> createState() => _AddLineSheetState();
+  State<_LineSheet> createState() => _LineSheetState();
 }
 
-class _AddLineSheetState extends State<_AddLineSheet> {
+class _LineSheetState extends State<_LineSheet> {
   Items? _selectedItem;
-  final _qtyController = TextEditingController(text: '1');
-  final _priceController = TextEditingController();
+  late final TextEditingController _qtyController;
+  late final TextEditingController _priceController;
+
+  bool get _isEditing => widget.initial != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initial;
+    _selectedItem = initial?.item;
+    // formatQty, not toString(): a whole quantity must seed the field as "10",
+    // never "10.0", or every edit round-trips a decimal the user didn't type.
+    _qtyController = TextEditingController(
+      text: initial == null ? '1' : formatQty(initial.qty),
+    );
+    _priceController = TextEditingController(
+      text: initial?.price == null ? '' : initial!.price!.toStringAsFixed(2),
+    );
+  }
 
   @override
   void dispose() {
@@ -762,13 +928,27 @@ class _AddLineSheetState extends State<_AddLineSheet> {
     super.dispose();
   }
 
-  List<Items> get _rawMaterials =>
-      itemStore.items.where((i) => i.isRawMaterial).toList();
+  /// What a supplier can actually deliver: Raw Materials **and** Finished
+  /// Goods (a bottled drink is bought, not cooked). Both own physical stock,
+  /// and `confirmGRN` has no product-type check of its own — it just calls
+  /// `applyStockDelta`, which is correct for either.
+  ///
+  /// Excluded, deliberately:
+  /// - **Recipe-Based** owns no stock at all (`resolvePhysicalStock` forces
+  ///   `trackInventory: false, stockQuantity: 0`), so receiving one would
+  ///   write a quantity nothing ever reads.
+  /// - **Semi-Finished** is replenished by the Production flow, not GRN —
+  ///   see `ProductType.semiFinished` and inventory_recipe_system_plan.md §6.3.
+  ///   A product decision, not a technical limit; revisit if a shop needs to
+  ///   buy prep it would normally make in-house.
+  List<Items> get _purchasableItems => itemStore.items
+      .where((i) => i.isRawMaterial || i.isFinishedGood)
+      .toList();
 
   void _pickItem() async {
     final selected = await showDialog<Items>(
       context: context,
-      builder: (_) => _RawMaterialPickerDialog(items: _rawMaterials),
+      builder: (_) => _PurchasableItemPickerDialog(items: _purchasableItems),
     );
     if (selected != null) {
       setState(() {
@@ -810,7 +990,7 @@ class _AddLineSheetState extends State<_AddLineSheet> {
                 ),
               ),
               Text(
-                'Add Raw Material',
+                _isEditing ? 'Edit Line' : 'Add Item',
                 style: GoogleFonts.poppins(
                   fontSize: AppResponsive.subheadingFontSize(context),
                   fontWeight: FontWeight.w600,
@@ -819,7 +999,7 @@ class _AddLineSheetState extends State<_AddLineSheet> {
               ),
               const SizedBox(height: 16),
               InkWell(
-                onTap: _rawMaterials.isEmpty ? null : _pickItem,
+                onTap: _purchasableItems.isEmpty ? null : _pickItem,
                 borderRadius: BorderRadius.circular(12),
                 child: Container(
                   padding: const EdgeInsets.symmetric(
@@ -849,9 +1029,9 @@ class _AddLineSheetState extends State<_AddLineSheet> {
                       Expanded(
                         child: Text(
                           _selectedItem?.name ??
-                              (_rawMaterials.isEmpty
-                                  ? 'No Raw Material items found'
-                                  : 'Select Raw Material *'),
+                              (_purchasableItems.isEmpty
+                                  ? 'No purchasable items found'
+                                  : 'Select Item *'),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: GoogleFonts.poppins(
@@ -908,7 +1088,7 @@ class _AddLineSheetState extends State<_AddLineSheet> {
                   onPressed: () {
                     if (_selectedItem == null) {
                       NotificationService.instance.showError(
-                        'Please select a raw material',
+                        'Please select an item',
                       );
                       return;
                     }
@@ -921,7 +1101,7 @@ class _AddLineSheetState extends State<_AddLineSheet> {
                       return;
                     }
                     final priceText = _priceController.text.trim();
-                    widget.onAdd(
+                    widget.onSubmit(
                       _POLine(
                         item: _selectedItem!,
                         qty: qty,
@@ -941,7 +1121,7 @@ class _AddLineSheetState extends State<_AddLineSheet> {
                     ),
                   ),
                   child: Text(
-                    'Add Line',
+                    _isEditing ? 'Update Line' : 'Add Line',
                     style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
                   ),
                 ),
@@ -954,18 +1134,19 @@ class _AddLineSheetState extends State<_AddLineSheet> {
   }
 }
 
-/// Simple searchable list dialog limited to Raw Material items.
-class _RawMaterialPickerDialog extends StatefulWidget {
+/// Simple searchable list dialog over the items a supplier can deliver.
+class _PurchasableItemPickerDialog extends StatefulWidget {
   final List<Items> items;
 
-  const _RawMaterialPickerDialog({required this.items});
+  const _PurchasableItemPickerDialog({required this.items});
 
   @override
-  State<_RawMaterialPickerDialog> createState() =>
-      _RawMaterialPickerDialogState();
+  State<_PurchasableItemPickerDialog> createState() =>
+      _PurchasableItemPickerDialogState();
 }
 
-class _RawMaterialPickerDialogState extends State<_RawMaterialPickerDialog> {
+class _PurchasableItemPickerDialogState
+    extends State<_PurchasableItemPickerDialog> {
   final _searchController = TextEditingController();
   String _query = '';
 
@@ -984,7 +1165,7 @@ class _RawMaterialPickerDialogState extends State<_RawMaterialPickerDialog> {
               .toList();
 
     return AppDialogShell(
-      title: 'Select Raw Material',
+      title: 'Select Item',
       accent: AppColors.primary,
       icon: Icons.grain_rounded,
       body: SizedBox(
@@ -994,7 +1175,7 @@ class _RawMaterialPickerDialogState extends State<_RawMaterialPickerDialog> {
           children: [
             AppTextField(
               controller: _searchController,
-              hint: 'Search raw materials...',
+              hint: 'Search items...',
               icon: Icons.search_rounded,
               autofocus: true,
               onChanged: (v) => setState(() => _query = v),
@@ -1005,7 +1186,7 @@ class _RawMaterialPickerDialogState extends State<_RawMaterialPickerDialog> {
                   ? const AppEmptyState(
                       dense: true,
                       icon: Icons.search_off_rounded,
-                      title: 'No raw materials found',
+                      title: 'No items found',
                     )
                   : ListView.separated(
                       itemCount: filtered.length,
@@ -1023,8 +1204,13 @@ class _RawMaterialPickerDialogState extends State<_RawMaterialPickerDialog> {
                               fontSize: AppResponsive.bodyFontSize(context),
                             ),
                           ),
+                          // Type is named because two kinds now share this
+                          // list — "Tomato Sauce" could be a bought jar or a
+                          // prepped batch, and only the type tells them apart.
                           subtitle: Text(
-                            'Stock: ${item.stockQuantity} ${item.unit ?? ''}',
+                            '${ProductType.displayName(item.productType)}'
+                            ' · Stock: '
+                            '${formatQtyWithUnit(item.stockQuantity, item.unit)}',
                             style: GoogleFonts.poppins(
                               fontSize: AppResponsive.smallFontSize(context),
                               color: AppColors.textSecondary,

@@ -48,6 +48,11 @@ class RouteNames {
   // Restaurant - Inventory
   static const restaurantInventory = '/restaurant-inventory';
 
+  /// The low-stock work list. Named so a low-stock notification can land on
+  /// the screen that actually restocks, rather than on the Inventory hub —
+  /// retail's `stockAlerts` already worked this way.
+  static const restaurantLowStock = '/restaurant-low-stock';
+
   // Restaurant - Staff
   static const restaurantStaff = '/restaurant-staff';
 
@@ -85,6 +90,26 @@ class RouteNames {
       '/restaurant-report-customerlistbyrevenue';
   static const restaurantReportsExpense = '/restaurant-report-expensereport';
   static const restaurantReportsPaymentMode = '/restaurant-report-paymentmode';
+
+  // Purchasing reports. PO Status needs three routes for one screen —
+  // Navigator.pushNamed has no other way to pick a named constructor.
+  static const restaurantReportsPurchaseSummary =
+      '/restaurant-report-purchase-summary';
+  static const restaurantReportsSupplierPurchase =
+      '/restaurant-report-supplier-purchase';
+  static const restaurantReportsPoPending = '/restaurant-report-po-pending';
+  static const restaurantReportsPoPartial = '/restaurant-report-po-partial';
+  static const restaurantReportsPoCompleted = '/restaurant-report-po-completed';
+  static const restaurantReportsGrn = '/restaurant-report-grn';
+  static const restaurantReportsDamagedItems =
+      '/restaurant-report-damaged-items';
+  static const restaurantReportsPurchaseReturn =
+      '/restaurant-report-purchase-return';
+  static const restaurantReportsStockAdjustment =
+      '/restaurant-report-stock-adjustment';
+  static const restaurantReportsLowStock = '/restaurant-report-low-stock';
+  static const restaurantReportsSupplierStatement =
+      '/restaurant-report-supplier-statement';
   static const restaurantShiftReport = '/restaurant-shift-report';
   static const restaurantStaffPerformance = '/restaurant-staff-performance';
   static const restaurantCashDrawer = '/restaurant-cash-drawer';

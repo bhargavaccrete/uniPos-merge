@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/data/models/restaurant/db/restaurant_grn_item_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/restaurant_purchase_order_item_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/restaurant_purchase_order_model.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
@@ -810,18 +811,10 @@ class _GoodsReceivingScreenState extends State<GoodsReceivingScreen> {
     );
   }
 
-  String _handlingLabel(String handling) {
-    switch (handling) {
-      case 'returnToSupplier':
-        return 'Return to Supplier';
-      case 'keepForClaim':
-        return 'Keep for Claim';
-      case 'writeOff':
-        return 'Write Off';
-      default:
-        return handling;
-    }
-  }
+  /// Delegates to the model so the label has exactly one definition — the
+  /// Damaged Items report reads the same switch.
+  String _handlingLabel(String handling) =>
+      RestaurantGRNItemModel.handlingDisplayOf(handling);
 
   Widget _qtyChip(String label, double qty, Color color) {
     return Container(

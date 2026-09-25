@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/stores/setup_wizard_store.dart';
 import '../../../util/common/app_responsive.dart';
 import 'package:billberrylite/core/config/app_config.dart';
+import 'package:billberrylite/core/config/phone_rule.dart';
 import 'package:billberrylite/data/models/common/staffModel_310.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:uuid/uuid.dart';
@@ -141,10 +142,13 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
       _pinFocus.requestFocus();
       return;
     }
-    if (phone.isNotEmpty && phone.length != 10) {
-      NotificationService.instance.showError(
-        'Mobile number must be exactly 10 digits',
-      );
+    // Country-aware, and optional. Uses PhoneRule's SAVED-country getters
+    // rather than the `*For(country, …)` forms the Store Details step needs:
+    // that step calls `saveBusinessDetails()` on Continue, so by the time this
+    // step renders the country is already persisted.
+    final phoneErr = PhoneRule.validate(phone, required: false);
+    if (phoneErr != null) {
+      NotificationService.instance.showError(phoneErr);
       _phoneFocus.requestFocus();
       return;
     }
@@ -516,10 +520,10 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
                                   controller: _phoneController,
                                   focusNode: _phoneFocus,
                                   label: 'Phone',
-                                  hint: 'Optional, 10 digits',
+                                  hint: 'Optional, ${PhoneRule.lengthLabel}',
                                   icon: Icons.phone_outlined,
                                   keyboardType: TextInputType.phone,
-                                  maxLength: 10,
+                                  maxLength: PhoneRule.maxLength,
                                   inputFormatters: [
                                     FilteringTextInputFormatter.digitsOnly,
                                   ],
