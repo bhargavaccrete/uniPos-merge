@@ -69,7 +69,8 @@ void main() {
     required double balanceAfter,
     String unit = 'pcs',
     String itemName = 'Widget',
-    String reason = 'Correction',
+    // A real adjustment label — the report keeps only those (R-13).
+    String reason = 'Stock count correction',
     String staffName = 'Admin',
     String? note,
     DateTime? at,
@@ -383,11 +384,44 @@ void main() {
         isIn: true,
         quantity: 1,
         balanceAfter: 1,
-        reason: 'Damaged in store',
+        reason: 'Damaged / Broken',
         staffName: 'Priya');
 
     final r = (await report()).single;
-    expect(r['reason'], 'Damaged in store');
+    expect(r['reason'], 'Damaged / Broken');
     expect(r['staffName'], 'Priya');
+  });
+
+  // ── R-13: adjustments only ─────────────────────────────────────────────
+
+  test('R-13 sales, receipts, returns and other movements stay out', () async {
+    // The shared box holds every kind of movement; only adjustment reasons
+    // (incl. stock-take commits, which use the same labels) belong here.
+    const others = [
+      'Sale',
+      'Sale (bundle: Combo)',
+      'Opening stock',
+      'Stock edited',
+      'Goods received',
+      'Return',
+      'Exchange',
+      'Assembly batch',
+    ];
+    for (var i = 0; i < others.length; i++) {
+      await seed('X-$i',
+          isIn: false, quantity: 1, balanceAfter: 1,
+          itemName: others[i], reason: others[i]);
+    }
+    await seed('ADJ-1',
+        isIn: false, quantity: 2, balanceAfter: 8,
+        itemName: 'THEFT', reason: 'Theft / Shrinkage');
+    await seed('ADJ-2',
+        isIn: true, quantity: 1, balanceAfter: 9,
+        itemName: 'COUNT', reason: 'Stock count correction',
+        note: 'Stock take ST-00001');
+
+    final rows = await report();
+    expect(ids(rows).toSet(), {'THEFT', 'COUNT'});
+    expect(removedCount(rows), 1, reason: 'a Sale must not count as removed');
   });
 }

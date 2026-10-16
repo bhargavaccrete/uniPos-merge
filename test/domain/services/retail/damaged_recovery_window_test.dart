@@ -445,6 +445,87 @@ void main() {
     }
   });
 
+  // R-23: cancelling through the store writes the value off as a dated loss,
+  // so it lands in `absorbed` in the cancellation's month instead of vanishing.
+  test('cancelling a return records its value as absorbed, once', () async {
+    await Hive.openBox(HiveBoxNames.appCounters); // loss numbers
+    await seedGRN('GRN-JAN', at: jan(10));
+    await seedReturn('RET-C', returnDate: jan(12), totalAmount: 600);
+    await Hive.box<PurchaseReturnItemModel>(HiveBoxNames.purchaseReturnItems)
+        .add(PurchaseReturnItemModel.create(
+      returnId: 'RET-C',
+      grnItemId: 'GI-1',
+      variantId: 'V-1',
+      productId: 'P-1',
+      productName: 'Mug',
+      returnedQty: 3,
+      costPrice: 200,
+    ));
+    await hydrate();
+
+    expect(await damagedGoodsStore.cancelPurchaseReturn('RET-C'), isTrue);
+    expect(await damagedGoodsStore.cancelPurchaseReturn('RET-C'), isFalse,
+        reason: 'already cancelled — no second write-off');
+
+    final losses = Hive.box<InventoryLossModel>(HiveBoxNames.inventoryLosses)
+        .values
+        .toList();
+    expect(losses, hasLength(1));
+    expect(losses.single.source, InventoryLossSource.returnCancelled);
+    expect(losses.single.lossValue, 600);
+
+    // Dated by the cancellation (now), so it shows in the current month.
+    final now = DateTime.now();
+    final t = totals(await ReportService().getPurchaseSummaryReport(
+      startDate: DateTime(now.year, now.month),
+      endDate: DateTime(now.year, now.month + 1),
+    ));
+    expect(t.absorbed, 600);
+    expect(t.expected, 0, reason: 'no longer owed');
+  });
+
+  // R-50: a credit note can't exceed the goods sent back, nor land on a
+  // cancelled return.
+  test('a credit note above the return value is refused', () async {
+    await seedGRN('GRN-JAN', at: jan(10));
+    await seedReturn('RET-B', returnDate: jan(12), totalAmount: 600);
+    await hydrate();
+
+    expect(
+        await damagedGoodsStore.recordCreditNote(
+            returnId: 'RET-B', creditNoteNumber: 'CN-1', amount: 6000),
+        isFalse);
+    expect(damagedGoodsStore.errorMessage, contains('600.00'));
+
+    expect(
+        await damagedGoodsStore.recordCreditNote(
+            returnId: 'RET-B', creditNoteNumber: 'CN-1', amount: 400),
+        isTrue);
+  });
+
+  // R-24: the supplier agreed, then never paid.
+  test('an approved claim can be rejected, then written off', () async {
+    await Hive.openBox(HiveBoxNames.appCounters);
+    await seedGRN('GRN-JAN', at: jan(10));
+    await seedClaim('CLM-A',
+        claimDate: jan(15), status: SupplierClaimStatus.approved);
+    await hydrate();
+
+    final ok = await damagedGoodsStore.updateClaimStatus(
+        claimId: 'CLM-A', status: SupplierClaimStatus.rejected);
+    expect(ok, isTrue);
+
+    final claim = damagedGoodsStore.supplierClaims
+        .firstWhere((c) => c.claimId == 'CLM-A');
+    expect(claim.statusEnum, SupplierClaimStatus.rejected);
+
+    // Rejected is final: it cannot be settled afterwards.
+    expect(
+        await damagedGoodsStore.updateClaimStatus(
+            claimId: 'CLM-A', status: SupplierClaimStatus.settled),
+        isFalse);
+  });
+
   // ── Window mechanics ───────────────────────────────────────────────────
 
   test('date boundaries: inclusive start, exclusive end on the event date',

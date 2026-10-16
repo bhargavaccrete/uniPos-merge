@@ -220,7 +220,8 @@ mixin _$CartStore on _CartStore, Store {
       String? lineDiscountType,
       double? lineDiscountValue,
       String? lineDiscountReason,
-      String? lineDiscountNote}) {
+      String? lineDiscountNote,
+      bool ignoreStock = false}) {
     return _$addItemAsyncAction.run(() => super.addItem(product, variant,
         category: category,
         priceOverride: priceOverride,
@@ -232,7 +233,8 @@ mixin _$CartStore on _CartStore, Store {
         lineDiscountType: lineDiscountType,
         lineDiscountValue: lineDiscountValue,
         lineDiscountReason: lineDiscountReason,
-        lineDiscountNote: lineDiscountNote));
+        lineDiscountNote: lineDiscountNote,
+        ignoreStock: ignoreStock));
   }
 
   late final _$addQuickItemAsyncAction =
@@ -362,7 +364,8 @@ mixin _$CartStore on _CartStore, Store {
       String? lineDiscountType,
       double? lineDiscountValue,
       String? lineDiscountReason,
-      String? lineDiscountNote}) {
+      String? lineDiscountNote,
+      bool ignoreStock = false}) {
     return _$addItemToTabAsyncAction.run(() => super.addItemToTab(
         product, variant,
         category: category,
@@ -375,7 +378,8 @@ mixin _$CartStore on _CartStore, Store {
         lineDiscountType: lineDiscountType,
         lineDiscountValue: lineDiscountValue,
         lineDiscountReason: lineDiscountReason,
-        lineDiscountNote: lineDiscountNote));
+        lineDiscountNote: lineDiscountNote,
+        ignoreStock: ignoreStock));
   }
 
   late final _$addQuickItemToTabAsyncAction =

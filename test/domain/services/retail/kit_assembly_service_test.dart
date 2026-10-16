@@ -183,6 +183,61 @@ void main() {
       );
     });
 
+    test('R-45 assembling rolls component cost into the kit, averaged', () async {
+      await setUpKit(kitStock: 0, comp1QtyPerKit: 2, comp2QtyPerKit: 3);
+      await productStore.updateVariantCostPrice('comp-1', 10); // 2 × 10 = 20
+      await productStore.updateVariantCostPrice('comp-2', 5); //  3 × 5 = 15
+
+      await RetailInventoryService.assembleKit(
+          kitProduct: makeKitProduct(), kitVariantId: 'kit-v1', batchQty: 4);
+      expect((await productStore.getVariantById('kit-v1'))!.costPrice, 35,
+          reason: 'no kits on hand yet → the batch cost');
+
+      // Components get dearer; the next batch averages into the 4 on hand.
+      await productStore.updateVariantCostPrice('comp-1', 20); // 40 + 15 = 55
+      await RetailInventoryService.assembleKit(
+          kitProduct: makeKitProduct(), kitVariantId: 'kit-v1', batchQty: 4);
+      expect((await productStore.getVariantById('kit-v1'))!.costPrice,
+          closeTo((4 * 35 + 4 * 55) / 8, 1e-9));
+    });
+
+    test('R-45 a component with no cost leaves the kit cost alone', () async {
+      await setUpKit(kitStock: 0);
+      await productStore.updateVariantCostPrice('comp-1', 10); // comp-2 unknown
+
+      await RetailInventoryService.assembleKit(
+          kitProduct: makeKitProduct(), kitVariantId: 'kit-v1', batchQty: 1);
+      expect((await productStore.getVariantById('kit-v1'))!.costPrice, isNull);
+    });
+
+    test('a second variant of the same kit assembles from its own recipe', () async {
+      // R-08: each variant of a repack product carries its own component list.
+      await setUpKit(kitStock: 0, comp1Stock: 100, comp2Stock: 100);
+      await addVariant(variantId: 'kit-v2', productId: 'kit-prod', stockQty: 0);
+      await bundleRepo.saveBundle(RetailBundleModel(
+        id: 'bundle-2',
+        productId: 'kit-prod',
+        variantId: 'kit-v2',
+        components: [BundleComponentModel(componentVariantId: 'comp-1', quantity: 5)],
+        createdAt: now,
+        updatedAt: now,
+      ));
+
+      final result = await RetailInventoryService.assembleKit(
+        kitProduct: makeKitProduct(),
+        kitVariantId: 'kit-v2',
+        batchQty: 2,
+      );
+
+      expect(result.bundleId, 'bundle-2');
+      expect((await productStore.getVariantById('kit-v2'))!.stockQty, 2);
+      expect((await productStore.getVariantById('kit-v1'))!.stockQty, 0,
+          reason: 'first variant untouched');
+      expect((await productStore.getVariantById('comp-1'))!.stockQty, 100 - 5 * 2);
+      expect((await productStore.getVariantById('comp-2'))!.stockQty, 100,
+          reason: 'not in kit-v2\'s recipe');
+    });
+
     test('rejects assembly for a variant with no bundle configured', () async {
       await addVariant(variantId: 'unconfigured-v1', productId: 'kit-prod', stockQty: 0);
 

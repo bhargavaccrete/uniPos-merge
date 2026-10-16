@@ -249,11 +249,13 @@ class SupplierAccountSummary {
 /// testable without Hive or the service locator, the same way the GRN credit
 /// decisions are.
 ///
-/// [entries] may be in any order — buckets are order-independent — but
-/// [SupplierAccountSummary.closing] is taken from the chronologically last
-/// entry's stored `balanceAfter` rather than by summing, so it reports what the
-/// balance actually was rather than what the buckets imply. When the two
-/// disagree there is a bug, and the Overview tab should show it.
+/// [entries] may be in any order. [SupplierAccountSummary.closing] is the SUM
+/// of every movement, which no ordering can change. It used to be the stored
+/// `balanceAfter` of the last entry by date — but `balanceAfter` is stamped at
+/// ENTRY time, so a back-dated row (a payment dated today at 00:00, entered
+/// after a GRN at 10:00) made the "last" row the wrong one and Outstanding
+/// showed ₹1000 on a settled account. The Overview compares this closing with
+/// the supplier's `currentBalance`; a gap there is still a real bug to show.
 SupplierAccountSummary summariseLedger(List<SupplierLedgerEntryModel> entries) {
   if (entries.isEmpty) return const SupplierAccountSummary();
 
@@ -281,8 +283,6 @@ SupplierAccountSummary summariseLedger(List<SupplierLedgerEntryModel> entries) {
     }
   }
 
-  final sorted = [...entries]..sort((a, b) => a.date.compareTo(b.date));
-
   return SupplierAccountSummary(
     opening: opening,
     purchases: purchases,
@@ -290,6 +290,41 @@ SupplierAccountSummary summariseLedger(List<SupplierLedgerEntryModel> entries) {
     claimCredits: claimCredits,
     payments: payments,
     adjustments: adjustments,
-    closing: sorted.last.balanceAfter,
+    closing: opening +
+        purchases +
+        returnCredits +
+        claimCredits +
+        payments +
+        adjustments,
   );
+}
+
+/// Ledger reading order: by calendar DAY of [SupplierLedgerEntryModel.date],
+/// then by when the row was entered. Picked dates land at 00:00 while
+/// system-dated rows (a GRN) carry the time of day, so sorting on the raw
+/// timestamp put a payment entered after today's GRN before it.
+int compareLedgerOrder(SupplierLedgerEntryModel a, SupplierLedgerEntryModel b) {
+  String day(String iso) => iso.length >= 10 ? iso.substring(0, 10) : iso;
+  final byDay = day(a.date).compareTo(day(b.date));
+  if (byDay != 0) return byDay;
+  final byEntry = a.createdAt.compareTo(b.createdAt);
+  if (byEntry != 0) return byEntry;
+  return a.entryId.compareTo(b.entryId);
+}
+
+/// Running balance after each entry, keyed by `entryId`, computed in
+/// [compareLedgerOrder] — what the Ledger tab shows beside each row. The
+/// stored `balanceAfter` is the balance at ENTRY time, which reads out of
+/// sequence as soon as anything is back-dated; it stays on the row as audit.
+Map<String, double> ledgerRunningBalances(
+  List<SupplierLedgerEntryModel> entries,
+) {
+  final sorted = [...entries]..sort(compareLedgerOrder);
+  final result = <String, double>{};
+  var balance = 0.0;
+  for (final e in sorted) {
+    balance += e.amount;
+    result[e.entryId] = balance;
+  }
+  return result;
 }

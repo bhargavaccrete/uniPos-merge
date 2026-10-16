@@ -373,8 +373,38 @@ class _AddProductScreenState extends State<AddProductScreen>
     try {
       final productStore = locator<ProductStore>();
 
-      // Create updated product
-      final product = ProductModel.fromProduct(
+      // Built ON the stored product, so what this form doesn't show survives:
+      // `fromProduct` rebuilt it from scratch, dropping stockMode (a Bundle or
+      // Kit silently became Standard) and resetting createdAt.
+      final stored = productStore.getProductById(_editingProductId!);
+      final description =
+          _formStore.description.isNotEmpty ? _formStore.description : null;
+      final taxRate = _formStore.taxRate > 0 ? _formStore.taxRate : null;
+      final product = stored?.copyWith(
+            productName: _formStore.name.trim(),
+            category: _formStore.selectedCategoryId!,
+            subCategory: _formStore.subCategory,
+            brandName: _formStore.brandName,
+            clearBrandName: _formStore.brandName == null,
+            imagePath: _formStore.imagePath,
+            description: description,
+            clearDescription: description == null,
+            hasVariants: _formStore.isVariableProduct,
+            productType: _formStore.productType,
+            defaultPrice: _formStore.isSimpleProduct ? _formStore.price : null,
+            defaultMrp: _formStore.isSimpleProduct ? _formStore.mrp : null,
+            defaultCostPrice:
+                _formStore.isSimpleProduct ? _formStore.costPrice : null,
+            gstRate: taxRate,
+            taxId: _formStore.selectedTaxId,
+            clearTax: _formStore.selectedTaxId == null && taxRate == null,
+            imageBytes: _formStore.imageBytes,
+            hsnCode: _formStore.hsnCode,
+            clearHsnCode: (_formStore.hsnCode ?? '').isEmpty,
+            allowOrderWhenOutOfStock: _formStore.allowOrderWhenOutOfStock,
+            updateAt: DateTime.now().toIso8601String(),
+          ) ??
+          ProductModel.fromProduct(
         productId: _editingProductId!,
         productName: _formStore.name.trim(),
         category: _formStore.selectedCategoryId!,
@@ -405,29 +435,51 @@ class _AddProductScreenState extends State<AddProductScreen>
       if (_formStore.isVariableProduct) {
         // For variable products, update/create all variants from the form
         for (final variantData in _formStore.retailVariants) {
-          final variant = VarianteModel.create(
-            varianteId: variantData.id,
-            productId: _editingProductId!,
-            sku: await _skuOrGenerated(variantData.sku),
-            barcode: variantData.barcode,
-            customAttributes: variantData.attributes,
-            attributeValueIds: variantData.attributeValueIds,
-            mrp: variantData.mrp,
-            costPrice: variantData.costPrice,
-            sellingPrice: variantData.price,
-            stockQty: variantData.stockQuantity,
-            minStock: _formStore.minStock,
-            taxRate: _formStore.taxRate > 0 ? _formStore.taxRate : null,
-            taxId: _formStore.selectedTaxId,
-            isDecimalQuantity: _formStore.isDecimalQuantity,
-            unit: _formStore.unit,
-            expiryDate: _formStore.expiryDate?.toIso8601String(),
-          );
-
-          // Check if variant exists, if so update, otherwise add
+          final sku = await _skuOrGenerated(variantData.sku);
           final existingVariant = await productStore.getVariantById(
             variantData.id,
           );
+
+          // An existing variant is updated IN PLACE — rebuilding it with
+          // `create` wiped status, isDefault, hsnCode, imagePath and createdAt.
+          // A stock change here is logged by updateVariant ("Stock edited").
+          final VarianteModel variant = existingVariant != null
+              ? existingVariant.copyWith(
+                  sku: sku,
+                  barcode: variantData.barcode,
+                  customAttributes: variantData.attributes,
+                  attributeValueIds: variantData.attributeValueIds,
+                  mrp: variantData.mrp,
+                  costPrice: variantData.costPrice,
+                  sellingPrice: variantData.price,
+                  stockQty: variantData.stockQuantity,
+                  minStock: _formStore.minStock,
+                  taxRate: _formStore.taxRate > 0 ? _formStore.taxRate : null,
+                  taxId: _formStore.selectedTaxId,
+                  isDecimalQuantity: _formStore.isDecimalQuantity,
+                  unit: _formStore.unit,
+                  expiryDate: _formStore.expiryDate?.toIso8601String(),
+                  clearExpiryDate: _formStore.expiryDate == null,
+                )
+              : VarianteModel.create(
+                  varianteId: variantData.id,
+                  productId: _editingProductId!,
+                  sku: sku,
+                  barcode: variantData.barcode,
+                  customAttributes: variantData.attributes,
+                  attributeValueIds: variantData.attributeValueIds,
+                  mrp: variantData.mrp,
+                  costPrice: variantData.costPrice,
+                  sellingPrice: variantData.price,
+                  stockQty: variantData.stockQuantity,
+                  minStock: _formStore.minStock,
+                  taxRate: _formStore.taxRate > 0 ? _formStore.taxRate : null,
+                  taxId: _formStore.selectedTaxId,
+                  isDecimalQuantity: _formStore.isDecimalQuantity,
+                  unit: _formStore.unit,
+                  expiryDate: _formStore.expiryDate?.toIso8601String(),
+                );
+
           final result = existingVariant != null
               ? await productStore.updateVariant(variant)
               : await productStore.addVariant(variant);
@@ -5244,6 +5296,25 @@ class _AddProductScreenState extends State<AddProductScreen>
                   return;
                 }
 
+                // A combination already in the list keeps its row — same id,
+                // prices and stock. Regenerating used to mint a fresh UUID for
+                // every combination, and since saving never deletes the old
+                // variants, an edit left each surviving combination TWICE.
+                String keyOf(Map<String, String>? ids) {
+                  final entries = (ids ?? const <String, String>{})
+                      .entries
+                      .map((e) => '${e.key}=${e.value}')
+                      .toList()
+                    ..sort();
+                  return entries.join('|');
+                }
+
+                final previousByKey = {
+                  for (final row in _formStore.retailVariants)
+                    if (row.attributeValueIds.isNotEmpty)
+                      keyOf(row.attributeValueIds): row,
+                };
+
                 // Generate only selected variants with default values (0)
                 // User will set prices using bulk edit bar after generation
                 _disposeAllVariantControllers();
@@ -5254,6 +5325,15 @@ class _AddProductScreenState extends State<AddProductScreen>
                     final variantName = combo.values
                         .map((v) => v.value)
                         .join(' - ');
+
+                    final previous = previousByKey[keyOf({
+                      for (final e in combo.entries)
+                        e.value.attributeId: e.value.valueId,
+                    })];
+                    if (previous != null) {
+                      _formStore.retailVariants.add(previous);
+                      continue;
+                    }
 
                     _formStore.retailVariants.add(
                       VariantFormData(

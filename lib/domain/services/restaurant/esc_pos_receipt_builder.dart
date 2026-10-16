@@ -63,8 +63,8 @@ class EscPosReceiptBuilder {
   /// The kitchen needs to know WHAT to make, not how much it costs.
   ///
   /// Layout:
+  /// No restaurant name — the ticket opens with the KOT number.
   /// ```
-  ///      RESTAURANT NAME
   ///      KOT #12 (ADD-ON)
   ///   Table: T3  |  Dine In
   ///   Order #7   |  14:30

@@ -546,6 +546,29 @@ class _AddProductScreenState extends State<AddProductScreen> {
       }
     }
 
+    // A stock-mode switch changes what a variant's own stockQty MEANS. A
+    // bundle holds none of its own (it sells from its components), so:
+    //  • into Bundle — real units would be stranded, invisible to sale and
+    //    count. Refused until they are adjusted away.
+    //  • out of Bundle — its own figure was typed at creation and never real;
+    //    left alone it would suddenly become sellable. Reset to 0 below.
+    final wasBundle = existing.isBundle;
+    final becomesBundle = _stockMode == 'bundle';
+    if (becomesBundle && !wasBundle) {
+      final withStock = productStore
+          .variantsFor(existing.productId)
+          .where((v) => v.stockQty != 0)
+          .toList();
+      if (withStock.isNotEmpty) {
+        NotificationService.instance.showError(
+          '${existing.productName} still has stock. A bundle holds none of its '
+          'own — adjust its stock to 0 before making it a Bundle.',
+        );
+        return;
+      }
+    }
+    final resetOwnStock = wasBundle && !becomesBundle;
+
     final taxRate = _taxRateFor(_selectedTaxId);
     final brand = _brandController.text.trim();
     final description = _descriptionController.text.trim();
@@ -593,13 +616,18 @@ class _AddProductScreenState extends State<AddProductScreen> {
       // to reach every one of them — including CLEARING it, which needs the
       // explicit flag because `?? this.x` can never write null back.
       final expiryChanged = variant.expiryDate != expiryIso;
-      if (unitChanged || expiryChanged) {
+      // Leaving Bundle: the phantom own figure goes to 0 in this SAME write —
+      // a separate pass would be overwritten by this loop's stale snapshot.
+      // updateVariant logs the change as a "Stock edited" movement.
+      final stockReset = resetOwnStock && variant.stockQty != 0;
+      if (unitChanged || expiryChanged || stockReset) {
         await productStore.updateVariant(
           variant.copyWith(
             isDecimalQuantity: _isDecimalQuantity,
             unit: _isDecimalQuantity ? _unit : 'piece',
             expiryDate: expiryIso,
             clearExpiryDate: expiryIso == null,
+            stockQty: stockReset ? 0 : null,
           ),
         );
       }
@@ -733,6 +761,20 @@ class _AddProductScreenState extends State<AddProductScreen> {
         );
         return;
       }
+    }
+
+    // Generated rows need a selling price exactly like manual ones. They were
+    // never checked, so an unfilled row saved as null and billed at MRP or ₹0.
+    // Named, because a bulk run can produce a dozen near-identical rows.
+    final unpriced = _generatedVariants
+        .where((v) => v.sellingPrice == null)
+        .map((v) => v.hasAttributes ? v.variantDescription : (v.sku ?? 'Variant'))
+        .toList();
+    if (unpriced.isNotEmpty) {
+      NotificationService.instance.showError(
+        'Enter a selling price for: ${unpriced.join(', ')}',
+      );
+      return;
     }
 
     // Attribute-generated rows carry their OWN editable/scannable barcode and

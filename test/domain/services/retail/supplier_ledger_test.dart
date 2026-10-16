@@ -52,6 +52,50 @@ void main() {
     );
   }
 
+  group('R-22 back-dated entries', () {
+    // Recorded in this order: a GRN confirmed today at 10:00 (system time),
+    // then a payment whose date was PICKED as today, i.e. 00:00.
+    SupplierLedgerEntryModel row(String id, double amount, double after,
+            String date, String createdAt) =>
+        SupplierLedgerEntryModel(
+          entryId: id,
+          supplierId: 's-1',
+          date: date,
+          type: amount > 0 ? 'purchase' : 'payment',
+          amount: amount,
+          balanceAfter: after,
+          description: id,
+          createdAt: createdAt,
+        );
+
+    final grn = row('grn', 1000, 1000, '2026-09-25T10:00:00.000',
+        '2026-09-25T10:00:00.000');
+    final pay = row('pay', -1000, 0, '2026-09-25T00:00:00.000',
+        '2026-09-25T11:00:00.000');
+
+    test('Outstanding is the real balance, not the "last by date" row', () {
+      final s = summariseLedger([grn, pay]);
+      expect(s.closing, 0, reason: 'used to read 1000 from the GRN row');
+      expectReconciles(s);
+    });
+
+    test('same-day rows read in the order they were entered', () {
+      final sorted = [pay, grn]..sort(compareLedgerOrder);
+      expect(sorted.map((e) => e.entryId), ['grn', 'pay']);
+    });
+
+    test('running balances are recomputed in reading order', () {
+      expect(ledgerRunningBalances([pay, grn]), {'grn': 1000.0, 'pay': 0.0});
+    });
+
+    test('a genuinely earlier day still sorts first', () {
+      final yesterdayPay = row('y', -200, 800, '2026-09-24T00:00:00.000',
+          '2026-09-25T12:00:00.000');
+      final sorted = [grn, yesterdayPay]..sort(compareLedgerOrder);
+      expect(sorted.first.entryId, 'y');
+    });
+  });
+
   group('Running balance', () {
     test('opening → purchase → credits → payment chains correctly', () {
       final entries = journal([

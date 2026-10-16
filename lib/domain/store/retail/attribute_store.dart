@@ -670,6 +670,30 @@ abstract class _AttributeStoreBase with Store {
     return result;
   }
 
+  /// The `attributeValueIds` that match [descriptors]: each `{name: value}`
+  /// whose name is a catalogue attribute and whose value is one of its values
+  /// (case-insensitive) maps to `{attributeId: valueId}`. Anything else is
+  /// free text and has no id. Rebuilding this from the edited descriptors is
+  /// what keeps it from drifting behind `customAttributes` — [attributesOf]
+  /// reads the ids first, so a stale id would outrank the edit.
+  ///
+  /// Requires [attributes] and their values to be loaded.
+  Map<String, String> valueIdsFor(Map<String, String> descriptors) {
+    final result = <String, String>{};
+    descriptors.forEach((name, value) {
+      final attribute = getAttributeByName(name);
+      if (attribute == null) return;
+      final wanted = value.trim().toLowerCase();
+      for (final v in getValues(attribute.attributeId)) {
+        if (v.value.trim().toLowerCase() == wanted) {
+          result[attribute.attributeId] = v.valueId;
+          return;
+        }
+      }
+    });
+    return result;
+  }
+
   /// Human-readable descriptor for a stored attribute map, falling back to the
   /// legacy columns for records saved before generic attributes existed.
   ///

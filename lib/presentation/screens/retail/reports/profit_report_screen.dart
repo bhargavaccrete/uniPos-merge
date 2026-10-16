@@ -884,6 +884,8 @@ class _ProfitReportScreenState extends State<ProfitReportScreen>
     final margin = row['margin'] as double;
     final marginPercent = row['marginPercent'] as double;
     final isRepack = row['isRepack'] == true;
+    // A component has no cost price — no margin can be claimed.
+    final costIncomplete = row['costIncomplete'] == true;
 
     return Container(
       margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
@@ -942,17 +944,21 @@ class _ProfitReportScreenState extends State<ProfitReportScreen>
                   vertical: 4,
                 ),
                 decoration: BoxDecoration(
-                  color: margin >= 0
-                      ? Colors.green.shade50
-                      : Colors.red.shade50,
+                  color: costIncomplete
+                      ? Colors.orange.shade50
+                      : (margin >= 0 ? Colors.green.shade50 : Colors.red.shade50),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
-                  '${marginPercent.toStringAsFixed(1)}%',
+                  costIncomplete
+                      ? 'Cost missing'
+                      : '${marginPercent.toStringAsFixed(1)}%',
                   style: GoogleFonts.poppins(
-                    color: margin >= 0
-                        ? Colors.green.shade700
-                        : Colors.red.shade700,
+                    color: costIncomplete
+                        ? Colors.orange.shade700
+                        : (margin >= 0
+                            ? Colors.green.shade700
+                            : Colors.red.shade700),
                     fontSize: AppResponsive.captionFontSize(context),
                     fontWeight: FontWeight.w600,
                   ),
@@ -966,13 +972,16 @@ class _ProfitReportScreenState extends State<ProfitReportScreen>
               Expanded(
                 child: _buildSmallStat(
                   'Margin',
-                  formatMoney(margin),
-                  margin >= 0 ? Colors.green : Colors.red,
+                  costIncomplete ? '—' : formatMoney(margin),
+                  costIncomplete
+                      ? Colors.orange
+                      : (margin >= 0 ? Colors.green : Colors.red),
                 ),
               ),
               Expanded(
                 child: _buildSmallStat(
-                  'Selling Price',
+                  // Excludes any tax inside the price — the margin is net.
+                  'Price (ex-tax)',
                   formatMoney((row['sellingPrice'] as double)),
                   Colors.blue,
                 ),

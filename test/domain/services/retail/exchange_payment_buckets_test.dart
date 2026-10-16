@@ -15,6 +15,11 @@ import 'package:billberrylite/data/models/restaurant/db/eodmodel_317.dart';
 import 'package:billberrylite/data/models/restaurant/db/expensel_316.dart';
 import 'package:billberrylite/data/models/restaurant/db/stock_movement_model.dart';
 import 'package:billberrylite/data/models/retail/hive_model/credit_payment_model_218.dart';
+import 'package:billberrylite/data/models/retail/hive_model/inventory_loss_model_178.dart';
+import 'package:billberrylite/data/models/retail/hive_model/purchase_return_model_174.dart';
+import 'package:billberrylite/data/models/retail/hive_model/supplier_claim_model_176.dart';
+import 'package:billberrylite/domain/services/retail/sale_return_reason.dart';
+import 'package:billberrylite/domain/store/retail/damaged_goods_store.dart';
 import 'package:billberrylite/data/models/retail/hive_model/product_model_200.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_item_model_204.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
@@ -163,14 +168,21 @@ void main() {
     );
   }
 
+  /// [previousDay] puts the original sale OUTSIDE today's EOD window, so the
+  /// report holds only the exchange — the figures below measure the exchange
+  /// alone. (A same-day S1 adds its own ₹1000 cash, which is correct EOD
+  /// behaviour but not what these tests measure.)
   Future<void> seedSale({
     required double price,
     required String paymentType,
+    bool previousDay = false,
   }) async {
     // Two seconds back: the EOD window's end bound is exclusive and computed
     // as `DateTime.now()` inside the report.
     final now = DateTime.now()
-        .subtract(const Duration(seconds: 2))
+        .subtract(previousDay
+            ? const Duration(days: 1)
+            : const Duration(seconds: 2))
         .toIso8601String();
 
     await Hive.box<SaleModel>(HiveBoxNames.sales).put(
@@ -234,13 +246,17 @@ void main() {
       .where((p) => p.paymentType.toLowerCase() == label.toLowerCase())
       .fold<double>(0, (sum, p) => sum + p.totalAmount);
 
-  /// Everything the exchange documents put through the drawer.
+  /// Everything the exchange documents put through the drawer — by the SAME
+  /// rule the Cash Drawer screen and history report use: a return counts its
+  /// cash refund, a sale its cash component, never both. (Applying both to a
+  /// return counted an exchange's cash leg twice.)
   double drawerCash() {
     final exchangeDocs = allSales().where((s) => s.saleId != 'S1');
     var total = 0.0;
     for (final sale in exchangeDocs) {
-      total += CashDrawerLedger.cashComponentOf(sale);
-      total -= CashDrawerLedger.cashRefundOf(sale);
+      total += sale.isReturn == true
+          ? -CashDrawerLedger.cashRefundOf(sale)
+          : CashDrawerLedger.cashComponentOf(sale);
     }
     return total;
   }
@@ -250,7 +266,7 @@ void main() {
   group('cheaper replacement — only the refund reaches the buckets', () {
     setUp(() async {
       await seedCatalogue(sold: 1000, replacement: 800);
-      await seedSale(price: 1000, paymentType: 'cash');
+      await seedSale(price: 1000, paymentType: 'cash', previousDay: true);
     });
 
     test('UPI shows -200, not -1000 + 800 and not 800', () async {
@@ -319,7 +335,7 @@ void main() {
   group('dearer replacement — only the collection reaches the buckets', () {
     setUp(() async {
       await seedCatalogue(sold: 1000, replacement: 1200);
-      await seedSale(price: 1000, paymentType: 'cash');
+      await seedSale(price: 1000, paymentType: 'cash', previousDay: true);
     });
 
     test('UPI shows +200, not +1200', () async {
@@ -352,7 +368,7 @@ void main() {
   group('an even swap moves no money at all', () {
     test('no bucket records anything, and the drawer is untouched', () async {
       await seedCatalogue(sold: 1000, replacement: 1000);
-      await seedSale(price: 1000, paymentType: 'cash');
+      await seedSale(price: 1000, paymentType: 'cash', previousDay: true);
 
       await exchange('upi');
       final report = await eod();
@@ -367,7 +383,7 @@ void main() {
   group('each document still reconciles against itself', () {
     test('every payment leg sums to that document total', () async {
       await seedCatalogue(sold: 1000, replacement: 800);
-      await seedSale(price: 1000, paymentType: 'cash');
+      await seedSale(price: 1000, paymentType: 'cash', previousDay: true);
       await exchange('upi');
 
       for (final sale in allSales().where((s) => s.saleId != 'S1')) {
@@ -385,7 +401,7 @@ void main() {
 
     test('neither document claims a money method it never saw', () async {
       await seedCatalogue(sold: 1000, replacement: 800);
-      await seedSale(price: 1000, paymentType: 'cash');
+      await seedSale(price: 1000, paymentType: 'cash', previousDay: true);
       await exchange('upi');
 
       final replacement = allSales().firstWhere(
@@ -400,6 +416,55 @@ void main() {
             .every((l) => ExchangeService.isExchangeCredit(l['method'] as String?)),
         isTrue,
       );
+    });
+  });
+
+  // ==========================================================================
+  // R-44: unsellable goods don't go back on the shelf.
+  group('return reason decides restock vs write-off', () {
+    Future<void> openLossBoxes() async {
+      await Hive.openBox<PurchaseReturnModel>(HiveBoxNames.purchaseReturns);
+      await Hive.openBox<SupplierClaimModel>(HiveBoxNames.supplierClaims);
+      await Hive.openBox<InventoryLossModel>(HiveBoxNames.inventoryLosses);
+      locator.registerLazySingleton<DamagedGoodsStore>(() => DamagedGoodsStore());
+    }
+
+    double stockOfV1() =>
+        Hive.box<VarianteModel>(HiveBoxNames.variants).get('v1')!.stockQty;
+
+    test('a DAMAGED return is written off, not restocked', () async {
+      await openLossBoxes();
+      await seedCatalogue(sold: 1000, replacement: 800);
+      await seedSale(price: 1000, paymentType: 'cash');
+
+      await ReturnService().processFullReturn(
+        originalSaleId: 'S1',
+        refundMethod: 'cash',
+        returnReason: SaleReturnReason.damaged.code,
+      );
+
+      expect(stockOfV1(), 9, reason: 'not put back on the shelf');
+      final loss = Hive.box<InventoryLossModel>(HiveBoxNames.inventoryLosses)
+          .values
+          .single;
+      expect(loss.source, InventoryLossSource.saleReturn);
+      expect(loss.lossValue, 60, reason: '1 × the cost frozen on the sale');
+    });
+
+    test('a CHANGED-MIND return still restocks', () async {
+      await openLossBoxes();
+      await seedCatalogue(sold: 1000, replacement: 800);
+      await seedSale(price: 1000, paymentType: 'cash');
+
+      await ReturnService().processFullReturn(
+        originalSaleId: 'S1',
+        refundMethod: 'cash',
+        returnReason: SaleReturnReason.changedMind.code,
+      );
+
+      expect(stockOfV1(), 10);
+      expect(Hive.box<InventoryLossModel>(HiveBoxNames.inventoryLosses).isEmpty,
+          isTrue);
     });
   });
 

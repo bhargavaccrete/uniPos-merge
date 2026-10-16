@@ -96,6 +96,9 @@ void main() {
       gstRate: gstRate,
       gstAmount: gstAmount,
       refundAmount: refundAmount,
+      // RefundService always stamps this, and EOD counts a refund in the
+      // session it HAPPENED in (by refundedAt) — an unstamped refund reads 0.
+      refundedAt: refundAmount > 0 ? DateTime.now() : null,
       orderStatus: status,
       sessionId: session,
       paymentListJson: paymentListJson,

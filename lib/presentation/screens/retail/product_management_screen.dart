@@ -3,6 +3,8 @@ import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:billberrylite/presentation/screens/retail/add_product_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/assemble_kit_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/bundles_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/category_management_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/import_product/bulk_import_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/inventory_screen.dart';
@@ -118,6 +120,55 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
     );
   }
 
+  /// Assembling writes stock, so it rides the stock-adjustment plan key.
+  void _openAssembleKit() {
+    if (!PlanGuard.allowedOr(
+      context,
+      RetailEntKeys.inventory,
+      featureName: 'Assemble Kit',
+    )) {
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const AssembleKitScreen()),
+    );
+  }
+
+  void _openBundles() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const BundlesScreen()),
+    );
+  }
+
+  /// A Products-tab, stock-adjuster-only app-bar action that appears only
+  /// while the catalog has something for it to act on.
+  Widget _productsTabAction({
+    required bool Function() hasTarget,
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onPressed,
+  }) {
+    return AnimatedBuilder(
+      animation: _tabController.animation!,
+      builder: (_, child) => Observer(
+        builder: (_) {
+          if (_tabController.animation!.value.round() != 0 ||
+              !StockAdjustmentService.canAdjust ||
+              !hasTarget()) {
+            return const SizedBox.shrink();
+          }
+          return IconButton(
+            icon: Icon(icon),
+            tooltip: tooltip,
+            onPressed: onPressed,
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // True on desktop too — it means "not a phone", not "tablet".
@@ -144,6 +195,21 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
                 onPressed: _openStockTakes,
               );
             },
+          ),
+          // Kits are built here; the embedded InventoryScreen has no AppBar,
+          // so these can't live there.
+          _productsTabAction(
+            hasTarget: () => productStore.products.any((p) => p.isRepack),
+            icon: Icons.inventory_rounded,
+            tooltip: 'Assemble Kit',
+            onPressed: _openAssembleKit,
+          ),
+          _productsTabAction(
+            hasTarget: () =>
+                productStore.products.any((p) => p.isBundle || p.isRepack),
+            icon: Icons.widgets_outlined,
+            tooltip: 'Bundles',
+            onPressed: _openBundles,
           ),
           // Products tab only. Bulk import was previously reachable only from
           // the onboarding wizard, so an existing shop had no way back to it.

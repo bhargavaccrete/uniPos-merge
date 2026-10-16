@@ -4,6 +4,7 @@ import 'package:flutter_mobx/flutter_mobx.dart';
 import '../../../core/di/service_locator.dart';
 import 'package:billberrylite/data/models/retail/hive_model/supplier_model_205.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/domain/services/retail/grn_receiving_service.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/common/row_action_button.dart';
@@ -46,6 +47,7 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
     POStatus.partiallyCompleted,
     POStatus.fullyCompleted,
     POStatus.cancelled,
+    POStatus.closed,
   ];
 
   static const List<String> _tabLabels = [
@@ -55,6 +57,7 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
     'Partial',
     'Completed',
     'Cancelled',
+    'Closed',
   ];
 
   SupplierModel? _supplierFilter;
@@ -65,6 +68,10 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
     super.initState();
     _tabController = TabController(length: _tabStatuses.length, vsync: this);
     _supplierFilter = widget.initialSupplier;
+    // Finish any receipt a crash interrupted, then show the orders it updated.
+    GrnReceivingService.resumeInterrupted().then((n) {
+      if (n > 0 && mounted) purchaseOrderStore.loadPurchaseOrders();
+    });
     purchaseOrderStore.loadPurchaseOrders();
     // The filter dropdown and the detail sheet's WhatsApp share both read
     // supplierStore, which nothing on this route was hydrating.

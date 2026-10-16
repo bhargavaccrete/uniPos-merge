@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/di/service_locator.dart';
@@ -9,15 +10,16 @@ import '../../../data/models/retail/hive_model/bundle_model.dart';
 import '../../../data/models/retail/hive_model/kit_assembly_model.dart';
 import '../../../data/repositories/restaurant/stock_movement_repository.dart';
 import '../restaurant/day_management_service.dart';
+import 'grn_receiving_service.dart';
 
 /// Deducts stock for a completed retail sale.
 ///
-/// Before this service, `checkout_screen.dart` mutated `variant.stockQty`
-/// directly with no audit row — the one gap in an otherwise fully-logged
-/// retail stock ledger (manual adjustments and returns both write a
-/// [StockMovementModel] via [StockAdjustmentService]/`return_service.dart`;
-/// only the sale path didn't). This centralizes sale-time deduction so it
-/// logs the same way, and gives bundle/kit cascade logic (see
+/// Every retail stock change writes a [StockMovementModel]: sales (here),
+/// returns ([restockForReturn]), opening stock and edits
+/// (`ProductStore.addVariant/updateVariant` via [recordMovement]), receipts
+/// (`GrnReceivingService`), adjustments and stock takes
+/// ([StockAdjustmentService]), kit assembly and exchanges. This centralizes
+/// sale-time deduction so it logs the same way, and gives bundle/kit cascade logic (see
 /// docs/retail_inventory_system_plan.md) a service layer to hang off instead
 /// of growing inside the checkout screen. Mirrors restaurant's
 /// `InventoryService.deductStockForOrder`.
@@ -29,11 +31,19 @@ class RetailInventoryService {
   /// Retail sells in whole units — same convention as [StockAdjustmentService].
   static const String _unit = 'pcs';
 
-  static Future<void> deductStockForSale(List<CartItemModel> cartItems) async {
+  /// With [saleId], every row gets a deterministic id
+  /// (`sale_<saleId>_<cartItemId>`, plus the component for a bundle) and a
+  /// line whose row already exists is skipped — so re-running the deduction
+  /// for the same sale after a mid-way failure applies only what is missing.
+  static Future<void> deductStockForSale(
+    List<CartItemModel> cartItems, {
+    String? saleId,
+  }) async {
     final staffName = authService.currentUsername ?? 'Staff';
     final sessionId = await DayManagementService.getCurrentSessionId();
 
     for (final item in cartItems) {
+      final lineKey = saleId == null ? null : 'sale_${saleId}_${item.cartItemId}';
       ProductModel? product;
       try {
         product = productStore.products.firstWhere(
@@ -51,15 +61,19 @@ class RetailInventoryService {
           saleQty: item.qty,
           staffName: staffName,
           sessionId: sessionId,
+          lineKey: lineKey,
         );
         continue;
       }
 
+      if (lineKey != null && _movements.contains(lineKey)) continue;
       final variant = await productStore.getVariantById(item.variantId);
       if (variant == null) continue;
 
-      final newStock = variant.stockQty - item.qty;
-      final finalStock = newStock < 0 ? 0.0 : newStock;
+      // Never clamped: selling past zero (allow-when-out, or a race) leaves a
+      // negative count, so the row reconciles and the shortfall stays visible
+      // for the next stock take. Same as restaurant's applyStockDelta.
+      final finalStock = variant.stockQty - item.qty;
       await productStore.updateVariantStock(item.variantId, finalStock);
 
       final label = product != null && variant.hasAttributes
@@ -67,7 +81,7 @@ class RetailInventoryService {
           : (product?.productName ?? item.productName);
 
       await _movements.saveMovement(StockMovementModel(
-        id: const Uuid().v4(),
+        id: lineKey ?? const Uuid().v4(),
         timestamp: DateTime.now(),
         itemId: item.productId,
         variantId: item.variantId,
@@ -76,7 +90,7 @@ class RetailInventoryService {
         quantity: item.qty.toDouble(),
         balanceAfter: finalStock.toDouble(),
         reason: 'Sale',
-        unit: _unit,
+        unit: variant.isDecimalQuantity ? variant.effectiveUnit : _unit,
         staffName: staffName,
         sessionId: sessionId,
       ));
@@ -95,17 +109,20 @@ class RetailInventoryService {
     required double saleQty,
     required String staffName,
     required String? sessionId,
+    String? lineKey,
   }) async {
     final RetailBundleModel? bundle = bundleRepository.getBundleForVariant(bundleVariantId);
     if (bundle == null || !bundle.hasComponents) return; // unconfigured bundle — nothing to deduct
 
     for (final component in bundle.components) {
+      final rowId =
+          lineKey == null ? null : '${lineKey}_${component.componentVariantId}';
+      if (rowId != null && _movements.contains(rowId)) continue;
       final variant = await productStore.getVariantById(component.componentVariantId);
       if (variant == null) continue;
 
       final deductQty = saleQty * component.quantity;
-      final newStock = variant.stockQty - deductQty;
-      final finalStock = newStock < 0 ? 0.0 : newStock;
+      final finalStock = variant.stockQty - deductQty; // not clamped — see above
       await productStore.updateVariantStock(component.componentVariantId, finalStock);
 
       String label = variant.sku ?? component.componentVariantId;
@@ -119,7 +136,7 @@ class RetailInventoryService {
       } catch (_) {}
 
       await _movements.saveMovement(StockMovementModel(
-        id: const Uuid().v4(),
+        id: rowId ?? const Uuid().v4(),
         timestamp: DateTime.now(),
         itemId: variant.productId,
         variantId: variant.varianteId,
@@ -128,7 +145,7 @@ class RetailInventoryService {
         quantity: deductQty.toDouble(),
         balanceAfter: finalStock.toDouble(),
         reason: 'Sale (bundle: ${bundleProduct.productName})',
-        unit: _unit,
+        unit: variant.isDecimalQuantity ? variant.effectiveUnit : _unit,
         staffName: staffName,
         sessionId: sessionId,
       ));
@@ -164,6 +181,140 @@ class RetailInventoryService {
     }
     if (minBundles == null) return 0; // no valid components — nothing sellable
     return minBundles < 0 ? 0 : minBundles;
+  }
+
+  /// A bundle variant with no bundle row, or an empty one. Selling it would
+  /// deduct nothing (see [_deductBundleComponents]), so the cart refuses it
+  /// outright — even when the product allows selling out of stock.
+  static bool isUnconfiguredBundle(ProductModel product, VarianteModel variant) {
+    if (!product.isBundle) return false;
+    final bundle = bundleRepository.getBundleForVariant(variant.varianteId);
+    return bundle == null || !bundle.hasComponents;
+  }
+
+  /// Product-level sellable total for list/tile display: bundles count what
+  /// their components support, everything else its own stock.
+  static double totalAvailableToSell(
+    ProductModel product,
+    List<VarianteModel> variants,
+  ) =>
+      variants.fold(0.0, (sum, v) => sum + calculateAvailableToSell(product, v));
+
+  /// Puts returned goods back on the shelf and logs each restock. A bundle
+  /// holds no stock of its own, so its return restores the components the
+  /// sale deducted (current recipe, `qty × component.quantity` each); anything
+  /// else is credited to its own variant. A bundle with no configured
+  /// components deducted nothing at sale time, so nothing is restored.
+  static Future<void> restockForReturn({
+    required String productId,
+    required String variantId,
+    required double qty,
+    String reason = 'Return',
+    String? note,
+  }) async {
+    Future<void> credit(String id, double add) async {
+      final variant = await productStore.getVariantById(id);
+      if (variant == null) return;
+      final newStock = variant.stockQty + add;
+      await productStore.updateVariantStock(id, newStock);
+      await recordMovement(
+        variant: variant,
+        type: 'in',
+        quantity: add,
+        balanceAfter: newStock,
+        reason: reason,
+        note: note,
+      );
+    }
+
+    final product = productStore.getProductById(productId);
+    if (product != null && product.isBundle) {
+      final bundle = bundleRepository.getBundleForVariant(variantId);
+      if (bundle == null || !bundle.hasComponents) return;
+      for (final component in bundle.components) {
+        await credit(component.componentVariantId, qty * component.quantity);
+      }
+      return;
+    }
+    await credit(variantId, qty);
+  }
+
+  /// Takes goods off the shelf outside checkout (an exchange's replacement)
+  /// and logs each deduction — the counterpart of [restockForReturn]. A
+  /// bundle holds no stock of its own, so it deducts its components
+  /// (`qty × component.quantity`); anything else its own variant. Not
+  /// clamped, same as a sale.
+  static Future<void> deductStock({
+    required String productId,
+    required String variantId,
+    required double qty,
+    required String reason,
+    String? note,
+  }) async {
+    Future<void> take(String id, double amount) async {
+      final variant = await productStore.getVariantById(id);
+      if (variant == null) return;
+      final newStock = variant.stockQty - amount;
+      await productStore.updateVariantStock(id, newStock);
+      await recordMovement(
+        variant: variant,
+        type: 'out',
+        quantity: amount,
+        balanceAfter: newStock,
+        reason: reason,
+        note: note,
+      );
+    }
+
+    final product = productStore.getProductById(productId);
+    if (product != null && product.isBundle) {
+      final bundle = bundleRepository.getBundleForVariant(variantId);
+      if (bundle == null || !bundle.hasComponents) return;
+      for (final component in bundle.components) {
+        await take(component.componentVariantId, qty * component.quantity);
+      }
+      return;
+    }
+    await take(variantId, qty);
+  }
+
+  /// Writes one stock-history row for a change that has ALREADY been applied.
+  ///
+  /// The shared shape for writers that have no document of their own to hang
+  /// the row off (opening stock, edits, returns). Never throws: the stock has
+  /// moved either way, and failing the caller over its audit row would be
+  /// worse than a missing row, which the debug log still reports.
+  static Future<void> recordMovement({
+    required VarianteModel variant,
+    required String type,
+    required double quantity,
+    required double balanceAfter,
+    required String reason,
+    String? note,
+  }) async {
+    try {
+      final product = productStore.getProductById(variant.productId);
+      final name = product?.productName ?? 'Item';
+      await _movements.saveMovement(StockMovementModel(
+        id: const Uuid().v4(),
+        timestamp: DateTime.now(),
+        itemId: variant.productId,
+        variantId: variant.varianteId,
+        itemName: variant.hasAttributes
+            ? '$name (${variant.variantDescription})'
+            : name,
+        type: type,
+        quantity: quantity,
+        balanceAfter: balanceAfter,
+        reason: reason,
+        note: note,
+        unit: variant.isDecimalQuantity ? variant.effectiveUnit : _unit,
+        staffName: authService.currentUsername ?? 'Staff',
+        sessionId: await DayManagementService.getCurrentSessionId(),
+      ));
+    } catch (e) {
+      debugPrint('Stock movement not recorded ($reason): $e');
+    }
   }
 
   /// Assembles one batch of a repack/kit variant from its components:
@@ -212,9 +363,20 @@ class RetailInventoryService {
     final sessionId = await DayManagementService.getCurrentSessionId();
     final movementIds = <String>[];
 
+    // What one kit costs to build — the components it consumes, at their
+    // cost. Null when any component has no cost: an unknown is not ₹0.
+    double? unitCost = 0;
+
     for (final component in bundle.components) {
       final variant = await productStore.getVariantById(component.componentVariantId);
       if (variant == null) continue;
+
+      final componentCost = variant.costPrice;
+      if (componentCost == null || componentCost <= 0) {
+        unitCost = null;
+      } else if (unitCost != null) {
+        unitCost += componentCost * component.quantity;
+      }
 
       final deductQty = component.quantity * batchQty;
       final newStock = variant.stockQty - deductQty;
@@ -250,7 +412,21 @@ class RetailInventoryService {
 
     final kitVariant = await productStore.getVariantById(kitVariantId);
     final newKitStock = (kitVariant?.stockQty ?? 0) + batchQty;
+
+    // Roll the batch's component cost into the kit's cost, averaged with the
+    // kits already on hand — the same rule a goods receipt uses. The kit's
+    // cost used to stay whatever was typed, so kit sales froze a made-up cost
+    // into profit.
+    final newKitCost = GrnReceivingService.weightedAverageCost(
+      onHand: kitVariant?.stockQty ?? 0,
+      currentCost: kitVariant?.costPrice,
+      receivedQty: batchQty.toDouble(),
+      receiptCost: unitCost,
+    );
     await productStore.updateVariantStock(kitVariantId, newKitStock);
+    if (newKitCost != null && newKitCost != kitVariant?.costPrice) {
+      await productStore.updateVariantCostPrice(kitVariantId, newKitCost);
+    }
 
     final producedMovementId = const Uuid().v4();
     await _movements.saveMovement(StockMovementModel(

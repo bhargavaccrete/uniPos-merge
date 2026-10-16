@@ -21,20 +21,29 @@ class SaleReturnReason {
   /// alone explains nothing.
   final bool requiresNote;
 
+  /// Whether the returned goods can be sold again. False for damaged,
+  /// defective and expired stock: those are written off as an inventory loss
+  /// instead of going back on the shelf, where the next customer would be
+  /// sold them.
+  final bool restocks;
+
   const SaleReturnReason({
     required this.code,
     required this.label,
     this.requiresNote = false,
+    this.restocks = true,
   });
 
   static const damaged = SaleReturnReason(
     code: 'damaged',
     label: 'Damaged',
+    restocks: false,
   );
 
   static const defective = SaleReturnReason(
     code: 'defective',
     label: 'Defective / Not Working',
+    restocks: false,
   );
 
   static const wrongItem = SaleReturnReason(
@@ -55,7 +64,12 @@ class SaleReturnReason {
   static const expired = SaleReturnReason(
     code: 'expired',
     label: 'Expired / Past Date',
+    restocks: false,
   );
+
+  /// True unless [code] is a reason whose goods can't be resold. An unknown or
+  /// missing reason restocks — the long-standing behaviour.
+  static bool restocksFor(String? code) => byCode(code)?.restocks ?? true;
 
   static const other = SaleReturnReason(
     code: 'other',

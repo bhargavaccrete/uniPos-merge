@@ -127,9 +127,12 @@ class StockTakeItemModel extends HiveObject {
       systemQty: systemQty ?? this.systemQty,
       countedQty: countedQty ?? this.countedQty,
       costPrice: costPrice ?? this.costPrice,
-      // Re-stamped on every edit: a recount is a new count, and the old
-      // timestamp would misdate the snapshot that systemQty belongs to.
-      countedAt: DateTime.now().toIso8601String(),
+      // Re-stamped on a recount — a new count, whose old timestamp would
+      // misdate the systemQty snapshot. NOT on marking a line applied, which
+      // used to misdate the count and reorder the lines.
+      countedAt: (systemQty != null || countedQty != null)
+          ? DateTime.now().toIso8601String()
+          : countedAt,
       appliedQty: appliedQty ?? this.appliedQty,
     );
   }

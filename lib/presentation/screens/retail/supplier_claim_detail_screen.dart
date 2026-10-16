@@ -64,7 +64,8 @@ class _SupplierClaimDetailScreenState extends State<SupplierClaimDetailScreen> {
       case SupplierClaimStatus.pending:
         return [SupplierClaimStatus.approved, SupplierClaimStatus.rejected];
       case SupplierClaimStatus.approved:
-        return [SupplierClaimStatus.settled];
+        // Rejected too: the supplier agreed but never paid.
+        return [SupplierClaimStatus.settled, SupplierClaimStatus.rejected];
       case SupplierClaimStatus.rejected:
       case SupplierClaimStatus.settled:
         return const [];

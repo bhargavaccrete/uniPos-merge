@@ -5,6 +5,7 @@
 import 'package:billberrylite/core/config/tax_label_rule.dart';
 import 'package:billberrylite/util/common/tax_split.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/core/config/tax_feature.dart';
 import 'package:billberrylite/data/models/retail/hive_model/credit_payment_model_218.dart';
 import 'package:billberrylite/data/models/retail/hive_model/grn_model_213.dart';
 import 'package:billberrylite/data/models/retail/hive_model/purchase_return_model_174.dart';
@@ -1685,40 +1686,70 @@ class ReportService {
   /// (mirrors how [getLowStockReport] is also window-less). See
   /// docs/retail_inventory_system_plan.md §3.3.
   Future<List<Map<String, dynamic>>> getBundleMarginReport() async {
-    final costByVariantId = <String, double>{
-      for (final v in productStore.variants) v.varianteId: v.costPrice ?? 0.0,
+    // Null when a component has no cost. Counting it as ₹0 overstated the
+    // margin — the same "unknown is not zero" rule the profit report follows.
+    final costByVariantId = <String, double?>{
+      for (final v in productStore.variants) v.varianteId: v.costPrice,
     };
+
+    // Margin is measured on the price EXCLUDING tax, like the Profit report's
+    // net revenue: under tax-inclusive pricing the GST inside the price is
+    // collected for the government, not earned. Comparing the gross price
+    // with cost overstated every bundle's margin by its tax.
+    final taxInclusive =
+        TaxFeature.enabled && await gstService.isTaxInclusiveMode();
+    final defaultRate = await gstService.getDefaultGstRate();
 
     final rows = <Map<String, dynamic>>[];
     for (final product in productStore.products) {
       if (!product.needsBundleComponents) continue;
-      final variant = productStore.primaryVariantFor(product.productId);
-      if (variant == null) continue;
-      final bundle = bundleRepository.getBundleForVariant(variant.varianteId);
-      if (bundle == null || !bundle.hasComponents) continue;
+      final variants = productStore.variantsFor(product.productId);
+      // Every variant has its own recipe; only the first used to be reported.
+      for (final variant in variants) {
+        final bundle =
+            bundleRepository.getBundleForVariant(variant.varianteId);
+        if (bundle == null || !bundle.hasComponents) continue;
 
-      final componentCost =
-          bundle.estimatedCost((id) => costByVariantId[id] ?? 0.0);
-      final sellingPrice = variant.sellingPrice ?? variant.mrp ?? 0.0;
-      final margin = sellingPrice - componentCost;
-      final marginPercent =
-          sellingPrice != 0 ? (margin / sellingPrice) * 100 : 0.0;
+        final costIncomplete = bundle.components.any((c) =>
+            c.quantity > 0 && (costByVariantId[c.componentVariantId] ?? 0) <= 0);
+        final componentCost =
+            bundle.estimatedCost((id) => costByVariantId[id] ?? 0.0);
+        final grossPrice = variant.sellingPrice ?? variant.mrp ?? 0.0;
+        // Same rate order as the cart: variant → product → default.
+        final rate = variant.taxRate ?? product.gstRate ?? defaultRate;
+        final sellingPrice = taxInclusive && rate > 0
+            ? grossPrice / (1 + rate / 100)
+            : grossPrice;
+        final margin = sellingPrice - componentCost;
+        final marginPercent =
+            sellingPrice != 0 ? (margin / sellingPrice) * 100 : 0.0;
 
-      rows.add({
-        'productId': product.productId,
-        'productName': product.productName,
-        'variantId': variant.varianteId,
-        'isRepack': product.isRepack,
-        'sellingPrice': sellingPrice,
-        'componentCost': componentCost,
-        'margin': margin,
-        'marginPercent': marginPercent,
-        'componentCount': bundle.components.length,
-      });
+        rows.add({
+          'productId': product.productId,
+          'productName': variants.length > 1 && variant.hasAttributes
+              ? '${product.productName} (${variant.variantDescription})'
+              : product.productName,
+          'variantId': variant.varianteId,
+          'isRepack': product.isRepack,
+          'sellingPrice': sellingPrice,
+          'componentCost': componentCost,
+          'margin': margin,
+          'marginPercent': marginPercent,
+          'componentCount': bundle.components.length,
+          // The margin figures above are not trustworthy when true — the
+          // screen shows "cost missing" instead of a number.
+          'costIncomplete': costIncomplete,
+        });
+      }
     }
 
-    rows.sort((a, b) =>
-        (a['marginPercent'] as double).compareTo(b['marginPercent'] as double));
+    // Weakest real margin first; rows with a missing cost last.
+    rows.sort((a, b) {
+      final ai = a['costIncomplete'] == true, bi = b['costIncomplete'] == true;
+      if (ai != bi) return ai ? 1 : -1;
+      return (a['marginPercent'] as double)
+          .compareTo(b['marginPercent'] as double);
+    });
     return rows;
   }
 
@@ -2046,7 +2077,9 @@ class ReportService {
     for (final r in damagedGoodsStore.purchaseReturns) {
       switch (r.statusEnum) {
         case PurchaseReturnStatus.cancelled:
-          break; // never returned, never credited, no dependable date
+          // Counted through the `return_cancelled` loss rows written at
+          // cancellation (dated by it) in the loss loop below — never here too.
+          break;
         case PurchaseReturnStatus.pending:
           if (_withinRange(r.returnDate, start, end)) {
             entry(r.supplierId, r.supplierName).expected += r.totalAmount;

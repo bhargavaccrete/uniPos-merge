@@ -491,7 +491,7 @@ class RetailImportTemplateBuilder {
       RetailImportColumn.sellingPrice: 'Required: number only',
       RetailImportColumn.mrp: 'Optional',
       RetailImportColumn.stock: 'Optional, defaults to 0',
-      RetailImportColumn.minStock: 'Optional, defaults to 5',
+      RetailImportColumn.minStock: 'Optional, blank uses the shop low-stock level',
     };
     _setInstruction(
       s,

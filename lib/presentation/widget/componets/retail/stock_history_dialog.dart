@@ -6,11 +6,13 @@ import 'package:billberrylite/presentation/widget/componets/common/app_dialog.da
 import 'package:billberrylite/presentation/widget/componets/common/app_empty_state.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/util/common/quantity_format.dart';
 
 import '../../../../data/models/restaurant/db/stock_movement_model.dart';
 import '../../../../domain/services/retail/stock_adjustment_service.dart';
 
-/// Manual stock corrections for one product, newest first.
+/// Every stock movement for one product — sales, receipts, returns,
+/// adjustments, opening stock — newest first.
 ///
 /// Read-only and unsortable on purpose: this is an audit trail. Correcting an
 /// entry means recording another adjustment, never editing this list.
@@ -36,9 +38,8 @@ class StockHistoryDialog extends StatelessWidget {
       body: movements.isEmpty
           ? const AppEmptyState(
               icon: Icons.history_toggle_off_rounded,
-              title: 'No adjustments yet',
-              message:
-                  'Stock has only moved through receipts, sales and returns.',
+              title: 'No stock movements yet',
+              message: 'Sales, receipts, returns and adjustments appear here.',
             )
           : ConstrainedBox(
               // Caps the sheet on a long history instead of letting the dialog
@@ -68,9 +69,9 @@ class _Row extends StatelessWidget {
   Widget build(BuildContext context) {
     final isIn = movement.isIn;
     final color = isIn ? AppColors.success : AppColors.danger;
-    final signed = movement.signedQuantity.toInt();
-    final before =
-        (movement.balanceAfter - movement.signedQuantity).toInt();
+    // Doubles throughout — `.toInt()` showed a 2.5 kg change as 2.
+    final signed = formatQty(movement.signedQuantity.abs());
+    final before = movement.balanceAfter - movement.signedQuantity;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -94,7 +95,8 @@ class _Row extends StatelessWidget {
                 ),
               ),
               Text(
-                '$before → ${movement.balanceAfter.toInt()} pcs'
+                '${formatQty(before)} → '
+                '${formatQtyWithUnit(movement.balanceAfter, movement.unit)}'
                 ' • by ${movement.staffName}',
                 style: GoogleFonts.poppins(
                   fontSize: AppResponsive.captionFontSize(context),
@@ -121,7 +123,7 @@ class _Row extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         Text(
-          isIn ? '+$signed' : '$signed',
+          isIn ? '+$signed' : '−$signed',
           style: GoogleFonts.poppins(
             fontSize: AppResponsive.bodyFontSize(context),
             fontWeight: FontWeight.w700,

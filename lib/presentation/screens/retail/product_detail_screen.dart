@@ -178,18 +178,22 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  void _openEditVariant(VarianteModel variant) {
+  Future<void> _openEditVariant(VarianteModel variant) async {
+    // The dialog seeds its rows from the attribute catalogue and rebuilds the
+    // value ids from it on save — both wrong against an empty catalogue.
+    if (attributeStore.attributes.isEmpty) {
+      await attributeStore.loadAttributes();
+      if (!mounted) return;
+    }
     showDialog(
       context: context,
       builder: (_) => _EditVariantDialog(variant: variant),
     );
   }
 
-  /// Why this product's stock is what it is — adjustments only.
-  ///
-  /// Deliberately NOT a full stock ledger: sales and receipts already have
-  /// their own reports, and mixing them in here would imply this is the
-  /// complete movement history when it is only the manual corrections.
+  /// Why this product's stock is what it is — its full stock ledger. Every
+  /// stock change writes a movement, so this is the complete history; the
+  /// Stock Adjustment report is the adjustments-only view.
   void _openStockHistory() {
     showDialog(
       context: context,
@@ -269,6 +273,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     if (productStore.variantCountFor(widget.product.productId) <= 1) {
       NotificationService.instance.showError(
         'A product needs at least one variant. Delete the product instead.',
+      );
+      return;
+    }
+
+    final usedIn = productStore.bundlesUsing([variant.varianteId]);
+    if (usedIn.isNotEmpty) {
+      await showAppErrorDialog(
+        context: context,
+        title: 'Used in bundles',
+        message: '"${variant.shortDescription}" is a component of the bundles '
+            'below. Remove it from them first, then delete it.',
+        errors: usedIn,
+        icon: Icons.widgets_outlined,
       );
       return;
     }
@@ -1359,7 +1376,11 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
     // Keys that match a catalogue attribute become real attribute rows, so an
     // existing Size keeps its value picker instead of being demoted to a
     // free-text pair the moment you open the editor.
-    _attrRows.addAll(_seedRowsFromAttributes(v.customAttributes));
+    //
+    // Seeded from the CANONICAL descriptors (ids first, then text) — what the
+    // till prints — not the raw text map, which can be missing or stale.
+    // The opener loads the catalogue first.
+    _attrRows.addAll(_seedRowsFromAttributes(attributeStore.attributesOf(v)));
   }
 
   @override
@@ -1472,10 +1493,29 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
       return;
     }
 
+    // The rows are the truth after an edit: both descriptor fields are rebuilt
+    // from them, or the ids (which the till reads first) keep the old value.
+    // valueIdsFor needs the catalogue, which this screen doesn't load itself.
+    if (attributeStore.attributes.isEmpty) {
+      await attributeStore.loadAttributes();
+      if (!mounted) return;
+    }
+    final descriptors = _attrRowsMap(_attrRows) ?? const <String, String>{};
+
+    // Built on the LIVE variant, not the one this dialog opened with: every
+    // field the form does not edit — stockQty above all — must keep its
+    // current value. The snapshot wrote the opening stock back over any sale
+    // made while the dialog was open. (Fields the form DOES show, like cost,
+    // save what the form holds.)
+    final live =
+        await productStore.getVariantById(widget.variant.varianteId) ??
+            widget.variant;
+    if (!mounted) return;
+
     // MUST go through copyWith. Hand-building a VarianteModel here is how
     // sellingPrice, hsnCode, attributeValueIds, imagePath, isDefault and status
     // used to get silently wiped on every edit.
-    final updated = widget.variant.copyWith(
+    final updated = live.copyWith(
       sellingPrice: double.tryParse(_sellingPriceController.text.trim()) ?? 0.0,
       costPrice: _costPriceController.text.trim().isEmpty
           ? null
@@ -1487,7 +1527,8 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
       status: _active ? kActiveVariantStatus : kInactiveVariantStatus,
       // An empty map rather than null, so removing every row actually clears
       // them instead of falling back to the old values.
-      customAttributes: _attrRowsMap(_attrRows) ?? const <String, String>{},
+      customAttributes: descriptors,
+      attributeValueIds: attributeStore.valueIdsFor(descriptors),
       // `barcode ?? this.barcode` cannot null the field, so removing one needs
       // the explicit flag — same reason as clearMrp above.
       barcode: newBarcode.isEmpty ? null : newBarcode,
@@ -1970,12 +2011,36 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
     }
     if (!_formKey.currentState!.validate() || _saving) return;
 
-    final combos = _activeCombinations;
-    if (combos.isEmpty) {
+    final ticked = _activeCombinations;
+    if (ticked.isEmpty) {
       NotificationService.instance.showError(
         _combinations.isEmpty
             ? 'Select at least one value to create variants from'
             : 'Every combination is unticked — tick at least one to create',
+      );
+      return;
+    }
+
+    // Skip combinations the product already has. Every ticked one used to be
+    // created, so re-running Bulk Add made a second "Red / M" at 0 stock.
+    // Compared on the canonical descriptors (what the till prints), ignoring
+    // case, and only on this run's axes.
+    final existingDescriptors = productStore
+        .variantsFor(widget.productId)
+        .map((v) => {
+              for (final e in attributeStore.attributesOf(v).entries)
+                e.key.toLowerCase(): e.value.trim().toLowerCase(),
+            })
+        .toList();
+    bool alreadyExists(VariantCombination combo) => existingDescriptors.any(
+        (d) => combo.attributeValuePairs.every((pair) =>
+            d[pair.attribute.name.toLowerCase()] ==
+            pair.value.value.trim().toLowerCase()));
+    final combos = ticked.where((c) => !alreadyExists(c)).toList();
+    final skipped = ticked.length - combos.length;
+    if (combos.isEmpty) {
+      NotificationService.instance.showError(
+        'This product already has every selected combination',
       );
       return;
     }
@@ -2075,7 +2140,12 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
 
     if (!mounted) return;
     Navigator.pop(context);
-    NotificationService.instance.showSuccess('${combos.length} variants added');
+    NotificationService.instance.showSuccess(
+      skipped == 0
+          ? '${combos.length} variants added'
+          : '${combos.length} variants added · $skipped already existed and '
+              'were skipped',
+    );
   }
 
   /// Shown instead of the form while attributes load, and in place of it when

@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/domain/store/retail/stock_alert_store.dart';
 import 'package:billberrylite/core/routes/notification_routes.dart';
 import 'package:billberrylite/data/models/common/notification_presenter.dart';
 import 'package:billberrylite/data/models/retail/hive_model/variante_model_201.dart';
@@ -40,6 +43,27 @@ class RetailNotificationSyncService {
   static const String _expirySeed = 'expiry_alert:retail-summary';
 
   static const int _morningHour = 9;
+
+  static Timer? _debounce;
+
+  /// Fire-and-forget reconcile after a stock write, coalesced over a short
+  /// window — the retail twin of restaurant's `LowStockSyncService.scheduleSync`.
+  ///
+  /// Alerts used to refresh only at startup and on the notifications screen,
+  /// so selling the last unit or receiving new stock left them stale all day.
+  /// Called from `ProductStore`'s stock writers (the choke point every sale,
+  /// receipt, return, adjustment and edit goes through). The debounce keeps a
+  /// 50-line stock take to one run. A no-op until the alert store exists.
+  static void scheduleSync() {
+    if (!locator.isRegistered<StockAlertStore>()) return;
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 400), () {
+      _debounce = null;
+      // Unawaited on purpose: a notification refresh must never delay or
+      // fail a stock write.
+      runStartupChecks().catchError((_) {});
+    });
+  }
 
   /// [asOf] and [warningDays] exist for tests — production always uses now / 7.
   static Future<void> runStartupChecks({

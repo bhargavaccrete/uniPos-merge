@@ -34,6 +34,7 @@ import 'package:billberrylite/domain/services/retail/retail_billing_service.dart
 import 'package:billberrylite/presentation/widget/componets/retail/line_discount_dialog.dart';
 import 'package:billberrylite/presentation/widget/componets/retail/quick_item_dialog.dart';
 import 'package:billberrylite/domain/services/retail/quick_item_service.dart';
+import 'package:billberrylite/domain/services/retail/inventory_service.dart';
 import '../../../../core/di/service_locator.dart';
 import 'package:billberrylite/core/routes/routes_name.dart';
 import 'package:billberrylite/domain/services/common/notification_service.dart';
@@ -641,12 +642,12 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
       name: product.productName,
       unitPrice: variant.sellingPrice ?? variant.mrp ?? 0,
       unit: variant.unit,
-      stockQuantity: variant.stockQty,
-      // `cartStore.addItem` already refuses `requestedQty > stockQty`, so the
-      // sheet enforcing the same rule changes nothing about what can be sold —
-      // it just reports it here, beside the numbers, instead of as a toast
-      // after the sheet has closed and the entry is lost.
-      trackInventory: true,
+      stockQuantity:
+          RetailInventoryService.calculateAvailableToSell(product, variant),
+      // Mirrors `cartStore.addItem`'s own rule, so the sheet reports a refusal
+      // beside the numbers instead of as a toast after the entry is lost — and
+      // stands aside, like addItem, when the product sells on past zero.
+      trackInventory: !product.sellsWhenOutOfStock,
     );
     return selection?.quantity;
   }
@@ -1531,7 +1532,8 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
           price = product.defaultPrice ?? product.defaultMrp ?? 0;
         }
 
-        final stock = variants.fold<double>(0.0, (sum, v) => sum + v.stockQty);
+        final stock =
+            RetailInventoryService.totalAvailableToSell(product, variants);
 
         return Container(
           margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
@@ -1848,7 +1850,8 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
         if (price == 0) {
           price = product.defaultPrice ?? product.defaultMrp ?? 0;
         }
-        final stock = variants.fold<double>(0.0, (s, v) => s + v.stockQty);
+        final stock =
+            RetailInventoryService.totalAvailableToSell(product, variants);
         final outOfStock = stock <= 0;
         final radius = BorderRadius.circular(
           AppResponsive.borderRadius(context),

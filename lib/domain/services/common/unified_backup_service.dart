@@ -64,6 +64,7 @@ import 'package:billberrylite/data/models/retail/hive_model/cart_model_202.dart'
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_item_model_204.dart';
 import 'package:billberrylite/data/models/retail/hive_model/supplier_model_205.dart';
+import 'package:billberrylite/data/models/retail/hive_model/supplier_ledger_entry_model_179.dart';
 import 'package:billberrylite/data/models/retail/hive_model/purchase_return_model_174.dart';
 import 'package:billberrylite/data/models/retail/hive_model/purchase_return_item_model_175.dart';
 import 'package:billberrylite/data/models/retail/hive_model/supplier_claim_model_176.dart';
@@ -1123,6 +1124,14 @@ class UnifiedBackupService {
         exportMap["suppliers"] = [];
       }
 
+      // Supplier balance journal — the history behind each currentBalance.
+      try {
+        exportMap["supplierLedger"] = Hive.box<SupplierLedgerEntryModel>(HiveBoxNames.supplierLedger).values.map((e) => e.toMap()).toList();
+      } catch (e) {
+        debugPrint("⚠️ Supplier ledger box error: $e");
+        exportMap["supplierLedger"] = [];
+      }
+
       // Purchases/purchaseItems intentionally absent — the standalone Purchase
       // feature was removed; goods now arrive through Purchase Orders + GRN.
       // Older backups may still carry those keys; they're simply ignored.
@@ -1175,6 +1184,20 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Stock movements box error: $e");
         exportMap["stockMovements"] = [];
+      }
+
+      // Cash drawer movements — Cash In / Cash Out, opening float and the EOD
+      // safe drop. Same shared box and key as the restaurant branch; without
+      // it a restored retail shop lost its drawer history.
+      try {
+        exportMap["cashMovements"] =
+            Hive.box<CashMovementModel>(HiveBoxNames.restaurantCashMovements)
+                .values
+                .map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>)
+                .toList();
+      } catch (e) {
+        debugPrint("⚠️ Cash movements box error: $e");
+        exportMap["cashMovements"] = [];
       }
 
       // Physical stock counts. The completed ones justify the adjustments in
@@ -2698,6 +2721,28 @@ class UnifiedBackupService {
           (s) => s.supplierId,  // Use supplierId as key
     );
 
+    // Supplier balance journal, restored with the balances it explains. A
+    // backup from before the ledger was exported has no key: clear instead of
+    // keeping this device's rows, which would not add up to the restored
+    // balances. An empty journal reads as "Balance brought forward" and is
+    // backfilled as a real opening row on the next movement.
+    try {
+      final ledgerBox =
+          Hive.box<SupplierLedgerEntryModel>(HiveBoxNames.supplierLedger);
+      if (data["supplierLedger"] == null) {
+        await ledgerBox.clear();
+      } else {
+        await restoreBoxTypedWithId(
+          "supplierLedger",
+          ledgerBox,
+          (m) => SupplierLedgerEntryModel.fromMap(m),
+          (e) => e.entryId,
+        );
+      }
+    } catch (e) {
+      debugPrint("⚠️ Error restoring supplier ledger: $e");
+    }
+
     // Purchases/purchaseItems are no longer restored — the standalone Purchase
     // feature was removed. A backup taken before that still carries those keys;
     // skipping them is intentional, not an oversight.
@@ -2744,6 +2789,26 @@ class UnifiedBackupService {
       );
     } catch (e) {
       debugPrint("⚠️ Error restoring stock movements: $e");
+    }
+
+    // Cash drawer movements. A backup from before retail exported them has no
+    // key: clear rather than keep this device's rows, which belong to a
+    // different point in time than the restored sales.
+    try {
+      final cashBox =
+          Hive.box<CashMovementModel>(HiveBoxNames.restaurantCashMovements);
+      if (data["cashMovements"] == null) {
+        await cashBox.clear();
+      } else {
+        await restoreBoxTypedWithId(
+          "cashMovements",
+          cashBox,
+          (m) => CashMovementModel.fromMap(m),
+          (cm) => cm.id,
+        );
+      }
+    } catch (e) {
+      debugPrint("⚠️ Error restoring cash movements: $e");
     }
 
     // Physical stock count paperwork.

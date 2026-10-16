@@ -14,7 +14,7 @@ import '../../../core/di/service_locator.dart';
 import 'package:billberrylite/data/models/retail/hive_model/purchase_order_model_211.dart';
 import 'package:billberrylite/data/models/retail/hive_model/grn_model_213.dart';
 import 'package:billberrylite/data/models/retail/hive_model/grn_item_model_214.dart';
-import 'package:billberrylite/data/models/retail/hive_model/supplier_ledger_entry_model_179.dart';
+import 'package:billberrylite/domain/services/retail/grn_receiving_service.dart';
 import 'package:billberrylite/core/plan/plan_guard.dart';
 import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
 
@@ -40,6 +40,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
   final ScrollController _itemsScrollController = ScrollController();
   final List<ReceivingItemData> _receivingItems = [];
   bool _isLoading = true;
+  bool _saving = false;
 
   @override
   void initState() {
@@ -56,6 +57,10 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
   }
 
   Future<void> _loadPOItems() async {
+    // An interrupted receipt must land before "remaining" is computed, or its
+    // quantity would show as still outstanding and be received twice.
+    await GrnReceivingService.resumeInterrupted();
+
     // Reserved alongside the item load — the screen already shows a spinner
     // until this finishes, so the number is in place before anything reads it.
     _grnNumber = await purchaseOrderStore.generateGRNNumber();
@@ -280,12 +285,37 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                   SizedBox(width: AppResponsive.mediumSpacing(context)),
                   appDialogPrimaryButton(
                     label: 'Save',
-                    onPressed: () {
+                    onPressed: () async {
                       if (damaged > received) {
                         NotificationService.instance.showError(
                           'Damaged quantity cannot exceed received quantity',
                         );
                         return;
+                      }
+
+                      // Over-receipt stays allowed — suppliers do ship extra,
+                      // and the PO treats a surplus as satisfying its line —
+                      // but never silently: a typo of 100 for 10 used to add
+                      // 100 to stock and bill the supplier for all of it.
+                      // `orderedQty` here is what is still DUE on the line.
+                      if (received > item.orderedQty + 1e-9) {
+                        final extra = received - item.orderedQty;
+                        final ok = await showAppConfirmDialog(
+                          context: dialogContext,
+                          title: 'More than ordered?',
+                          message:
+                              'Only ${formatQty(item.orderedQty)} of '
+                              '${item.productName} are still due on '
+                              '${widget.purchaseOrder.poNumber}. Receive '
+                              '${formatQty(received)} — ${formatQty(extra)} '
+                              'more than ordered? The supplier is billed for '
+                              'all ${formatQty(received)}.',
+                          confirmLabel: 'Receive ${formatQty(received)}',
+                          cancelLabel: 'Fix quantity',
+                          accent: AppColors.warning,
+                          icon: Icons.warning_amber_rounded,
+                        );
+                        if (!ok || !dialogContext.mounted || !mounted) return;
                       }
 
                       setState(() {
@@ -298,7 +328,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                           costPrice: price,
                         );
                       });
-                      Navigator.pop(dialogContext);
+                      if (dialogContext.mounted) Navigator.pop(dialogContext);
                     },
                   ),
                 ],
@@ -468,6 +498,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
   }
 
   Future<void> _saveAndConfirmGRN() async {
+    if (_saving) return;
     if (!PlanGuard.allowedOr(
       context,
       RetailEntKeys.purchaseReceive,
@@ -556,6 +587,11 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
       0.0,
       (sum, item) => sum + item.damagedAmount,
     );
+
+    // Lines received beyond what was still due — shown in the confirmation.
+    final overReceived = _receivingItems
+        .where((item) => item.receivedQty > item.orderedQty + 1e-9)
+        .toList();
 
     // Count items by handling method
     final returnToSupplierItems = _receivingItems
@@ -707,6 +743,24 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                   ),
               ],
 
+              // Per line, not from the totals: one line over and another short
+              // can net to "exactly as ordered" and hide both.
+              if (overReceived.isNotEmpty) ...[
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
+                _confirmSection(
+                  'More than ordered',
+                  Icons.warning_amber_rounded,
+                  AppColors.warning,
+                ),
+                for (final i in overReceived)
+                  _buildConfirmItem(
+                    '${i.productName}: ${formatQty(i.receivedQty)} received, '
+                    '${formatQty(i.orderedQty)} due '
+                    '(+${formatQty(i.receivedQty - i.orderedQty)}) — billed in full',
+                    color: AppColors.warning,
+                  ),
+              ],
+
               if (totalReceived < totalOrdered) ...[
                 SizedBox(height: AppResponsive.mediumSpacing(context)),
                 _confirmSection(
@@ -757,56 +811,19 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
       ),
     );
 
-    if (confirmed != true) return;
+    if (confirmed != true || _saving) return;
 
-    // Save GRN
-    await purchaseOrderStore.createGRN(grn, grnItems);
+    // Stock, cost, supplier accrual, damaged documents and confirmation, in a
+    // crash-resumable order — see GrnReceivingService.
+    setState(() => _saving = true);
+    final result = await GrnReceivingService.receive(grn, grnItems);
+    if (mounted) setState(() => _saving = false);
 
-    // Confirm GRN (this updates PO status)
-    final confirmedItems = await purchaseOrderStore.confirmGRN(grn.grnId);
-
-    // Update stock for each item - ONLY acceptedQty goes to stock
-    // Use goodQty as fallback for backward compatibility with old data
-    for (var item in confirmedItems) {
-      final qtyToAdd = item.acceptedQty > 0 ? item.acceptedQty : item.goodQty;
-      if (qtyToAdd > 0) {
-        final variant = await productStore.getVariantById(item.variantId);
-        if (variant != null) {
-          final newStock = variant.stockQty + qtyToAdd;
-          await productStore.updateVariantStock(item.variantId, newStock);
-
-          // Also update cost price if provided
-          if (item.costPrice != null && item.costPrice! > 0) {
-            await productStore.updateVariantCostPrice(
-              item.variantId,
-              item.costPrice!,
-            );
-          }
-        }
-      }
+    if (!result.success) {
+      NotificationService.instance.showError(result.errorMessage!);
+      return;
     }
-
-    // Accrue the full delivered value against the supplier. Damaged units are
-    // recovered afterwards by the documents created below — a return's credit
-    // note or a settled claim — and a write-off recovers nothing, which is what
-    // makes it a genuine cost.
-    await supplierStore.recordBalanceMovement(
-      supplierId: widget.purchaseOrder.supplierId,
-      amount: totalBillableAmount,
-      type: SupplierLedgerType.purchase,
-      description: 'Goods received against ${widget.purchaseOrder.poNumber}',
-      docNumber: grn.grnNumber,
-      docId: grn.grnId,
-      date: _receivedDate.toIso8601String(),
-    );
-
-    // Turn the damaged-handling choices into real documents. Runs last and
-    // never throws: stock and the supplier balance are already committed, so a
-    // failure here must not make a confirmed GRN look failed.
-    final damagedOutcome = await damagedGoodsStore.recordFromGRN(
-      grn: grn,
-      items: confirmedItems,
-    );
+    final damagedOutcome = result.damaged;
 
     if (mounted) {
       Navigator.pop(context, true);
@@ -1397,7 +1414,7 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                     child: SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
-                        onPressed: _saveAndConfirmGRN,
+                        onPressed: _saving ? null : _saveAndConfirmGRN,
                         icon: Icon(
                           Icons.check_circle,
                           size: AppResponsive.iconSize(context),

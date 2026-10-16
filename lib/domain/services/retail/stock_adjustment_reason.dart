@@ -104,6 +104,13 @@ class StockAdjustmentReason {
     return null;
   }
 
+  /// Whether a stored movement `reason` came from a manual adjustment (or a
+  /// stock-take commit, which adjusts through the same service). Movements
+  /// store the LABEL, and the box also holds sales, receipts, returns, opening
+  /// stock, assembly and exchange rows — this is what keeps those out of the
+  /// adjustment report.
+  static bool isAdjustment(String stored) => all.any((r) => r.label == stored);
+
   /// Resolves a stored `reason` string back to a label. History rows persist
   /// the label, so this falls back to the raw value rather than 'Unknown'.
   static String labelFor(String stored) => byCode(stored)?.label ?? stored;

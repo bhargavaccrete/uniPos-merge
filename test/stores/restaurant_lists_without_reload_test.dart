@@ -236,6 +236,86 @@ void main() {
       expect(await store.cancelTake(second.takeId), isTrue);
       expect(rows(store), await freshRows());
     });
+
+    // Same three double-apply paths retail had (R-20).
+    Future<void> putItem(String id, double stock) async {
+      await Hive.box<Items>(HiveBoxNames.restaurantItems).put(
+          id, Items(id: id, name: id, trackInventory: true, stockQuantity: stock));
+      await itemStore.loadItems();
+    }
+
+    double stockOf(String id) => itemStore.getItemById(id)!.stockQuantity;
+
+    test('a lost take save does not let a re-commit apply lines twice',
+        () async {
+      await putItem('flour', 10);
+      final store = RestaurantStockTakeStore();
+      await store.startTake();
+      await store.countItem(item: itemStore.getItemById('flour')!, countedQty: 7);
+      await store.commit(shortageReason: 'Stock correction');
+      expect(stockOf('flour'), 7);
+
+      // The completed save never landed: the take is still a draft.
+      final take = store.currentTake!;
+      await Hive.box<RestaurantStockTakeModel>(HiveBoxNames.restaurantStockTakes)
+          .put(take.takeId,
+              take.copyWith(status: RestaurantStockTakeStatus.draft.name));
+      await store.openTake(take.takeId);
+
+      final again = await store.commit(shortageReason: 'Stock correction');
+      expect(again.success, isFalse, reason: 'nothing left to apply');
+      expect(stockOf('flour'), 7);
+    });
+
+    test('a crash before appliedQty is saved does not re-apply the line',
+        () async {
+      await putItem('flour', 10);
+      final store = RestaurantStockTakeStore();
+      await store.startTake();
+      await store.countItem(item: itemStore.getItemById('flour')!, countedQty: 7);
+      final line = store.currentItems.single;
+
+      // The adjustment landed (stock + its st_ movement); appliedQty did not.
+      await putItem('flour', 7);
+      await Hive.box<StockMovementModel>(HiveBoxNames.restaurantStockMovements)
+          .put('st_${line.takeItemId}', StockMovementModel(
+            id: 'st_${line.takeItemId}', timestamp: DateTime.now(),
+            itemId: 'flour', itemName: 'flour', type: 'out', quantity: 3,
+            balanceAfter: 7, reason: 'Stock correction', unit: 'pcs',
+            staffName: 'x'));
+
+      final r = await store.commit(shortageReason: 'Stock correction');
+      expect(r.success, isTrue);
+      expect(stockOf('flour'), 7, reason: 'skipped, not 4');
+      expect(store.currentTake!.isEditable, isFalse);
+    });
+
+    test('a partial commit stays open, locks applied lines, finishes later',
+        () async {
+      await putItem('flour', 10);
+      await putItem('sugar', 10);
+      final store = RestaurantStockTakeStore();
+      await store.startTake();
+      await store.countItem(item: itemStore.getItemById('flour')!, countedQty: 7);
+      await store.countItem(item: itemStore.getItemById('sugar')!, countedQty: 0);
+      await putItem('sugar', 4); // used since the count → sugar can't apply
+
+      final first = await store.commit(shortageReason: 'Stock correction');
+      expect(first.appliedLines, 1);
+      expect(store.currentTake!.isEditable, isTrue, reason: 'not terminal');
+      expect(store.varianceItems.single.itemId, 'sugar');
+      expect(await store.countItem(
+          item: itemStore.getItemById('flour')!, countedQty: 1), isFalse);
+      expect(await store.cancelTake(store.currentTake!.takeId), isFalse);
+
+      await store.countItem(item: itemStore.getItemById('sugar')!, countedQty: 0);
+      final second = await store.commit(shortageReason: 'Stock correction');
+      expect(second.appliedLines, 1);
+      expect(stockOf('sugar'), 0);
+      expect(store.currentTake!.isEditable, isFalse);
+      expect(store.currentTake!.committedLineCount, 2);
+      expect(store.currentTake!.committedNetQty, -7);
+    });
   });
 
   // setup_items_list_screen: no reload after the edit-item screen.

@@ -240,6 +240,23 @@ class _InventoryScreenState extends State<InventoryScreen>
     )) {
       return;
     }
+    // A component of someone else's bundle can't go: the bundle would sell
+    // with that item silently skipped. Name them so the owner can fix it.
+    final usedIn = productStore.bundlesUsing(
+      productStore.variantsFor(product.productId).map((v) => v.varianteId),
+    );
+    if (usedIn.isNotEmpty) {
+      await showAppErrorDialog(
+        context: context,
+        title: 'Used in bundles',
+        message: '"${product.productName}" is a component of the bundles '
+            'below. Remove it from them first, then delete it.',
+        errors: usedIn,
+        icon: Icons.widgets_outlined,
+      );
+      return;
+    }
+
     // Deleting the product takes its variants with it (productStore.deleteProduct
     // prunes them), so say so before asking.
     final variantCount = productStore.variantCountFor(product.productId);

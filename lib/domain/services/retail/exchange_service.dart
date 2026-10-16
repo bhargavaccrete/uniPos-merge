@@ -5,14 +5,13 @@ import 'package:flutter/foundation.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/core/config/tax_feature.dart';
 import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
-import 'package:billberrylite/data/models/restaurant/db/stock_movement_model.dart';
 import 'package:billberrylite/data/models/retail/hive_model/cart_model_202.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_item_model_204.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
 import 'package:billberrylite/data/models/retail/hive_model/variante_model_201.dart';
-import 'package:billberrylite/data/repositories/restaurant/stock_movement_repository.dart';
 import 'package:billberrylite/domain/services/common/document_number_service.dart';
-import 'package:billberrylite/domain/services/restaurant/day_management_service.dart';
+import 'package:billberrylite/domain/services/retail/inventory_service.dart';
+import 'package:billberrylite/util/common/quantity_format.dart';
 import 'package:billberrylite/domain/services/retail/retail_billing_service.dart';
 import 'package:billberrylite/domain/services/retail/return_math.dart';
 import 'package:billberrylite/domain/services/retail/return_service.dart';
@@ -197,12 +196,6 @@ class ExchangeService {
   static bool isExchangeCredit(String? method) =>
       (method ?? '').trim().toLowerCase() == exchangeCreditMethod;
 
-  /// Retail counts in pieces; the shared movement model carries a unit because
-  /// restaurant stock can be weighed.
-  static const String _unit = 'pcs';
-
-  static final StockMovementRepository _movements = StockMovementRepository();
-
   final ReturnService _returnService;
   final DocumentNumberService _numbers;
 
@@ -291,11 +284,26 @@ class ExchangeService {
     if (replacement.status.toLowerCase().trim() != 'active') {
       throw Exception('That replacement is not active and cannot be sold');
     }
-    if (replacement.stockQty < replacementQty) {
+    // Same stock rule as the cart: a bundle's availability is what its
+    // components support (its own figure means nothing), a component-less
+    // bundle can't be handed over, and allow-when-out lifts the limit.
+    final replacementProduct =
+        productStore.getProductById(replacement.productId);
+    if (replacementProduct != null &&
+        RetailInventoryService.isUnconfiguredBundle(
+            replacementProduct, replacement)) {
+      throw Exception('That bundle has no components set up');
+    }
+    final available = replacementProduct == null
+        ? replacement.stockQty
+        : RetailInventoryService.calculateAvailableToSell(
+            replacementProduct, replacement);
+    final sellsWhenOut = replacementProduct?.sellsWhenOutOfStock ?? false;
+    if (!sellsWhenOut && available < replacementQty) {
       throw Exception(
-        replacement.stockQty <= 0
+        available <= 0
             ? 'The replacement is out of stock'
-            : 'Only ${replacement.stockQty} of the replacement in stock',
+            : 'Only ${formatQty(available)} of the replacement in stock',
       );
     }
     if (replacement.effectivePrice <= 0) {
@@ -433,27 +441,17 @@ class ExchangeService {
           // Only the difference ever leaves the till on an exchange; the rest
           // of the return value crosses to the replacement as goods.
           cashRefundOverride: q.refundedInMoney,
+          // ReturnService logs the restock itself (per component for a
+          // bundle); tagging it here makes both legs identifiable in Stock
+          // History without a second, duplicate row.
+          stockReason: stockReason,
+          stockNotePrefix: groupId,
         );
       } catch (e) {
         return ExchangeResult.failure(_message(e));
       }
 
       await _stamp(returnSaleId, groupId, q.returnLegs(paymentMethod));
-
-      // ---- 3. audit the returned stock ------------------------------------
-      // ReturnService already moved the stock; this records WHY, so the two
-      // exchange legs are identifiable in Stock History. Written after the
-      // move, per the StockAdjustmentService rule: a failed move must never
-      // leave a log entry claiming a change that did not happen.
-      await _recordMovement(
-        variantId: returnedVariantId,
-        productId: q.returnedLine.productId,
-        name: q.returnedLine.productName ?? 'Item',
-        type: 'in',
-        qty: returnQty,
-        groupId: groupId,
-        counterpart: returnSaleId,
-      );
 
       // ---- 4. the REPLACEMENT half ----------------------------------------
       // An ordinary sale, so it takes the next number in the ordinary invoice
@@ -480,23 +478,14 @@ class ExchangeService {
       }
 
       // ---- 5. move and audit the replacement stock ------------------------
-      final current =
-          await productStore.getVariantById(q.replacementVariant.varianteId);
-      if (current != null) {
-        final newStock = current.stockQty - replacementQty;
-        await productStore.updateVariantStock(
-          q.replacementVariant.varianteId,
-          newStock < 0 ? 0.0 : newStock,
-        );
-      }
-      await _recordMovement(
-        variantId: q.replacementVariant.varianteId,
+      // A bundle replacement deducts its COMPONENTS — it used to take its
+      // own meaningless figure, so the goods handed over never left stock.
+      await RetailInventoryService.deductStock(
         productId: q.replacementVariant.productId,
-        name: q.replacementBill.lines.first.item.productName,
-        type: 'out',
+        variantId: q.replacementVariant.varianteId,
         qty: replacementQty,
-        groupId: groupId,
-        counterpart: replacementSaleId,
+        reason: stockReason,
+        note: '$groupId · $replacementSaleId',
       );
 
       return ExchangeResult.ok(
@@ -608,43 +597,6 @@ class ExchangeService {
     await saleStore.addSaleWithItems(sale, [item]);
   }
 
-  /// One row in Stock History, tagged so an exchange movement is explainable
-  /// months later.
-  ///
-  /// Audit-only: it never blocks the exchange, because the stock has already
-  /// moved and the documents already carry the figures.
-  Future<void> _recordMovement({
-    required String variantId,
-    required String productId,
-    required String name,
-    required String type,
-    required double qty,
-    required String groupId,
-    required String counterpart,
-  }) async {
-    try {
-      final variant = await productStore.getVariantById(variantId);
-      await _movements.saveMovement(
-        StockMovementModel(
-          id: _uuid.v4(),
-          timestamp: DateTime.now(),
-          itemId: productId,
-          variantId: variantId,
-          itemName: name,
-          type: type,
-          quantity: qty.toDouble(),
-          balanceAfter: (variant?.stockQty ?? 0).toDouble(),
-          reason: stockReason,
-          note: '$groupId · $counterpart',
-          unit: _unit,
-          staffName: authService.currentUsername ?? 'Admin',
-          sessionId: await DayManagementService.getCurrentSessionId(),
-        ),
-      );
-    } catch (e) {
-      debugPrint('Exchange stock movement not recorded: $e');
-    }
-  }
 
   // ==========================================================================
   // Reconciliation

@@ -97,11 +97,21 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
   }
 
   Future<void> _selectDeliveryDate() async {
+    final today = DateUtils.dateOnly(DateTime.now());
+    final lastDate = today.add(const Duration(days: 365));
+    // A draft saved earlier can carry a delivery date that is now in the past.
+    // showDatePicker asserts initialDate >= firstDate, so opening the picker on
+    // such a draft broke it; start from today instead.
+    final initial = _expectedDeliveryDate.isBefore(today)
+        ? today
+        : (_expectedDeliveryDate.isAfter(lastDate)
+            ? lastDate
+            : _expectedDeliveryDate);
     final picked = await showDatePicker(
       context: context,
-      initialDate: _expectedDeliveryDate,
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      initialDate: initial,
+      firstDate: today,
+      lastDate: lastDate,
     );
 
     if (picked != null) {
@@ -1362,7 +1372,12 @@ class _ProductSearchDialogState extends State<_ProductSearchDialog> {
   }
 
   Future<void> _loadVariants() async {
-    final variants = await productStore.getAllVariants();
+    // Bundles aren't bought — they're sold from their components. Ordering
+    // and receiving one only raised its own meaningless stock figure.
+    final variants = (await productStore.getAllVariants())
+        .where((v) => !(productStore.getProductById(v.productId)?.isBundle ?? false))
+        .toList();
+    if (!mounted) return;
     setState(() {
       _allVariants = variants;
       _filteredVariants = variants;

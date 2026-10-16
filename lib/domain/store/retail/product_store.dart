@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:mobx/mobx.dart';
 import 'package:uuid/uuid.dart';
 
@@ -9,6 +10,8 @@ import '../../../core/di/service_locator.dart';
 import '../../../core/plan/plan_enforcement.dart';
 import '../../../core/plan/retail_entitlement_keys.dart';
 import '../../services/retail/expiry_status.dart';
+import '../../services/retail/inventory_service.dart';
+import '../../services/retail/retail_notification_sync_service.dart';
 
 
 part 'product_store.g.dart';
@@ -147,9 +150,12 @@ abstract class _ProductStore with Store {
       barcode: code.isEmpty ? null : code,
       sellingPrice: sellingPrice,
       mrp: effectiveMrp,
-      costPrice: 0,
+      // Unknown, not ₹0: profit reports count a null cost as "unknown" and
+      // leave it out, while 0 made every such sale look 100% margin. A GRN
+      // or Edit Variant supplies the real cost later.
+      costPrice: null,
       stockQty: stockQty,
-      sku: '',
+      sku: null,
       createdAt: now,
       updateAt: now,
       isDefault: true,
@@ -215,8 +221,49 @@ abstract class _ProductStore with Store {
     return updated;
   }
 
+  /// Names of OTHER products whose bundle/kit recipe uses any of
+  /// [variantIds] as a component. Deleting such a variant used to leave the
+  /// bundle selling with that component silently skipped (no deduction) and
+  /// unassemblable, so a delete is refused while this is non-empty — the
+  /// recipe is the owner's to change, never silently rewritten.
+  List<String> bundlesUsing(Iterable<String> variantIds) {
+    final ids = variantIds.toSet();
+    final names = <String>{};
+    for (final bundle in bundleRepository.getAllBundles()) {
+      if (bundle.components.any((c) => ids.contains(c.componentVariantId))) {
+        names.add(getProductById(bundle.productId)?.productName ?? 'a bundle');
+      }
+    }
+    return names.toList()..sort();
+  }
+
+  /// Records that die with a deleted product/variant: its own bundle/kit
+  /// recipe rows and (for a product) its attribute assignments — left behind
+  /// they were orphans, and the attribute rows blocked deleting an attribute.
+  ///
+  /// Runs AFTER the delete and never throws: tidying leftovers must not be
+  /// able to stop the delete itself (import rollback depends on it).
+  Future<void> _dropOwnedRecords(
+    Iterable<String> variantIds, {
+    String? productId,
+  }) async {
+    try {
+      for (final id in variantIds) {
+        await bundleRepository.deleteBundleForVariant(id);
+      }
+      if (productId != null) {
+        await attributeStore.removeAttributesFromProduct(productId);
+      }
+    } catch (e) {
+      debugPrint('Cleanup after delete incomplete: $e');
+    }
+  }
+
   @action
   Future<void> deleteProduct(String productId) async {
+    final variantIds =
+        variantsFor(productId).map((v) => v.varianteId).toList();
+
     // Delete from database (also deletes variants)
     await _productRepository.deleteProduct(productId);
 
@@ -224,6 +271,8 @@ abstract class _ProductStore with Store {
     // in-memory list has to be pruned to match.
     products.removeWhere((p) => p.productId == productId);
     variants.removeWhere((v) => v.productId == productId);
+
+    await _dropOwnedRecords(variantIds, productId: productId);
   }
 
   /// Find product by barcode (searches through variants)
@@ -263,7 +312,12 @@ abstract class _ProductStore with Store {
     final lowerQuery = query.toLowerCase();
     return products.where((product) {
       final nameMatch = product.productName.toLowerCase().contains(lowerQuery);
-      final categoryMatch = product.category.toLowerCase().contains(lowerQuery);
+      // `category` holds the category's ID; match its NAME, which is what a
+      // cashier types. Matching the id never found anything.
+      final categoryMatch = categoryStore
+          .displayNameFor(product.category)
+          .toLowerCase()
+          .contains(lowerQuery);
       final brandMatch = product.brandName?.toLowerCase().contains(lowerQuery) ?? false;
       return nameMatch || categoryMatch || brandMatch;
     }).toList();
@@ -401,6 +455,28 @@ abstract class _ProductStore with Store {
     }
   }
 
+  /// Keeps the product's derived `hasVariants`/`productType` in step with its
+  /// actual variant count after an add or delete. They were only set at
+  /// creation, so a product grown to 2+ variants in Product Detail kept
+  /// saying "simple" and its variant chip stayed wrong.
+  Future<void> _syncVariantFlags(String productId) async {
+    final product = getProductById(productId);
+    if (product == null) return;
+    final hasMany = variantsFor(productId).length > 1;
+    if (product.hasVariants == hasMany) return;
+    await updateProduct(product.copyWith(
+      hasVariants: hasMany,
+      productType: hasMany ? 'variable' : 'simple',
+    ));
+  }
+
+  /// Re-reads [variant] from the box after a successful write and mirrors THAT
+  /// into memory, so the cache holds exactly what the repository stored.
+  Future<void> _mirrorSaved(VarianteModel variant) async {
+    final saved = await _variantRepository.getVariantById(variant.varianteId);
+    _upsertVariantInMemory(saved ?? variant);
+  }
+
   /// Get all variants for a product
   Future<List<VarianteModel>> getVariantsForProduct(String productId) async {
     return await _variantRepository.getVariantsByProductId(productId);
@@ -417,30 +493,72 @@ abstract class _ProductStore with Store {
     // Only mirror into the in-memory list on success, or the cache would
     // disagree with the box. The failure message rides on the result — callers
     // surface it, so there is no store-level error state to keep in sync.
-    if (result.success) _upsertVariantInMemory(variant);
+    if (result.success) {
+      // Mirror what was SAVED, not the input: the repository mints a barcode
+      // for a blank one, and mirroring the input kept `null` in memory — a
+      // later save from memory (e.g. Apply Tax) then wrote the barcode away.
+      await _mirrorSaved(variant);
+      // Every create path lands here, so the history starts at the first unit.
+      if (variant.stockQty > 0) {
+        await RetailInventoryService.recordMovement(
+          variant: variant,
+          type: 'in',
+          quantity: variant.stockQty,
+          balanceAfter: variant.stockQty,
+          reason: 'Opening stock',
+        );
+      }
+      await _syncVariantFlags(variant.productId);
+    }
     return result;
   }
 
   @action
   Future<VariantWriteResult> updateVariant(VarianteModel variant) async {
+    final before = await _variantRepository.getVariantById(variant.varianteId);
     final result = await _variantRepository.updateVariant(variant);
     // Only mirror into the in-memory list on success, or the cache would
     // disagree with the box. The failure message rides on the result — callers
     // surface it, so there is no store-level error state to keep in sync.
-    if (result.success) _upsertVariantInMemory(variant);
+    if (result.success) {
+      // What was saved — the repository normalises the barcode on write.
+      await _mirrorSaved(variant);
+      // Stock, min stock or expiry may have changed — refresh alerts.
+      RetailNotificationSyncService.scheduleSync();
+      // A whole-record save that carries a different stock figure is a stock
+      // change like any other — log it rather than let stock jump silently.
+      final delta = variant.stockQty - (before?.stockQty ?? variant.stockQty);
+      if (delta != 0) {
+        await RetailInventoryService.recordMovement(
+          variant: variant,
+          type: delta > 0 ? 'in' : 'out',
+          quantity: delta.abs(),
+          balanceAfter: variant.stockQty,
+          reason: 'Stock edited',
+        );
+      }
+    }
     return result;
   }
 
   @action
   Future<void> deleteVariant(String variantId) async {
+    final productId = variants
+        .where((v) => v.varianteId == variantId)
+        .firstOrNull
+        ?.productId;
     await _variantRepository.deleteVariant(variantId);
+    await _dropOwnedRecords([variantId]);
     variants.removeWhere((v) => v.varianteId == variantId);
+    if (productId != null) await _syncVariantFlags(productId);
   }
 
   /// Update stock for a variant
   @action
   Future<void> updateVariantStock(String variantId, double newStock) async {
     await _variantRepository.updateStock(variantId, newStock);
+    // Every retail stock movement lands here — keep alerts current.
+    RetailNotificationSyncService.scheduleSync();
     // Re-read rather than rebuilding with copyWith — copyWith bumps `updateAt`
     // to now, which would drift the in-memory copy from what was persisted.
     final persisted = await _variantRepository.getVariantById(variantId);

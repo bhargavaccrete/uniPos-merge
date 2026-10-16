@@ -147,9 +147,10 @@ void main() {
       expect(v.sku, isNull);
       expect(r.groups.single.hsnCode, isNull);
       expect(r.groups.single.description, isNull);
-      // Documented defaults, not silent zeros.
+      // Documented defaults, not silent zeros. A blank Min Stock follows the
+      // shop's low-stock level (null), as the product form does.
       expect(v.stockQty, 0);
-      expect(v.minStock, 5);
+      expect(v.minStock, isNull);
     });
 
     test('the template instruction row is skipped, not imported', () {

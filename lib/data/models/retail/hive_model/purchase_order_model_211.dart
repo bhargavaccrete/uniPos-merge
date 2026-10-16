@@ -9,12 +9,16 @@ part 'purchase_order_model_211.g.dart';
 /// - partiallyCompleted: Some items have been received
 /// - fullyCompleted: All items have been received
 /// - cancelled: PO has been cancelled
+/// - closed: short-closed — the rest will never arrive (supplier shipped part
+///   and stopped). Terminal; what was received stands. Stored as a string, so
+///   adding it needs no migration.
 enum POStatus {
   draft,
   sent,
   partiallyCompleted,
   fullyCompleted,
   cancelled,
+  closed,
 }
 
 @HiveType(typeId: HiveTypeIds.retailPurchaseOrder)
@@ -112,7 +116,8 @@ class PurchaseOrderModel extends HiveObject {
   /// Check if PO is completed
   bool get isCompleted =>
       statusEnum == POStatus.fullyCompleted ||
-      statusEnum == POStatus.cancelled;
+      statusEnum == POStatus.cancelled ||
+      statusEnum == POStatus.closed;
 
   Map<String, dynamic> toMap() {
     return {

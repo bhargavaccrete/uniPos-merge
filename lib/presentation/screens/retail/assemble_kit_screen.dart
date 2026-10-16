@@ -12,6 +12,7 @@ import 'package:billberrylite/data/models/retail/hive_model/product_model_200.da
 import 'package:billberrylite/data/models/retail/hive_model/variante_model_201.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/domain/services/retail/inventory_service.dart';
+import 'package:billberrylite/domain/services/retail/stock_adjustment_service.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_empty_state.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
@@ -40,7 +41,22 @@ class AssembleKitScreen extends StatefulWidget {
 
 class _AssembleKitScreenState extends State<AssembleKitScreen> {
   ProductModel? _selectedProduct;
-  VarianteModel? _selectedVariant;
+
+  /// The kit variant being assembled. Kept as an id and resolved live from
+  /// productStore, so stock shown here refreshes after every batch. Each
+  /// variant of a repack product has its own component list.
+  String? _selectedVariantId;
+
+  List<VarianteModel> get _kitVariants => _selectedProduct == null
+      ? const []
+      : productStore.variantsFor(_selectedProduct!.productId);
+
+  VarianteModel? get _selectedVariant {
+    for (final v in _kitVariants) {
+      if (v.varianteId == _selectedVariantId) return v;
+    }
+    return null;
+  }
   final TextEditingController _batchQtyController = TextEditingController();
   bool _submitting = false;
   _KitMode _mode = _KitMode.assemble;
@@ -73,9 +89,16 @@ class _AssembleKitScreenState extends State<AssembleKitScreen> {
   void _selectProduct(ProductModel product) {
     setState(() {
       _selectedProduct = product;
-      // Repack products are single-variant only (see ProductModel doc), so
-      // this is the one variant that carries the kit's own stock.
-      _selectedVariant = productStore.primaryVariantFor(product.productId);
+      _selectedVariantId =
+          productStore.primaryVariantFor(product.productId)?.varianteId;
+      _batchQtyController.clear();
+    });
+  }
+
+  void _selectVariant(String variantId) {
+    if (variantId == _selectedVariantId) return;
+    setState(() {
+      _selectedVariantId = variantId;
       _batchQtyController.clear();
     });
   }
@@ -99,6 +122,13 @@ class _AssembleKitScreenState extends State<AssembleKitScreen> {
     final variant = _selectedVariant;
     final qty = _batchQty;
     if (product == null || variant == null || qty <= 0) return;
+    // Both directions write stock; the service itself carries no role check.
+    if (!StockAdjustmentService.canAdjust) {
+      NotificationService.instance.showError(
+        'Only an admin or manager can assemble or disassemble kits',
+      );
+      return;
+    }
 
     setState(() => _submitting = true);
     try {
@@ -118,13 +148,9 @@ class _AssembleKitScreenState extends State<AssembleKitScreen> {
       final verb = _isDisassemble ? 'Disassembled' : 'Assembled';
       NotificationService.instance.showSuccess(
         '$verb ${result.batchQty} unit'
-        '${result.batchQty == 1 ? '' : 's'} of ${product.productName}',
+        '${result.batchQty == 1 ? '' : 's'} of ${product.productName}'
+        '${_kitVariants.length > 1 && variant.hasAttributes ? ' (${variant.variantDescription})' : ''}',
       );
-      // Re-sync the selected variant so the component/kit stock numbers shown
-      // below reflect the freshly updated balances.
-      setState(() {
-        _selectedVariant = productStore.primaryVariantFor(product.productId);
-      });
     } catch (e) {
       if (!mounted) return;
       NotificationService.instance.showError(
@@ -162,7 +188,11 @@ class _AssembleKitScreenState extends State<AssembleKitScreen> {
                 _buildModeToggle(context),
                 SizedBox(height: AppResponsive.mediumSpacing(context)),
                 _buildProductPicker(context),
-                if (_selectedProduct != null) ...[
+                if (_kitVariants.length > 1) ...[
+                  SizedBox(height: AppResponsive.mediumSpacing(context)),
+                  _buildVariantPicker(context),
+                ],
+                if (_selectedProduct != null && _selectedVariant != null) ...[
                   SizedBox(height: AppResponsive.largeSpacing(context)),
                   _buildBundleCard(context),
                   SizedBox(height: AppResponsive.largeSpacing(context)),
@@ -282,6 +312,32 @@ class _AssembleKitScreenState extends State<AssembleKitScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  /// Shown only for a multi-variant kit — each variant has its own recipe.
+  Widget _buildVariantPicker(BuildContext context) {
+    return Wrap(
+      spacing: AppResponsive.smallSpacing(context),
+      runSpacing: AppResponsive.smallSpacing(context),
+      children: [
+        for (final v in _kitVariants)
+          ChoiceChip(
+            label: Text(
+              v.hasAttributes ? v.variantDescription : (v.sku ?? 'Variant'),
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.smallFontSize(context),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            selected: v.varianteId == _selectedVariantId,
+            onSelected: (_) => _selectVariant(v.varianteId),
+            selectedColor: AppColors.primary.withValues(alpha: 0.12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+      ],
     );
   }
 

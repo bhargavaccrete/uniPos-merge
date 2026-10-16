@@ -78,11 +78,13 @@ class HoldSaleService {
   }
 
   /// Restore a parked sale into the cart, replacing whatever is there, and
-  /// delete the hold. Returns the number of lines that could not be restored
-  /// because their product or variant no longer exists.
+  /// delete the hold. Returns a description of every line that could not be
+  /// restored — only lines that can NEVER come back (product/variant deleted,
+  /// bundle with no components). Stock is not checked here: a short line is
+  /// restored and checkout names the shortfall, rather than being dropped.
   ///
   /// Throws [StateError] when the hold has no items.
-  static Future<int> restore(HoldSaleModel holdSale) async {
+  static Future<List<String>> restore(HoldSaleModel holdSale) async {
     final items = await holdSaleStore.getItemsForHoldSale(holdSale.holdSaleId);
     if (items.isEmpty) {
       throw StateError('No items found in parked sale');
@@ -90,7 +92,7 @@ class HoldSaleService {
 
     await retailCartStore.clearCartAndSave();
 
-    int skipped = 0;
+    final skipped = <String>[];
     for (final holdItem in items) {
       // A quick item has no catalogue row to look up, so it must be replayed
       // before the lookup below — which treats a miss as "this product was
@@ -103,7 +105,26 @@ class HoldSaleService {
           gstRate: holdItem.gstRate ?? 0,
           qty: holdItem.qty.round(),
         );
-        if (!result.success) skipped++;
+        if (!result.success) {
+          skipped.add('${holdItem.productName}: ${result.errorMessage ?? 'could not be added'}');
+          continue;
+        }
+        // addQuickItemToTab takes no discount, so a parked quick line's
+        // discount used to be dropped and the customer charged more than
+        // quoted. The new line sits at the top of the cart — replay it there.
+        final value = holdItem.lineDiscountValue ?? 0;
+        final reason = holdItem.lineDiscountReason;
+        if (value > 0 && reason != null && retailCartStore.items.isNotEmpty) {
+          await retailCartStore.setLineDiscountInTab(
+            variantId: retailCartStore.items.first.variantId,
+            type: holdItem.lineDiscountType == DiscountType.percentage.name
+                ? DiscountType.percentage
+                : DiscountType.amount,
+            value: value,
+            reason: reason,
+            note: holdItem.lineDiscountNote,
+          );
+        }
         continue;
       }
 
@@ -111,7 +132,7 @@ class HoldSaleService {
       final variant = await productStore.getVariantById(holdItem.variantId);
 
       if (product == null || variant == null) {
-        skipped++;
+        skipped.add('${holdItem.productName}: no longer in the catalogue');
         continue;
       }
 
@@ -137,8 +158,13 @@ class HoldSaleService {
         lineDiscountValue: holdItem.lineDiscountValue,
         lineDiscountReason: holdItem.lineDiscountReason,
         lineDiscountNote: holdItem.lineDiscountNote,
+        // Brought back whole even if stock sold meanwhile; checkout names any
+        // shortfall. Dropping the line here lost it for good.
+        ignoreStock: true,
       );
-      if (!result.success) skipped++;
+      if (!result.success) {
+        skipped.add('${holdItem.productName}: ${result.errorMessage ?? 'could not be added'}');
+      }
     }
 
     // Replay the ORDER-level discount too. `clearCartAndSave` above runs

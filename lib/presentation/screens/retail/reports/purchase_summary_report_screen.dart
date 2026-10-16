@@ -25,6 +25,7 @@ class PurchaseSummaryReportScreen extends StatelessWidget {
     'partiallyCompleted': 'Partially Received',
     'fullyCompleted': 'Completed',
     'cancelled': 'Cancelled',
+    'closed': 'Closed (short)',
   };
 
   @override

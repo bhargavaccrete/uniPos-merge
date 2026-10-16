@@ -65,6 +65,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       TaxLabelRule.components;
   bool _isProcessing = false;
 
+  /// The sale already written for this cart, from the moment
+  /// `addSaleWithItems` succeeds until the cart is cleared. While set, both
+  /// complete buttons FINISH this sale (stock, cart, receipt) instead of
+  /// minting a new invoice — a retry after a mid-way failure used to record
+  /// the sale twice and deduct its stock twice.
+  SaleModel? _committedSale;
+  List<SaleItemModel> _committedItems = const [];
+  bool _committedIsCredit = false;
+
   // Split payment state
   List<PaymentEntry> _paymentEntries = [];
   double _totalPaid = 0;
@@ -151,6 +160,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   @override
   void dispose() {
+    // Leaving with a saved-but-unfinished sale: finish its stock and clear the
+    // cart in the background, so the same cart can never be checked out again
+    // as a second sale. Deduction is idempotent per sale.
+    final pending = _committedSale;
+    if (pending != null) {
+      final items = cartStore.items.toList();
+      () async {
+        try {
+          await RetailInventoryService.deductStockForSale(items,
+              saleId: pending.saleId);
+          await cartStore.clearCartAndSave();
+        } catch (e) {
+          debugPrint('Could not finish sale ${pending.invoiceNumber}: $e');
+        }
+      }();
+    }
     _discountController.removeListener(_syncDiscountToStore);
     _discountController.dispose();
     _otherReasonController.dispose();
@@ -235,8 +260,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Future<void> _processCreditSale() async {
+    if (_isProcessing) return;
+    if (_committedSale != null) return _resumeCommittedSale();
+
     // Plan gate — daily bill cap (a credit sale is still a bill).
     if (!await _withinDailyBillCap()) return;
+    if (!await _hasStockForCheckout()) return;
 
     // Require customer for credit sales
     if (customerStore.selectedCustomer == null) {
@@ -392,35 +421,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         await customerStore.redeemCustomerPoints(customerId, _pointsRedeemed);
       }
 
-      // Save sale and items through the store, then adjust stock
-      await saleStore.addSaleWithItems(
-        sale,
-        await _buildSaleItems(saleId, bill),
-      );
-      await _deductStock();
+      // Save sale and items through the store. From here on the sale EXISTS:
+      // anything that fails below is finished by a retry, never re-created.
+      final saleItems = await _buildSaleItems(saleId, bill);
+      await saleStore.addSaleWithItems(sale, saleItems);
+      _committedSale = sale;
+      _committedItems = saleItems;
+      _committedIsCredit = true;
 
-      // Store customer before clearing
-      final customer = customerStore.selectedCustomer;
-
-      // Clear the cart
-      await cartStore.clearCartAndSave();
-
-      // Refresh credit store
-      creditStore.loadData();
-
-      if (mounted) {
-        await _showCreditSuccessDialog(sale: sale, customer: customer!);
-      }
-
-      // Closing the dialog only closed the DIALOG — the cart was cleared
-      // above, so the user was left staring at an empty Checkout and had to
-      // press back again to reach billing. Hand control back to the POS, which
-      // already awaits `true` to toast the success.
-      if (mounted) Navigator.of(context).pop(true);
+      await _finishCommittedSale();
     } catch (e) {
       if (mounted) {
         NotificationService.instance.showError(
-          'Error processing credit sale: $e',
+          _committedSale != null
+              ? _unfinishedSaleMessage(e)
+              : 'Error processing credit sale: $e',
         );
       }
     } finally {
@@ -535,17 +550,92 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }).toList();
   }
 
-  /// Deduct stock for sold items, logging a StockMovementModel audit row per
-  /// line — see `RetailInventoryService.deductStockForSale`.
-  Future<void> _deductStock() async {
-    await RetailInventoryService.deductStockForSale(cartStore.items);
+  /// Everything after a sale is saved: stock, cart, receipt. Shared by both
+  /// paths and by a retry, so it must be safe to run again for the same sale —
+  /// the deduction is idempotent per [SaleModel.saleId], and nothing here
+  /// writes a sale or touches the customer.
+  Future<void> _finishCommittedSale() async {
+    final sale = _committedSale!;
+    await RetailInventoryService.deductStockForSale(
+      cartStore.items,
+      saleId: sale.saleId,
+    );
+
+    // Store customer before clearing
+    final customer = customerStore.selectedCustomer;
+    await cartStore.clearCartAndSave();
+
+    final saleItems = _committedItems;
+    final isCredit = _committedIsCredit;
+    _committedSale = null;
+    _committedItems = const [];
+    _committedIsCredit = false;
+
+    if (isCredit) creditStore.loadData();
+
+    if (mounted) {
+      if (isCredit) {
+        await _showCreditSuccessDialog(sale: sale, customer: customer!);
+      } else {
+        await _showSuccessDialog(
+          sale: sale,
+          saleItems: saleItems,
+          customer: customer,
+        );
+      }
+    }
+
+    // Closing the dialog only closed the DIALOG — the cart was cleared above,
+    // so the user was left on an empty Checkout. Hand control back to the POS,
+    // which already awaits `true` to toast the success.
+    if (mounted) Navigator.of(context).pop(true);
   }
+
+  /// Either button pressed again after a failure that happened AFTER the sale
+  /// was saved: finish that sale, never create another.
+  Future<void> _resumeCommittedSale() async {
+    setState(() => _isProcessing = true);
+    try {
+      await _finishCommittedSale();
+    } catch (e) {
+      if (mounted) {
+        NotificationService.instance.showError(_unfinishedSaleMessage(e));
+      }
+    } finally {
+      if (mounted) setState(() => _isProcessing = false);
+    }
+  }
+
+  /// Last stock check before a sale is written — see
+  /// `CartStore.checkoutShortfalls`. Runs before an invoice number is minted,
+  /// so a refused cart burns nothing.
+  Future<bool> _hasStockForCheckout() async {
+    final shortfalls = await cartStore.checkoutShortfalls();
+    if (shortfalls.isEmpty) return true;
+    if (mounted) {
+      await showAppErrorDialog(
+        context: context,
+        title: 'Not enough stock',
+        errors: shortfalls,
+        message: 'Another open bill may have sold these since they were added. '
+            'Reduce the quantities, then check out.',
+        icon: Icons.inventory_2_outlined,
+      );
+    }
+    return false;
+  }
+
+  String _unfinishedSaleMessage(Object e) =>
+      'Sale ${_committedSale!.invoiceNumber} is saved, but finishing it '
+      'failed: $e. Tap again to finish it — it will not be recorded twice.';
 
   Future<void> _processCheckout() async {
     if (_isProcessing) return;
+    if (_committedSale != null) return _resumeCommittedSale();
 
     // Plan gate — daily bill cap, checked before we start processing.
     if (!await _withinDailyBillCap()) return;
+    if (!await _hasStockForCheckout()) return;
 
     setState(() {
       _isProcessing = true;
@@ -622,30 +712,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       // Persist the header and its lines through the store, in one action.
       final saleItems = await _buildSaleItems(saleId, bill);
       await saleStore.addSaleWithItems(sale, saleItems);
+      // The sale EXISTS from here: a failure below is finished by a retry.
+      _committedSale = sale;
+      _committedItems = saleItems;
+      _committedIsCredit = false;
 
-      await _deductStock();
-
-      // Store customer before clearing
-      final customer = customerStore.selectedCustomer;
-
-      // Clear the cart
-      await cartStore.clearCartAndSave();
-
-      if (mounted) {
-        // Show success dialog with print options
-        await _showSuccessDialog(
-          sale: sale,
-          saleItems: saleItems,
-          customer: customer,
-        );
-      }
-
-      // See the credit path above — the dialog's buttons pop the dialog, not
-      // this screen, so printing and pressing back landed on a blank Checkout.
-      if (mounted) Navigator.of(context).pop(true);
+      await _finishCommittedSale();
     } catch (e) {
       if (mounted) {
-        NotificationService.instance.showError('Error processing checkout: $e');
+        NotificationService.instance.showError(
+          _committedSale != null
+              ? _unfinishedSaleMessage(e)
+              : 'Error processing checkout: $e',
+        );
       }
     } finally {
       if (mounted) {

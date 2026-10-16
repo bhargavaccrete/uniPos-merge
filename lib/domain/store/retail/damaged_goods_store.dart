@@ -55,6 +55,9 @@ abstract class _DamagedGoodsStore with Store {
   /// Reason stamped on a write-off raised after a claim was rejected.
   static const String claimRejectedReason = 'Supplier claim rejected';
 
+  /// Reason stamped on losses written when a purchase return is cancelled.
+  static const String returnCancelledReason = 'Purchase return cancelled';
+
   @observable
   ObservableList<PurchaseReturnModel> purchaseReturns =
       ObservableList<PurchaseReturnModel>();
@@ -150,6 +153,12 @@ abstract class _DamagedGoodsStore with Store {
       return const DamagedGoodsOutcome();
     }
   }
+
+  /// Whether [recordFromGRN] already produced any document for [grnId].
+  Future<bool> hasDocumentsForGRN(String grnId) async =>
+      (await _returnRepository.getByGRN(grnId)).isNotEmpty ||
+      (await _claimRepository.getByGRN(grnId)).isNotEmpty ||
+      (await _lossRepository.getByGRN(grnId)).isNotEmpty;
 
   Future<String> _createReturn(
       GRNModel grn, List<GRNItemModel> items) async {
@@ -283,8 +292,21 @@ abstract class _DamagedGoodsStore with Store {
   }) async {
     final existing = _returnRepository.getById(returnId);
     if (existing == null) return false;
+    // A cancelled return is final; its value was written off as a loss.
+    if (existing.statusEnum == PurchaseReturnStatus.cancelled) {
+      errorMessage = 'A cancelled return cannot receive a credit note.';
+      return false;
+    }
 
     final creditAmount = amount ?? existing.totalAmount;
+    // A note for more than the goods sent back is a typo, and it would credit
+    // the supplier account with money that was never owed back.
+    if (creditAmount < 0 || creditAmount > existing.totalAmount + 0.009) {
+      errorMessage =
+          'The credit note must be between 0 and the return value '
+          '(${existing.totalAmount.toStringAsFixed(2)}).';
+      return false;
+    }
     final adjustment =
         PurchaseReturnModel.creditAdjustment(existing, creditAmount);
 
@@ -320,8 +342,14 @@ abstract class _DamagedGoodsStore with Store {
   /// Withdraw a return that is no longer expected.
   ///
   /// **No balance movement, deliberately.** The goods never went back, so the
-  /// liability the GRN accrued for them still stands. Cancelling only stops the
-  /// business waiting for a credit note that isn't coming.
+  /// liability the GRN accrued for them still stands.
+  ///
+  /// That billed value is now the business's cost, so the returned lines are
+  /// written off as inventory losses (source [InventoryLossSource.returnCancelled]),
+  /// dated by the cancellation. Without them a cancelled return fell out of
+  /// every purchasing bucket — expected, recovered AND absorbed — and the
+  /// damage cost vanished from the Purchase Summary and Supplier-wise reports.
+  /// Touches no stock: the damaged units never entered inventory.
   @action
   Future<bool> cancelPurchaseReturn(String returnId, {String? reason}) async {
     final existing = _returnRepository.getById(returnId);
@@ -332,8 +360,45 @@ abstract class _DamagedGoodsStore with Store {
       notes: reason ?? existing.notes,
     );
 
+    // Status first: isOpen then refuses a second cancel, so the write-off
+    // below can only ever run once for this return.
     await _returnRepository.save(updated);
     _replaceReturn(updated);
+
+    try {
+      final lines = await _returnRepository.getItems(returnId);
+      final created = <InventoryLossModel>[];
+      for (final line in lines) {
+        final number = await _numbers.next(
+          _lossPrefix,
+          isTaken: (n) => inventoryLosses.any((l) => l.lossNumber == n),
+        );
+        created.add(InventoryLossModel.create(
+          lossNumber: number,
+          source: InventoryLossSource.returnCancelled,
+          grnId: existing.grnId,
+          grnNumber: existing.grnNumber,
+          grnItemId: line.grnItemId,
+          poId: existing.poId,
+          supplierId: existing.supplierId,
+          supplierName: existing.supplierName,
+          variantId: line.variantId,
+          productId: line.productId,
+          productName: line.productName,
+          variantInfo: line.variantInfo,
+          quantity: line.returnedQty,
+          costPrice: line.costPrice,
+          reason: returnCancelledReason,
+          note: 'Return ${existing.returnNumber} cancelled',
+        ));
+      }
+      if (created.isNotEmpty) {
+        await _lossRepository.saveAll(created);
+        inventoryLosses.insertAll(0, created);
+      }
+    } catch (e) {
+      errorMessage = 'Return cancelled, but its loss could not be recorded: $e';
+    }
     return true;
   }
 
@@ -352,9 +417,11 @@ abstract class _DamagedGoodsStore with Store {
 
   // ==================== SUPPLIER CLAIM ====================
 
-  /// Move a claim through its lifecycle. Only a pending claim can be approved
-  /// or rejected; only an approved claim can be settled — so a rejected claim
-  /// can't quietly become settled later.
+  /// Move a claim through its lifecycle. A pending claim can be approved or
+  /// rejected; an APPROVED claim can be settled or, when the supplier agreed
+  /// but never paid, rejected — otherwise it sat as "expected" recovery for
+  /// ever with no way to write it off. A rejected or settled claim is final,
+  /// so a rejected claim can't quietly become settled later.
   ///
   /// **Settlement is the claim's credit event.** The GRN billed these units, so
   /// reaching `settled` reduces the supplier balance by the claim total.
@@ -376,7 +443,8 @@ abstract class _DamagedGoodsStore with Store {
     final current = existing.statusEnum;
     final allowed = switch (status) {
       SupplierClaimStatus.approved => current == SupplierClaimStatus.pending,
-      SupplierClaimStatus.rejected => current == SupplierClaimStatus.pending,
+      SupplierClaimStatus.rejected => current == SupplierClaimStatus.pending ||
+          current == SupplierClaimStatus.approved,
       SupplierClaimStatus.settled => current == SupplierClaimStatus.approved,
       SupplierClaimStatus.pending => false,
     };
@@ -542,6 +610,7 @@ abstract class _DamagedGoodsStore with Store {
     double? costPrice,
     required String reason,
     String? note,
+    String source = InventoryLossSource.stockAdjustment,
   }) async {
     if (quantity <= 0) return null;
 
@@ -553,7 +622,7 @@ abstract class _DamagedGoodsStore with Store {
 
       final loss = InventoryLossModel.create(
         lossNumber: number,
-        source: InventoryLossSource.stockAdjustment,
+        source: source,
         variantId: variantId,
         productId: productId,
         productName: productName,

@@ -86,9 +86,17 @@ abstract class _RestaurantStockTakeStore with Store {
   @computed
   int get openDraftCount => draftTakes.length;
 
+  /// Variance lines — in a draft, only those NOT yet applied (a partial commit
+  /// leaves the rest here to finish); in a completed take, all of them, for
+  /// review. Commit and its dialog read this, so an applied line can never be
+  /// offered, or applied, twice. (Same rule as retail's StockTakeStore.)
   @computed
-  List<RestaurantStockTakeItemModel> get varianceItems =>
-      currentItems.where((i) => i.hasVariance).toList();
+  List<RestaurantStockTakeItemModel> get varianceItems {
+    final draft = currentTake?.isEditable ?? false;
+    return currentItems
+        .where((i) => i.hasVariance && (!draft || i.appliedQty == null))
+        .toList();
+  }
 
   @computed
   int get countedLineCount => currentItems.length;
@@ -201,6 +209,11 @@ abstract class _RestaurantStockTakeStore with Store {
           variant != null ? (variant.stockQuantity ?? 0) : item.stockQuantity;
 
       final existing = _repository.findLine(take.takeId, item.id);
+      if (existing?.appliedQty != null) {
+        errorMessage =
+            'This line was already applied to stock. Correct it with a new count.';
+        return false;
+      }
 
       if (existing != null) {
         final updated = existing.copyWith(
@@ -245,6 +258,13 @@ abstract class _RestaurantStockTakeStore with Store {
       return false;
     }
 
+    final line =
+        currentItems.where((i) => i.takeItemId == takeItemId).firstOrNull;
+    if (line?.appliedQty != null) {
+      errorMessage = 'An applied line is part of the stock record — it stays.';
+      return false;
+    }
+
     try {
       await _repository.deleteItem(takeItemId);
       currentItems.removeWhere((i) => i.takeItemId == takeItemId);
@@ -264,6 +284,13 @@ abstract class _RestaurantStockTakeStore with Store {
       errorMessage = 'A completed stock take cannot be cancelled.';
       return false;
     }
+    // A partial commit already moved stock; deleting the take would orphan
+    // those adjustments from the paperwork that explains them.
+    if ((await _repository.getItems(takeId)).any((i) => i.appliedQty != null)) {
+      errorMessage =
+          'Part of this stock take is already applied. Commit the rest instead.';
+      return false;
+    }
 
     try {
       await _repository.deleteTakeWithItems(takeId);
@@ -278,8 +305,13 @@ abstract class _RestaurantStockTakeStore with Store {
 
   // ==================== COMMIT ====================
 
-  /// Applies every variance line via `StockAdjustService.adjustTo`. Terminal
-  /// — there is no re-open, a wrong count is corrected by a new take.
+  /// Applies every not-yet-applied variance line via
+  /// `StockAdjustService.adjustTo`. **Resumable, never double-applied:** a line
+  /// is marked `appliedQty` once its adjustment lands and its movement carries
+  /// the id `st_<takeItemId>`, so a re-commit after a partial failure or a
+  /// crash skips what is done. The take becomes `completed` (terminal) only
+  /// when EVERY variance line is applied; until then it stays a draft with its
+  /// applied lines locked. A wrong applied count is corrected by a new take.
   ///
   /// [shortageReason] is stamped on every line the count found *less* than
   /// the system expected — pick from `StockAdjustService.lossReasons` (e.g.
@@ -336,6 +368,9 @@ abstract class _RestaurantStockTakeStore with Store {
           newStock: target,
           reason: line.isShortage ? shortageReason : 'Stock correction',
           note: _lineNote(take, note),
+          // A crash between the adjustment and the appliedQty save below
+          // would otherwise re-apply this line on the next commit.
+          movementId: 'st_${line.takeItemId}',
         );
 
         if (!success) {
@@ -348,16 +383,24 @@ abstract class _RestaurantStockTakeStore with Store {
         netQty += line.variance;
       }
 
+      // Totals and status from the whole take, not this run — a take can be
+      // committed in several passes.
+      final allLines = await _repository.getItems(take.takeId);
+      final applied = allLines.where((i) => i.appliedQty != null).toList();
+      final outstanding =
+          allLines.any((i) => i.hasVariance && i.appliedQty == null);
+      final done = applied.isNotEmpty && !outstanding;
+
       final completed = take.copyWith(
-        status: appliedLines > 0
+        status: done
             ? RestaurantStockTakeStatus.completed.name
             : RestaurantStockTakeStatus.draft.name,
         varianceReason: varianceReason,
         note: note,
-        completedAt:
-            appliedLines > 0 ? DateTime.now().toIso8601String() : null,
-        committedLineCount: appliedLines,
-        committedNetQty: netQty,
+        completedAt: done ? DateTime.now().toIso8601String() : null,
+        committedLineCount: applied.length,
+        committedNetQty:
+            applied.fold<double>(0.0, (s, i) => s + i.appliedQty!),
       );
 
       await _repository.save(completed);

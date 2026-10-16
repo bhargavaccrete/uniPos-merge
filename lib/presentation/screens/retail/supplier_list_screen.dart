@@ -268,18 +268,18 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
     )) {
       return;
     }
-    // Purchases/POs/GRNs resolve the supplier name by id at render time, so
-    // removing a supplier with history would leave those screens blank.
-    final references = await supplierStore.countReferences(supplier.supplierId);
+    // Deleting also wipes the supplier's ledger, so any purchase paperwork,
+    // payment/credit or outstanding balance blocks it — named, not counted.
+    final blockers = await supplierStore.deleteBlockers(supplier.supplierId);
     if (!mounted) return;
 
-    if (references > 0) {
+    if (blockers.isNotEmpty) {
       await showAppErrorDialog(
         context: context,
         title: 'Can\'t delete "${supplier.name}"',
-        message:
-            '$references purchase record${references == 1 ? '' : 's'} still reference this supplier. '
-            'Deleting them would leave that history without a supplier name.',
+        message: 'This supplier still has history. Deleting it would lose '
+            'that record and its account statement.',
+        errors: blockers,
       );
       return;
     }

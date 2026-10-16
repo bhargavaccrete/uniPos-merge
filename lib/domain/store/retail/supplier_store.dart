@@ -2,6 +2,8 @@ import 'package:mobx/mobx.dart';
 import 'package:billberrylite/data/models/retail/hive_model/supplier_model_205.dart';
 import 'package:billberrylite/data/repositories/retail/grn_repository.dart';
 import 'package:billberrylite/data/repositories/retail/purchase_order_repository.dart';
+import 'package:billberrylite/data/repositories/retail/purchase_return_repository.dart';
+import 'package:billberrylite/data/repositories/retail/supplier_claim_repository.dart';
 import 'package:billberrylite/data/repositories/retail/supplier_ledger_repository.dart';
 import 'package:billberrylite/data/repositories/retail/supplier_repository.dart';
 import 'package:billberrylite/data/models/retail/hive_model/supplier_ledger_entry_model_179.dart';
@@ -203,6 +205,11 @@ abstract class _SupplierStore with Store {
     await loadSuppliers();
   }
 
+  /// Whether [type] was already posted for the document [docId] — lets a
+  /// resumed receipt skip an accrual it already made.
+  bool hasLedgerEntryForDoc(String docId, SupplierLedgerType type) =>
+      _ledgerRepository.hasEntryForDoc(docId, type.name);
+
   /// One-time lazy backfill for suppliers created before the journal existed.
   ///
   /// Writes their standing balance as a real `opening` row so every later
@@ -263,6 +270,40 @@ abstract class _SupplierStore with Store {
         .getPurchaseOrdersBySupplier(supplierId);
     final grns = await GRNRepository().getGRNsBySupplier(supplierId);
     return orders.length + grns.length;
+  }
+
+  /// Why [supplierId] can't be deleted — empty when it can.
+  ///
+  /// Deleting also wipes the supplier's ledger, so anything that is real money
+  /// or paperwork blocks it: purchase orders and receipts (which resolve the
+  /// name by id), returns and claims, any journal row beyond the opening
+  /// balance (a payment or credit), and a non-zero balance. The old check
+  /// counted only POs and GRNs, so a supplier with payments and ₹5,000 still
+  /// owed could be deleted along with its whole history.
+  Future<List<String>> deleteBlockers(String supplierId) async {
+    final blockers = <String>[];
+    String n(int count, String what) => '$count $what${count == 1 ? '' : 's'}';
+
+    final orders = await PurchaseOrderRepository()
+        .getPurchaseOrdersBySupplier(supplierId);
+    final grns = await GRNRepository().getGRNsBySupplier(supplierId);
+    final returns = await PurchaseReturnRepository().getBySupplier(supplierId);
+    final claims = await SupplierClaimRepository().getBySupplier(supplierId);
+    final movements = (await _ledgerRepository.getBySupplier(supplierId))
+        .where((e) => e.typeEnum != SupplierLedgerType.opening)
+        .length;
+    final balance =
+        _supplierRepository.getSupplierById(supplierId)?.currentBalance ?? 0;
+
+    if (orders.isNotEmpty) blockers.add(n(orders.length, 'purchase order'));
+    if (grns.isNotEmpty) blockers.add(n(grns.length, 'goods receipt'));
+    if (returns.isNotEmpty) blockers.add(n(returns.length, 'purchase return'));
+    if (claims.isNotEmpty) blockers.add(n(claims.length, 'supplier claim'));
+    if (movements > 0) blockers.add(n(movements, 'payment or credit'));
+    if (balance.abs() > 0.009) {
+      blockers.add('Outstanding balance ${balance.toStringAsFixed(2)}');
+    }
+    return blockers;
   }
 
   @computed

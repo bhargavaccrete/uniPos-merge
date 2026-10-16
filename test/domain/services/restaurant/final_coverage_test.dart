@@ -633,7 +633,9 @@ void main() {
       final text = String.fromCharCodes(
           bytes.where((b) => b >= 32 && b < 127));
 
-      expect(text.contains('Test Restaurant'), isTrue);
+      // The kitchen ticket opens with the KOT number; the restaurant name is
+      // not printed on a KOT (see buildKotTicket's layout).
+      expect(text.contains('Test Restaurant'), isFalse);
       expect(text.contains('KOT #42'), isTrue);
       expect(text.contains('Dine In'), isTrue);
       expect(text.contains('T3'), isTrue);

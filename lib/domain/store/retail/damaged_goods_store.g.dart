@@ -201,7 +201,8 @@ mixin _$DamagedGoodsStore on _DamagedGoodsStore, Store {
       required double quantity,
       double? costPrice,
       required String reason,
-      String? note}) {
+      String? note,
+      String source = InventoryLossSource.stockAdjustment}) {
     return _$recordAdjustmentLossAsyncAction.run(() => super
         .recordAdjustmentLoss(
             variantId: variantId,
@@ -211,7 +212,8 @@ mixin _$DamagedGoodsStore on _DamagedGoodsStore, Store {
             quantity: quantity,
             costPrice: costPrice,
             reason: reason,
-            note: note));
+            note: note,
+            source: source));
   }
 
   @override

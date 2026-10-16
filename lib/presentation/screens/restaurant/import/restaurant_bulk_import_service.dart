@@ -351,7 +351,10 @@ class RestaurantBulkImportService {
     if (isSoldByWeight && unit.isEmpty) {
       errors.add('Row $rowNumber: Unit required when IsSoldByWeight is YES');
     }
-    if (unit.isNotEmpty && normalizeItemUnit(unit) == null) {
+    if (isPoundUnit(unit)) {
+      // Relabelling lb as kg would book the quantity 2.2× too high.
+      errors.add('Row $rowNumber: Pounds aren\'t supported — convert to kg first (1 lb = 0.4536 kg)');
+    } else if (unit.isNotEmpty && normalizeItemUnit(unit) == null) {
       errors.add('Row $rowNumber: Unrecognized Unit "$unit" (use kg, gm, liter, ml or piece)');
     }
 

@@ -16,6 +16,16 @@ class InventoryLossSource {
   /// the already-billed damage becomes the business's cost.
   static const String claimRejected = 'claim_rejected';
 
+  /// Raised when a purchase return is cancelled: the damaged goods are not
+  /// going back and no credit note is coming, so the value the GRN billed is
+  /// the business's cost — dated by the cancellation.
+  static const String returnCancelled = 'return_cancelled';
+
+  /// A customer returned goods that can't be resold (damaged, defective,
+  /// expired). They never re-enter stock; their cost is the business's loss.
+  /// No GRN — inventory, not purchasing.
+  static const String saleReturn = 'sale_return';
+
   /// Raised by a manual stock adjustment whose reason was loss-bearing —
   /// breakage, expiry, theft, internal use, samples. Unlike the two sources
   /// above, these units WERE in inventory, so `StockAdjustmentService` removes

@@ -10,6 +10,7 @@ import '../../../data/models/retail/hive_model/cart_model_202.dart';
 import '../../../data/models/retail/hive_model/billing_tab_model_173.dart';
 import '../../../data/repositories/retail/cart_repository.dart';
 import '../../services/retail/gst_service.dart';
+import '../../services/retail/inventory_service.dart';
 import '../../services/retail/retail_billing_service.dart';
 import '../../services/retail/line_discount_service.dart';
 import '../../services/retail/quick_item_service.dart';
@@ -48,6 +49,13 @@ class CartOperationResult {
   factory CartOperationResult.outOfStock() => CartOperationResult(
         success: false,
         errorMessage: 'Item is out of stock',
+        availableStock: 0,
+      );
+
+  factory CartOperationResult.unconfiguredBundle() => CartOperationResult(
+        success: false,
+        errorMessage:
+            'This bundle has no components set up. Edit the product to add them.',
         availableStock: 0,
       );
 
@@ -333,6 +341,11 @@ abstract class _CartStore with Store {
   /// [lineDiscountNote] likewise replay a parked LINE discount. The amount is
   /// re-resolved here rather than replayed, so a percentage is exact for the
   /// restored quantity. For a NEW discount, use [setLineDiscount].
+  ///
+  /// [ignoreStock] is for restoring a parked sale only: the customer's bill
+  /// comes back whole even if stock sold meanwhile, and checkout's
+  /// `checkoutShortfalls` stops the sale with a named shortfall. Dropping the
+  /// line here instead used to lose it for good.
   @action
   Future<CartOperationResult> addItem(
     ProductModel product,
@@ -348,8 +361,18 @@ abstract class _CartStore with Store {
     double? lineDiscountValue,
     String? lineDiscountReason,
     String? lineDiscountNote,
+    bool ignoreStock = false,
   }) async {
-    final availableStock = variant.stockQty;
+    // Selling an unconfigured bundle would deduct nothing, so no policy lifts this.
+    if (RetailInventoryService.isUnconfiguredBundle(product, variant)) {
+      return CartOperationResult.unconfiguredBundle();
+    }
+    // A bundle's stock is what its components support, never its own figure.
+    // Less whatever other open bills already hold — each tab used to see the
+    // whole shelf, so two tabs could each take the last unit.
+    final availableStock =
+        RetailInventoryService.calculateAvailableToSell(product, variant) -
+            _heldInOtherTabs(variant.varianteId);
 
     // Check if the same variant is already in the cart
     final index = items.indexWhere((item) => item.variantId == variant.varianteId);
@@ -360,7 +383,7 @@ abstract class _CartStore with Store {
     // `allowOrderWhenOutOfStock` policy (restaurant's `Items` flag, mirrored).
     // A shop whose counts have drifted can then still ring up goods that are
     // visibly on the shelf; stock simply goes negative and is reconciled later.
-    final sellsWhenOut = product.sellsWhenOutOfStock;
+    final sellsWhenOut = product.sellsWhenOutOfStock || ignoreStock;
 
     // Check if item is out of stock
     if (availableStock <= 0 && !sellsWhenOut) {
@@ -895,8 +918,9 @@ abstract class _CartStore with Store {
     // Re-read the variant for live stock, exactly as incrementQuantity does.
     final variant = await variantRepository.getVariantById(variantId);
 
-    if (variant != null) {
-      final availableStock = variant.stockQty;
+    final availableStock =
+        variant == null ? null : _stockLimit(item.productId, variant);
+    if (availableStock != null) {
       if (quantity > availableStock) {
         return CartOperationResult.insufficientStock(
           available: availableStock,
@@ -945,6 +969,78 @@ abstract class _CartStore with Store {
     return CartOperationResult.success();
   }
 
+  /// The stock ceiling for a cart line, or `null` when there is none because
+  /// the product sells on past zero (`allowOrderWhenOutOfStock`) — the same
+  /// policy [addItem] applies, so `+`, a typed quantity and the first tap all
+  /// agree. For a bundle the ceiling is what its components support.
+  double? _stockLimit(String productId, VarianteModel variant) {
+    final product = productStore.getProductById(productId);
+    final held = _heldInOtherTabs(variant.varianteId);
+    if (product == null) return variant.stockQty - held;
+    if (product.sellsWhenOutOfStock) return null;
+    return RetailInventoryService.calculateAvailableToSell(product, variant) -
+        held;
+  }
+
+  /// Units of [variantId] sitting in open bills OTHER than the active one.
+  /// The active tab's own lines are in [items]; its entry in [tabs] can lag.
+  double _heldInOtherTabs(String variantId) {
+    var held = 0.0;
+    for (var i = 0; i < tabs.length; i++) {
+      if (i == activeTabIndex) continue;
+      for (final line in tabs[i].items) {
+        if (line.variantId == variantId) held += line.qty;
+      }
+    }
+    return held;
+  }
+
+  /// Lines this cart cannot be checked out with, as "name: need X, Y in
+  /// stock" — the last stock check before a sale is written.
+  ///
+  /// The cart gates guard each line as it is added, but not two open bills
+  /// taking the same shelf, a parked sale restored after its stock sold, or a
+  /// bundle and its own component in one cart. So demand is summed per
+  /// STOCK-HOLDING variant (a bundle line expands into its components; a quick
+  /// item needs none) and compared with live stock. Variants whose product
+  /// sells past zero are exempt. Empty means the cart can be sold.
+  Future<List<String>> checkoutShortfalls() async {
+    final need = <String, double>{};
+    for (final line in items) {
+      final product = productStore.getProductById(line.productId);
+      if (product == null) continue; // quick item — no stock
+      if (product.isBundle) {
+        final components =
+            bundleRepository.getBundleForVariant(line.variantId)?.components;
+        if (components == null) continue;
+        for (final c in components) {
+          need[c.componentVariantId] =
+              (need[c.componentVariantId] ?? 0) + line.qty * c.quantity;
+        }
+      } else {
+        need[line.variantId] = (need[line.variantId] ?? 0) + line.qty;
+      }
+    }
+
+    final shortfalls = <String>[];
+    for (final entry in need.entries) {
+      final variant = await productStore.getVariantById(entry.key);
+      if (variant == null) continue;
+      final product = productStore.getProductById(variant.productId);
+      if (product?.sellsWhenOutOfStock ?? false) continue;
+      if (entry.value > variant.stockQty + 1e-9) {
+        final name = product?.productName ?? 'Item';
+        final label = variant.hasAttributes
+            ? '$name (${variant.variantDescription})'
+            : name;
+        final onHand = variant.stockQty < 0 ? 0.0 : variant.stockQty;
+        shortfalls.add('$label: need ${CartOperationResult.formatQty(entry.value)}, '
+            '${CartOperationResult.formatQty(onHand)} in stock');
+      }
+    }
+    return shortfalls;
+  }
+
   @action
   Future<CartOperationResult> incrementQuantity(String variantId) async {
     final index = items.indexWhere((item) => item.variantId == variantId);
@@ -961,8 +1057,9 @@ abstract class _CartStore with Store {
     final requestedQty = item.qty + (variant?.quantityStep ?? 1.0);
 
     // Validate stock if variant is found
-    if (variant != null) {
-      final availableStock = variant.stockQty;
+    final availableStock =
+        variant == null ? null : _stockLimit(item.productId, variant);
+    if (availableStock != null) {
       if (requestedQty > availableStock) {
         return CartOperationResult.insufficientStock(
           available: availableStock,
@@ -1245,6 +1342,7 @@ abstract class _CartStore with Store {
     double? lineDiscountValue,
     String? lineDiscountReason,
     String? lineDiscountNote,
+    bool ignoreStock = false,
   }) async {
     final result = await addItem(
       product,
@@ -1260,6 +1358,7 @@ abstract class _CartStore with Store {
       lineDiscountValue: lineDiscountValue,
       lineDiscountReason: lineDiscountReason,
       lineDiscountNote: lineDiscountNote,
+      ignoreStock: ignoreStock,
     );
     if (result.success) {
       await _saveCurrentTabItems();

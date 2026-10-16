@@ -4,7 +4,10 @@ import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/data/models/retail/hive_model/credit_payment_model_218.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_item_model_204.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
+import 'package:billberrylite/domain/services/retail/inventory_service.dart';
 import 'package:billberrylite/domain/services/retail/return_math.dart';
+import 'package:billberrylite/domain/services/retail/sale_return_reason.dart';
+import 'package:billberrylite/data/models/retail/hive_model/inventory_loss_model_178.dart';
 import 'package:billberrylite/util/common/loyalty_points.dart';
 import 'package:uuid/uuid.dart';
 
@@ -212,6 +215,11 @@ class ReturnService {
     /// the whole refund. `null` — every plain return — behaves exactly as
     /// before.
     double? cashRefundOverride,
+    /// Stock-history reason and note prefix for the restock. An exchange passes
+    /// its own ('Exchange', group id) so its returned goods are logged once,
+    /// as part of the exchange. Plain returns log 'Return' + credit note no.
+    String stockReason = 'Return',
+    String? stockNotePrefix,
   }) async {
     final outcome = await _process(
       originalSaleId: originalSaleId,
@@ -220,6 +228,8 @@ class ReturnService {
       returnReason: returnReason,
       returnNote: returnNote,
       cashRefundOverride: cashRefundOverride,
+      stockReason: stockReason,
+      stockNotePrefix: stockNotePrefix,
     );
     return outcome.returnSaleId;
   }
@@ -237,6 +247,8 @@ class ReturnService {
     String? returnReason,
     String? returnNote,
     double? cashRefundOverride,
+    String stockReason = 'Return',
+    String? stockNotePrefix,
   }) async {
     // ---- validate: nothing is written until every check passes -------------
     final originalSale = await saleStore.getSaleById(originalSaleId);
@@ -314,13 +326,39 @@ class ReturnService {
       _buildReturnLines(returnSaleId: returnSaleId, figures: figures),
     );
 
-    // 2. Put the goods back on the shelf.
+    // 2. Put the goods back on the shelf — a bundle into its components.
+    //    Unless they can't be resold (damaged / defective / expired): those
+    //    used to go straight back into sellable stock. Now they stay out and
+    //    are written off at the cost frozen on the original sale line.
+    final resellable = SaleReturnReason.restocksFor(returnReason);
     for (final line in figures.lines) {
-      final variant = await productStore.getVariantById(line.source.varianteId);
-      if (variant == null) continue;
-      await productStore.updateVariantStock(
-        line.source.varianteId,
-        variant.stockQty + line.qty,
+      if (!resellable) {
+        // Never blocks the refund: the return document is already written,
+        // so a missing loss row is logged, not thrown.
+        try {
+          await damagedGoodsStore.recordAdjustmentLoss(
+            variantId: line.source.varianteId,
+            productId: line.source.productId,
+            productName: line.source.productName,
+            quantity: line.qty,
+            costPrice: line.source.costPrice,
+            reason: SaleReturnReason.labelFor(returnReason ?? ''),
+            note: 'Customer return $creditNoteNumber',
+            source: InventoryLossSource.saleReturn,
+          );
+        } catch (e) {
+          debugPrint('Return write-off not recorded: $e');
+        }
+        continue;
+      }
+      await RetailInventoryService.restockForReturn(
+        productId: line.source.productId,
+        variantId: line.source.varianteId,
+        qty: line.qty,
+        reason: stockReason,
+        note: stockNotePrefix == null
+            ? creditNoteNumber
+            : '$stockNotePrefix · $returnSaleId',
       );
     }
 

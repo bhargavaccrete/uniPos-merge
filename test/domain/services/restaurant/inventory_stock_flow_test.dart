@@ -81,6 +81,9 @@ void main() {
         HiveBoxNames.restaurantPurchaseOrderItems);
     await Hive.openBox<RestaurantGRNModel>(HiveBoxNames.restaurantGrns);
     await Hive.openBox<RestaurantGRNItemModel>(HiveBoxNames.restaurantGrnItems);
+    // confirmGRN numbers the receipt through DocumentNumberService, whose
+    // counters live here — the app always opens it at startup.
+    await Hive.openBox(HiveBoxNames.appCounters);
 
     locator
       ..registerLazySingleton<ItemStore>(() => ItemStore(ItemRepository()))

@@ -154,7 +154,10 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
   StockAdjustmentReason? _reason;
   bool _saving = false;
 
-  double get _currentStock => widget.variant.stockQty;
+  /// The level shown as "Current" and used for the preview. Starts at the
+  /// variant the dialog opened with; replaced by the live level if the
+  /// service reports stock moved while the dialog was open.
+  late double _currentStock = widget.variant.stockQty;
 
   double? get _counted => widget.variant.isDecimalQuantity
       ? double.tryParse(_countedController.text.trim())
@@ -220,23 +223,42 @@ class _StockAdjustmentDialogState extends State<StockAdjustmentDialog> {
       newStock: _counted!,
       reason: reason,
       note: _noteController.text,
+      // What the user was shown — refused, with the live level, if it moved.
+      expectedStock: _currentStock,
     );
 
     if (!mounted) return;
 
     if (!result.success) {
-      setState(() => _saving = false);
+      setState(() {
+        _saving = false;
+        final live = result.liveStock;
+        if (live != null) {
+          // Re-base the preview on the real level; the direction may have
+          // flipped, so drop a reason that no longer fits.
+          _currentStock = live;
+          final r = _reason;
+          if (r != null && !_reasonOptions.any((o) => o.code == r.code)) {
+            _reason = null;
+          }
+        }
+      });
       NotificationService.instance
           .showError(result.errorMessage ?? 'Adjustment failed.');
       return;
     }
 
     Navigator.pop(context, true);
+    final warning = result.warning;
+    if (warning != null) {
+      NotificationService.instance.showWarning(warning);
+      return;
+    }
     final loss = result.lossNumber;
     NotificationService.instance.showSuccess(
       loss == null
-          ? 'Stock adjusted to ${result.balanceAfter}'
-          : 'Stock adjusted to ${result.balanceAfter} - loss $loss recorded',
+          ? 'Stock adjusted to ${formatQty(result.balanceAfter ?? 0)}'
+          : 'Stock adjusted to ${formatQty(result.balanceAfter ?? 0)} - loss $loss recorded',
     );
   }
 

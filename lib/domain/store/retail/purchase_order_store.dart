@@ -120,11 +120,19 @@ abstract class _PurchaseOrderStore with Store {
       estimatedTotal: estimatedTotal,
     );
 
-    await _poRepository.updatePurchaseOrder(updatedPO);
-
-    // Delete old items and add new ones
-    await _poItemRepository.deleteItemsByPOId(po.poId);
+    // New lines FIRST, then remove only the old ones they replace, header
+    // last. Deleting every line before re-adding meant a crash in between
+    // left the draft with no lines while its header still counted them; now
+    // the worst case is extra (visible, editable) lines, never lost ones.
+    final oldIds = (await _poItemRepository.getItemsByPOId(po.poId))
+        .map((i) => i.poItemId)
+        .toSet();
     await _poItemRepository.addPOItems(items);
+    final keptIds = items.map((i) => i.poItemId).toSet();
+    for (final id in oldIds.difference(keptIds)) {
+      await _poItemRepository.deletePOItem(id);
+    }
+    await _poRepository.updatePurchaseOrder(updatedPO);
 
     final index = purchaseOrders.indexWhere((p) => p.poId == po.poId);
     if (index != -1) {
@@ -231,6 +239,23 @@ abstract class _PurchaseOrderStore with Store {
     if (po == null || po.statusEnum != POStatus.draft) return false;
 
     await updatePOStatus(poId, POStatus.cancelled);
+    return true;
+  }
+
+  /// Short-close a PO whose remaining quantity will never arrive — the
+  /// supplier shipped 8 of 10 and discontinued the item. Only while it can
+  /// still receive (sent / partially completed); cancel is draft-only, so
+  /// without this such an order stayed pending forever: in the Receive list,
+  /// in supplier on-order exposure and in the Purchase Summary outstanding.
+  ///
+  /// Terminal. What was received (stock, supplier bill, GRNs) stands; nothing
+  /// is reversed. Returns false when the PO isn't in a closable state.
+  /// (No @action: the only mutation is [updatePOStatus], which is one.)
+  Future<bool> closePurchaseOrder(String poId) async {
+    final po = _poRepository.getPurchaseOrderById(poId);
+    if (po == null || !po.canReceive) return false;
+
+    await updatePOStatus(poId, POStatus.closed);
     return true;
   }
 
@@ -385,6 +410,18 @@ abstract class _PurchaseOrderStore with Store {
     return items;
   }
 
+  /// Draft GRNs. Receiving only ever writes a draft as the first step of a
+  /// confirm, so every draft is a receipt that was interrupted part-way.
+  Future<List<GRNModel>> getDraftGRNs() => _grnRepository.getDraftGRNs();
+
+  Future<List<GRNItemModel>> getGRNItems(String grnId) =>
+      _grnItemRepository.getItemsByGRNId(grnId);
+
+  /// Whether a non-cancelled GRN already carries [grnNumber].
+  Future<bool> isGRNNumberUsed(String grnNumber) async =>
+      (await _grnRepository.getAllGRNs()).any((g) =>
+          g.grnNumber == grnNumber && g.statusEnum != GRNStatus.cancelled);
+
   /// Cancel a draft GRN
   @action
   Future<void> cancelGRN(String grnId) async {
@@ -425,6 +462,12 @@ abstract class _PurchaseOrderStore with Store {
   Future<void> _updatePOStatusAfterGRN(String poId) async {
     final po = _poRepository.getPurchaseOrderById(poId);
     if (po == null) return;
+    // A closed or cancelled order is final: a receipt resumed after a crash
+    // (GrnReceivingService.resumeInterrupted) must not reopen it.
+    if (po.statusEnum == POStatus.closed ||
+        po.statusEnum == POStatus.cancelled) {
+      return;
+    }
 
     final poItems = await _poItemRepository.getItemsByPOId(poId);
     // Legacy/restore protection. An order with no lines, or nothing actually

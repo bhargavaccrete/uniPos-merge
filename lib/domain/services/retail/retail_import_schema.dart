@@ -325,14 +325,17 @@ class RetailImportVariantRow {
   final double sellingPrice;
   final double? mrp;
   final double stockQty;
-  final double minStock;
+
+  /// Null when the cell was blank — the variant then follows the shop-wide
+  /// low-stock threshold.
+  final double? minStock;
   final Map<String, String> attributes;
 
   const RetailImportVariantRow({
     required this.rowNumber,
     required this.sellingPrice,
     required this.stockQty,
-    required this.minStock,
+    this.minStock,
     required this.attributes,
     this.sku,
     this.barcode,
@@ -676,7 +679,14 @@ class RetailImportParser {
 
     final rawUnit = headers.cell(parent.cells, RetailImportColumn.unit);
     var unit = 'piece';
-    if (rawUnit.isNotEmpty) {
+    if (isPoundUnit(rawUnit)) {
+      // Relabelling lb as kg would book the quantity 2.2× too high.
+      error(
+        parent.rowNumber,
+        'Unit',
+        'Pounds aren\'t supported — convert to kg first (1 lb = 0.4536 kg).',
+      );
+    } else if (rawUnit.isNotEmpty) {
       final normalised = normalizeItemUnit(rawUnit);
       if (normalised == null) {
         error(
@@ -893,7 +903,10 @@ class RetailImportParser {
             sellingPrice: sellingPrice,
             mrp: mrp,
             stockQty: stock ?? 0,
-            minStock: minStock ?? 5,
+            // Blank = the shop's own low-stock level (null), same as the
+            // product form. A fixed 5 overrode that setting for every
+            // imported variant.
+            minStock: minStock,
             attributes: attributes,
           ),
         );

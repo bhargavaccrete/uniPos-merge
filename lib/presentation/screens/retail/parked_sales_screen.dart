@@ -55,12 +55,22 @@ class _ParkedSalesScreenState extends State<ParkedSalesScreen> {
     try {
       final skipped = await HoldSaleService.restore(holdSale);
 
+      // Named before leaving: a bare count told the cashier nothing about
+      // which of the customer's items did not come back.
+      if (skipped.isNotEmpty && mounted) {
+        await showAppErrorDialog(
+          context: context,
+          title: 'Some items could not be restored',
+          errors: skipped,
+          message: 'The rest of the parked sale is in the cart.',
+        );
+      }
       if (mounted) {
         Navigator.pop(context, true);
       }
-      if (skipped > 0) {
+      if (skipped.isNotEmpty) {
         NotificationService.instance.showWarning(
-          'Restored to cart — $skipped item(s) skipped (no longer available)',
+          'Restored to cart — ${skipped.length} item(s) left out',
         );
       } else {
         NotificationService.instance.showSuccess(

@@ -272,13 +272,19 @@ class StockAdjustService {
   ///
   /// No-op (returns `true` without writing anything) when [newStock] already
   /// matches the current level.
+  ///
+  /// [movementId] makes a batch caller (stock-take commit) idempotent: if a
+  /// movement with that id already exists, the adjustment was applied before
+  /// a crash and nothing is written again.
   static Future<bool> adjustTo({
     required Items item,
     ItemVariante? variant,
     required double newStock,
     required String reason,
     String? note,
+    String? movementId,
   }) async {
+    if (movementId != null && _repo.contains(movementId)) return true;
     final oldStock =
         variant != null ? (variant.stockQuantity ?? 0) : item.stockQuantity;
     if (newStock == oldStock) return true;
@@ -311,7 +317,7 @@ class StockAdjustService {
 
     final sessionId = await DayManagementService.getCurrentSessionId();
     await _repo.saveMovement(StockMovementModel(
-      id: const Uuid().v4(),
+      id: movementId ?? const Uuid().v4(),
       timestamp: DateTime.now(),
       itemId: item.id,
       variantId: variant?.variantId,

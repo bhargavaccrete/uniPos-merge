@@ -4,6 +4,14 @@
 /// DropdownButton's items crashes it).
 const List<String> kItemUnits = ['kg', 'gm', 'liter', 'ml', 'piece'];
 
+/// True for a pound spelling. [normalizeItemUnit] maps these to 'kg' only so a
+/// legacy item's LABEL keeps working — it converts no quantity. Imports must
+/// refuse them instead, or 10 lb of stock would be booked as 10 kg (≈2.2×).
+bool isPoundUnit(String? raw) {
+  final u = (raw ?? '').toLowerCase().trim();
+  return u == 'lb' || u == 'lbs' || u == 'pound' || u == 'pounds';
+}
+
 /// Map any legacy / alias / mis-cased unit string to a canonical [kItemUnits]
 /// value, or null when blank/unrecognized. This keeps items saved with older
 /// spellings ('litre', 'pcs', 'lbs', 'gram', …) working in the dropdowns.

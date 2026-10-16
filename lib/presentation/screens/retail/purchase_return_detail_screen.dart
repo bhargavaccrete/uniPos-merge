@@ -152,7 +152,8 @@ class _PurchaseReturnDetailScreenState
                   if (!dialogContext.mounted) return;
                   if (!ok) {
                     NotificationService.instance.showError(
-                      'Could not record the credit note',
+                      damagedGoodsStore.errorMessage ??
+                          'Could not record the credit note',
                     );
                     return;
                   }
@@ -179,8 +180,9 @@ class _PurchaseReturnDetailScreenState
       context: context,
       title: 'Cancel ${_model.returnNumber}?',
       message:
-          'The return stays on record as Cancelled and stops counting towards '
-          'what has been sent back for its GRN.',
+          'The goods are not going back and no credit note is coming, so its '
+          'value is recorded as an inventory loss. The return stays on record '
+          'as Cancelled.',
       confirmLabel: 'Cancel Return',
       cancelLabel: 'Keep',
       accent: AppColors.danger,

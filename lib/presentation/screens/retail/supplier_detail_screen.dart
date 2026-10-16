@@ -44,6 +44,9 @@ class _SupplierDetailScreenState extends State<SupplierDetailScreen>
   late SupplierModel _supplier;
 
   List<SupplierLedgerEntryModel> _ledger = [];
+
+  /// Running balance per entry id, in ledger reading order.
+  Map<String, double> _running = const {};
   SupplierAccountSummary _summary = const SupplierAccountSummary();
   List<_PurchaseGroup> _purchases = [];
   bool _isLoading = true;
@@ -87,6 +90,9 @@ class _SupplierDetailScreenState extends State<SupplierDetailScreen>
         orElse: () => _supplier,
       );
       _ledger = ledger.reversed.toList(); // newest first for display
+      // Recomputed in reading order — the stored balanceAfter is entry-time
+      // and reads out of sequence once anything is back-dated.
+      _running = ledgerRunningBalances(ledger);
       _summary = summariseLedger(ledger);
       _purchases = _groupPurchases(orders, receipts);
       _isLoading = false;
@@ -697,7 +703,7 @@ class _SupplierDetailScreenState extends State<SupplierDetailScreen>
               ),
               const SizedBox(height: 2),
               Text(
-                formatMoney(entry.balanceAfter.abs()),
+                formatMoney((_running[entry.entryId] ?? entry.balanceAfter).abs()),
                 style: GoogleFonts.poppins(
                   fontSize: AppResponsive.captionFontSize(context),
                   color: AppColors.textSecondary,
@@ -1147,6 +1153,8 @@ class _PurchaseGroup {
         return 'Completed';
       case POStatus.cancelled:
         return 'Cancelled';
+      case POStatus.closed:
+        return 'Closed short';
     }
   }
 }

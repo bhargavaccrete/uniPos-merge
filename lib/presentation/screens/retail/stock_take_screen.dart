@@ -232,7 +232,8 @@ class _StockTakeScreenState extends State<StockTakeScreen> {
       errors: failed,
       message:
           'Their stock moved after they were counted, or the product no '
-          'longer exists. Recount these in a new stock take.',
+          'longer exists. This stock take stays open with the applied lines '
+          'locked — recount or remove these, then apply again.',
     );
   }
 

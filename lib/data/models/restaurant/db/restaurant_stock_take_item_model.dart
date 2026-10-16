@@ -105,8 +105,11 @@ class RestaurantStockTakeItemModel extends HiveObject {
       systemQty: systemQty ?? this.systemQty,
       countedQty: countedQty ?? this.countedQty,
       costPrice: costPrice ?? this.costPrice,
-      // Re-stamped on every edit: a recount is a new count.
-      countedAt: DateTime.now().toIso8601String(),
+      // Re-stamped on a recount (a new count) — NOT on marking a line
+      // applied, which misdated the count and reordered the lines.
+      countedAt: (systemQty != null || countedQty != null)
+          ? DateTime.now().toIso8601String()
+          : countedAt,
       appliedQty: appliedQty ?? this.appliedQty,
     );
   }

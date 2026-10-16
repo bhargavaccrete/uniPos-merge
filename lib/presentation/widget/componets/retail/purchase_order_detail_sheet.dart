@@ -11,6 +11,8 @@ import 'package:billberrylite/data/models/retail/hive_model/grn_model_213.dart';
 import 'package:billberrylite/data/models/retail/hive_model/purchase_order_item_model_212.dart';
 import 'package:billberrylite/data/models/retail/hive_model/purchase_order_model_211.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/domain/services/retail/grn_receiving_service.dart';
+import 'package:billberrylite/util/restaurant/restaurant_session.dart';
 import 'package:billberrylite/domain/store/retail/damaged_goods_store.dart';
 import 'package:billberrylite/domain/store/retail/purchase_order_store.dart';
 import 'package:billberrylite/presentation/screens/retail/add_purchase_order_screen.dart';
@@ -47,6 +49,8 @@ Color poStatusColor(POStatus status) {
       return AppColors.success;
     case POStatus.cancelled:
       return AppColors.danger;
+    case POStatus.closed:
+      return AppColors.textSecondary;
   }
 }
 
@@ -62,6 +66,8 @@ String poStatusLabel(POStatus status) {
       return 'Completed';
     case POStatus.cancelled:
       return 'Cancelled';
+    case POStatus.closed:
+      return 'Closed';
   }
 }
 
@@ -116,6 +122,7 @@ String buildRetailWhatsAppPOMessage({
     case POStatus.draft:
     case POStatus.sent:
     case POStatus.cancelled:
+    case POStatus.closed: // not shareable — see _canShare
       return _openPOMessage(po, items, unitOf);
   }
 }
@@ -359,6 +366,44 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
     }
   }
 
+  /// Short-close: the rest of this order will never arrive. A secondary,
+  /// irreversible action, so it lives as a small header icon behind a
+  /// confirmation rather than beside Receive.
+  Future<void> _closeOrder(BuildContext context) async {
+    final navigator = Navigator.of(context);
+    final outstanding = receipts.values
+        .fold<double>(0, (s, r) => s + (r.remaining > 0 ? r.remaining : 0));
+    final confirmed = await showAppConfirmDialog(
+      context: context,
+      title: 'Close ${po.poNumber}?',
+      message: outstanding > 0
+          ? '${formatQty(outstanding)} still due will no longer be expected '
+              'from ${po.supplierName ?? 'the supplier'}. What was received '
+              'stays in stock and on the supplier account. This cannot be '
+              'undone.'
+          : 'Nothing more will be received against this order. This cannot '
+              'be undone.',
+      confirmLabel: 'Close order',
+      accent: AppColors.danger,
+      icon: Icons.lock_outline_rounded,
+    );
+    if (!confirmed) return;
+
+    // An interrupted receipt must land before the order is closed, or its
+    // quantity would read as "never delivered".
+    await GrnReceivingService.resumeInterrupted();
+    final ok = await purchaseOrderStore.closePurchaseOrder(po.poId);
+    if (!navigator.mounted) return;
+    if (!ok) {
+      NotificationService.instance
+          .showError('${po.poNumber} can no longer be closed.');
+      return;
+    }
+    navigator.pop();
+    NotificationService.instance.showSuccess('${po.poNumber} closed');
+    onChanged?.call();
+  }
+
   /// Supplier phone for this PO, or null when there isn't a usable one.
   ///
   /// Reads [supplierStore] because the PO only denormalizes the supplier's
@@ -375,7 +420,9 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
   /// A PO is shareable once it has left draft — there is nothing to send a
   /// supplier before that, and a cancelled order shouldn't be re-sent.
   bool get _canShare =>
-      po.statusEnum != POStatus.draft && po.statusEnum != POStatus.cancelled;
+      po.statusEnum != POStatus.draft &&
+      po.statusEnum != POStatus.cancelled &&
+      po.statusEnum != POStatus.closed;
 
   Future<void> _markSent(BuildContext context) async {
     final navigator = Navigator.of(context);
@@ -440,6 +487,7 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
       case POStatus.draft:
       case POStatus.sent:
       case POStatus.cancelled:
+      case POStatus.closed:
         return 'WhatsApp PO';
     }
   }
@@ -618,6 +666,16 @@ class PurchaseOrderDetailSheet extends StatelessWidget {
                         ),
                       ),
                     ),
+                    if (po.canReceive && RestaurantSession.canAccess('purchase'))
+                      IconButton(
+                        icon: Icon(
+                          Icons.lock_outline_rounded,
+                          size: AppResponsive.iconSize(context),
+                        ),
+                        color: AppColors.textSecondary,
+                        tooltip: 'Close order (rest won\'t arrive)',
+                        onPressed: () => _closeOrder(context),
+                      ),
                   ],
                 ),
               ),

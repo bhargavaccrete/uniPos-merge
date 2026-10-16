@@ -72,7 +72,9 @@ class PurchaseOrderRepository {
     final allPOs = _poBox.values.toList();
     return allPOs.where((po) {
       final status = po.statusEnum;
-      return status == POStatus.fullyCompleted || status == POStatus.cancelled;
+      return status == POStatus.fullyCompleted ||
+          status == POStatus.cancelled ||
+          status == POStatus.closed;
     }).toList()
       ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
   }

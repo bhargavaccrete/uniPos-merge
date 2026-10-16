@@ -10,6 +10,10 @@ import 'package:billberrylite/core/init/hive_init.dart';
 import 'package:billberrylite/data/models/common/customer_model_125.dart';
 import 'package:billberrylite/data/models/restaurant/db/cash_movement_model.dart';
 import 'package:billberrylite/data/models/retail/hive_model/credit_payment_model_218.dart';
+import 'package:billberrylite/data/models/retail/hive_model/inventory_loss_model_178.dart';
+import 'package:billberrylite/data/models/retail/hive_model/purchase_return_model_174.dart';
+import 'package:billberrylite/data/models/retail/hive_model/supplier_claim_model_176.dart';
+import 'package:billberrylite/domain/store/retail/damaged_goods_store.dart';
 import 'package:billberrylite/data/models/retail/hive_model/product_model_200.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_item_model_204.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
@@ -168,6 +172,11 @@ void main() {
           () => CashMovementRepository());
       locator.registerLazySingleton<CashMovementStore>(
           () => CashMovementStore(locator<CashMovementRepository>()));
+      // Damaged / expired returns are written off (R-44) through this store.
+      await Hive.openBox<PurchaseReturnModel>(HiveBoxNames.purchaseReturns);
+      await Hive.openBox<SupplierClaimModel>(HiveBoxNames.supplierClaims);
+      await Hive.openBox<InventoryLossModel>(HiveBoxNames.inventoryLosses);
+      locator.registerLazySingleton<DamagedGoodsStore>(() => DamagedGoodsStore());
 
       service = ReturnService();
     });

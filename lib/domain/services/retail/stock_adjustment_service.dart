@@ -5,6 +5,7 @@ import '../../../core/di/service_locator.dart';
 import '../../../data/models/restaurant/db/stock_movement_model.dart';
 import '../../../data/models/retail/hive_model/variante_model_201.dart';
 import '../../../data/repositories/restaurant/stock_movement_repository.dart';
+import '../../../util/common/quantity_format.dart';
 import '../restaurant/day_management_service.dart';
 import 'stock_adjustment_reason.dart';
 
@@ -19,15 +20,38 @@ class StockAdjustmentResult {
   /// Loss number (`LOSS-…`) when the reason was loss-bearing, else null.
   final String? lossNumber;
 
+  /// Set when the adjustment was refused because stock moved since the caller
+  /// read it — the live level, for the caller to show before retrying.
+  final double? liveStock;
+
+  /// True when a caller-supplied movement id was already recorded, so the
+  /// adjustment had been applied before and nothing was written this time.
+  final bool alreadyApplied;
+
+  /// Set on a SUCCESS that still needs the user's attention — the stock
+  /// moved but a loss-bearing adjustment's loss row could not be saved.
+  final String? warning;
+
   const StockAdjustmentResult({
     required this.success,
     this.errorMessage,
     this.balanceAfter,
     this.lossNumber,
+    this.liveStock,
+    this.alreadyApplied = false,
+    this.warning,
   });
 
   factory StockAdjustmentResult.failure(String message) =>
       StockAdjustmentResult(success: false, errorMessage: message);
+
+  factory StockAdjustmentResult.stale(double live) => StockAdjustmentResult(
+        success: false,
+        liveStock: live,
+        errorMessage:
+            'Stock changed to ${formatQty(live)} while this was open — check '
+            'the change and save again.',
+      );
 }
 
 /// The only sanctioned way to change retail stock outside a document.
@@ -77,11 +101,23 @@ class StockAdjustmentService {
   /// what a stock count produces, and it keeps the "no change" case trivial to
   /// detect. Pass the [reason] the user picked; [note] is required when
   /// [StockAdjustmentReason.requiresNote] is set.
+  ///
+  /// The change, the audit row and any loss are computed against the LIVE
+  /// variant, never the [variant] snapshot a dialog opened with — a sale in
+  /// between used to record the wrong delta and loss quantity. A caller that
+  /// SHOWED the user a stock level passes it as [expectedStock]; if stock has
+  /// moved since, nothing is written and [StockAdjustmentResult.stale] carries
+  /// the live level back.
   static Future<StockAdjustmentResult> adjust({
     required VarianteModel variant,
     required double newStock,
     required StockAdjustmentReason reason,
     String? note,
+    double? expectedStock,
+    /// Deterministic id for the audit row. A batch caller (stock take) passes
+    /// one per line so a re-run after a crash finds the row and skips the
+    /// line instead of applying it twice.
+    String? movementId,
   }) async {
     if (!canAdjust) {
       return StockAdjustmentResult.failure(
@@ -89,8 +125,35 @@ class StockAdjustmentService {
       );
     }
 
+    if (movementId != null && _movements.contains(movementId)) {
+      return const StockAdjustmentResult(success: true, alreadyApplied: true);
+    }
+
     if (newStock < 0) {
       return StockAdjustmentResult.failure('Stock cannot be negative.');
+    }
+
+    final live = await productStore.getVariantById(variant.varianteId);
+    if (live == null) {
+      return StockAdjustmentResult.failure('This variant no longer exists.');
+    }
+    variant = live;
+    if (expectedStock != null && live.stockQty != expectedStock) {
+      return StockAdjustmentResult.stale(live.stockQty);
+    }
+
+    // Resolved BEFORE any write: a missing product used to throw after the
+    // stock had already moved, leaving a change with no audit row.
+    final product = productStore.getProductById(variant.productId);
+    if (product == null) {
+      return StockAdjustmentResult.failure('Product not found.');
+    }
+    // A bundle sells from its components; its own figure is ignored, so
+    // adjusting it would record a stock change that changes nothing real.
+    if (product.isBundle) {
+      return StockAdjustmentResult.failure(
+        'A bundle holds no stock of its own — adjust its components instead.',
+      );
     }
 
     final oldStock = variant.stockQty;
@@ -121,16 +184,12 @@ class StockAdjustmentService {
 
       // 2. Audit row. Written after the move so a failed move never leaves a
       //    log entry claiming a change that did not happen.
-      final product = productStore.products.firstWhere(
-        (p) => p.productId == variant.productId,
-        orElse: () => throw StateError('Product not found'),
-      );
       final label = variant.hasAttributes
           ? '${product.productName} (${variant.variantDescription})'
           : product.productName;
 
       await _movements.saveMovement(StockMovementModel(
-        id: const Uuid().v4(),
+        id: movementId ?? const Uuid().v4(),
         timestamp: DateTime.now(),
         itemId: variant.productId,
         variantId: variant.varianteId,
@@ -166,13 +225,22 @@ class StockAdjustmentService {
         success: true,
         balanceAfter: newStock,
         lossNumber: lossNumber,
+        // The stock HAS moved and its movement row exists, so this is still a
+        // success — but a missing loss row understates the loss report, and
+        // `recordAdjustmentLoss` swallows its error, so say it out loud.
+        warning: recordsLoss && lossNumber == null
+            ? 'Stock adjusted, but the loss record could not be saved — the '
+                'loss report will not include it.'
+            : null,
       );
     } catch (e) {
       return StockAdjustmentResult.failure('Adjustment failed: $e');
     }
   }
 
-  /// Adjustment history for one product, newest first — includes its variants.
+  /// EVERY stock movement for one product (sales, receipts, returns,
+  /// adjustments…), newest first, including its variants — the product's full
+  /// stock ledger for the Stock History dialog. Not filtered to adjustments.
   static List<StockMovementModel> historyForProduct(String productId) =>
       _movements.movementsForItem(productId);
 
@@ -184,9 +252,14 @@ class StockAdjustmentService {
     return list;
   }
 
-  /// Every adjustment ever recorded, newest first — the history screen's feed.
+  /// Every manual adjustment (incl. stock-take commits) ever recorded, newest
+  /// first — the Stock Adjustment report's feed. The shared movement box holds
+  /// every other kind of movement too; only adjustment reasons pass.
   static List<StockMovementModel> allAdjustments() {
-    final list = _movements.allMovements();
+    final list = _movements
+        .allMovements()
+        .where((m) => StockAdjustmentReason.isAdjustment(m.reason))
+        .toList();
     // Newest first, then the movement id. A stock take applies many
     // adjustments in one loop, so several routinely share a millisecond — and
     // `List.sort` is not stable, so tied rows could reorder between loads.
