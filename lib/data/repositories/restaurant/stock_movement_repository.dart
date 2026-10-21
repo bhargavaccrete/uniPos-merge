@@ -15,6 +15,10 @@ class StockMovementRepository {
     await _box.put(movement.id, movement);
   }
 
+  /// Whether a movement with this id was already saved — lets a caller that
+  /// uses a deterministic id make its write idempotent.
+  bool contains(String id) => _box.containsKey(id);
+
   /// All movements for an item (including its variants), newest first.
   /// The per-item history shows everything for the item; the stored
   /// [StockMovementModel.itemName] distinguishes variant rows.
@@ -23,4 +27,8 @@ class StockMovementRepository {
     list.sort((a, b) => b.timestamp.compareTo(a.timestamp));
     return list;
   }
+
+  /// Every movement in the box, unsorted — callers sort for their own view.
+  /// Used by retail's stock-adjustment history, which spans all products.
+  List<StockMovementModel> allMovements() => _box.values.toList();
 }

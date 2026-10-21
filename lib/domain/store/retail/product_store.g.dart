@@ -9,13 +9,15 @@ part of 'product_store.dart';
 // ignore_for_file: non_constant_identifier_names, unnecessary_brace_in_string_interps, unnecessary_lambdas, prefer_expression_function_bodies, lines_longer_than_80_chars, avoid_as, avoid_annotating_with_dynamic, no_leading_underscores_for_local_identifiers
 
 mixin _$ProductStore on _ProductStore, Store {
-  Computed<List<String>>? _$sortedCategoriesComputed;
+  Computed<Map<String, List<VarianteModel>>>? _$variantsByProductComputed;
 
   @override
-  List<String> get sortedCategories => (_$sortedCategoriesComputed ??=
-          Computed<List<String>>(() => super.sortedCategories,
-              name: '_ProductStore.sortedCategories'))
-      .value;
+  Map<String, List<VarianteModel>> get variantsByProduct =>
+      (_$variantsByProductComputed ??=
+              Computed<Map<String, List<VarianteModel>>>(
+                  () => super.variantsByProduct,
+                  name: '_ProductStore.variantsByProduct'))
+          .value;
 
   late final _$productsAtom =
       Atom(name: '_ProductStore.products', context: context);
@@ -33,19 +35,19 @@ mixin _$ProductStore on _ProductStore, Store {
     });
   }
 
-  late final _$categoriesAtom =
-      Atom(name: '_ProductStore.categories', context: context);
+  late final _$variantsAtom =
+      Atom(name: '_ProductStore.variants', context: context);
 
   @override
-  ObservableList<String> get categories {
-    _$categoriesAtom.reportRead();
-    return super.categories;
+  ObservableList<VarianteModel> get variants {
+    _$variantsAtom.reportRead();
+    return super.variants;
   }
 
   @override
-  set categories(ObservableList<String> value) {
-    _$categoriesAtom.reportWrite(value, super.categories, () {
-      super.categories = value;
+  set variants(ObservableList<VarianteModel> value) {
+    _$variantsAtom.reportWrite(value, super.variants, () {
+      super.variants = value;
     });
   }
 
@@ -65,6 +67,26 @@ mixin _$ProductStore on _ProductStore, Store {
     return _$addProductAsyncAction.run(() => super.addProduct(product));
   }
 
+  late final _$createSimpleProductAsyncAction =
+      AsyncAction('_ProductStore.createSimpleProduct', context: context);
+
+  @override
+  Future<(ProductModel, VarianteModel)> createSimpleProduct(
+      {required String name,
+      required String categoryId,
+      required String barcode,
+      required double sellingPrice,
+      double? mrp,
+      double stockQty = 1}) {
+    return _$createSimpleProductAsyncAction.run(() => super.createSimpleProduct(
+        name: name,
+        categoryId: categoryId,
+        barcode: barcode,
+        sellingPrice: sellingPrice,
+        mrp: mrp,
+        stockQty: stockQty));
+  }
+
   late final _$updateProductAsyncAction =
       AsyncAction('_ProductStore.updateProduct', context: context);
 
@@ -81,11 +103,19 @@ mixin _$ProductStore on _ProductStore, Store {
     return _$deleteProductAsyncAction.run(() => super.deleteProduct(productId));
   }
 
+  late final _$loadVariantsAsyncAction =
+      AsyncAction('_ProductStore.loadVariants', context: context);
+
+  @override
+  Future<void> loadVariants() {
+    return _$loadVariantsAsyncAction.run(() => super.loadVariants());
+  }
+
   late final _$addVariantAsyncAction =
       AsyncAction('_ProductStore.addVariant', context: context);
 
   @override
-  Future<void> addVariant(VarianteModel variant) {
+  Future<VariantWriteResult> addVariant(VarianteModel variant) {
     return _$addVariantAsyncAction.run(() => super.addVariant(variant));
   }
 
@@ -93,7 +123,7 @@ mixin _$ProductStore on _ProductStore, Store {
       AsyncAction('_ProductStore.updateVariant', context: context);
 
   @override
-  Future<void> updateVariant(VarianteModel variant) {
+  Future<VariantWriteResult> updateVariant(VarianteModel variant) {
     return _$updateVariantAsyncAction.run(() => super.updateVariant(variant));
   }
 
@@ -109,7 +139,7 @@ mixin _$ProductStore on _ProductStore, Store {
       AsyncAction('_ProductStore.updateVariantStock', context: context);
 
   @override
-  Future<void> updateVariantStock(String variantId, int newStock) {
+  Future<void> updateVariantStock(String variantId, double newStock) {
     return _$updateVariantStockAsyncAction
         .run(() => super.updateVariantStock(variantId, newStock));
   }
@@ -121,31 +151,6 @@ mixin _$ProductStore on _ProductStore, Store {
   Future<void> updateVariantCostPrice(String variantId, double newCostPrice) {
     return _$updateVariantCostPriceAsyncAction
         .run(() => super.updateVariantCostPrice(variantId, newCostPrice));
-  }
-
-  late final _$loadCategoriesAsyncAction =
-      AsyncAction('_ProductStore.loadCategories', context: context);
-
-  @override
-  Future<void> loadCategories() {
-    return _$loadCategoriesAsyncAction.run(() => super.loadCategories());
-  }
-
-  late final _$addCategoryAsyncAction =
-      AsyncAction('_ProductStore.addCategory', context: context);
-
-  @override
-  Future<void> addCategory(String category) {
-    return _$addCategoryAsyncAction.run(() => super.addCategory(category));
-  }
-
-  late final _$deleteCategoryAsyncAction =
-      AsyncAction('_ProductStore.deleteCategory', context: context);
-
-  @override
-  Future<void> deleteCategory(String category) {
-    return _$deleteCategoryAsyncAction
-        .run(() => super.deleteCategory(category));
   }
 
   late final _$clearAllDataAsyncAction =
@@ -160,8 +165,8 @@ mixin _$ProductStore on _ProductStore, Store {
   String toString() {
     return '''
 products: ${products},
-categories: ${categories},
-sortedCategories: ${sortedCategories}
+variants: ${variants},
+variantsByProduct: ${variantsByProduct}
     ''';
   }
 }

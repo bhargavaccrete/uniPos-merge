@@ -14,4 +14,6 @@ export 'add_item_form_state.dart';
 // Widgets
 export 'widgets/category_selector_button.dart';
 export 'widgets/inventory_toggle.dart';
+export 'widgets/product_type_selector.dart';
 export 'widgets/selling_method_selector.dart';
+export 'widgets/tax_selector_button.dart';

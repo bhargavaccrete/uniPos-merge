@@ -12,10 +12,17 @@ class SavedPrinterModel extends HiveObject {
   final String name;
 
   @HiveField(2)
-  final String type; // 'bluetooth' | 'wifi'
+  // 'bluetooth' | 'wifi' | 'usb' | 'windows' | 'windows_pdf'
+  // 'windows'     → RAW ESC/POS through the Windows spooler (thermal printers)
+  // 'windows_pdf' → rendered receipt PDF through the Windows printing API
+  //                 (doPDF, Microsoft Print to PDF, document printers)
+  final String type;
 
   @HiveField(3)
-  final String address; // MAC address for BT, "IP:port" for WiFi
+  // MAC for BT, "IP:port" for WiFi, "vendorId:productId" for USB, and the
+  // Windows spooler queue name for 'windows'. The queue name may itself
+  // contain a colon ("Printer on SERVER:2") — never split it.
+  final String address;
 
   @HiveField(4)
   final int paperSize; // 58 or 80 (mm)
@@ -43,6 +50,15 @@ class SavedPrinterModel extends HiveObject {
   bool get isBluetooth => type == 'bluetooth';
   bool get isWifi => type == 'wifi';
   bool get isUsb => type == 'usb';
+
+  /// RAW ESC/POS through the Windows print spooler — a real thermal printer.
+  bool get isWindows => type == 'windows';
+
+  /// A Windows PDF/document printer. Receives a RENDERED receipt PDF, never
+  /// ESC/POS: control codes are meaningless to a PDF writer, which discards
+  /// them while every layer still reports success.
+  bool get isWindowsPdf => type == 'windows_pdf';
+
   bool get isKotPrinter => role == 'kot' || role == 'both';
   bool get isReceiptPrinter => role == 'receipt' || role == 'both';
 

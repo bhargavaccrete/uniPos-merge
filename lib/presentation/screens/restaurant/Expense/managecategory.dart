@@ -3,6 +3,7 @@ import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/data/models/restaurant/db/expensemodel_315.dart';
 import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_empty_state.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:uuid/uuid.dart';
@@ -17,8 +18,6 @@ class ManageCategory extends StatefulWidget {
   @override
   State<ManageCategory> createState() => _ManageCategoryState();
 }
-
-
 
 class _ManageCategoryState extends State<ManageCategory> {
   final TextEditingController categoryController = TextEditingController();
@@ -47,14 +46,13 @@ class _ManageCategoryState extends State<ManageCategory> {
       (c) => c.name.toLowerCase() == name.toLowerCase(),
     );
     if (isDuplicate) {
-      NotificationService.instance.showError('A category with this name already exists');
+      NotificationService.instance.showError(
+        'A category with this name already exists',
+      );
       return;
     }
 
-    final category = ExpenseCategory(
-      id: Uuid().v4(),
-      name: name,
-    );
+    final category = ExpenseCategory(id: Uuid().v4(), name: name);
 
     final success = await expenseCategoryStore.addCategory(category);
     if (success) {
@@ -76,6 +74,97 @@ class _ManageCategoryState extends State<ManageCategory> {
     await expenseCategoryStore.deleteCategory(id);
   }
 
+  /// Rename dialog for [category]. Reuses the State-owned [categoryController]
+  /// (disposed on unmount, never in .then()) so there's no dialog-controller
+  /// lifecycle crash.
+  Future<void> _showEditCategoryDialog(ExpenseCategory category) async {
+    categoryController.text = category.name;
+    await showDialog(
+      context: context,
+      builder: (ctx) => AppDialogShell(
+        title: 'Edit Category',
+        accent: AppColors.primary,
+        icon: Icons.edit_rounded,
+        body: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Category Name',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 10),
+            AppTextField(
+              controller: categoryController,
+              autofocus: true,
+              hint: 'Enter category name',
+              icon: Icons.category_outlined,
+              textInputAction: TextInputAction.done,
+              onFieldSubmitted: (_) => _updateCategoryName(category),
+            ),
+          ],
+        ),
+        actions: [
+          appDialogCancelButton(ctx),
+          const SizedBox(width: 12),
+          appDialogPrimaryButton(
+            label: 'Update',
+            onPressed: () => _updateCategoryName(category),
+          ),
+        ],
+      ),
+    );
+    categoryController.clear();
+  }
+
+  Future<void> _updateCategoryName(ExpenseCategory category) async {
+    final name = categoryController.text.trim();
+    if (name.isEmpty) {
+      NotificationService.instance.showError('Category name cannot be empty');
+      return;
+    }
+    final isDuplicate = expenseCategoryStore.categories.any(
+      (c) => c.id != category.id && c.name.toLowerCase() == name.toLowerCase(),
+    );
+    if (isDuplicate) {
+      NotificationService.instance.showError(
+        'A category with this name already exists',
+      );
+      return;
+    }
+    final updated = ExpenseCategory(
+      id: category.id,
+      name: name,
+      isEnabled: category.isEnabled,
+    );
+    await expenseCategoryStore.updateCategory(updated);
+    NotificationService.instance.showSuccess('Category updated successfully');
+    if (mounted) Navigator.pop(context);
+  }
+
+  /// Compact icon button for the card's edit / delete actions — no oversized
+  /// touch target or coloured box.
+  Widget _cardAction({
+    required IconData icon,
+    required Color color,
+    required String tooltip,
+    required VoidCallback onTap,
+  }) {
+    return IconButton(
+      onPressed: onTap,
+      icon: Icon(icon, color: color, size: 20),
+      tooltip: tooltip,
+      visualDensity: VisualDensity.compact,
+      padding: const EdgeInsets.all(6),
+      constraints: const BoxConstraints(),
+      splashRadius: 20,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isTablet = !AppResponsive.isMobile(context);
@@ -95,290 +184,343 @@ class _ManageCategoryState extends State<ManageCategory> {
           // Add Button Section
           Container(
             color: AppColors.white,
-            padding: EdgeInsets.all(isTablet ? 20 : 16),
-            child: SizedBox(
-              width: double.infinity,
-              height: isTablet ? 54 : 48,
-              child: ElevatedButton.icon(
-                onPressed: () {
-                  Widget formContent = Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Icon(Icons.add_circle_rounded, size: isTablet ? 26 : 24, color: AppColors.primary),
-                          ),
-                          SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              'Add New Category',
-                              style: GoogleFonts.poppins(
-                                fontSize: isTablet ? 20 : 18,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                          ),
-                          IconButton(
-                            onPressed: () => Navigator.pop(context),
-                            icon: Icon(Icons.close_rounded, color: AppColors.textSecondary),
-                          ),
-                        ],
-                      ),
-                      Divider(height: 24, color: AppColors.divider),
-                      Text(
-                        'Category Name',
-                        style: GoogleFonts.poppins(
-                          fontSize: isTablet ? 15 : 14,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      SizedBox(height: 10),
-                      AppTextField(
-                        controller: categoryController,
-                        hint: 'Enter category name',
-                        icon: Icons.category_outlined,
-                      ),
-                      SizedBox(height: 24),
-                      SizedBox(
-                        width: double.infinity,
-                        height: isTablet ? 52 : 48,
-                        child: ElevatedButton(
-                          onPressed: () => AddECategory(),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                          child: Text(
-                            'Add Category',
-                            style: GoogleFonts.poppins(fontSize: isTablet ? 16 : 15, fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                      ),
-                    ],
-                  );
-
-                  if (isTablet) {
-                    showDialog(
-                      context: context,
-                      builder: (context) => AppDialogShell(
-                        title: 'Add New Category',
-                        accent: AppColors.primary,
-                        icon: Icons.add_circle_rounded,
-                        body: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
+            padding: AppResponsive.padding(context),
+            child: AppResponsive.constrainedContent(
+              context: context,
+              maxWidth: AppResponsive.maxContentWidth(context),
+              heightFactor: 1,
+              child: SizedBox(
+                width: double.infinity,
+                height: AppResponsive.buttonHeight(context),
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Widget formContent = Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
                           children: [
-                            Text(
-                              'Category Name',
-                              style: GoogleFonts.poppins(
-                                fontSize: isTablet ? 15 : 14,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textPrimary,
+                            Container(
+                              padding: EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(
+                                Icons.add_circle_rounded,
+                                size: AppResponsive.getValue(
+                                  context,
+                                  mobile: 24.0,
+                                  tablet: 26.0,
+                                  desktop: 28.0,
+                                ),
+                                color: AppColors.primary,
                               ),
                             ),
-                            SizedBox(height: 10),
-                            AppTextField(
-                              controller: categoryController,
-                              hint: 'Enter category name',
-                              icon: Icons.category_outlined,
+                            SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'Add New Category',
+                                style: GoogleFonts.poppins(
+                                  fontSize: AppResponsive.subheadingFontSize(
+                                    context,
+                                  ),
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              onPressed: () => Navigator.pop(context),
+                              icon: Icon(
+                                Icons.close_rounded,
+                                color: AppColors.textSecondary,
+                              ),
                             ),
                           ],
                         ),
-                        actions: [
-                          appDialogCancelButton(context),
-                          const SizedBox(width: 12),
-                          appDialogPrimaryButton(
-                            label: 'Add Category',
+                        Divider(height: 24, color: AppColors.divider),
+                        Text(
+                          'Category Name',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.bodyFontSize(context),
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        SizedBox(height: 10),
+                        AppTextField(
+                          controller: categoryController,
+                          autofocus: true,
+                          hint: 'Enter category name',
+                          icon: Icons.category_outlined,
+                          textInputAction: TextInputAction.done,
+                          onFieldSubmitted: (_) => AddECategory(),
+                        ),
+                        SizedBox(height: 24),
+                        SizedBox(
+                          width: double.infinity,
+                          height: AppResponsive.buttonHeight(context),
+                          child: ElevatedButton(
                             onPressed: () => AddECategory(),
-                          ),
-                        ],
-                      ),
-                    );
-                  } else {
-                    showModalBottomSheet(
-                      context: context,
-                      isScrollControlled: true,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                      ),
-                      builder: (BuildContext context) {
-                        return Container(
-                          padding: EdgeInsets.only(
-                            left: 20,
-                            right: 20,
-                            top: 0,
-                            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.white,
-                            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                          ),
-                          child: SingleChildScrollView(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Center(
-                                  child: Container(
-                                    margin: EdgeInsets.only(top: 12, bottom: 16),
-                                    width: 40,
-                                    height: 4,
-                                    decoration: BoxDecoration(
-                                      color: AppColors.divider,
-                                      borderRadius: BorderRadius.circular(2),
-                                    ),
-                                  ),
-                                ),
-                                formContent,
-                              ],
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            child: Text(
+                              'Add Category',
+                              style: GoogleFonts.poppins(
+                                fontSize: AppResponsive.buttonFontSize(context),
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
-                        );
-                      },
+                        ),
+                      ],
                     );
-                  }
-                },
-                icon: Icon(Icons.add_circle_rounded, size: isTablet ? 20 : 18),
-                label: Text(
-                  'Add New Category',
-                  style: GoogleFonts.poppins(
-                    fontSize: isTablet ? 16 : 15,
-                    fontWeight: FontWeight.w600,
+
+                    if (isTablet) {
+                      showDialog(
+                        context: context,
+                        builder: (context) => AppDialogShell(
+                          title: 'Add New Category',
+                          accent: AppColors.primary,
+                          icon: Icons.add_circle_rounded,
+                          body: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Category Name',
+                                style: GoogleFonts.poppins(
+                                  fontSize: AppResponsive.bodyFontSize(context),
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              SizedBox(height: 10),
+                              AppTextField(
+                                controller: categoryController,
+                                autofocus: true,
+                                hint: 'Enter category name',
+                                icon: Icons.category_outlined,
+                                textInputAction: TextInputAction.done,
+                                onFieldSubmitted: (_) => AddECategory(),
+                              ),
+                            ],
+                          ),
+                          actions: [
+                            appDialogCancelButton(context),
+                            const SizedBox(width: 12),
+                            appDialogPrimaryButton(
+                              label: 'Add Category',
+                              onPressed: () => AddECategory(),
+                            ),
+                          ],
+                        ),
+                      );
+                    } else {
+                      showModalBottomSheet(
+                        context: context,
+                        isScrollControlled: true,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.vertical(
+                            top: Radius.circular(20),
+                          ),
+                        ),
+                        builder: (BuildContext context) {
+                          return Container(
+                            padding: EdgeInsets.only(
+                              left: 20,
+                              right: 20,
+                              top: 0,
+                              bottom:
+                                  MediaQuery.of(context).viewInsets.bottom + 20,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.white,
+                              borderRadius: BorderRadius.vertical(
+                                top: Radius.circular(20),
+                              ),
+                            ),
+                            child: SingleChildScrollView(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Center(
+                                    child: Container(
+                                      margin: EdgeInsets.only(
+                                        top: 12,
+                                        bottom: 16,
+                                      ),
+                                      width: 40,
+                                      height: 4,
+                                      decoration: BoxDecoration(
+                                        color: AppColors.divider,
+                                        borderRadius: BorderRadius.circular(2),
+                                      ),
+                                    ),
+                                  ),
+                                  formContent,
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    }
+                  },
+                  icon: Icon(
+                    Icons.add_circle_rounded,
+                    size: AppResponsive.getValue(
+                      context,
+                      mobile: 18.0,
+                      tablet: 20.0,
+                      desktop: 22.0,
+                    ),
                   ),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                  label: Text(
+                    'Add New Category',
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.buttonFontSize(context),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                 ),
               ),
             ),
           ),
 
-          // Categories List
+          // Categories List — capped so rows stay a readable column.
           Expanded(
-            child: Observer(
-              builder: (context) {
-                final allcategory = expenseCategoryStore.categories;
+            child: AppResponsive.constrainedContent(
+              context: context,
+              maxWidth: AppResponsive.maxContentWidth(context),
+              alignment: Alignment.topCenter,
+              child: Observer(
+                builder: (context) {
+                  final allcategory = expenseCategoryStore.categories;
 
-                if (allcategory.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          padding: EdgeInsets.all(isTablet ? 24 : 20),
-                          decoration: BoxDecoration(
-                            color: AppColors.surfaceMedium,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            Icons.category_rounded,
-                            size: isTablet ? 64 : 56,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                        SizedBox(height: 16),
-                        Text(
-                          'No categories found',
-                          style: GoogleFonts.poppins(
-                            fontSize: isTablet ? 18 : 16,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        SizedBox(height: 8),
-                        Text(
-                          'Add your first category to get started',
-                          style: GoogleFonts.poppins(
-                            fontSize: isTablet ? 15 : 14,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
+                  if (allcategory.isEmpty) {
+                    // Shared component — was a hand-rolled badge + two Texts.
+                    return const AppEmptyState(
+                      icon: Icons.category_rounded,
+                      title: 'No categories found',
+                      message: 'Add your first category to get started',
+                    );
+                  }
+
+                  return ListView.builder(
+                    padding: EdgeInsets.all(
+                      AppResponsive.mediumSpacing(context),
                     ),
-                  );
-                }
-
-                return ListView.builder(
-                  padding: EdgeInsets.all(isTablet ? 16 : 12),
-                  itemCount: allcategory.length,
-                  itemBuilder: (context, index) {
-                    final category = allcategory[index];
-                    return Container(
-                      margin: EdgeInsets.only(bottom: 12),
-                      padding: EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: AppColors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha:0.03),
-                            blurRadius: 8,
-                            offset: Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: category.isEnabled
-                                  ? AppColors.primary.withValues(alpha:0.1)
-                                  : AppColors.textSecondary.withValues(alpha:0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Icon(
-                              Icons.category_rounded,
-                              color: category.isEnabled ? AppColors.primary : AppColors.textSecondary,
-                              size: 24,
-                            ),
-                          ),
-                          SizedBox(width: 14),
-                          Expanded(
-                            child: Text(
-                              category.name,
-                              style: GoogleFonts.poppins(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 16,
-                                color: AppColors.textPrimary,
+                    itemCount: allcategory.length,
+                    itemBuilder: (context, index) {
+                      final category = allcategory[index];
+                      return Container(
+                        margin: EdgeInsets.only(bottom: 10),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.divider),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: category.isEnabled
+                                    ? AppColors.primary.withValues(alpha: 0.1)
+                                    : AppColors.textSecondary.withValues(
+                                        alpha: 0.1,
+                                      ),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(
+                                Icons.category_rounded,
+                                color: category.isEnabled
+                                    ? AppColors.primary
+                                    : AppColors.textSecondary,
+                                size: 20,
                               ),
                             ),
-                          ),
-                          Switch(
-                            value: category.isEnabled,
-                            onChanged: (bool value) async {
-                              final updatedCategory = ExpenseCategory(
-                                id: category.id,
-                                name: category.name,
-                                isEnabled: value,
-                              );
-                              await expenseCategoryStore.updateCategory(updatedCategory);
-                            },
-                            activeColor: AppColors.primary,
-                          ),
-                          SizedBox(width: 8),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: Colors.red.withValues(alpha:0.1),
-                              borderRadius: BorderRadius.circular(8),
+                            SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    category.name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: GoogleFonts.poppins(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: AppResponsive.bodyFontSize(
+                                        context,
+                                      ),
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                  if (!category.isEnabled)
+                                    Text(
+                                      'Disabled',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: AppResponsive.captionFontSize(
+                                          context,
+                                        ),
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                ],
+                              ),
                             ),
-                            child: IconButton(
-                              onPressed: () async {
+                            // Compact enable/disable toggle
+                            Transform.scale(
+                              scale: 0.8,
+                              child: Switch(
+                                value: category.isEnabled,
+                                onChanged: (bool value) async {
+                                  final updatedCategory = ExpenseCategory(
+                                    id: category.id,
+                                    name: category.name,
+                                    isEnabled: value,
+                                  );
+                                  await expenseCategoryStore.updateCategory(
+                                    updatedCategory,
+                                  );
+                                },
+                                activeColor: AppColors.primary,
+                                materialTapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                              ),
+                            ),
+                            _cardAction(
+                              icon: Icons.edit_outlined,
+                              color: AppColors.primary,
+                              tooltip: 'Edit',
+                              onTap: () => _showEditCategoryDialog(category),
+                            ),
+                            _cardAction(
+                              icon: Icons.delete_outline_rounded,
+                              color: AppColors.danger,
+                              tooltip: 'Delete',
+                              onTap: () async {
                                 final confirm = await showAppConfirmDialog(
                                   context: context,
                                   title: 'Delete Category',
@@ -392,20 +534,14 @@ class _ManageCategoryState extends State<ManageCategory> {
                                   await _delete(category.id);
                                 }
                               },
-                              icon: Icon(
-                                Icons.delete_rounded,
-                                color: Colors.red,
-                                size: isTablet ? 22 : 20,
-                              ),
-                              tooltip: 'Delete',
                             ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                );
-              },
+                          ],
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
             ),
           ),
         ],

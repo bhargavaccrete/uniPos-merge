@@ -1,18 +1,32 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:mobx/mobx.dart';
+import '../../../core/config/app_config.dart';
+import '../../../core/plan/entitlements.dart';
+import '../../../core/plan/entitlement_debug.dart';
+import '../../../core/routes/routes_name.dart';
 import '../../../data/models/restaurant/license_model.dart';
 import '../../../domain/services/common/device_payload_service.dart';
 import '../../../domain/services/common/dev_token_helper.dart';
 import '../../../domain/services/common/license_api_service.dart';
 import '../../../domain/services/common/license_validation_service.dart';
+import '../../../domain/services/common/manifest_service.dart';
+import '../../../util/restaurant/restaurant_session.dart';
+import '../../../core/di/service_locator.dart';
 
 part 'license_store.g.dart';
 
-class LicenseStore = _LicenseStore with _$LicenseStore; // ignore: use_of_private_type_in_public_api
+class LicenseStore extends _LicenseStore with _$LicenseStore {
+  LicenseStore(super.api);
+
+  static void navigateToNextScreen(BuildContext context) {
+    _LicenseStore.navigateToNextScreen(context);
+  }
+}
 
 abstract class _LicenseStore with Store {
   final LicenseApiService _api;
@@ -28,6 +42,12 @@ abstract class _LicenseStore with Store {
   // (ms since epoch). Expiry is checked against max(now, this) so setting the
   // device clock backward cannot make an expired license look valid.
   static const _lastSeenKey = 'unipos_last_seen_epoch';
+  // Server-driven entitlements manifest (signed) cache — separate from the RSA
+  // license token. Drives Entitlements; refreshed by sync.
+  static const _manifestRawKey = 'unipos_manifest_raw';
+  static const _manifestSigKey = 'unipos_manifest_sig';
+  static const _entVersionKey = 'unipos_entitlement_version';
+  static const _lastSyncKey = 'unipos_last_sync_at';
   static const _storage = FlutterSecureStorage();
 
   Timer? _heartbeatTimer;
@@ -37,8 +57,9 @@ abstract class _LicenseStore with Store {
   // when licenseInfo changes, by which point this is already loaded.
   int _trustedNowMs = 0;
 
-  /// When true, the app behaves as licensed without an actual activation.
-  /// Set via [skipLicense]; cleared via [clearBypass].
+  /// DEPRECATED escape hatch. License-skip was removed — the app is key-only —
+  /// so this is now permanently false (forced off in [loadBypassFlag]). Retained
+  /// only because entitlement checks read it as `bypassed || <real check>`.
   @observable
   bool licenseBypassed = false;
 
@@ -59,6 +80,14 @@ abstract class _LicenseStore with Store {
   bool get isLicensed =>
       licenseBypassed ||
       (licenseInfo?.isValidLocallyAsOf(_trustedNow()) ?? false);
+
+  /// Strict-whitelist guard: the verified entitlements manifest is the single
+  /// source of truth. Bypass (web/testing) is exempt; otherwise a licensed
+  /// device with no verified manifest (never activated with one, or its cache
+  /// failed verification) must reactivate before using licensed features.
+  /// Reactive inside an Observer — reads the entitlements ObservableMap.
+  bool get hasVerifiedManifest =>
+      licenseBypassed || Entitlements.instance.hasManifest;
 
   @computed
   bool get isExpiringSoon =>
@@ -90,10 +119,152 @@ abstract class _LicenseStore with Store {
     await _saveToken(jsonEncode(storedJson));
   }
 
-  Future<void> _lockLicense() async {
+  @action
+  Future<void> clearAllLicenseState() async {
     stopHeartbeatTimer();
     await _storage.delete(key: _tokenKey);
     licenseInfo = null;
+    await _clearManifestCache();
+    Entitlements.instance.clear();
+  }
+
+  /// Soft lock: strip all entitlements/manifest so no licensed feature is
+  /// reachable, but keep [licenseInfo] (with its expired/suspended status) and
+  /// the heartbeat running. The lock screen reads the preserved status to show
+  /// the correct message; a later server reactivation restores access on its own.
+  Future<void> _lockOutKeepingStatus() async {
+    await _clearManifestCache();
+    Entitlements.instance.clear();
+  }
+
+  // ── Entitlements Manifest (signed) ─────────────────────────────────────────
+
+  Future<void> _saveManifest(String raw, String sig, int version) async {
+    await _storage.write(key: _manifestRawKey, value: raw);
+    await _storage.write(key: _manifestSigKey, value: sig);
+    await _storage.write(key: _entVersionKey, value: '$version');
+  }
+
+  Future<void> _clearManifestCache() async {
+    await _storage.delete(key: _manifestRawKey);
+    await _storage.delete(key: _manifestSigKey);
+    await _storage.delete(key: _entVersionKey);
+  }
+
+  Future<int> _cachedEntVersion() async {
+    final v = await _storage.read(key: _entVersionKey);
+    return int.tryParse(v ?? '') ?? 0;
+  }
+
+  Future<DateTime?> lastSyncAt() async {
+    final v = await _storage.read(key: _lastSyncKey);
+    return v == null ? null : DateTime.tryParse(v);
+  }
+
+  Future<void> _touchLastSync() async {
+    await _storage.write(
+        key: _lastSyncKey, value: DateTime.now().toIso8601String());
+  }
+
+  /// Verifies a manifest+signature carried in a server [data] block, loads it
+  /// into [Entitlements], and caches it. No-op if the block lacks a manifest or
+  /// the signature/identity checks fail (keeps the prior cached entitlements).
+  /// Returns true only if a valid, verified manifest was loaded. Returns false
+  /// when the response carried no manifest, or the manifest failed verification
+  /// (in which case all license state is wiped — it can't be trusted). Callers
+  /// that require entitlements (activation) MUST treat false as a hard failure.
+  Future<bool> _ingestManifest(
+      Map<String, dynamic> data, String deviceId, String licenseKey) async {
+    final raw = data['manifest'] as String?;
+    final sig = data['signature'] as String?;
+    if (raw == null || sig == null) return false;
+    final parsed = await ManifestService.verifyAndParse(
+      manifestRaw: raw,
+      sigB64: sig,
+      deviceId: deviceId,
+      licenseKey: licenseKey,
+    );
+    if (parsed == null) {
+      await clearAllLicenseState();
+      return false;
+    }
+    // Full REPLACE (not merge): loadFromManifest clears first, so a downgrade
+    // key drops features the new plan omits and an upgrade key adds new ones.
+    Entitlements.instance.loadFromManifest(parsed);
+    await _saveManifest(raw, sig, parsed.version);
+    return true;
+  }
+
+  /// Loads the cached manifest into [Entitlements] for offline-first enforcement.
+  Future<void> _loadCachedManifest(String deviceId, String licenseKey) async {
+    try {
+      final raw = await _storage.read(key: _manifestRawKey);
+      final sig = await _storage.read(key: _manifestSigKey);
+      if (raw == null || sig == null) return;
+      final parsed = await ManifestService.verifyAndParse(
+        manifestRaw: raw,
+        sigB64: sig,
+        deviceId: deviceId,
+        licenseKey: licenseKey,
+      );
+      if (parsed != null) {
+        Entitlements.instance.loadFromManifest(parsed);
+      } else {
+        // Cached manifest failed verification (tampered / wrong device / wrong
+        // key) — wipe all licensing state.
+        await clearAllLicenseState();
+      }
+    } catch (_) {}
+  }
+
+  /// Startup: hydrate entitlements from cache (offline-safe), then kick a
+  /// background sync to pick up plan changes / revocation when online.
+  Future<void> _hydrateAndSyncManifest() async {
+    final info = licenseInfo;
+    if (info == null) return;
+    final devicePayload = await DevicePayloadService.build();
+    final deviceId = devicePayload['deviceid'] as String? ?? '';
+    await _loadCachedManifest(deviceId, info.licenseKey);
+    syncEntitlements(); // fire-and-forget
+  }
+
+  /// Sync entitlements with the server: detects plan changes and revocation
+  /// without an app release. Offline → keeps the cached manifest silently.
+  /// Returns true only when a new, verified manifest was actually applied
+  /// (i.e. the plan changed on this sync) so callers can surface it.
+  @action
+  Future<bool> syncEntitlements() async {
+    final info = licenseInfo;
+    if (info == null) return false;
+    final devicePayload = await DevicePayloadService.build();
+    final deviceId = devicePayload['deviceid'] as String? ?? '';
+    try {
+      final data = await _api.sync(
+        licenseKey: info.licenseKey,
+        deviceId: deviceId,
+        entitlementVersion: await _cachedEntVersion(),
+      );
+      final valid = data['valid'] as bool? ?? true;
+      if (!valid) {
+        // Server rejected. Sync's envelope doesn't reliably carry the full
+        // license record, so defer to checkStatus() — the one endpoint with an
+        // authoritative reason — to apply the precise state (expired/suspended
+        // preserved, device-mismatch wiped).
+        await checkStatus();
+        return false;
+      }
+      await _touchLastSync();
+      final changed = data['entitlementChanged'] as bool? ?? false;
+      if (changed) {
+        final applied = await _ingestManifest(data, deviceId, info.licenseKey);
+        EntitlementDebug.dump('SYNC', data); // debug-only — only when changed
+        return applied;
+      }
+      return false;
+    } catch (_) {
+      // Offline — keep cache, enforce expiry + grace locally.
+      return false;
+    }
   }
 
   // ── Anti-rollback trusted clock (high-water-mark) ──────────────────────────
@@ -146,29 +317,27 @@ abstract class _LicenseStore with Store {
 
   // ── Load & Validate ───────────────────────────────────────────────────────
 
-  // ── License bypass (skip) ─────────────────────────────────────────────────
+  // ── License bypass (REMOVED — app is key-only) ─────────────────────────────
 
-  /// Loads the persisted bypass flag. Call at startup before guarding routes.
+  /// Startup: force license-bypass OFF. Skip was removed, so the app only runs
+  /// with a valid key. This also clears any `true` persisted by older builds —
+  /// healing a device that had "Skip for now" stuck on (which silently disabled
+  /// every entitlement cap). Call before guarding routes.
   @action
   Future<void> loadBypassFlag() async {
+    licenseBypassed = false;
     try {
       final prefs = await SharedPreferences.getInstance();
-      licenseBypassed = prefs.getBool(_bypassKey) ?? false;
+      await prefs.remove(_bypassKey);
     } catch (_) {}
   }
 
-  /// Bypass the license requirement so the app is not locked. Persists across
-  /// restarts. Used as a temporary "Skip for now" escape hatch.
+  /// No-op. License-skip was removed (the app is key-only). Retained only so the
+  /// generated MobX binding still resolves; it can never re-enable bypass.
   @action
-  Future<void> skipLicense() async {
-    licenseBypassed = true;
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(_bypassKey, true);
-    } catch (_) {}
-  }
+  Future<void> skipLicense() async {}
 
-  /// Re-enables the license gate (clears the skip).
+  /// Re-enables the license gate (clears the skip). Still used defensively.
   @action
   Future<void> clearBypass() async {
     licenseBypassed = false;
@@ -198,6 +367,7 @@ abstract class _LicenseStore with Store {
         await _loadAndAdvanceTrustedClock(seedFrom: info?.activatedAt);
         licenseInfo = info;
         if (licenseInfo != null) startHeartbeatTimer();
+        await _hydrateAndSyncManifest();
         return;
       }
 
@@ -214,6 +384,7 @@ abstract class _LicenseStore with Store {
       await _loadAndAdvanceTrustedClock(seedFrom: info.activatedAt);
       licenseInfo = info;
       if (licenseInfo != null) startHeartbeatTimer();
+      await _hydrateAndSyncManifest();
     } catch (_) {}
   }
 
@@ -350,6 +521,22 @@ abstract class _LicenseStore with Store {
         _deviceIdKey: devicePayload['deviceid'],
       };
       await _saveToken(jsonEncode(storedJson));
+      // Verify + cache the entitlements manifest carried in the same response.
+      // A licensed device MUST have a verified manifest (strict-whitelist model),
+      // so a missing/invalid manifest is a hard activation failure — otherwise a
+      // key change would report success while the app silently locks out or keeps
+      // the OLD plan's entitlements.
+      final ingested = await _ingestManifest(
+          data, devicePayload['deviceid'] as String? ?? '', info.licenseKey);
+      if (!ingested) {
+        await clearAllLicenseState();
+        errorMessage =
+            'License activated but entitlements could not be verified. '
+            'Please try again or contact support.';
+        return false;
+      }
+      EntitlementDebug.dump('ACTIVATE', data); // debug-only diagnostics
+      await _touchLastSync();
       startHeartbeatTimer();
       return true;
     } on LicenseApiException catch (e) {
@@ -374,11 +561,17 @@ abstract class _LicenseStore with Store {
 
       if (valid) {
         await _applyServerData(data);
-      } else if (reason == 'EXPIRED') {
+      } else if (reason == 'EXPIRED' || reason == 'SUSPENDED') {
+        // Keep the license record so the lock screen can show the right state
+        // (expired vs. deactivated) — but strip entitlements so no licensed
+        // feature stays reachable. The persisted status ('expired'/'suspended')
+        // survives an offline restart via the saved token.
         await _applyServerData(data);
+        await _lockOutKeepingStatus();
       } else {
-        // DEVICE_MISMATCH, SUSPENDED, or unknown reason — hard lock
-        await _lockLicense();
+        // DEVICE_MISMATCH or unknown reason — can't trust the identity at all,
+        // wipe everything (this reverts the device to "License Required").
+        await clearAllLicenseState();
       }
     } on LicenseApiException catch (e) {
       errorMessage = e.message;
@@ -394,7 +587,10 @@ abstract class _LicenseStore with Store {
     if (licenseInfo == null) return;
     try {
       final accepted = await _api.heartbeat(licenseInfo!.licenseKey);
-      if (!accepted) await _lockLicense();
+      // Heartbeat only returns accept/reject with no reason — defer to
+      // checkStatus() so a rejection resolves to the correct locked state
+      // (expired/suspended preserved) rather than a blanket wipe.
+      if (!accepted) await checkStatus();
     } catch (_) {
       // Network error — offline grace, keep license active
     }
@@ -404,7 +600,10 @@ abstract class _LicenseStore with Store {
     _heartbeatTimer?.cancel();
     _heartbeatTimer = Timer.periodic(
       kDebugMode ? const Duration(seconds: 30) : const Duration(hours: 6),
-      (_) => heartbeat(),
+      (_) async {
+        await heartbeat();
+        await syncEntitlements();
+      },
     );
   }
 
@@ -413,8 +612,18 @@ abstract class _LicenseStore with Store {
     _heartbeatTimer = null;
   }
 
+  /// Manual "Refresh from Server": re-checks license status AND pulls any
+  /// entitlement/plan change on demand (the 6h timer does this automatically,
+  /// this lets an admin apply a plan change immediately). Returns true when the
+  /// plan actually changed so the UI can confirm it.
   @action
-  Future<void> refreshLicense() async => checkStatus();
+  Future<bool> refreshLicense() async {
+    await checkStatus();
+    // If status stripped/wiped the license (expired/suspended/mismatch) there's
+    // no valid plan to pull — skip the sync.
+    if (licenseInfo == null || !isLicensed) return false;
+    return syncEntitlements();
+  }
 
   // ── Pending Key (collected at startup, activated after setup) ────────────
 
@@ -456,9 +665,7 @@ abstract class _LicenseStore with Store {
         // Always clear locally even if server call fails
       }
     }
-    stopHeartbeatTimer();
-    await _storage.delete(key: _tokenKey);
-    licenseInfo = null;
+    await clearAllLicenseState();
     errorMessage = null;
   }
 
@@ -505,5 +712,54 @@ abstract class _LicenseStore with Store {
       currentDevice: devicePayload,
     );
     await _saveToken(rawToken);
+  }
+
+  /// Route decision helper for restaurant entry points (Splash, Login, Setup Wizard).
+  /// Navigates to License Key Entry, License Lock, or Dashboard based on state.
+  static void navigateToNextScreen(BuildContext context) {
+    final licStore = locator<LicenseStore>();
+
+    // 1. If not licensed (and not bypassed)
+    if (!licStore.isLicensed) {
+      // A device with NO license record: a brand-new device goes through Key
+      // Entry -> Setup Wizard (activation is deferred until the wizard captures
+      // the store name). But a device that has ALREADY completed setup and only
+      // LOST its license — e.g. deactivated by the server, which returns
+      // reason=DEVICE_MISMATCH and wipes licenseInfo to null (see checkStatus) —
+      // must NOT be forced back through onboarding. Route it to the Lock screen
+      // to re-activate and return straight to the app.
+      if (licStore.licenseInfo == null && !AppConfig.isSetupComplete) {
+        // No license at all on a fresh device -> License Activation (Key Entry)
+        Navigator.pushReplacementNamed(context, RouteNames.licenseKeyEntry);
+      } else {
+        // Expired / suspended / device-unregistered on an already-set-up
+        // device -> License Locked (re-activate in place).
+        Navigator.pushReplacementNamed(context, RouteNames.licenseLock);
+      }
+      return;
+    }
+
+    // 2. Must have a verified manifest to proceed (unless bypassed)
+    if (!licStore.hasVerifiedManifest) {
+      Navigator.pushReplacementNamed(context, RouteNames.licenseLock);
+      return;
+    }
+
+    // 3. Fully valid and verified -> hand over to the mode's own entry point.
+    // Steps 1 and 2 above are mode-agnostic (lock / key entry are the same
+    // decision for both), so only this destination branches.
+    if (AppConfig.isRetail) {
+      // Retail has no staff session; its own admin login runs after this,
+      // driven by splashScreen's authService.initialize().
+      Navigator.pushReplacementNamed(context, RouteNames.retailBilling);
+      return;
+    }
+
+    final isLoggedIn = RestaurantSession.isLoggedIn;
+    if (isLoggedIn) {
+      Navigator.pushReplacementNamed(context, RouteNames.restaurantHome);
+    } else {
+      Navigator.pushReplacementNamed(context, RouteNames.restaurantLogin);
+    }
   }
 }

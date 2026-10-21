@@ -67,6 +67,81 @@ class EndOfDayReport extends HiveObject{
   @HiveField(19)
   final double cancelledOrderAmount; // Total value of those cancelled orders
 
+  @HiveField(20)
+  final String? sessionId; // The POS session this close belongs to (null = retail/legacy)
+
+  // ==================== CREDIT COLLECTIONS (retail) ====================
+  // Repayments taken against existing credit during the day. Distinct from
+  // sales: money arriving for goods sold on an EARLIER day, so it must never be
+  // added to `totalSales` — but it IS cash that has to be in the drawer.
+
+  @HiveField(21)
+  final double cashCollections;
+
+  @HiveField(22)
+  final double cardCollections;
+
+  @HiveField(23)
+  final double upiCollections;
+
+  // ==================== PROFIT (retail) ====================
+
+  /// Cost of goods sold for the day, from the cost frozen on each sale line.
+  @HiveField(24)
+  final double totalCost;
+
+  /// Ex-tax revenue minus [totalCost]. Collected GST is not profit.
+  @HiveField(25)
+  final double grossProfit;
+
+  // ==================== CUSTOMER OUTSTANDING (retail) ====================
+
+  /// How many customers were carrying a balance at close.
+  @HiveField(26)
+  final int customersWithDue;
+
+  /// Total owed to the shop at close, across all customers.
+  @HiveField(27)
+  final double totalOutstanding;
+
+  // ==================== SAFE DROP ====================
+
+  /// Cash physically removed from the drawer at close — the safe drop.
+  ///
+  /// Stored rather than left in a cash-movement note so the settlement slip can
+  /// be reprinted months later with the real figure, and so a report can say
+  /// where the day's cash went. Records written before this existed read back
+  /// 0, which correctly means "nothing was taken out".
+  @HiveField(28, defaultValue: 0.0)
+  final double cashWithdrawn;
+
+  /// What stayed in the drawer, and therefore the next day's opening float.
+  ///
+  /// Derived from the COUNTED cash, not [closingBalance] — the latter is the
+  /// system-expected figure, which differs from the count whenever there is a
+  /// variance.
+  double get cashKept => cashReconciliation.actualCash - cashWithdrawn;
+
+  /// Credit repayments across every mode.
+  ///
+  /// Derived, not stored: persisting it alongside its own three components is
+  /// how a stored total drifts from the parts it claims to sum.
+  double get totalCollections =>
+      cashCollections + cardCollections + upiCollections;
+
+  /// Gross margin as a percentage of **ex-tax** revenue.
+  ///
+  /// The denominator is `totalSales - totalTax`, not `totalSales`: [grossProfit]
+  /// is computed against revenue with the collected GST removed, so dividing by
+  /// a tax-inclusive figure would understate the margin by the tax rate.
+  ///
+  /// `!= 0` rather than `> 0`: a day whose refunds outweigh its sales has
+  /// negative revenue, and `> 0` would render that loss as a flat 0%.
+  double get profitMargin {
+    final exTaxRevenue = totalSales - totalTax;
+    return exTaxRevenue != 0 ? (grossProfit / exTaxRevenue) * 100 : 0.0;
+  }
+
   EndOfDayReport({
     required this.date,
     required this.openingBalance,
@@ -88,6 +163,17 @@ class EndOfDayReport extends HiveObject{
     this.roundOff = 0,
     this.cancelledOrderCount = 0,
     this.cancelledOrderAmount = 0,
+    this.sessionId,
+    // Retail-only; default to zero so restaurant closes and reports written
+    // before these existed stay constructible unchanged.
+    this.cashCollections = 0,
+    this.cardCollections = 0,
+    this.upiCollections = 0,
+    this.totalCost = 0,
+    this.grossProfit = 0,
+    this.customersWithDue = 0,
+    this.totalOutstanding = 0,
+    this.cashWithdrawn = 0,
   });
 
   Map<String, dynamic> toMap() {
@@ -112,6 +198,15 @@ class EndOfDayReport extends HiveObject{
       'roundOff': roundOff,
       'cancelledOrderCount': cancelledOrderCount,
       'cancelledOrderAmount': cancelledOrderAmount,
+      'sessionId': sessionId,
+      'cashCollections': cashCollections,
+      'cardCollections': cardCollections,
+      'upiCollections': upiCollections,
+      'totalCost': totalCost,
+      'grossProfit': grossProfit,
+      'customersWithDue': customersWithDue,
+      'totalOutstanding': totalOutstanding,
+      'cashWithdrawn': cashWithdrawn,
     };
   }
 
@@ -137,6 +232,15 @@ class EndOfDayReport extends HiveObject{
       roundOff: (map['roundOff'] ?? 0).toDouble(),
       cancelledOrderCount: map['cancelledOrderCount'] ?? 0,
       cancelledOrderAmount: (map['cancelledOrderAmount'] ?? 0).toDouble(),
+      sessionId: map['sessionId'],
+      cashCollections: (map['cashCollections'] ?? 0).toDouble(),
+      cardCollections: (map['cardCollections'] ?? 0).toDouble(),
+      upiCollections: (map['upiCollections'] ?? 0).toDouble(),
+      totalCost: (map['totalCost'] ?? 0).toDouble(),
+      grossProfit: (map['grossProfit'] ?? 0).toDouble(),
+      customersWithDue: map['customersWithDue'] ?? 0,
+      totalOutstanding: (map['totalOutstanding'] ?? 0).toDouble(),
+      cashWithdrawn: (map['cashWithdrawn'] ?? 0).toDouble(),
     );
   }
 

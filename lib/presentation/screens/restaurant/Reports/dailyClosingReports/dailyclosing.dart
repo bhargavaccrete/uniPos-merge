@@ -9,7 +9,13 @@ import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
-import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_app_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_body.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_card.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_empty_state.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_export_button.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_filter_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_summary_row.dart';
 import '../../../../widget/componets/common/report_summary_card.dart';
 
 enum ClosingPeriod { DayWise, MonthWise, Custom }
@@ -28,95 +34,32 @@ class _DailyClosingReportState extends State<DailyClosingReport> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      appBar: buildPrimaryAppBar(
-        titleWidget: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Daily Closing Report',
-              style: GoogleFonts.poppins(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-                fontSize: 20,
-              ),
-            ),
-            Text(
-              'End of day financial summary',
-              style: GoogleFonts.poppins(
-                color: Colors.white70,
-                fontWeight: FontWeight.w500,
-                fontSize: 12,
-              ),
-            ),
-          ],
-        ),
+      appBar: reportAppBar(
+        title: 'Daily Closing Reports',
+        subtitle: 'End of day closing summaries',
       ),
       body: Column(
         children: [
           AppResponsive.verticalSpace(context, size: SpacingSize.small),
-
-          // Filter Buttons
-          Container(
-            color: AppColors.white,
-            padding: AppResponsive.horizontalPadding(context).copyWith(top: 12, bottom: 12),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _filterButton(ClosingPeriod.DayWise, 'Day Wise', Icons.today),
-                  AppResponsive.horizontalSpace(context, size: SpacingSize.small),
-                  _filterButton(ClosingPeriod.MonthWise, 'Month Wise', Icons.calendar_month),
-                  AppResponsive.horizontalSpace(context, size: SpacingSize.small),
-                  _filterButton(ClosingPeriod.Custom, 'Custom', Icons.date_range),
-                ],
-              ),
-            ),
+          ReportFilterBar<ClosingPeriod>(
+            selected: _selectedPeriod,
+            onSelected: (p) => setState(() => _selectedPeriod = p),
+            options: const [
+              ReportFilterOption(
+                  value: ClosingPeriod.DayWise, label: 'Day Wise', icon: Icons.today),
+              ReportFilterOption(
+                  value: ClosingPeriod.MonthWise,
+                  label: 'Month Wise',
+                  icon: Icons.calendar_month),
+              ReportFilterOption(
+                  value: ClosingPeriod.Custom, label: 'Custom', icon: Icons.date_range),
+            ],
           ),
-
           AppResponsive.verticalSpace(context, size: SpacingSize.small),
-
           Expanded(
-            child: ClosingReportView(
-              period: _selectedPeriod,
-            ),
+            child: ClosingReportView(period: _selectedPeriod),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _filterButton(ClosingPeriod period, String title, IconData icon) {
-    bool isSelected = _selectedPeriod == period;
-    return ElevatedButton.icon(
-      onPressed: () {
-        setState(() {
-          _selectedPeriod = period;
-        });
-      },
-      icon: Icon(icon, size: AppResponsive.smallIconSize(context)),
-      label: Text(
-        title,
-        style: GoogleFonts.poppins(
-          fontSize: AppResponsive.smallFontSize(context),
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-      style: ElevatedButton.styleFrom(
-        padding: EdgeInsets.symmetric(
-          horizontal: AppResponsive.getValue(context, mobile: 16.0, tablet: 20.0),
-          vertical: AppResponsive.getValue(context, mobile: 12.0, tablet: 14.0),
-        ),
-        backgroundColor: isSelected ? AppColors.primary : AppColors.white,
-        foregroundColor: isSelected ? AppColors.white : AppColors.textPrimary,
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-          side: BorderSide(
-            color: isSelected ? AppColors.primary : AppColors.divider,
-            width: 1,
-          ),
-        ),
       ),
     );
   }
@@ -460,7 +403,7 @@ class _ClosingReportViewState extends State<ClosingReportView> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return Center(child: CircularProgressIndicator(color: AppColors.primary));
+      return const ReportLoading();
     }
 
     if (widget.period == ClosingPeriod.MonthWise) {
@@ -475,19 +418,16 @@ class _ClosingReportViewState extends State<ClosingReportView> {
   }
 
   Widget _buildDayWiseView() {
-    return SingleChildScrollView(
-      padding: AppResponsive.padding(context),
-      child: AppResponsive.constrainedContent(
-        context: context,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+    return ReportBody(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
             _buildDateSelector(),
             AppResponsive.verticalSpace(context),
             if (_reportCount > 0) ...[
               _buildSummaryCards(),
               AppResponsive.verticalSpace(context),
-              _buildExportButton(),
+              ReportExportButton(onPressed: _exportReport),
               AppResponsive.verticalSpace(context),
               _buildOrderTable(),
               AppResponsive.verticalSpace(context),
@@ -495,21 +435,17 @@ class _ClosingReportViewState extends State<ClosingReportView> {
               AppResponsive.verticalSpace(context),
               _buildFinancialSummary(),
             ] else
-              _buildEmptyState(),
-          ],
-        ),
+              _emptyState,
+        ],
       ),
     );
   }
 
   Widget _buildMonthWiseSelector() {
-    return SingleChildScrollView(
-      padding: AppResponsive.padding(context),
-      child: AppResponsive.constrainedContent(
-        context: context,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+    return ReportBody(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
             Row(
               children: [
                 Expanded(
@@ -631,7 +567,7 @@ class _ClosingReportViewState extends State<ClosingReportView> {
             if (_reportCount > 0) ...[
               _buildSummaryCards(),
               AppResponsive.verticalSpace(context),
-              _buildExportButton(),
+              ReportExportButton(onPressed: _exportReport),
               AppResponsive.verticalSpace(context),
               _buildOrderTable(),
               AppResponsive.verticalSpace(context),
@@ -639,21 +575,17 @@ class _ClosingReportViewState extends State<ClosingReportView> {
               AppResponsive.verticalSpace(context),
               _buildFinancialSummary(),
             ] else
-              _buildEmptyState(),
-          ],
-        ),
+              _emptyState,
+        ],
       ),
     );
   }
 
   Widget _buildCustomSelector() {
-    return SingleChildScrollView(
-      padding: AppResponsive.padding(context),
-      child: AppResponsive.constrainedContent(
-        context: context,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+    return ReportBody(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
             Container(
               padding: AppResponsive.cardPadding(context),
               decoration: BoxDecoration(
@@ -731,7 +663,7 @@ class _ClosingReportViewState extends State<ClosingReportView> {
               AppResponsive.verticalSpace(context),
               _buildSummaryCards(),
               AppResponsive.verticalSpace(context),
-              _buildExportButton(),
+              ReportExportButton(onPressed: _exportReport),
               AppResponsive.verticalSpace(context),
               _buildOrderTable(),
               AppResponsive.verticalSpace(context),
@@ -740,10 +672,9 @@ class _ClosingReportViewState extends State<ClosingReportView> {
               _buildFinancialSummary(),
             ] else if (_fromDate != null && _toDate != null) ...[
               AppResponsive.verticalSpace(context),
-              _buildEmptyState(),
+              _emptyState,
             ],
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -860,69 +791,32 @@ class _ClosingReportViewState extends State<ClosingReportView> {
               ),
             ),
           ),
-        Row(
-          children: [
-            Expanded(
-              child: _buildSummaryCard(
-                'Total Sales',
-                '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalSales)}',
-                Icons.trending_up,
-                Colors.green,
-              ),
-            ),
-            AppResponsive.horizontalSpace(context),
-            Expanded(
-              child: _buildSummaryCard(
-                'Total Expenses',
-                '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalExpenses)}',
-                Icons.trending_down,
-                Colors.red,
-              ),
-            ),
-            AppResponsive.horizontalSpace(context),
-            Expanded(
-              child: _buildSummaryCard(
-                'Net Amount',
-                '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(netAmount)}',
-                Icons.account_balance_wallet,
-                Colors.blue,
-              ),
-            ),
-          ],
-        ),
+        ReportSummaryRow(cards: [
+          _buildSummaryCard(
+            'Total Sales',
+            '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalSales)}',
+            Icons.trending_up,
+            Colors.green,
+          ),
+          _buildSummaryCard(
+            'Total Expenses',
+            '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalExpenses)}',
+            Icons.trending_down,
+            Colors.red,
+          ),
+          _buildSummaryCard(
+            'Net Amount',
+            '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(netAmount)}',
+            Icons.account_balance_wallet,
+            Colors.blue,
+          ),
+        ]),
       ],
     );
   }
 
   Widget _buildSummaryCard(String title, String value, IconData icon, Color color) {
     return ReportSummaryCard(title: title, value: value, icon: icon, color: color);
-  }
-
-  Widget _buildExportButton() {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton.icon(
-        onPressed: _exportReport,
-        icon: Icon(Icons.file_download_outlined, size: AppResponsive.iconSize(context)),
-        label: Text(
-          'Export Report',
-          style: GoogleFonts.poppins(
-            fontSize: AppResponsive.buttonFontSize(context),
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.green,
-          foregroundColor: AppColors.white,
-          padding: EdgeInsets.symmetric(
-            vertical: AppResponsive.getValue(context, mobile: 14.0, tablet: 16.0, desktop: 18.0),
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      ),
-    );
   }
 
   Widget _buildOrderTable() {
@@ -955,12 +849,11 @@ class _ClosingReportViewState extends State<ClosingReportView> {
               ),
             ),
           ),
-          SingleChildScrollView(
+          LayoutBuilder(
+            builder: (context, box) => SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minWidth: AppResponsive.screenWidth(context) - AppResponsive.getValue(context, mobile: 32.0, tablet: 40.0),
-              ),
+              constraints: BoxConstraints(minWidth: box.maxWidth),
               child: DataTable(
                 columnSpacing: AppResponsive.tableColumnSpacing(context),
                 headingRowColor: WidgetStateProperty.all(AppColors.surfaceLight),
@@ -1050,6 +943,7 @@ class _ClosingReportViewState extends State<ClosingReportView> {
               ),
             ),
           ),
+          ),
         ],
       ),
     );
@@ -1085,12 +979,11 @@ class _ClosingReportViewState extends State<ClosingReportView> {
               ),
             ),
           ),
-          SingleChildScrollView(
+          LayoutBuilder(
+            builder: (context, box) => SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minWidth: AppResponsive.screenWidth(context) - AppResponsive.getValue(context, mobile: 32.0, tablet: 40.0),
-              ),
+              constraints: BoxConstraints(minWidth: box.maxWidth),
               child: DataTable(
                 columnSpacing: AppResponsive.tableColumnSpacing(context),
                 headingRowColor: WidgetStateProperty.all(AppColors.surfaceLight),
@@ -1148,6 +1041,7 @@ class _ClosingReportViewState extends State<ClosingReportView> {
                 }).toList(),
               ),
             ),
+          ),
           ),
         ],
       ),
@@ -1214,41 +1108,9 @@ class _ClosingReportViewState extends State<ClosingReportView> {
     );
   }
 
-  Widget _buildEmptyState() {
-    return Center(
-      child: Container(
-        padding: EdgeInsets.all(
-          AppResponsive.getValue(context, mobile: 32.0, tablet: 40.0, desktop: 48.0),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.receipt_long_outlined,
-              size: AppResponsive.getValue(context, mobile: 64.0, tablet: 80.0, desktop: 96.0),
-              color: AppColors.textSecondary.withValues(alpha: 0.5),
-            ),
-            AppResponsive.verticalSpace(context),
-            Text(
-              'No Report Data',
-              style: GoogleFonts.poppins(
-                fontSize: AppResponsive.subheadingFontSize(context),
-                fontWeight: FontWeight.w600,
-                color: AppColors.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'No closing report found for selected period',
-              style: GoogleFonts.poppins(
-                fontSize: AppResponsive.bodyFontSize(context),
-                color: AppColors.textSecondary.withValues(alpha: 0.7),
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget get _emptyState => const ReportEmptyState(
+        icon: Icons.receipt_long_outlined,
+        title: 'No Report Data',
+        message: 'No closing report found for selected period',
+      );
 }

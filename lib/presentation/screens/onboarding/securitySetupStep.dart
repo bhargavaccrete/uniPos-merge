@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:hive/hive.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:billberrylite/core/config/app_config.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
-import 'package:billberrylite/data/models/retail/hive_model/staff_model_222.dart';
+import 'package:billberrylite/core/plan/entitlement_keys.dart';
+import 'package:billberrylite/core/plan/plan_enforcement.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/util/restaurant/restaurant_auth_helper.dart';
@@ -33,16 +32,20 @@ class SecuritySetupStep extends StatefulWidget {
 }
 
 class _SecuritySetupStepState extends State<SecuritySetupStep> {
-  // Admin login PIN (key matches admin_login.dart / changePassword.dart).
-  static const String _adminPasswordKey = 'restaurant_admin_password';
-
+  // Admin login PIN — shared by both modes (RestaurantAuthHelper.adminPinKey).
   final _pinController = TextEditingController();
   final _pinConfirmController = TextEditingController();
+  final _pinFocusNode = FocusNode();
+  final _pinConfirmFocusNode = FocusNode();
+  bool _obscurePin = true;
+
+  // Shared: backup password.
   final _pwdController = TextEditingController();
   final _pwdConfirmController = TextEditingController();
-
-  bool _obscurePin = true;
+  final _pwdFocusNode = FocusNode();
+  final _pwdConfirmFocusNode = FocusNode();
   bool _obscurePwd = true;
+
   bool _saving = false;
   String? _error;
 
@@ -52,37 +55,42 @@ class _SecuritySetupStepState extends State<SecuritySetupStep> {
     _pinConfirmController.dispose();
     _pwdController.dispose();
     _pwdConfirmController.dispose();
+    _pinFocusNode.dispose();
+    _pinConfirmFocusNode.dispose();
+    _pwdFocusNode.dispose();
+    _pwdConfirmFocusNode.dispose();
     super.dispose();
   }
 
   /// Validates the inputs, returning an error to show or null when all valid.
   String? _validate() {
     final pin = _pinController.text.trim();
-    final pwd = _pwdController.text.trim();
     if (pin.length < 4 || pin.length > 6) {
       return 'Admin PIN must be 4–6 digits';
     }
     if (pin != _pinConfirmController.text.trim()) {
       return 'Admin PINs do not match';
     }
+    // Backup password is only collected when the plan includes backups
+    // (settings module). Otherwise skip its policy check entirely.
+    if (!PlanEnforce.allows(EntKeys.settings)) return null;
     // Shared backup-password policy (same rules in Settings + export gate).
     return BackupEncryptionService.validatePassword(
-        pwd, _pwdConfirmController.text.trim());
+      _pwdController.text.trim(),
+      _pwdConfirmController.text.trim(),
+    );
   }
 
   /// True when [pin] is already assigned to a staff member, so the admin PIN
-  /// can't reuse it (keeps PIN-only login unambiguous). Staff are persisted by
-  /// the previous Staff step, so we read them straight from storage. Restaurant
-  /// staff store a hashed PIN (verify); retail staff store it in plaintext.
+  /// can't reuse it (keeps PIN-only login unambiguous — both modes now log in
+  /// by PIN, admin checked first then staff, see AuthService.login). Staff are
+  /// persisted by the previous Staff step, so we read them straight from
+  /// storage. The stored PIN is always hashed — verify against the new pin.
   Future<bool> _pinUsedByStaff(String pin) async {
-    if (AppConfig.isRetail) {
-      if (!Hive.isBoxOpen('retail_staff')) return false;
-      final box = Hive.box<RetailStaffModel>('retail_staff');
-      return box.values.any((s) => s.pin == pin);
-    }
     await staffStore.loadStaff();
-    return staffStore.staff
-        .any((s) => RestaurantAuthHelper.verifyPassword(pin, s.pinNo));
+    return staffStore.staff.any(
+      (s) => RestaurantAuthHelper.verifyPassword(pin, s.pinNo),
+    );
   }
 
   Future<void> _onContinue() async {
@@ -95,8 +103,10 @@ class _SecuritySetupStepState extends State<SecuritySetupStep> {
     // Reject an admin PIN already in use by a staff member (mirrors the staff
     // screen, which rejects a staff PIN matching the admin's).
     if (await _pinUsedByStaff(_pinController.text.trim())) {
-      setState(() => _error =
-          'This PIN is already assigned to a staff member. Choose a different admin PIN.');
+      setState(
+        () => _error =
+            'This PIN is already assigned to a staff member. Choose a different admin PIN.',
+      );
       return;
     }
 
@@ -105,12 +115,20 @@ class _SecuritySetupStepState extends State<SecuritySetupStep> {
       _saving = true;
     });
 
-    // Save admin PIN (hashed) + backup password. Saved immediately (same pattern
-    // as the payment-setup step) so they persist even before wizard completion.
+    // Save admin PIN + backup password. Saved immediately (same pattern as the
+    // payment-setup step) so they persist even before wizard completion.
+    // Written directly (not via AuthService, which is only DI-registered for
+    // retail) to the shared key both modes read at login.
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
-        _adminPasswordKey, RestaurantAuthHelper.hashPassword(_pinController.text.trim()));
-    await BackupEncryptionService.setPassword(_pwdController.text.trim());
+      RestaurantAuthHelper.adminPinKey,
+      RestaurantAuthHelper.hashPassword(_pinController.text.trim()),
+    );
+    // Only set a backup password when the plan includes backups; otherwise it's
+    // collected lazily later (ensureBackupPassword) if the plan is upgraded.
+    if (PlanEnforce.allows(EntKeys.settings)) {
+      await BackupEncryptionService.setPassword(_pwdController.text.trim());
+    }
 
     if (!mounted) return;
     setState(() => _saving = false);
@@ -128,103 +146,187 @@ class _SecuritySetupStepState extends State<SecuritySetupStep> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-            _buildHeader(context),
-            SizedBox(height: AppResponsive.largeSpacing(context)),
+                  _buildHeader(context),
+                  SizedBox(height: AppResponsive.largeSpacing(context)),
 
-            // ── Admin login PIN ──
-            _sectionLabel(context, 'Admin Login PIN', Icons.admin_panel_settings_rounded),
-            SizedBox(height: AppResponsive.smallSpacing(context)),
-            AppTextField(
-              controller: _pinController,
-              label: 'Admin PIN (4–6 digits)',
-              hint: 'Used to log in as admin',
-              icon: Icons.pin_rounded,
-              obscureText: _obscurePin,
-              keyboardType: TextInputType.number,
-              maxLength: 6,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              suffixIcon: IconButton(
-                icon: Icon(_obscurePin ? Icons.visibility_off : Icons.visibility),
-                onPressed: () => setState(() => _obscurePin = !_obscurePin),
-              ),
-            ),
-            SizedBox(height: AppResponsive.mediumSpacing(context)),
-            AppTextField(
-              controller: _pinConfirmController,
-              label: 'Confirm Admin PIN',
-              icon: Icons.pin_rounded,
-              obscureText: _obscurePin,
-              keyboardType: TextInputType.number,
-              maxLength: 6,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            ),
-
-            SizedBox(height: AppResponsive.largeSpacing(context)),
-
-            // ── Backup password ──
-            _sectionLabel(context, 'Backup Password', Icons.lock_rounded),
-            SizedBox(height: AppResponsive.smallSpacing(context)),
-            AppTextField(
-              controller: _pwdController,
-              label: 'Backup Password (6 digits)',
-              hint: 'Used to encrypt your backups',
-              icon: Icons.lock_outline_rounded,
-              obscureText: _obscurePwd,
-              keyboardType: TextInputType.number,
-              maxLength: 6,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              suffixIcon: IconButton(
-                icon: Icon(_obscurePwd ? Icons.visibility_off : Icons.visibility),
-                onPressed: () => setState(() => _obscurePwd = !_obscurePwd),
-              ),
-            ),
-            SizedBox(height: AppResponsive.mediumSpacing(context)),
-            AppTextField(
-              controller: _pwdConfirmController,
-              label: 'Confirm Backup Password',
-              icon: Icons.lock_outline_rounded,
-              obscureText: _obscurePwd,
-              keyboardType: TextInputType.number,
-              maxLength: 6,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            ),
-            SizedBox(height: AppResponsive.smallSpacing(context)),
-            Row(
-              children: [
-                Icon(Icons.info_outline_rounded,
-                    size: 16, color: Colors.orange.shade700),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    'Backups cannot be recovered without this password. Keep it safe.',
-                    style: GoogleFonts.poppins(
-                        fontSize: 11.5, color: Colors.orange.shade800),
+                  // ── Admin login PIN — same mechanism for both modes ──
+                  _sectionLabel(
+                    context,
+                    'Admin Login PIN',
+                    Icons.admin_panel_settings_rounded,
                   ),
-                ),
-              ],
-            ),
+                  SizedBox(height: AppResponsive.smallSpacing(context)),
+                  AppTextField(
+                    controller: _pinController,
+                    autofocus: true,
+                    focusNode: _pinFocusNode,
+                    label: 'Admin PIN (4–6 digits)',
+                    hint: 'Used to log in as admin',
+                    icon: Icons.pin_rounded,
+                    obscureText: _obscurePin,
+                    keyboardType: TextInputType.number,
+                    maxLength: 6,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    textInputAction: TextInputAction.next,
+                    onFieldSubmitted: (_) => FocusScope.of(
+                      context,
+                    ).requestFocus(_pinConfirmFocusNode),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePin ? Icons.visibility_off : Icons.visibility,
+                      ),
+                      onPressed: () =>
+                          setState(() => _obscurePin = !_obscurePin),
+                    ),
+                  ),
+                  SizedBox(height: AppResponsive.mediumSpacing(context)),
+                  AppTextField(
+                    controller: _pinConfirmController,
+                    focusNode: _pinConfirmFocusNode,
+                    label: 'Confirm Admin PIN',
+                    icon: Icons.pin_rounded,
+                    obscureText: _obscurePin,
+                    keyboardType: TextInputType.number,
+                    maxLength: 6,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    textInputAction: PlanEnforce.allows(EntKeys.settings)
+                        ? TextInputAction.next
+                        : TextInputAction.done,
+                    onFieldSubmitted: (_) {
+                      if (PlanEnforce.allows(EntKeys.settings)) {
+                        FocusScope.of(context).requestFocus(_pwdFocusNode);
+                      } else {
+                        _onContinue();
+                      }
+                    },
+                  ),
 
-            if (_error != null) ...[
-              SizedBox(height: AppResponsive.mediumSpacing(context)),
-              Text(_error!,
-                  style: GoogleFonts.poppins(color: Colors.red, fontSize: 12.5)),
-            ],
+                  // Backup Password section — only when the plan includes backups.
+                  if (PlanEnforce.allows(EntKeys.settings)) ...[
+                    SizedBox(height: AppResponsive.largeSpacing(context)),
 
+                    // ── Backup password ──
+                    _sectionLabel(
+                      context,
+                      'Backup Password',
+                      Icons.lock_rounded,
+                    ),
+                    SizedBox(height: AppResponsive.smallSpacing(context)),
+                    AppTextField(
+                      controller: _pwdController,
+                      focusNode: _pwdFocusNode,
+                      label: 'Backup Password (6 digits)',
+                      hint: 'Used to encrypt your backups',
+                      icon: Icons.lock_outline_rounded,
+                      obscureText: _obscurePwd,
+                      keyboardType: TextInputType.number,
+                      maxLength: 6,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      textInputAction: TextInputAction.next,
+                      onFieldSubmitted: (_) => FocusScope.of(
+                        context,
+                      ).requestFocus(_pwdConfirmFocusNode),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscurePwd ? Icons.visibility_off : Icons.visibility,
+                        ),
+                        onPressed: () =>
+                            setState(() => _obscurePwd = !_obscurePwd),
+                      ),
+                    ),
+                    SizedBox(height: AppResponsive.mediumSpacing(context)),
+                    AppTextField(
+                      controller: _pwdConfirmController,
+                      focusNode: _pwdConfirmFocusNode,
+                      label: 'Confirm Backup Password',
+                      icon: Icons.lock_outline_rounded,
+                      obscureText: _obscurePwd,
+                      keyboardType: TextInputType.number,
+                      maxLength: 6,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      textInputAction: TextInputAction.done,
+                      onFieldSubmitted: (_) => _onContinue(),
+                    ),
+                    SizedBox(height: AppResponsive.smallSpacing(context)),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline_rounded,
+                          size: AppResponsive.smallIconSize(context),
+                          color: Colors.orange.shade700,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Backups cannot be recovered without this password. Keep it safe.',
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.captionFontSize(context),
+                              color: Colors.orange.shade800,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
           ),
+          if (_error != null)
+            Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: AppResponsive.largeSpacing(context),
+                vertical: AppResponsive.smallSpacing(context),
+              ),
+              child: Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppResponsive.largeSpacing(context),
+                  vertical: AppResponsive.mediumSpacing(context),
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.danger.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: AppColors.danger.withValues(alpha: 0.25),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.error_outline_rounded,
+                      size: AppResponsive.iconSize(context),
+                      color: AppColors.danger,
+                    ),
+                    SizedBox(width: AppResponsive.mediumSpacing(context)),
+                    Expanded(
+                      child: Text(
+                        _error!,
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.smallFontSize(context),
+                          color: AppColors.danger,
+                          fontWeight: FontWeight.w500,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           // Pinned footer — Back / Continue stay at the bottom like other steps.
           Container(
             padding: EdgeInsets.fromLTRB(
-                AppResponsive.largeSpacing(context),
-                12,
-                AppResponsive.largeSpacing(context),
-                AppResponsive.largeSpacing(context)),
+              AppResponsive.largeSpacing(context),
+              12,
+              AppResponsive.largeSpacing(context),
+              AppResponsive.largeSpacing(context),
+            ),
             decoration: BoxDecoration(
               color: Colors.white,
               border: Border(
-                top: BorderSide(color: AppColors.divider.withValues(alpha: 0.6)),
+                top: BorderSide(
+                  color: AppColors.divider.withValues(alpha: 0.6),
+                ),
               ),
             ),
             child: _buildNavButtons(context),
@@ -237,7 +339,11 @@ class _SecuritySetupStepState extends State<SecuritySetupStep> {
   Widget _sectionLabel(BuildContext context, String text, IconData icon) {
     return Row(
       children: [
-        Icon(icon, size: AppResponsive.smallIconSize(context), color: AppColors.primary),
+        Icon(
+          icon,
+          size: AppResponsive.smallIconSize(context),
+          color: AppColors.primary,
+        ),
         SizedBox(width: AppResponsive.smallSpacing(context)),
         Text(
           text,
@@ -258,14 +364,21 @@ class _SecuritySetupStepState extends State<SecuritySetupStep> {
         Text(
           'Security',
           style: GoogleFonts.poppins(
-            fontSize: AppResponsive.getValue<double>(context, mobile: 20, tablet: 24, desktop: 28),
+            fontSize: AppResponsive.getValue<double>(
+              context,
+              mobile: 20,
+              tablet: 24,
+              desktop: 28,
+            ),
             fontWeight: FontWeight.w700,
             color: AppColors.textPrimary,
           ),
         ),
         const SizedBox(height: 4),
         Text(
-          'Set an admin login PIN and a password that encrypts your backups.',
+          PlanEnforce.allows(EntKeys.settings)
+              ? 'Set an admin login PIN and a password that encrypts your backups.'
+              : 'Set an admin login PIN for this device.',
           style: GoogleFonts.poppins(
             fontSize: AppResponsive.smallFontSize(context),
             color: AppColors.textSecondary,
@@ -282,18 +395,33 @@ class _SecuritySetupStepState extends State<SecuritySetupStep> {
         Expanded(
           child: OutlinedButton.icon(
             onPressed: _saving ? null : widget.onPrevious,
-            icon: Icon(Icons.arrow_back, size: AppResponsive.smallIconSize(context)),
-            label: Text('Back',
-                style: GoogleFonts.poppins(
-                    fontSize: AppResponsive.bodyFontSize(context),
-                    fontWeight: FontWeight.w600)),
+            icon: Icon(
+              Icons.arrow_back,
+              size: AppResponsive.smallIconSize(context),
+            ),
+            label: Text(
+              'Back',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.textSecondary,
               side: const BorderSide(color: AppColors.divider),
               padding: EdgeInsets.symmetric(
-                  vertical: AppResponsive.getValue<double>(context, mobile: 14, tablet: 16, desktop: 16)),
+                vertical: AppResponsive.getValue<double>(
+                  context,
+                  mobile: 14,
+                  tablet: 16,
+                  desktop: 16,
+                ),
+              ),
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context))),
+                borderRadius: BorderRadius.circular(
+                  AppResponsive.borderRadius(context),
+                ),
+              ),
             ),
           ),
         ),
@@ -306,20 +434,39 @@ class _SecuritySetupStepState extends State<SecuritySetupStep> {
                 ? const SizedBox(
                     width: 16,
                     height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : Icon(Icons.arrow_forward,
-                    size: AppResponsive.smallIconSize(context), color: AppColors.white),
-            label: Text('Continue',
-                style: GoogleFonts.poppins(
-                    fontSize: AppResponsive.bodyFontSize(context),
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white)),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : Icon(
+                    Icons.arrow_forward,
+                    size: AppResponsive.smallIconSize(context),
+                    color: AppColors.white,
+                  ),
+            label: Text(
+              'Continue',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               padding: EdgeInsets.symmetric(
-                  vertical: AppResponsive.getValue<double>(context, mobile: 14, tablet: 16, desktop: 16)),
+                vertical: AppResponsive.getValue<double>(
+                  context,
+                  mobile: 14,
+                  tablet: 16,
+                  desktop: 16,
+                ),
+              ),
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context))),
+                borderRadius: BorderRadius.circular(
+                  AppResponsive.borderRadius(context),
+                ),
+              ),
               elevation: 0,
             ),
           ),

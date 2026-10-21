@@ -19,9 +19,20 @@ class BusinessTypeStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isWide = AppResponsive.isTablet(context) || AppResponsive.isDesktop(context);
-    final hPad = AppResponsive.getValue<double>(context, mobile: 20, tablet: 40, desktop: 56);
-    final vPad = AppResponsive.getValue<double>(context, mobile: 20, tablet: 28, desktop: 32);
+    final isWide =
+        AppResponsive.isTablet(context) || AppResponsive.isDesktop(context);
+    final hPad = AppResponsive.getValue<double>(
+      context,
+      mobile: 20,
+      tablet: 40,
+      desktop: 56,
+    );
+    final vPad = AppResponsive.getValue<double>(
+      context,
+      mobile: 20,
+      tablet: 28,
+      desktop: 32,
+    );
 
     return Column(
       children: [
@@ -62,7 +73,9 @@ class BusinessTypeStep extends StatelessWidget {
     return Center(
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxWidth: AppResponsive.getValue<double>(context, mobile: 600, tablet: 700, desktop: 820),
+          // Same cap the wizard applies (600 / 800) rather than a second,
+          // wider ladder of its own.
+          maxWidth: AppResponsive.maxFormWidth(context),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -91,9 +104,19 @@ class BusinessTypeStep extends StatelessWidget {
           'What kind of business are you running?',
           style: GoogleFonts.poppins(
             fontSize: compact
-                ? AppResponsive.getValue<double>(context, mobile: 22, tablet: 26, desktop: 28)
-                : AppResponsive.getValue<double>(context, mobile: 24, tablet: 28, desktop: 32),
-            fontWeight: FontWeight.w800,
+                ? AppResponsive.getValue<double>(
+                    context,
+                    mobile: 22,
+                    tablet: 26,
+                    desktop: 28,
+                  )
+                : AppResponsive.getValue<double>(
+                    context,
+                    mobile: 24,
+                    tablet: 28,
+                    desktop: 32,
+                  ),
+            fontWeight: FontWeight.w700,
             color: AppColors.textPrimary,
             height: 1.25,
           ),
@@ -108,7 +131,12 @@ class BusinessTypeStep extends StatelessWidget {
     return Text(
       'Pick one — Bill Berry Lite will adapt its layout, workflows, and features for you.',
       style: GoogleFonts.poppins(
-        fontSize: AppResponsive.getValue<double>(context, mobile: 13, tablet: 14, desktop: 15),
+        fontSize: AppResponsive.getValue<double>(
+          context,
+          mobile: 13,
+          tablet: 14,
+          desktop: 15,
+        ),
         color: AppColors.textSecondary,
         height: 1.5,
       ),
@@ -119,24 +147,39 @@ class BusinessTypeStep extends StatelessWidget {
 
   Widget _buildCards(BuildContext context) {
     final types = store.businessTypes;
-    final gap = AppResponsive.getValue<double>(context, mobile: 12, tablet: 16, desktop: 16);
+    final gap = AppResponsive.getValue<double>(
+      context,
+      mobile: 12,
+      tablet: 16,
+      desktop: 16,
+    );
 
     return Column(
       children: [
         for (int i = 0; i < types.length; i++) ...[
           if (i > 0) SizedBox(height: gap),
-          Observer(builder: (_) {
-            final isSelected = store.selectedBusinessTypeId == types[i]['id'];
-            return _BusinessTypeCard(
-              type: types[i],
-              isSelected: isSelected,
-              onTap: () => store.selectBusinessType(types[i]['id']!, types[i]['name']!),
-            );
-          }),
+          Observer(
+            builder: (_) {
+              final isSelected = store.selectedBusinessTypeId == types[i]['id'];
+              return _BusinessTypeCard(
+                type: types[i],
+                isSelected: isSelected,
+                onTap: () => store.selectBusinessType(
+                  types[i]['id']!,
+                  types[i]['name']!,
+                ),
+              );
+            },
+          ),
         ],
       ],
     );
   }
+
+  // The retail store type ("What do you sell?") is asked on the NEXT step,
+  // Store Details — see `RetailStoreTypeField`. It lives with the rest of the
+  // store's identity, and Store Details is where `saveBusinessDetails()` already
+  // persists it.
 
   // ── Info banner ───────────────────────────────────────────────────────────────
 
@@ -144,20 +187,25 @@ class BusinessTypeStep extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
       decoration: BoxDecoration(
-        color: Colors.amber.withValues(alpha: 0.08),
+        color: AppColors.warning.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
-          Icon(Icons.lock_outline, size: 15, color: Colors.amber.shade700),
+          Icon(Icons.lock_outline, size: 15, color: AppColors.warning),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               'You cannot change your business type after setup.',
               style: GoogleFonts.poppins(
-                fontSize: AppResponsive.getValue<double>(context, mobile: 12, tablet: 13, desktop: 13),
-                color: Colors.amber.shade800,
+                fontSize: AppResponsive.getValue<double>(
+                  context,
+                  mobile: 12,
+                  tablet: 13,
+                  desktop: 13,
+                ),
+                color: AppColors.warning,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -174,7 +222,9 @@ class BusinessTypeStep extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(hPad, 12, hPad, vPad),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border(top: BorderSide(color: AppColors.divider.withValues(alpha: 0.6))),
+        border: Border(
+          top: BorderSide(color: AppColors.divider.withValues(alpha: 0.6)),
+        ),
       ),
       child: Observer(
         builder: (_) => Row(
@@ -184,19 +234,29 @@ class BusinessTypeStep extends StatelessWidget {
               child: OutlinedButton.icon(
                 onPressed: onPrevious,
                 icon: const Icon(Icons.arrow_back, size: 15),
-                label: Text('Back',
-                    style: GoogleFonts.poppins(
-                        fontSize: AppResponsive.bodyFontSize(context),
-                        fontWeight: FontWeight.w600)),
+                label: Text(
+                  'Back',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.bodyFontSize(context),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.textSecondary,
                   side: const BorderSide(color: AppColors.divider),
                   padding: EdgeInsets.symmetric(
-                      vertical: AppResponsive.getValue<double>(
-                          context, mobile: 14, tablet: 16, desktop: 16)),
+                    vertical: AppResponsive.getValue<double>(
+                      context,
+                      mobile: 14,
+                      tablet: 16,
+                      desktop: 16,
+                    ),
+                  ),
                   shape: RoundedRectangleBorder(
-                      borderRadius:
-                          BorderRadius.circular(AppResponsive.borderRadius(context))),
+                    borderRadius: BorderRadius.circular(
+                      AppResponsive.borderRadius(context),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -211,26 +271,41 @@ class BusinessTypeStep extends StatelessWidget {
                     : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
-                  disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.35),
+                  disabledBackgroundColor: AppColors.primary.withValues(
+                    alpha: 0.35,
+                  ),
                   padding: EdgeInsets.symmetric(
-                      vertical: AppResponsive.getValue<double>(
-                          context, mobile: 14, tablet: 16, desktop: 16)),
+                    vertical: AppResponsive.getValue<double>(
+                      context,
+                      mobile: 14,
+                      tablet: 16,
+                      desktop: 16,
+                    ),
+                  ),
                   shape: RoundedRectangleBorder(
-                      borderRadius:
-                          BorderRadius.circular(AppResponsive.borderRadius(context))),
+                    borderRadius: BorderRadius.circular(
+                      AppResponsive.borderRadius(context),
+                    ),
+                  ),
                   elevation: 0,
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text('Continue',
-                        style: GoogleFonts.poppins(
-                          fontSize: AppResponsive.bodyFontSize(context),
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        )),
+                    Text(
+                      'Continue',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.bodyFontSize(context),
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
                     const SizedBox(width: 6),
-                    const Icon(Icons.arrow_forward, size: 15, color: Colors.white),
+                    const Icon(
+                      Icons.arrow_forward,
+                      size: 15,
+                      color: Colors.white,
+                    ),
                   ],
                 ),
               ),
@@ -269,7 +344,7 @@ class _BusinessTypeCard extends StatelessWidget {
   Color get _accentColor {
     switch (type['id']) {
       case 'restaurant':
-        return const Color(0xFFEF6C00);
+        return AppColors.orange;
       default:
         return AppColors.primary;
     }
@@ -278,8 +353,18 @@ class _BusinessTypeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final accent = _accentColor;
-    final iconSize = AppResponsive.getValue<double>(context, mobile: 28, tablet: 34, desktop: 38);
-    final pad = AppResponsive.getValue<double>(context, mobile: 16, tablet: 20, desktop: 24);
+    final iconSize = AppResponsive.getValue<double>(
+      context,
+      mobile: 28,
+      tablet: 34,
+      desktop: 38,
+    );
+    final pad = AppResponsive.getValue<double>(
+      context,
+      mobile: 16,
+      tablet: 20,
+      desktop: 24,
+    );
 
     return GestureDetector(
       onTap: onTap,
@@ -295,8 +380,20 @@ class _BusinessTypeCard extends StatelessWidget {
             width: 2,
           ),
           boxShadow: isSelected
-              ? [BoxShadow(color: accent.withValues(alpha: 0.15), blurRadius: 18, offset: const Offset(0, 5))]
-              : [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2))],
+              ? [
+                  BoxShadow(
+                    color: accent.withValues(alpha: 0.15),
+                    blurRadius: 18,
+                    offset: const Offset(0, 5),
+                  ),
+                ]
+              : [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -316,9 +413,11 @@ class _BusinessTypeCard extends StatelessWidget {
                 color: isSelected ? null : AppColors.surfaceLight,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(_icon(),
-                  size: iconSize,
-                  color: isSelected ? Colors.white : AppColors.textSecondary),
+              child: Icon(
+                _icon(),
+                size: iconSize,
+                color: isSelected ? Colors.white : AppColors.textSecondary,
+              ),
             ),
 
             const SizedBox(width: 14),
@@ -337,7 +436,11 @@ class _BusinessTypeCard extends StatelessWidget {
                           type['name'] ?? '',
                           style: GoogleFonts.poppins(
                             fontSize: AppResponsive.getValue<double>(
-                                context, mobile: 15, tablet: 17, desktop: 19),
+                              context,
+                              mobile: 15,
+                              tablet: 17,
+                              desktop: 19,
+                            ),
                             fontWeight: FontWeight.w700,
                             color: isSelected ? accent : AppColors.textPrimary,
                           ),
@@ -357,7 +460,11 @@ class _BusinessTypeCard extends StatelessWidget {
                           ),
                         ),
                         child: isSelected
-                            ? const Icon(Icons.check, size: 13, color: Colors.white)
+                            ? const Icon(
+                                Icons.check,
+                                size: 13,
+                                color: Colors.white,
+                              )
                             : null,
                       ),
                     ],
@@ -369,7 +476,11 @@ class _BusinessTypeCard extends StatelessWidget {
                     type['description'] ?? '',
                     style: GoogleFonts.poppins(
                       fontSize: AppResponsive.getValue<double>(
-                          context, mobile: 12, tablet: 13, desktop: 14),
+                        context,
+                        mobile: 12,
+                        tablet: 13,
+                        desktop: 14,
+                      ),
                       color: AppColors.textSecondary,
                       height: 1.45,
                     ),
@@ -382,5 +493,4 @@ class _BusinessTypeCard extends StatelessWidget {
       ),
     );
   }
-
 }

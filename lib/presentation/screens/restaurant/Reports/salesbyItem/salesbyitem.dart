@@ -1,19 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/util/restaurant/order_status_filter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../../../widget/componets/common/report_summary_card.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/domain/services/common/report_export_service.dart';
-import 'package:billberrylite/data/models/restaurant/db/pastordermodel_313.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
-import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
-
-enum ItemPeriod { Today, ThisWeek, ThisMonth, ThisYear, Custom }
+import 'package:billberrylite/presentation/widget/componets/common/report_app_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_body.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_card.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_date_range_card.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_empty_state.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_export_button.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_pagination.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_period.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_period_filter_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_summary_row.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_table.dart';
+import 'package:billberrylite/util/restaurant/report_history_window.dart';
 
 class Salesbyitem extends StatefulWidget {
   const Salesbyitem({super.key});
@@ -23,121 +32,34 @@ class Salesbyitem extends StatefulWidget {
 }
 
 class _SalesbyitemState extends State<Salesbyitem> {
-  ItemPeriod _selectedPeriod = ItemPeriod.Today;
+  ReportPeriod _selectedPeriod = ReportPeriod.today;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      appBar: buildPrimaryAppBar(
-        titleWidget: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Sales By Items',
-              style: GoogleFonts.poppins(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-              ),
-            ),
-            Text(
-              'Item-wise sales breakdown',
-              style: GoogleFonts.poppins(
-                fontSize: 12,
-                color: Colors.white70,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: Icon(
-              Icons.inventory_2_rounded,
-              size: AppResponsive.iconSize(context),
-              color: Colors.white,
-            ),
-          ),
-        ],
+      appBar: reportAppBar(
+        title: 'Sales By Items',
+        subtitle: 'Item-wise sales breakdown',
       ),
       body: Column(
         children: [
           AppResponsive.verticalSpace(context, size: SpacingSize.small),
-
-          // Filter Buttons
-          Container(
-            color: AppColors.white,
-            padding: AppResponsive.horizontalPadding(context).copyWith(top: 12, bottom: 12),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _filterButton(ItemPeriod.Today, 'Today', Icons.today),
-                  AppResponsive.horizontalSpace(context, size: SpacingSize.small),
-                  _filterButton(ItemPeriod.ThisWeek, 'This Week', Icons.view_week),
-                  AppResponsive.horizontalSpace(context, size: SpacingSize.small),
-                  _filterButton(ItemPeriod.ThisMonth, 'This Month', Icons.calendar_month),
-                  AppResponsive.horizontalSpace(context, size: SpacingSize.small),
-                  _filterButton(ItemPeriod.ThisYear, 'This Year', Icons.calendar_today),
-                  AppResponsive.horizontalSpace(context, size: SpacingSize.small),
-                  _filterButton(ItemPeriod.Custom, 'Custom', Icons.date_range),
-                ],
-              ),
-            ),
+          ReportPeriodFilterBar(
+            selected: _selectedPeriod,
+            onSelected: (p) => setState(() => _selectedPeriod = p),
+            featureNoun: 'item sales',
           ),
-
           AppResponsive.verticalSpace(context, size: SpacingSize.small),
-
-          Expanded(
-            child: ItemsDataView(
-              period: _selectedPeriod,
-            ),
-          ),
+          Expanded(child: ItemsDataView(period: _selectedPeriod)),
         ],
-      ),
-    );
-  }
-
-  Widget _filterButton(ItemPeriod period, String title, IconData icon) {
-    bool isSelected = _selectedPeriod == period;
-    return ElevatedButton.icon(
-      onPressed: () {
-        setState(() {
-          _selectedPeriod = period;
-        });
-      },
-      icon: Icon(icon, size: AppResponsive.smallIconSize(context)),
-      label: Text(
-        title,
-        style: GoogleFonts.poppins(
-          fontSize: AppResponsive.smallFontSize(context),
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-      style: ElevatedButton.styleFrom(
-        padding: EdgeInsets.symmetric(
-          horizontal: AppResponsive.getValue(context, mobile: 16.0, tablet: 20.0),
-          vertical: AppResponsive.getValue(context, mobile: 12.0, tablet: 14.0),
-        ),
-        backgroundColor: isSelected ? AppColors.primary : AppColors.white,
-        foregroundColor: isSelected ? AppColors.white : AppColors.textPrimary,
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-          side: BorderSide(
-            color: isSelected ? AppColors.primary : AppColors.divider,
-            width: 1,
-          ),
-        ),
       ),
     );
   }
 }
 
 class ItemsDataView extends StatefulWidget {
-  final ItemPeriod period;
+  final ReportPeriod period;
   const ItemsDataView({super.key, required this.period});
 
   @override
@@ -200,7 +122,7 @@ class _ItemsDataViewState extends State<ItemsDataView> {
   /// Single-pass: date filter + status exclusion + item aggregation in one loop.
   void _generateReport() {
     final now = DateTime.now();
-    final isCustom = widget.period == ItemPeriod.Custom;
+    final isCustom = widget.period == ReportPeriod.custom;
     final hasCustomRange = isCustom && _startDate != null && _endDate != null;
 
     // Pre-compute date boundaries once
@@ -208,38 +130,22 @@ class _ItemsDataViewState extends State<ItemsDataView> {
     late final DateTime endBound;
 
     if (!isCustom) {
-      switch (widget.period) {
-        case ItemPeriod.Today:
-          startBound = DateTime(now.year, now.month, now.day);
-          endBound = startBound.add(const Duration(days: 1));
-          break;
-        case ItemPeriod.ThisWeek:
-          final dayOfWeek = now.subtract(Duration(days: now.weekday - 1));
-          startBound = DateTime(dayOfWeek.year, dayOfWeek.month, dayOfWeek.day);
-          endBound = startBound.add(const Duration(days: 7));
-          break;
-        case ItemPeriod.ThisMonth:
-          startBound = DateTime(now.year, now.month);
-          endBound = DateTime(now.year, now.month + 1);
-          break;
-        case ItemPeriod.ThisYear:
-          startBound = DateTime(now.year);
-          endBound = DateTime(now.year + 1);
-          break;
-        case ItemPeriod.Custom:
-          break;
-      }
+      // Same helper the filter's history lock uses - they cannot disagree.
+      startBound = reportPeriodStartBound(widget.period, now);
+      endBound = reportPeriodEndBound(widget.period, now);
     } else if (hasCustomRange) {
       startBound = _startDate!;
       endBound = _endDate!.add(const Duration(days: 1));
     }
 
+    final cutoff = ReportHistoryWindow.cutoff;
     final Map<String, ItemReportData> itemSummary = {};
 
     // Single pass over all orders: date + status filter + item aggregation
     for (final order in pastOrderStore.pastOrders) {
       final orderDate = order.orderAt;
       if (orderDate == null) continue;
+      if (cutoff != null && orderDate.isBefore(cutoff)) continue;
       if (isCustom && !hasCustomRange) continue;
 
       if (orderDate.isBefore(startBound) || !orderDate.isBefore(endBound)) {
@@ -248,7 +154,7 @@ class _ItemsDataViewState extends State<ItemsDataView> {
 
       // Skip voided and fully refunded orders
       final status = order.orderStatus ?? '';
-      if (status == 'FULLY_REFUNDED' || status == 'VOIDED' || status == 'VOID') continue;
+      if (OrderStatusFilter.isExcludedFromRevenue(status)) continue;
 
       final isTaxInclusive = order.isTaxInclusive ?? false;
 
@@ -259,27 +165,23 @@ class _ItemsDataViewState extends State<ItemsDataView> {
           ? (order.totalPrice - order.refundAmount!) / order.totalPrice
           : 1.0;
 
-      // Pre-discount gross total — weights for bill-level discount distribution.
-      final orderGrossTotal = order.items.fold(0.0, (s, i) => s + i.price * i.quantity);
-      final orderDiscount = order.Discount ?? 0.0;
+      // Pre-refund gross total of all effective items in this order
+      final orderGrossTotal = order.items.fold(0.0, (s, i) {
+        final effectiveQty = i.quantity - (i.refundedQuantity ?? 0);
+        return s + (i.price * (effectiveQty > 0 ? effectiveQty : 0));
+      });
+      final netAmount = order.totalPrice - (order.refundAmount ?? 0.0);
+      final scaleFactor = orderGrossTotal > 0 ? netAmount / orderGrossTotal : 1.0;
 
       for (final cartItem in order.items) {
         // Use effectiveQuantity so refunded units don't contribute revenue.
         final effectiveQuantity = cartItem.quantity - (cartItem.refundedQuantity ?? 0);
         if (effectiveQuantity <= 0) continue;
 
-        // Base revenue = finalItemPrice (already has per-item discount) × effectiveQuantity.
-        final unitPrice = cartItem.finalItemPrice;
-        // Proportional share of the bill-level discount for this item's effective quantity.
-        final itemBillDiscount = orderGrossTotal > 0 && orderDiscount > 0
-            ? orderDiscount * (cartItem.price * effectiveQuantity) / orderGrossTotal
-            : 0.0;
-        final discountedRevenue = (unitPrice * effectiveQuantity) - itemBillDiscount;
-
-        // Add tax on the discounted base (exclusive) or already included (inclusive).
-        final taxRevenue = isTaxInclusive ? 0.0 : discountedRevenue * (cartItem.taxRate ?? 0.0);
-
-        final effectiveRevenue = (discountedRevenue + taxRevenue) * orderRefundRatio;
+        // Base gross price for the remaining quantity of this item
+        final itemGross = cartItem.price * effectiveQuantity;
+        // Scale to capture taxes, discounts, and order-level refunds proportionally
+        final effectiveRevenue = itemGross * scaleFactor;
 
         // Include variantName in the key so variants appear as separate rows.
         final itemKey = (cartItem.variantName != null && cartItem.variantName!.isNotEmpty)
@@ -299,8 +201,10 @@ class _ItemsDataViewState extends State<ItemsDataView> {
       }
     }
 
-    final reportData = itemSummary.values.toList()
+    final sorted = itemSummary.values.toList()
       ..sort((a, b) => b.totalRevenue.compareTo(a.totalRevenue));
+
+    final reportData = sorted;
 
     // Compute summary totals once here, not per build
     int totalQty = 0;
@@ -366,61 +270,18 @@ class _ItemsDataViewState extends State<ItemsDataView> {
   }
 
   String _getPeriodDisplayName() {
-    switch (widget.period) {
-      case ItemPeriod.Today:
-        return 'Today';
-      case ItemPeriod.ThisWeek:
-        return 'This Week';
-      case ItemPeriod.ThisMonth:
-        return 'This Month';
-      case ItemPeriod.ThisYear:
-        return 'This Year';
-      case ItemPeriod.Custom:
-        if (_startDate != null && _endDate != null) {
-          return '${DateFormat('dd MMM yyyy').format(_startDate!)} - ${DateFormat('dd MMM yyyy').format(_endDate!)}';
-        }
-        return 'Custom Period';
+    if (widget.period != ReportPeriod.custom) return widget.period.label;
+    if (_startDate != null && _endDate != null) {
+      return '${DateFormat('dd MMM yyyy').format(_startDate!)} - ${DateFormat('dd MMM yyyy').format(_endDate!)}';
     }
-  }
-
-  Future<void> _selectDate(BuildContext context, bool isStartDate) {
-    return showDatePicker(
-      context: context,
-      initialDate: (isStartDate ? _startDate : _endDate) ?? DateTime.now(),
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
-              primary: AppColors.primary,
-              onPrimary: AppColors.white,
-              surface: AppColors.white,
-            ),
-          ),
-          child: child!,
-        );
-      },
-    ).then((picked) {
-      if (picked != null) {
-        setState(() {
-          if (isStartDate) {
-            _startDate = picked;
-          } else {
-            _endDate = picked;
-          }
-        });
-      }
-    });
+    return 'Custom Period';
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return Center(child: CircularProgressIndicator(color: AppColors.primary));
-    }
+    if (_isLoading) return const ReportLoading();
 
-    if (widget.period == ItemPeriod.Custom) {
+    if (widget.period == ReportPeriod.custom) {
       return _buildCustomDateSelector();
     }
 
@@ -428,226 +289,46 @@ class _ItemsDataViewState extends State<ItemsDataView> {
   }
 
   Widget _buildCustomDateSelector() {
-    String formatDate(DateTime? date) {
-      if (date == null) return 'Select Date';
-      return DateFormat('dd MMM, yyyy').format(date);
-    }
-
-    return SingleChildScrollView(
-      padding: AppResponsive.padding(context),
-      child: AppResponsive.constrainedContent(
-        context: context,
-        child: Column(
-          children: [
-            Container(
-              padding: AppResponsive.cardPadding(context),
-              decoration: BoxDecoration(
-                color: AppColors.white,
-                borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.03),
-                    blurRadius: 8,
-                    offset: Offset(0, 2),
-                  ),
-                ],
+    return ReportBody(
+      child: Column(
+        children: [
+          ReportDateRangeCard(
+            initialStart: _startDate,
+            initialEnd: _endDate,
+            onApply: (start, end) {
+              setState(() {
+                _startDate = start;
+                _endDate = end;
+              });
+              _loadDataAndFilter();
+            },
+          ),
+          if (_startDate != null && _endDate != null) ...[
+            AppResponsive.verticalSpace(context),
+            if (_reportData.isNotEmpty)
+              _buildReportContent()
+            else
+              const ReportEmptyState(
+                icon: Icons.inventory_2_outlined,
+                title: 'No Items Sold',
+                message: 'No item sales found for the selected date range',
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Select Date Range',
-                    style: GoogleFonts.poppins(
-                      fontSize: AppResponsive.subheadingFontSize(context),
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  AppResponsive.verticalSpace(context),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildDatePickerButton(
-                          'Start Date',
-                          formatDate(_startDate),
-                          () => _selectDate(context, true),
-                        ),
-                      ),
-                      AppResponsive.horizontalSpace(context),
-                      Expanded(
-                        child: _buildDatePickerButton(
-                          'End Date',
-                          formatDate(_endDate),
-                          () => _selectDate(context, false),
-                        ),
-                      ),
-                    ],
-                  ),
-                  AppResponsive.verticalSpace(context),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: (_startDate != null && _endDate != null) ? _generateReport : null,
-                      icon: Icon(Icons.filter_list, size: AppResponsive.smallIconSize(context)),
-                      label: Text(
-                        'Apply Filter',
-                        style: GoogleFonts.poppins(
-                          fontSize: AppResponsive.buttonFontSize(context),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: AppColors.white,
-                        padding: EdgeInsets.symmetric(
-                          vertical: AppResponsive.getValue(context, mobile: 14.0, tablet: 16.0),
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        disabledBackgroundColor: AppColors.divider,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (_startDate != null && _endDate != null) ...[
-              AppResponsive.verticalSpace(context),
-              if (_filteredData.isNotEmpty)
-                _buildReportContent()
-              else
-                Container(
-                  padding: const EdgeInsets.symmetric(vertical: 40),
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: AppColors.white,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Column(
-                    children: [
-                      Icon(Icons.search_off_rounded, size: 48, color: AppColors.textSecondary),
-                      const SizedBox(height: 12),
-                      Text(
-                        'No items found',
-                        style: GoogleFonts.poppins(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'No items sold in the selected date range',
-                        style: GoogleFonts.poppins(
-                          fontSize: 13,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
           ],
-        ),
+        ],
       ),
-    );
-  }
-
-  Widget _buildDatePickerButton(String label, String value, VoidCallback onPressed) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: GoogleFonts.poppins(
-            fontSize: AppResponsive.smallFontSize(context),
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        AppResponsive.verticalSpace(context, size: SpacingSize.small),
-        InkWell(
-          onTap: onPressed,
-          borderRadius: BorderRadius.circular(10),
-          child: Container(
-            padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 12.0, tablet: 14.0)),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceLight,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppColors.divider),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  value,
-                  style: GoogleFonts.poppins(
-                    fontSize: AppResponsive.smallFontSize(context),
-                    color: value == 'Select Date' ? AppColors.textSecondary : AppColors.textPrimary,
-                  ),
-                ),
-                Icon(
-                  Icons.calendar_today,
-                  size: AppResponsive.smallIconSize(context),
-                  color: AppColors.primary,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
     );
   }
 
   Widget _buildReportUI() {
     if (_reportData.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 20.0, tablet: 24.0)),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceMedium,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.inventory_2_outlined,
-                size: AppResponsive.getValue(context, mobile: 56.0, tablet: 64.0),
-                color: AppColors.textSecondary,
-              ),
-            ),
-            AppResponsive.verticalSpace(context, size: SpacingSize.large),
-            Text(
-              'No Items Data',
-              style: GoogleFonts.poppins(
-                fontSize: AppResponsive.headingFontSize(context),
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            AppResponsive.verticalSpace(context, size: SpacingSize.small),
-            Text(
-              'No items sold in this period',
-              style: GoogleFonts.poppins(
-                fontSize: AppResponsive.bodyFontSize(context),
-                color: AppColors.textSecondary,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
+      return const ReportEmptyState(
+        icon: Icons.inventory_2_outlined,
+        title: 'No Items Sold',
+        message: 'No item sales found for this period',
       );
     }
 
-    return SingleChildScrollView(
-      padding: AppResponsive.padding(context),
-      child: AppResponsive.constrainedContent(
-        context: context,
-        child: _buildReportContent(),
-      ),
-    );
+    return ReportBody(child: _buildReportContent());
   }
 
   Widget _buildReportContent() {
@@ -657,46 +338,41 @@ class _ItemsDataViewState extends State<ItemsDataView> {
         AppResponsive.verticalSpace(context),
         _buildSearchBar(),
         AppResponsive.verticalSpace(context),
-        _buildExportButton(),
+        ReportExportButton(onPressed: _exportReport),
         AppResponsive.verticalSpace(context),
         _buildItemsTable(),
-        if (_filteredData.length > _rowsPerPage)
-          _buildPaginationControls(),
+        ReportPagination(
+          currentPage: _currentPage,
+          rowsPerPage: _rowsPerPage,
+          totalCount: _filteredData.length,
+          onPageChanged: (page) => setState(() => _currentPage = page),
+          unit: 'items',
+        ),
       ],
     );
   }
 
   Widget _buildSummaryCards(int totalItems, int totalQuantity, double totalRevenue) {
-    return Row(
-      children: [
-        Expanded(
-          child: ReportSummaryCard(
-            title: 'Total Items',
-            value: totalItems.toString(),
-            icon: Icons.inventory_2,
-            color: Colors.blue,
-          ),
-        ),
-        AppResponsive.horizontalSpace(context),
-        Expanded(
-          child: ReportSummaryCard(
-            title: 'Total Qty',
-            value: totalQuantity.toString(),
-            icon: Icons.shopping_cart,
-            color: Colors.orange,
-          ),
-        ),
-        AppResponsive.horizontalSpace(context),
-        Expanded(
-          child: ReportSummaryCard(
-            title: 'Revenue',
-            value: '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(totalRevenue)}',
-            icon: Icons.currency_rupee,
-            color: Colors.green,
-          ),
-        ),
-      ],
-    );
+    return ReportSummaryRow(cards: [
+      ReportSummaryCard(
+        title: 'Total Items',
+        value: totalItems.toString(),
+        icon: Icons.inventory_2,
+        color: Colors.blue,
+      ),
+      ReportSummaryCard(
+        title: 'Total Qty',
+        value: totalQuantity.toString(),
+        icon: Icons.shopping_cart,
+        color: Colors.orange,
+      ),
+      ReportSummaryCard(
+        title: 'Revenue',
+        value: '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(totalRevenue)}',
+        icon: Icons.currency_rupee,
+        color: Colors.green,
+      ),
+    ]);
   }
 
   Widget _buildSearchBar() {
@@ -718,164 +394,17 @@ class _ItemsDataViewState extends State<ItemsDataView> {
     );
   }
 
-  Widget _buildExportButton() {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton.icon(
-        onPressed: _exportReport,
-        icon: Icon(Icons.file_download_outlined, size: AppResponsive.iconSize(context)),
-        label: Text(
-          'Export Report',
-          style: GoogleFonts.poppins(
-            fontSize: AppResponsive.buttonFontSize(context),
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.green,
-          foregroundColor: AppColors.white,
-          padding: EdgeInsets.symmetric(
-            vertical: AppResponsive.getValue(context, mobile: 14.0, tablet: 16.0, desktop: 18.0),
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPaginationControls() {
-    final totalPages = (_filteredData.length / _rowsPerPage).ceil();
-    final start = _currentPage * _rowsPerPage + 1;
-    final end = ((_currentPage + 1) * _rowsPerPage).clamp(1, _filteredData.length);
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            'Showing $start–$end of ${_filteredData.length} items',
-            style: GoogleFonts.poppins(
-              fontSize: AppResponsive.smallFontSize(context),
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          Row(
-            children: [
-              IconButton(
-                onPressed: _currentPage > 0
-                    ? () => setState(() => _currentPage--)
-                    : null,
-                icon: const Icon(Icons.chevron_left),
-                iconSize: 24,
-                color: AppColors.primary,
-                disabledColor: AppColors.divider,
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  '${_currentPage + 1} / $totalPages',
-                  style: GoogleFonts.poppins(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.primary,
-                  ),
-                ),
-              ),
-              IconButton(
-                onPressed: _currentPage < totalPages - 1
-                    ? () => setState(() => _currentPage++)
-                    : null,
-                icon: const Icon(Icons.chevron_right),
-                iconSize: 24,
-                color: AppColors.primary,
-                disabledColor: AppColors.divider,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildItemsTable() {
-    final screenWidth = AppResponsive.screenWidth(context);
     final cellFontSize = AppResponsive.smallFontSize(context);
-    final headerFontSize = AppResponsive.bodyFontSize(context);
-    final pageData = _filteredData.length <= _rowsPerPage
-        ? _filteredData
-        : _filteredData.skip(_currentPage * _rowsPerPage).take(_rowsPerPage).toList();
+    final pageData = ReportPagination.pageSlice(_filteredData, _currentPage, _rowsPerPage);
 
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
-        border: Border.all(color: AppColors.divider, width: 0.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minWidth: screenWidth - AppResponsive.getValue(context, mobile: 32.0, tablet: 40.0),
-            ),
-            child: DataTable(
-              columnSpacing: AppResponsive.tableColumnSpacing(context),
-              headingRowColor: WidgetStateProperty.all(AppColors.surfaceLight),
-              headingRowHeight: AppResponsive.tableHeadingHeight(context),
-              dataRowMinHeight: AppResponsive.tableRowMinHeight(context),
-              dataRowMaxHeight: AppResponsive.tableRowMaxHeight(context),
-              columns: [
-                DataColumn(
-                  label: Text(
-                    'Item Name',
-                    style: GoogleFonts.poppins(
-                      fontWeight: FontWeight.w600,
-                      fontSize: headerFontSize,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ),
-                DataColumn(
-                  label: Text(
-                    'Quantity',
-                    style: GoogleFonts.poppins(
-                      fontWeight: FontWeight.w600,
-                      fontSize: headerFontSize,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  numeric: true,
-                ),
-                DataColumn(
-                  label: Text(
-                    'Revenue',
-                    style: GoogleFonts.poppins(
-                      fontWeight: FontWeight.w600,
-                      fontSize: headerFontSize,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  numeric: true,
-                ),
-              ],
-              rows: pageData.map((item) {
+    return ReportTable(
+      columns: [
+        ReportTable.column(context, 'Item Name'),
+        ReportTable.column(context, 'Quantity'),
+        ReportTable.column(context, 'Revenue'),
+      ],
+      rows: pageData.map((item) {
                 return DataRow(
                   cells: [
                     DataCell(
@@ -920,11 +449,7 @@ class _ItemsDataViewState extends State<ItemsDataView> {
                     ),
                   ],
                 );
-              }).toList(),
-            ),
-          ),
-        ),
-      ),
+      }).toList(),
     );
   }
 }

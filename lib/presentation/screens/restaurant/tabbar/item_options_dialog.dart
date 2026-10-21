@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 
@@ -9,6 +8,7 @@ import 'package:uuid/uuid.dart';
 import '../../../../constants/restaurant/color.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
+import '../../../../domain/services/restaurant/inventory_service.dart';
 import '../../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../../data/models/restaurant/db/choicemodel_306.dart';
 import '../../../../data/models/restaurant/db/choiceoptionmodel_307.dart';
@@ -22,12 +22,19 @@ import '../../../../domain/store/restaurant/choice_store.dart';
 import '../../../../domain/store/restaurant/extra_store.dart';
 import '../../../../util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
+
 class DisplayVariant {
   final String id;
   final String name;
   final double price;
   final double stockQuantity;
-  DisplayVariant({required this.id, required this.name, required this.price, required this.stockQuantity});
+  DisplayVariant({
+    required this.id,
+    required this.name,
+    required this.price,
+    required this.stockQuantity,
+  });
 }
 
 class ItemOptionsDialog extends StatefulWidget {
@@ -35,7 +42,9 @@ class ItemOptionsDialog extends StatefulWidget {
   final String? categoryName;
   final ScrollController? scrollController;
 
-  const ItemOptionsDialog({super.key, required this.item,
+  const ItemOptionsDialog({
+    super.key,
+    required this.item,
     this.categoryName,
     this.scrollController,
   });
@@ -56,10 +65,11 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
 
   // State for Choices
   List<ChoicesModel> _displayChoiceGroups = [];
-  Set<ChoiceOption> _selectedChoices = {}; // Use a Set to store multiple selected choices
+  Set<ChoiceOption> _selectedChoices =
+      {}; // Use a Set to store multiple selected choices
 
   List<Extramodel> _displayExtra = [];
-  Set<Topping> _selectedExtra ={};
+  Set<Topping> _selectedExtra = {};
 
   // Track quantity of each extra topping
   Map<String, int> _extraQuantities = {}; // toppingId -> quantity
@@ -113,17 +123,20 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
 
     for (ItemVariante itemVariant in widget.item.variant!) {
       // Use store instead of direct Hive access
-      final variantDetails = await _variantStore.getVariantById(itemVariant.variantId);
+      final variantDetails = await _variantStore.getVariantById(
+        itemVariant.variantId,
+      );
 
       if (variantDetails != null) {
-        _displayVariants.add(DisplayVariant(
-          id: variantDetails.id,
-          name: variantDetails.name,
-          price: itemVariant.price,
-          stockQuantity: itemVariant.stockQuantity ?? 0,
-        ));
-      } else {
-      }
+        _displayVariants.add(
+          DisplayVariant(
+            id: variantDetails.id,
+            name: variantDetails.name,
+            price: itemVariant.price,
+            stockQuantity: itemVariant.stockQuantity ?? 0,
+          ),
+        );
+      } else {}
     }
     if (_displayVariants.isNotEmpty) {
       // Select the first variant that has stock, or the first variant if all are out of stock
@@ -156,13 +169,13 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
   }
 
   Future<void> _prepareExtra() async {
-    if(widget.item.extraId == null || widget.item.extraId!.isEmpty) return ;
+    if (widget.item.extraId == null || widget.item.extraId!.isEmpty) return;
 
-    for(String extraId in widget.item.extraId!){
+    for (String extraId in widget.item.extraId!) {
       // Use store instead of direct Hive access
       final extraGroup = await _extraStore.getExtraById(extraId);
 
-      if(extraGroup != null){
+      if (extraGroup != null) {
         _displayExtra.add(extraGroup);
         // Initialize quantities for all toppings in this category
         if (extraGroup.topping != null) {
@@ -170,16 +183,17 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
             _extraQuantities[topping.name] = 0;
           }
         }
-      } else {
-      }
+      } else {}
     }
-
   }
 
   // Helper method to get total count of extras in a category
   int _getExtraCategoryCount(String categoryId) {
     int count = 0;
-    final category = _displayExtra.firstWhere((e) => e.Id == categoryId, orElse: () => Extramodel(Id: '', Ename: 'Unknown'));
+    final category = _displayExtra.firstWhere(
+      (e) => e.Id == categoryId,
+      orElse: () => Extramodel(Id: '', Ename: 'Unknown'),
+    );
     if (category.Ename != 'Unknown' && category.topping != null) {
       for (var topping in category.topping!) {
         count += _extraQuantities[topping.name] ?? 0;
@@ -205,7 +219,6 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
     return unmet;
   }
 
-
   void _recalculateTotal() {
     double price = 0.0;
     // Add price from the selected variant
@@ -223,7 +236,9 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
           if (quantity > 0) {
             double toppingPrice = topping.price;
             // Use variant-specific price if available and variant is selected
-            if (_selectedVariant != null && topping.isContainSize == true && topping.variantPrices != null) {
+            if (_selectedVariant != null &&
+                topping.isContainSize == true &&
+                topping.variantPrices != null) {
               toppingPrice = topping.getPriceForVariant(_selectedVariant!.id);
             }
             price += toppingPrice * quantity;
@@ -244,42 +259,70 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
       showDialog(
         context: context,
         builder: (ctx) => Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          backgroundColor: AppColors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(
+              AppResponsive.largeBorderRadius(context),
+            ),
+          ),
           child: Padding(
-            padding: const EdgeInsets.all(20),
+            padding: EdgeInsets.all(AppResponsive.largeSpacing(context)),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
                   decoration: BoxDecoration(
                     color: Colors.orange.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(Icons.warning_rounded, color: Colors.orange, size: 32),
+                  child: Icon(
+                    Icons.warning_rounded,
+                    color: Colors.orange,
+                    size: AppResponsive.getValue(
+                      context,
+                      mobile: 32.0,
+                      tablet: 36.0,
+                      desktop: 40.0,
+                    ),
+                  ),
                 ),
-                const SizedBox(height: 14),
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
                 Text(
                   'Selection Required',
-                  style: GoogleFonts.poppins(fontSize: 17, fontWeight: FontWeight.w700),
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.subheadingFontSize(context),
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: AppResponsive.smallSpacing(context)),
                 Text(
                   'Please select the required extras:',
-                  style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textSecondary),
-                ),
-                const SizedBox(height: 12),
-                ...unmet.map((name) => Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Row(
-                    children: [
-                      Icon(Icons.circle, size: 6, color: Colors.orange),
-                      const SizedBox(width: 8),
-                      Text(name, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500)),
-                    ],
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.smallFontSize(context),
+                    color: AppColors.textSecondary,
                   ),
-                )),
-                const SizedBox(height: 16),
+                ),
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
+                ...unmet.map(
+                  (name) => Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      children: [
+                        Icon(Icons.circle, size: 6, color: Colors.orange),
+                        SizedBox(width: AppResponsive.smallSpacing(context)),
+                        Text(
+                          name,
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.bodyFontSize(context),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                SizedBox(height: AppResponsive.largeSpacing(context)),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
@@ -288,10 +331,17 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
                       backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
                       elevation: 0,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      padding: EdgeInsets.symmetric(
+                        vertical: AppResponsive.mediumSpacing(context),
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
-                    child: Text('OK', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+                    child: Text(
+                      'OK',
+                      style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+                    ),
                   ),
                 ),
               ],
@@ -304,49 +354,52 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
 
     String finalTitle = widget.item.name;
 
-
     final cartItem = CartItem(
-        productId: widget.item.id,
-        isStockManaged: widget.item.trackInventory,
-        id: const Uuid().v4(),
-        title: finalTitle,
-        price: _totalPrice,
-        quantity: _quantity,
-        categoryName: widget.categoryName,
-        variantName:  _selectedVariant?.name,
-        variantPrice: _selectedVariant?.price,
-        choiceNames: _selectedChoices.map((c) => c.name).toSet().toList(),
-        taxRate: widget.item.taxRate,
-        extras: _selectedExtra.map((e) {
-          // Find the category this extra belongs to
-          String categoryName = '';
-          String categoryId = '';
-          for (var extraGroup in _displayExtra) {
-            if (extraGroup.topping!.contains(e)) {
-              categoryName = extraGroup.Ename;
-              categoryId = extraGroup.Id;
-              break;
-            }
+      productId: widget.item.id,
+      isStockManaged: widget.item.trackInventory,
+      id: const Uuid().v4(),
+      title: finalTitle,
+      price: _totalPrice,
+      quantity: _quantity,
+      categoryName: widget.categoryName,
+      variantName: _selectedVariant?.name,
+      variantPrice: _selectedVariant?.price,
+      choiceNames: _selectedChoices.map((c) => c.name).toSet().toList(),
+      taxRate: widget.item.taxRate,
+      extras: _selectedExtra.map((e) {
+        // Find the category this extra belongs to
+        String categoryName = '';
+        String categoryId = '';
+        for (var extraGroup in _displayExtra) {
+          if (extraGroup.topping!.contains(e)) {
+            categoryName = extraGroup.Ename;
+            categoryId = extraGroup.Id;
+            break;
           }
+        }
 
-          final displayName = categoryName.isNotEmpty ? '$categoryName - ${e.name}' : e.name;
-          final finalPrice = _selectedVariant != null && e.isContainSize == true && e.variantPrices != null
-              ? e.getPriceForVariant(_selectedVariant!.id)
-              : e.price;
+        final displayName = categoryName.isNotEmpty
+            ? '$categoryName - ${e.name}'
+            : e.name;
+        final finalPrice =
+            _selectedVariant != null &&
+                e.isContainSize == true &&
+                e.variantPrices != null
+            ? e.getPriceForVariant(_selectedVariant!.id)
+            : e.price;
 
-          // Get the quantity for this extra
-          final quantity = _extraQuantities[e.name] ?? 1;
+        // Get the quantity for this extra
+        final quantity = _extraQuantities[e.name] ?? 1;
 
-
-          return {
-            'name': e.name,
-            'displayName': displayName,
-            'price': finalPrice,
-            'categoryName': categoryName,
-            'categoryId': categoryId,
-            'quantity': quantity,
-          };
-        }).toList()
+        return {
+          'name': e.name,
+          'displayName': displayName,
+          'price': finalPrice,
+          'categoryName': categoryName,
+          'categoryId': categoryId,
+          'quantity': quantity,
+        };
+      }).toList(),
     );
 
     Navigator.of(context).pop(cartItem);
@@ -361,11 +414,11 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Column(
-        mainAxisSize: MainAxisSize.max,
+        mainAxisSize: MainAxisSize.min,
         children: [
           // Drag handle
           Container(
-            margin: const EdgeInsets.only(top: 12),
+            margin: EdgeInsets.only(top: AppResponsive.mediumSpacing(context)),
             width: 40,
             height: 4,
             decoration: BoxDecoration(
@@ -386,7 +439,7 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
                       Text(
                         widget.item.name,
                         style: GoogleFonts.poppins(
-                          fontSize: 20,
+                          fontSize: AppResponsive.headingFontSize(context),
                           fontWeight: FontWeight.w700,
                           color: AppColors.textPrimary,
                         ),
@@ -396,7 +449,7 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
                         Text(
                           widget.categoryName!,
                           style: GoogleFonts.poppins(
-                            fontSize: 13,
+                            fontSize: AppResponsive.smallFontSize(context),
                             fontWeight: FontWeight.w500,
                             color: AppColors.textSecondary,
                           ),
@@ -408,22 +461,30 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
                 GestureDetector(
                   onTap: () => Navigator.of(context).pop(),
                   child: Container(
-                    padding: EdgeInsets.all(8),
+                    padding: EdgeInsets.all(
+                      AppResponsive.smallSpacing(context),
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.surfaceMedium,
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(
+                        AppResponsive.smallBorderRadius(context),
+                      ),
                     ),
-                    child: Icon(Icons.close, size: 20, color: AppColors.textSecondary),
+                    child: Icon(
+                      Icons.close,
+                      size: AppResponsive.iconSize(context),
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                 ),
               ],
             ),
           ),
 
-          SizedBox(height: 20),
+          SizedBox(height: AppResponsive.largeSpacing(context)),
 
           // Scrollable content
-          Expanded(
+          Flexible(
             child: SingleChildScrollView(
               controller: widget.scrollController,
               padding: EdgeInsets.fromLTRB(20, 0, 20, 20),
@@ -437,151 +498,235 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
                   if (_displayChoiceGroups.isNotEmpty) _buildChoiceSection(),
 
                   // ------Extra Section-----
-                  if(_displayExtra.isNotEmpty) _buildExtraSection(),
+                  if (_displayExtra.isNotEmpty) _buildExtraSection(),
                 ],
               ),
             ),
           ),
 
           // Bottom: Price + Qty + Add to Cart
-          Builder(builder: (_) {
-            // Stock check: determine max quantity allowed
-            final bool trackStock = widget.item.trackInventory;
-            final bool allowOutOfStock = widget.item.allowOrderWhenOutOfStock;
-            double availableStock = 0;
-            if (trackStock) {
-              if (_selectedVariant != null) {
-                availableStock = _selectedVariant!.stockQuantity;
-              } else {
-                availableStock = widget.item.stockQuantity;
+          Builder(
+            builder: (_) {
+              // Stock check: determine max quantity allowed
+              final bool trackStock = InventoryService.isStockGoverned(
+                widget.item,
+              );
+              final bool allowOutOfStock = widget.item.allowOrderWhenOutOfStock;
+              double availableStock = 0;
+              if (trackStock) {
+                if (_selectedVariant != null && !widget.item.isRecipeBased) {
+                  availableStock = _selectedVariant!.stockQuantity;
+                } else {
+                  // Recipe-Based resolves to "how many can be made" from
+                  // ingredients; every other type to its stored stock.
+                  availableStock = InventoryService.effectiveAvailableStock(
+                    widget.item,
+                  );
+                }
               }
-            }
 
-            // Subtract quantity already in cart for this item+variant
-            int alreadyInCart = 0;
-            if (trackStock && !allowOutOfStock) {
-              for (final cartItem in restaurantCartStore.cartItems) {
-                if (cartItem.productId == widget.item.id) {
-                  if (_selectedVariant != null) {
-                    if (cartItem.variantName == _selectedVariant!.name) alreadyInCart += cartItem.quantity;
-                  } else {
-                    alreadyInCart += cartItem.quantity;
+              // Subtract quantity already in cart for this item+variant
+              int alreadyInCart = 0;
+              if (trackStock && !allowOutOfStock) {
+                for (final cartItem in restaurantCartStore.cartItems) {
+                  if (cartItem.productId == widget.item.id) {
+                    if (_selectedVariant != null) {
+                      if (cartItem.variantName == _selectedVariant!.name)
+                        alreadyInCart += cartItem.quantity;
+                    } else {
+                      alreadyInCart += cartItem.quantity;
+                    }
                   }
                 }
               }
-            }
 
-            final bool hasStockLimit = trackStock && !allowOutOfStock;
-            final int maxQty = hasStockLimit ? (availableStock.toInt() - alreadyInCart).clamp(0, 9999) : 9999;
-            final bool canIncrease = _quantity < maxQty;
-            // Live over-stock check against the selected variant's available qty.
-            final bool qtyOverStock = hasStockLimit && _quantity > maxQty;
+              // `availableStock` is infinite for a Recipe-Based item whose
+              // ingredients are all untracked — nothing constrains it, so there
+              // is no ceiling to enforce (and no finite int to clamp against).
+              final bool hasStockLimit =
+                  trackStock && !allowOutOfStock && availableStock.isFinite;
+              final int maxQty = hasStockLimit
+                  ? (availableStock.toInt() - alreadyInCart).clamp(0, 9999)
+                  : 9999;
+              final bool canIncrease = _quantity < maxQty;
+              // Live over-stock check against the selected variant's available qty.
+              final bool qtyOverStock = hasStockLimit && _quantity > maxQty;
 
-            // Keep the editable qty field in sync with _quantity (− / + changes),
-            // but never while the user is mid-edit.
-            if (!_qtyFocus.hasFocus && _qtyController.text != '$_quantity') {
-              _qtyController.text = '$_quantity';
-            }
+              // Keep the editable qty field in sync with _quantity (− / + changes),
+              // but never while the user is mid-edit.
+              if (!_qtyFocus.hasFocus && _qtyController.text != '$_quantity') {
+                _qtyController.text = '$_quantity';
+              }
 
-            return Container(
-              padding: EdgeInsets.fromLTRB(16, 10, 16, 10),
-              decoration: BoxDecoration(
-                color: AppColors.white,
-                border: Border(top: BorderSide(color: Colors.grey.shade200)),
-              ),
-              child: SafeArea(
-                top: false,
-                child: Row(
-                  children: [
-                    // Price
-                    Text(
-                      '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalPrice * _quantity)}',
-                      style: GoogleFonts.poppins(fontSize: 17, fontWeight: FontWeight.w600, color: AppColors.primary),
-                    ),
-                    SizedBox(width: 12),
-                    // Qty controls
-                    Container(
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey.shade300),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          InkWell(
-                            onTap: () { if (_quantity > 1) setState(() => _quantity--); },
-                            child: Padding(padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6), child: Icon(Icons.remove, size: 18, color: Colors.grey.shade700)),
-                          ),
-                          Container(
-                            width: 44,
-                            decoration: BoxDecoration(border: Border.symmetric(vertical: BorderSide(color: Colors.grey.shade300))),
-                            child: TextField(
-                              controller: _qtyController,
-                              focusNode: _qtyFocus,
-                              textAlign: TextAlign.center,
-                              keyboardType: TextInputType.number,
-                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                              style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600),
-                              decoration: const InputDecoration(
-                                isDense: true,
-                                border: InputBorder.none,
-                                contentPadding: EdgeInsets.symmetric(vertical: 8),
-                              ),
-                              // Live: update _quantity per keystroke so the Add
-                              // button disables the instant the qty goes over
-                              // stock (no need to tap away first).
-                              onChanged: (v) {
-                                final n = int.tryParse(v.trim());
-                                if (n == null || n < 1) return;
-                                final bool wasOver = hasStockLimit && _quantity > maxQty;
-                                final bool nowOver = hasStockLimit && n > maxQty;
-                                setState(() => _quantity = n);
-                                if (nowOver && !wasOver) {
-                                  NotificationService.instance.showError('Only $maxQty in stock');
-                                }
-                              },
-                              onSubmitted: (v) {
-                                _commitTypedQty(v, maxQty, hasStockLimit);
-                                _qtyFocus.unfocus();
-                              },
-                              onTapOutside: (_) {
-                                _commitTypedQty(_qtyController.text, maxQty, hasStockLimit);
-                                _qtyFocus.unfocus();
-                              },
-                            ),
-                          ),
-                          InkWell(
-                            onTap: canIncrease
-                                ? () => setState(() => _quantity++)
-                                : () => NotificationService.instance.showError('Only ${maxQty.toInt()} available in stock'),
-                            child: Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                              child: Icon(Icons.add, size: 18, color: canIncrease ? AppColors.primary : Colors.grey.shade400),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    SizedBox(width: 12),
-                    // Add to Cart button
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: ((hasStockLimit && maxQty <= 0) || qtyOverStock) ? null : _confirmAndAddItem,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          padding: EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                        child: Text('Add to Cart', style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w500)),
-                      ),
-                    ),
-                  ],
+              return Container(
+                padding: EdgeInsets.fromLTRB(16, 10, 16, 10),
+                decoration: BoxDecoration(
+                  color: AppColors.white,
+                  border: Border(top: BorderSide(color: Colors.grey.shade200)),
                 ),
-              ),
-            );
-          }),
+                child: SafeArea(
+                  top: false,
+                  child: Row(
+                    children: [
+                      // Price
+                      Text(
+                        '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalPrice * _quantity)}',
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.subheadingFontSize(context),
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      SizedBox(width: AppResponsive.mediumSpacing(context)),
+                      // Qty controls
+                      Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey.shade300),
+                          borderRadius: BorderRadius.circular(
+                            AppResponsive.smallBorderRadius(context),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            InkWell(
+                              onTap: () {
+                                if (_quantity > 1) setState(() => _quantity--);
+                              },
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: AppResponsive.smallSpacing(
+                                    context,
+                                  ),
+                                  vertical: 6,
+                                ),
+                                child: Icon(
+                                  Icons.remove,
+                                  size: AppResponsive.smallIconSize(context),
+                                  color: Colors.grey.shade700,
+                                ),
+                              ),
+                            ),
+                            Container(
+                              width: 44,
+                              decoration: BoxDecoration(
+                                border: Border.symmetric(
+                                  vertical: BorderSide(
+                                    color: Colors.grey.shade300,
+                                  ),
+                                ),
+                              ),
+                              child: TextField(
+                                controller: _qtyController,
+                                focusNode: _qtyFocus,
+                                textAlign: TextAlign.center,
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                ],
+                                style: GoogleFonts.poppins(
+                                  fontSize: AppResponsive.bodyFontSize(context),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                decoration: InputDecoration(
+                                  isDense: true,
+                                  border: InputBorder.none,
+                                  contentPadding: EdgeInsets.symmetric(
+                                    vertical: AppResponsive.smallSpacing(
+                                      context,
+                                    ),
+                                  ),
+                                ),
+                                // Live: update _quantity per keystroke so the Add
+                                // button disables the instant the qty goes over
+                                // stock (no need to tap away first).
+                                onChanged: (v) {
+                                  final n = int.tryParse(v.trim());
+                                  if (n == null || n < 1) return;
+                                  final bool wasOver =
+                                      hasStockLimit && _quantity > maxQty;
+                                  final bool nowOver =
+                                      hasStockLimit && n > maxQty;
+                                  setState(() => _quantity = n);
+                                  if (nowOver && !wasOver) {
+                                    NotificationService.instance.showError(
+                                      'Only $maxQty in stock',
+                                    );
+                                  }
+                                },
+                                onSubmitted: (v) {
+                                  _commitTypedQty(v, maxQty, hasStockLimit);
+                                  _qtyFocus.unfocus();
+                                },
+                                onTapOutside: (_) {
+                                  _commitTypedQty(
+                                    _qtyController.text,
+                                    maxQty,
+                                    hasStockLimit,
+                                  );
+                                  _qtyFocus.unfocus();
+                                },
+                              ),
+                            ),
+                            InkWell(
+                              onTap: canIncrease
+                                  ? () => setState(() => _quantity++)
+                                  : () => NotificationService.instance.showError(
+                                      'Only ${maxQty.toInt()} available in stock',
+                                    ),
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: AppResponsive.smallSpacing(
+                                    context,
+                                  ),
+                                  vertical: 6,
+                                ),
+                                child: Icon(
+                                  Icons.add,
+                                  size: AppResponsive.smallIconSize(context),
+                                  color: canIncrease
+                                      ? AppColors.primary
+                                      : Colors.grey.shade400,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(width: AppResponsive.mediumSpacing(context)),
+                      // Add to Cart button
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed:
+                              ((hasStockLimit && maxQty <= 0) || qtyOverStock)
+                              ? null
+                              : _confirmAndAddItem,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: EdgeInsets.symmetric(
+                              vertical: AppResponsive.mediumSpacing(context),
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          child: Text(
+                            'Add to Cart',
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.bodyFontSize(context),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
         ],
       ),
     );
@@ -592,20 +737,31 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          padding: EdgeInsets.symmetric(
+            horizontal: AppResponsive.mediumSpacing(context),
+            vertical: AppResponsive.smallSpacing(context),
+          ),
           decoration: BoxDecoration(
             color: AppColors.primary.withOpacity(0.06),
-            borderRadius: BorderRadius.circular(8),
-            border: Border(left: BorderSide(color: AppColors.primary, width: 3)),
+            borderRadius: BorderRadius.circular(
+              AppResponsive.smallBorderRadius(context),
+            ),
+            border: Border(
+              left: BorderSide(color: AppColors.primary, width: 3),
+            ),
           ),
           child: Row(
             children: [
-              Icon(Icons.straighten_rounded, size: 16, color: AppColors.primary),
-              SizedBox(width: 10),
+              Icon(
+                Icons.straighten_rounded,
+                size: AppResponsive.smallIconSize(context),
+                color: AppColors.primary,
+              ),
+              SizedBox(width: AppResponsive.smallSpacing(context)),
               Text(
                 'Select Size',
                 style: GoogleFonts.poppins(
-                  fontSize: 15,
+                  fontSize: AppResponsive.bodyFontSize(context),
                   fontWeight: FontWeight.w700,
                   color: AppColors.primary,
                 ),
@@ -613,42 +769,68 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
             ],
           ),
         ),
-        SizedBox(height: 12),
+        SizedBox(height: AppResponsive.mediumSpacing(context)),
         ..._displayVariants.map((variant) {
           final isSelected = _selectedVariant == variant;
-          final isOutOfStock = widget.item.trackInventory && variant.stockQuantity <= 0;
-          final canOrder = !widget.item.trackInventory || widget.item.allowOrderWhenOutOfStock || variant.stockQuantity > 0;
+          final isOutOfStock =
+              widget.item.trackInventory && variant.stockQuantity <= 0;
+          final canOrder =
+              !widget.item.trackInventory ||
+              widget.item.allowOrderWhenOutOfStock ||
+              variant.stockQuantity > 0;
 
           return GestureDetector(
-            onTap: canOrder ? () {
-              setState(() {
-                _selectedVariant = variant;
-                // Clear selected extras that are not available for the new variant
-                _selectedExtra.removeWhere((topping) {
-                  if (topping.isContainSize == true && topping.variantPrices != null) {
-                    return !topping.variantPrices!.containsKey(_selectedVariant?.id);
+            onTap: canOrder
+                ? () {
+                    setState(() {
+                      _selectedVariant = variant;
+                      // Clear selected extras that are not available for the new variant
+                      _selectedExtra.removeWhere((topping) {
+                        if (topping.isContainSize == true &&
+                            topping.variantPrices != null) {
+                          return !topping.variantPrices!.containsKey(
+                            _selectedVariant?.id,
+                          );
+                        }
+                        return false;
+                      });
+                      _recalculateTotal();
+                    });
                   }
-                  return false;
-                });
-                _recalculateTotal();
-              });
-            } : null,
+                : null,
             child: Opacity(
               opacity: canOrder ? 1.0 : 0.5,
               child: Container(
-                margin: EdgeInsets.only(bottom: 8),
-                padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                margin: EdgeInsets.only(
+                  bottom: AppResponsive.smallSpacing(context),
+                ),
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppResponsive.mediumSpacing(context),
+                  vertical: AppResponsive.smallSpacing(context),
+                ),
                 decoration: BoxDecoration(
                   color: isSelected
                       ? AppColors.primary
-                      : (canOrder ? Colors.grey.shade50 : AppColors.surfaceMedium),
-                  borderRadius: BorderRadius.circular(12),
+                      : (canOrder
+                            ? Colors.grey.shade50
+                            : AppColors.surfaceMedium),
+                  borderRadius: BorderRadius.circular(
+                    AppResponsive.borderRadius(context),
+                  ),
                   border: Border.all(
-                    color: isSelected ? AppColors.primary : Colors.grey.shade300,
+                    color: isSelected
+                        ? AppColors.primary
+                        : Colors.grey.shade300,
                     width: isSelected ? 2 : 1.5,
                   ),
                   boxShadow: isSelected
-                      ? [BoxShadow(color: AppColors.primary.withOpacity(0.2), blurRadius: 6, offset: Offset(0, 2))]
+                      ? [
+                          BoxShadow(
+                            color: AppColors.primary.withOpacity(0.2),
+                            blurRadius: 6,
+                            offset: Offset(0, 2),
+                          ),
+                        ]
                       : null,
                 ),
                 child: Row(
@@ -659,10 +841,14 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: isSelected ? AppColors.white : AppColors.divider,
+                          color: isSelected
+                              ? AppColors.white
+                              : AppColors.divider,
                           width: 2,
                         ),
-                        color: isSelected ? AppColors.white : Colors.transparent,
+                        color: isSelected
+                            ? AppColors.white
+                            : Colors.transparent,
                       ),
                       child: isSelected
                           ? Center(
@@ -677,7 +863,7 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
                             )
                           : null,
                     ),
-                    SizedBox(width: 12),
+                    SizedBox(width: AppResponsive.mediumSpacing(context)),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -685,21 +871,29 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
                           Text(
                             variant.name,
                             style: GoogleFonts.poppins(
-                              fontSize: 13.5,
+                              fontSize: AppResponsive.bodyFontSize(context),
                               fontWeight: FontWeight.w500,
-                              color: isSelected ? AppColors.white : AppColors.textPrimary,
+                              color: isSelected
+                                  ? AppColors.white
+                                  : AppColors.textPrimary,
                             ),
                           ),
                           if (widget.item.trackInventory && isOutOfStock) ...[
                             SizedBox(height: 2),
                             Text(
-                              widget.item.allowOrderWhenOutOfStock ? 'Order Available' : 'Out of Stock',
+                              widget.item.allowOrderWhenOutOfStock
+                                  ? 'Order Available'
+                                  : 'Out of Stock',
                               style: GoogleFonts.poppins(
-                                fontSize: 11,
+                                fontSize: AppResponsive.captionFontSize(
+                                  context,
+                                ),
                                 fontWeight: FontWeight.w500,
                                 color: isSelected
-                                  ? AppColors.white.withOpacity(0.8)
-                                  : (widget.item.allowOrderWhenOutOfStock ? AppColors.warning : AppColors.danger),
+                                    ? AppColors.white.withOpacity(0.8)
+                                    : (widget.item.allowOrderWhenOutOfStock
+                                          ? AppColors.warning
+                                          : AppColors.danger),
                               ),
                             ),
                           ] else if (widget.item.trackInventory) ...[
@@ -707,9 +901,13 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
                             Text(
                               '${variant.stockQuantity.toInt()} in stock',
                               style: GoogleFonts.poppins(
-                                fontSize: 11,
+                                fontSize: AppResponsive.captionFontSize(
+                                  context,
+                                ),
                                 fontWeight: FontWeight.w500,
-                                color: isSelected ? AppColors.white.withOpacity(0.8) : AppColors.success,
+                                color: isSelected
+                                    ? AppColors.white.withOpacity(0.8)
+                                    : AppColors.success,
                               ),
                             ),
                           ],
@@ -717,19 +915,26 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
                       ),
                     ),
                     Container(
-                      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: AppResponsive.smallSpacing(context),
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: isSelected
                             ? AppColors.white.withOpacity(0.2)
                             : AppColors.primary.withOpacity(0.08),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(
+                          AppResponsive.smallBorderRadius(context),
+                        ),
                       ),
                       child: Text(
                         '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(variant.price)}',
                         style: GoogleFonts.poppins(
-                          fontSize: 14,
+                          fontSize: AppResponsive.bodyFontSize(context),
                           fontWeight: FontWeight.w700,
-                          color: isSelected ? AppColors.white : AppColors.primary,
+                          color: isSelected
+                              ? AppColors.white
+                              : AppColors.primary,
                         ),
                       ),
                     ),
@@ -739,7 +944,7 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
             ),
           );
         }).toList(),
-        SizedBox(height: 16),
+        SizedBox(height: AppResponsive.largeSpacing(context)),
       ],
     );
   }
@@ -752,20 +957,31 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              padding: EdgeInsets.symmetric(
+                horizontal: AppResponsive.mediumSpacing(context),
+                vertical: AppResponsive.smallSpacing(context),
+              ),
               decoration: BoxDecoration(
                 color: AppColors.primary.withOpacity(0.06),
-                borderRadius: BorderRadius.circular(8),
-                border: Border(left: BorderSide(color: AppColors.primary, width: 3)),
+                borderRadius: BorderRadius.circular(
+                  AppResponsive.smallBorderRadius(context),
+                ),
+                border: Border(
+                  left: BorderSide(color: AppColors.primary, width: 3),
+                ),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.checklist_rounded, size: 16, color: AppColors.primary),
-                  SizedBox(width: 10),
+                  Icon(
+                    Icons.checklist_rounded,
+                    size: AppResponsive.smallIconSize(context),
+                    color: AppColors.primary,
+                  ),
+                  SizedBox(width: AppResponsive.smallSpacing(context)),
                   Text(
                     choiceGroup.name,
                     style: GoogleFonts.poppins(
-                      fontSize: 15,
+                      fontSize: AppResponsive.bodyFontSize(context),
                       fontWeight: FontWeight.w700,
                       color: AppColors.primary,
                     ),
@@ -773,7 +989,7 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
                 ],
               ),
             ),
-            SizedBox(height: 12),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
             ...choiceGroup.choiceOption.map((option) {
               final isSelected = _selectedChoices.contains(option);
               final allowMultiple = choiceGroup.allowMultipleSelection ?? false;
@@ -791,8 +1007,10 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
                     } else {
                       // Single selection only - behave like radio button
                       // Remove all other options from this choice group first
-                      _selectedChoices.removeWhere((selected) =>
-                        choiceGroup.choiceOption.any((opt) => opt.id == selected.id)
+                      _selectedChoices.removeWhere(
+                        (selected) => choiceGroup.choiceOption.any(
+                          (opt) => opt.id == selected.id,
+                        ),
                       );
                       // Then add the selected option
                       if (!isSelected) {
@@ -803,17 +1021,34 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
                   });
                 },
                 child: Container(
-                  margin: EdgeInsets.only(bottom: 8),
-                  padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  margin: EdgeInsets.only(
+                    bottom: AppResponsive.smallSpacing(context),
+                  ),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: AppResponsive.mediumSpacing(context),
+                    vertical: AppResponsive.smallSpacing(context),
+                  ),
                   decoration: BoxDecoration(
-                    color: isSelected ? AppColors.primary.withOpacity(0.08) : Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(12),
+                    color: isSelected
+                        ? AppColors.primary.withOpacity(0.08)
+                        : Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(
+                      AppResponsive.borderRadius(context),
+                    ),
                     border: Border.all(
-                      color: isSelected ? AppColors.primary : Colors.grey.shade300,
+                      color: isSelected
+                          ? AppColors.primary
+                          : Colors.grey.shade300,
                       width: isSelected ? 1.5 : 1,
                     ),
                     boxShadow: isSelected
-                        ? [BoxShadow(color: AppColors.primary.withOpacity(0.12), blurRadius: 4, offset: Offset(0, 2))]
+                        ? [
+                            BoxShadow(
+                              color: AppColors.primary.withOpacity(0.12),
+                              blurRadius: 4,
+                              offset: Offset(0, 2),
+                            ),
+                          ]
                         : null,
                   ),
                   child: Row(
@@ -822,12 +1057,18 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
                         width: 18,
                         height: 18,
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(allowMultiple ? 4 : 10),
+                          borderRadius: BorderRadius.circular(
+                            allowMultiple ? 4 : 10,
+                          ),
                           border: Border.all(
-                            color: isSelected ? AppColors.primary : Colors.grey.shade400,
+                            color: isSelected
+                                ? AppColors.primary
+                                : Colors.grey.shade400,
                             width: 2,
                           ),
-                          color: isSelected ? AppColors.primary : Colors.transparent,
+                          color: isSelected
+                              ? AppColors.primary
+                              : Colors.transparent,
                         ),
                         child: isSelected
                             ? Icon(
@@ -837,12 +1078,12 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
                               )
                             : null,
                       ),
-                      SizedBox(width: 14),
+                      SizedBox(width: AppResponsive.mediumSpacing(context)),
                       Expanded(
                         child: Text(
                           option.name,
                           style: GoogleFonts.poppins(
-                            fontSize: 13.5,
+                            fontSize: AppResponsive.bodyFontSize(context),
                             fontWeight: FontWeight.w500,
                             color: AppColors.textPrimary,
                           ),
@@ -853,210 +1094,268 @@ class _ItemOptionsDialogState extends State<ItemOptionsDialog> {
                 ),
               );
             }).toList(),
-            SizedBox(height: 16),
+            SizedBox(height: AppResponsive.largeSpacing(context)),
           ],
         );
       }).toList(),
     );
   }
 
-  Widget _buildExtraSection(){
+  Widget _buildExtraSection() {
     return Column(
-        crossAxisAlignment:  CrossAxisAlignment.start,
-        children: _displayExtra.map((extraGroup){
-          // Get min/max constraints for this extra category.
-          // Per-item extraConstraints takes priority; falls back to the extra's global default.
-          final constraints = widget.item.extraConstraints?[extraGroup.Id];
-          final minRequired = constraints?['min'] ?? extraGroup.minimum ?? 0;
-          final maxAllowed  = constraints?['max'] ?? extraGroup.maximum ?? 0;
-          final currentCount = _getExtraCategoryCount(extraGroup.Id);
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: _displayExtra.map((extraGroup) {
+        // Get min/max constraints for this extra category.
+        // Per-item extraConstraints takes priority; falls back to the extra's global default.
+        final constraints = widget.item.extraConstraints?[extraGroup.Id];
+        final minRequired = constraints?['min'] ?? extraGroup.minimum ?? 0;
+        final maxAllowed = constraints?['max'] ?? extraGroup.maximum ?? 0;
+        final currentCount = _getExtraCategoryCount(extraGroup.Id);
 
-          // First, filter the toppings for this extra group
-          final filteredToppings = extraGroup.topping!.where((topping) {
-            // Filter toppings based on size availability
-            if (topping.isContainSize == true) {
-              if (_selectedVariant != null && topping.variantPrices != null) {
-                if (topping.variantPrices!.containsKey(_selectedVariant!.id)) {
-                  final price = topping.variantPrices![_selectedVariant!.id] ?? 0.0;
-                  return price > 0;
-                }
-                return false;
+        // First, filter the toppings for this extra group
+        final filteredToppings = extraGroup.topping!.where((topping) {
+          // Filter toppings based on size availability
+          if (topping.isContainSize == true) {
+            if (_selectedVariant != null && topping.variantPrices != null) {
+              if (topping.variantPrices!.containsKey(_selectedVariant!.id)) {
+                final price =
+                    topping.variantPrices![_selectedVariant!.id] ?? 0.0;
+                return price > 0;
               }
               return false;
             }
-            return true;
-          }).toList();
-
-          // Only show this extra group if there are toppings to display
-          if (filteredToppings.isEmpty) {
-            return const SizedBox.shrink();
+            return false;
           }
+          return true;
+        }).toList();
 
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        // Only show this extra group if there are toppings to display
+        if (filteredToppings.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: AppResponsive.mediumSpacing(context),
+                vertical: AppResponsive.smallSpacing(context),
+              ),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.06),
+                borderRadius: BorderRadius.circular(
+                  AppResponsive.smallBorderRadius(context),
+                ),
+                border: Border(
+                  left: BorderSide(color: AppColors.primary, width: 3),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.add_circle_outline,
+                    size: AppResponsive.smallIconSize(context),
+                    color: AppColors.primary,
+                  ),
+                  SizedBox(width: AppResponsive.smallSpacing(context)),
+                  Text(
+                    extraGroup.Ename,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.bodyFontSize(context),
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                  if (minRequired > 0 || maxAllowed > 0) ...[
+                    SizedBox(width: AppResponsive.smallSpacing(context)),
+                    Text(
+                      '(${minRequired > 0 ? 'Min: $minRequired' : ''}${minRequired > 0 && maxAllowed > 0 ? ', ' : ''}${maxAllowed > 0 ? 'Max: $maxAllowed' : ''})',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.smallFontSize(context),
+                        color: AppColors.primary.withOpacity(0.7),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
+            if (maxAllowed > 0 && currentCount >= maxAllowed)
+              Padding(
+                padding: EdgeInsets.only(
+                  bottom: AppResponsive.mediumSpacing(context),
+                ),
+                child: Text(
+                  'Maximum selection reached',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.smallFontSize(context),
+                    color: AppColors.warning,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ...filteredToppings.map((topping) {
+              // Calculate the display price based on selected variant
+              double displayPrice = topping.price;
+              if (_selectedVariant != null &&
+                  topping.isContainSize == true &&
+                  topping.variantPrices != null) {
+                displayPrice = topping.getPriceForVariant(_selectedVariant!.id);
+              }
+
+              final currentQuantity = _extraQuantities[topping.name] ?? 0;
+              final canIncrement = maxAllowed == 0 || currentCount < maxAllowed;
+
+              return Container(
+                margin: EdgeInsets.only(
+                  bottom: AppResponsive.smallSpacing(context),
+                ),
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppResponsive.mediumSpacing(context),
+                  vertical: AppResponsive.smallSpacing(context),
+                ),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.06),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border(left: BorderSide(color: AppColors.primary, width: 3)),
+                  color: currentQuantity > 0
+                      ? AppColors.primary.withOpacity(0.08)
+                      : Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(
+                    AppResponsive.borderRadius(context),
+                  ),
+                  border: Border.all(
+                    color: currentQuantity > 0
+                        ? AppColors.primary
+                        : Colors.grey.shade300,
+                    width: currentQuantity > 0 ? 1.5 : 1,
+                  ),
+                  boxShadow: currentQuantity > 0
+                      ? [
+                          BoxShadow(
+                            color: AppColors.primary.withOpacity(0.12),
+                            blurRadius: 4,
+                            offset: Offset(0, 2),
+                          ),
+                        ]
+                      : null,
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.add_circle_outline, size: 16, color: AppColors.primary),
-                    SizedBox(width: 10),
-                    Text(
-                      extraGroup.Ename,
-                      style: GoogleFonts.poppins(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                    if (minRequired > 0 || maxAllowed > 0) ...[
-                      const SizedBox(width: 8),
-                      Text(
-                        '(${minRequired > 0 ? 'Min: $minRequired' : ''}${minRequired > 0 && maxAllowed > 0 ? ', ' : ''}${maxAllowed > 0 ? 'Max: $maxAllowed' : ''})',
-                        style: GoogleFonts.poppins(fontSize: 12, color: AppColors.primary.withOpacity(0.7)),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              SizedBox(height: 12),
-              if (maxAllowed > 0 && currentCount >= maxAllowed)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Text(
-                    'Maximum selection reached',
-                    style: GoogleFonts.poppins(fontSize: 12, color: AppColors.warning, fontWeight: FontWeight.w500),
-                  ),
-                ),
-              ...filteredToppings.map((topping){
-                // Calculate the display price based on selected variant
-                double displayPrice = topping.price;
-                if (_selectedVariant != null && topping.isContainSize == true && topping.variantPrices != null) {
-                  displayPrice = topping.getPriceForVariant(_selectedVariant!.id);
-                }
-
-                final currentQuantity = _extraQuantities[topping.name] ?? 0;
-                final canIncrement = maxAllowed == 0 || currentCount < maxAllowed;
-
-                return Container(
-                  margin: EdgeInsets.only(bottom: 8),
-                  padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: currentQuantity > 0 ? AppColors.primary.withOpacity(0.08) : Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: currentQuantity > 0 ? AppColors.primary : Colors.grey.shade300,
-                      width: currentQuantity > 0 ? 1.5 : 1,
-                    ),
-                    boxShadow: currentQuantity > 0
-                        ? [BoxShadow(color: AppColors.primary.withOpacity(0.12), blurRadius: 4, offset: Offset(0, 2))]
-                        : null,
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              topping.name,
-                              style: GoogleFonts.poppins(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.w500,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                            SizedBox(height: 2),
-                            Text(
-                              '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(displayPrice)}',
-                              style: GoogleFonts.poppins(
-                                fontSize: 12,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      // Quantity controls
-                      Row(
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          GestureDetector(
-                            onTap: currentQuantity > 0 ? () {
-                              setState(() {
-                                final newQuantity = currentQuantity - 1;
-                                _extraQuantities[topping.name] = newQuantity;
-                                if (newQuantity == 0) {
-                                  _selectedExtra.remove(topping);
-                                }
-                                _recalculateTotal();
-                              });
-                            } : null,
-                            child: Container(
-                              padding: EdgeInsets.all(6),
-                              decoration: BoxDecoration(
-                                color: currentQuantity > 0 ? AppColors.primary.withOpacity(0.1) : AppColors.surfaceMedium,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Icon(
-                                Icons.remove,
-                                size: 18,
-                                color: currentQuantity > 0 ? AppColors.primary : AppColors.textSecondary,
-                              ),
+                          Text(
+                            topping.name,
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.bodyFontSize(context),
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.textPrimary,
                             ),
                           ),
-                          Container(
-                            width: 40,
-                            alignment: Alignment.center,
-                            child: Text(
-                              currentQuantity.toString(),
-                              style: GoogleFonts.poppins(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                          ),
-                          GestureDetector(
-                            onTap: canIncrement ? () {
-                              setState(() {
-                                final newQuantity = currentQuantity + 1;
-                                _extraQuantities[topping.name] = newQuantity;
-                                if (newQuantity == 1) {
-                                  _selectedExtra.add(topping);
-                                }
-                                _recalculateTotal();
-                              });
-                            } : null,
-                            child: Container(
-                              padding: EdgeInsets.all(6),
-                              decoration: BoxDecoration(
-                                color: canIncrement ? AppColors.primary : AppColors.surfaceMedium,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Icon(
-                                Icons.add,
-                                size: 18,
-                                color: canIncrement ? AppColors.white : AppColors.textSecondary,
-                              ),
+                          SizedBox(height: 2),
+                          Text(
+                            '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(displayPrice)}',
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.smallFontSize(context),
+                              color: AppColors.textSecondary,
                             ),
                           ),
                         ],
                       ),
-                    ],
-                  ),
-                );
-              }).toList(),
-              SizedBox(height: 16),
-            ],
-          );
-
-        }).toList()
+                    ),
+                    // Quantity controls
+                    Row(
+                      children: [
+                        GestureDetector(
+                          onTap: currentQuantity > 0
+                              ? () {
+                                  setState(() {
+                                    final newQuantity = currentQuantity - 1;
+                                    _extraQuantities[topping.name] =
+                                        newQuantity;
+                                    if (newQuantity == 0) {
+                                      _selectedExtra.remove(topping);
+                                    }
+                                    _recalculateTotal();
+                                  });
+                                }
+                              : null,
+                          child: Container(
+                            padding: EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: currentQuantity > 0
+                                  ? AppColors.primary.withOpacity(0.1)
+                                  : AppColors.surfaceMedium,
+                              borderRadius: BorderRadius.circular(
+                                AppResponsive.smallBorderRadius(context),
+                              ),
+                            ),
+                            child: Icon(
+                              Icons.remove,
+                              size: AppResponsive.smallIconSize(context),
+                              color: currentQuantity > 0
+                                  ? AppColors.primary
+                                  : AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          width: 40,
+                          alignment: Alignment.center,
+                          child: Text(
+                            currentQuantity.toString(),
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.subheadingFontSize(
+                                context,
+                              ),
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: canIncrement
+                              ? () {
+                                  setState(() {
+                                    final newQuantity = currentQuantity + 1;
+                                    _extraQuantities[topping.name] =
+                                        newQuantity;
+                                    if (newQuantity == 1) {
+                                      _selectedExtra.add(topping);
+                                    }
+                                    _recalculateTotal();
+                                  });
+                                }
+                              : null,
+                          child: Container(
+                            padding: EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: canIncrement
+                                  ? AppColors.primary
+                                  : AppColors.surfaceMedium,
+                              borderRadius: BorderRadius.circular(
+                                AppResponsive.smallBorderRadius(context),
+                              ),
+                            ),
+                            child: Icon(
+                              Icons.add,
+                              size: AppResponsive.smallIconSize(context),
+                              color: canIncrement
+                                  ? AppColors.white
+                                  : AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+            SizedBox(height: AppResponsive.largeSpacing(context)),
+          ],
+        );
+      }).toList(),
     );
   }
-
 }

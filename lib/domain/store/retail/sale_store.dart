@@ -1,8 +1,11 @@
 import 'package:mobx/mobx.dart';
 
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
+import 'package:billberrylite/data/models/retail/hive_model/sale_item_model_204.dart';
 
 import '../../../data/repositories/retail/sale_repository.dart';
+import '../../../data/repositories/retail/sale_item_repository.dart';
+import '../../services/common/document_number_service.dart';
 
 part 'sale_store.g.dart';
 
@@ -10,6 +13,10 @@ class SaleStore = _SaleStore with _$SaleStore;
 
 abstract class _SaleStore with Store {
   late final SaleRepository _saleRepository;
+
+  /// A sale and its lines are one aggregate, so the store owns both
+  /// repositories. Screens must not reach for `saleItemRepository` themselves.
+  late final SaleItemRepository _saleItemRepository;
 
   @observable
   ObservableList<SaleModel> sales = ObservableList<SaleModel>();
@@ -19,6 +26,7 @@ abstract class _SaleStore with Store {
 
   _SaleStore() {
     _saleRepository = SaleRepository();
+    _saleItemRepository = SaleItemRepository();
     _init();
   }
 
@@ -26,6 +34,29 @@ abstract class _SaleStore with Store {
     await loadSales();
     await loadSalesStats();
   }
+
+  final DocumentNumberService _numbers = DocumentNumberService();
+
+  /// The next customer-facing invoice number — `INV-00001`, restarting at 1
+  /// each financial year.
+  ///
+  /// **This is not an id.** `saleId` stays the UUID primary key that every
+  /// foreign key points at; this is the number printed on the bill and shown in
+  /// reports, stored alongside it as `SaleModel.invoiceNumber`. Because it is
+  /// display-only, a repeat across years cannot overwrite a record — which is
+  /// exactly what lets it reset.
+  ///
+  /// Call at SUBMIT, never when the checkout screen opens: the counter never
+  /// goes backwards, so a number consumed by an abandoned form is a permanent
+  /// gap in the sequence.
+  Future<String> nextInvoiceNumber() =>
+      _numbers.next(DocumentNumberService.invoice);
+
+  /// The next credit-note number — `CRN-00001`. A return is a credit note under
+  /// GST Rule 53(1A), which wants its own consecutive series rather than a
+  /// number borrowed from the invoice run.
+  Future<String> nextCreditNoteNumber() =>
+      _numbers.next(DocumentNumberService.creditNote);
 
   // ==================== SALE OPERATIONS ====================
 
@@ -46,6 +77,27 @@ abstract class _SaleStore with Store {
 
     // Refresh stats
     await loadSalesStats();
+  }
+
+  /// Persist a completed sale together with its lines.
+  ///
+  /// This is the entry point checkout should use — writing the header and the
+  /// lines through one action keeps them from drifting apart, and keeps
+  /// `SaleItemRepository` out of the presentation layer.
+  @action
+  Future<void> addSaleWithItems(SaleModel sale, List<SaleItemModel> items) async {
+    await _saleRepository.addSale(sale);
+    await _saleItemRepository.addSaleItems(items);
+
+    sales.insert(0, sale);
+    await loadSalesStats();
+  }
+
+  /// Lines belonging to a settled sale. These are historical figures — render
+  /// them as stored, never recompute them.
+  @action
+  Future<List<SaleItemModel>> getItemsForSale(String saleId) async {
+    return _saleItemRepository.getItemsBySaleId(saleId);
   }
 
   @action
@@ -80,6 +132,14 @@ abstract class _SaleStore with Store {
   Future<List<SaleModel>> getAllSales() async {
     return await _saleRepository.getAllSales();
   }
+
+  /// Every sale in box order, uncopied — for single-pass report scans.
+  Iterable<SaleModel> salesInStorageOrder() =>
+      _saleRepository.salesInStorageOrder();
+
+  /// The sale with [saleId], read directly by key — no box copy.
+  SaleModel? saleInStorage(String saleId) =>
+      _saleRepository.saleInStorage(saleId);
 
   /// Get sale by ID
   @action

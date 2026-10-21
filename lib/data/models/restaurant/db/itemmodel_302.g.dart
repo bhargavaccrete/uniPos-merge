@@ -46,13 +46,17 @@ class ItemsAdapter extends TypeAdapter<Items> {
       itemCode: fields[25] as String?,
       defaultChoiceOptionIds: (fields[26] as List?)?.cast<String>(),
       taxIds: (fields[27] as List?)?.cast<String>(),
+      productType: fields[28] as String?,
+      recipeId: fields[29] as String?,
+      lastPurchaseCost: fields[30] as double?,
+      sellDirectlyAtPos: fields[31] as bool?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Items obj) {
     writer
-      ..writeByte(28)
+      ..writeByte(32)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -108,7 +112,15 @@ class ItemsAdapter extends TypeAdapter<Items> {
       ..writeByte(26)
       ..write(obj.defaultChoiceOptionIds)
       ..writeByte(27)
-      ..write(obj.taxIds);
+      ..write(obj.taxIds)
+      ..writeByte(28)
+      ..write(obj.productType)
+      ..writeByte(29)
+      ..write(obj.recipeId)
+      ..writeByte(30)
+      ..write(obj.lastPurchaseCost)
+      ..writeByte(31)
+      ..write(obj.sellDirectlyAtPos);
   }
 
   @override

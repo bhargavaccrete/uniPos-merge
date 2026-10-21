@@ -1,95 +1,113 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
-import '../../../../domain/services/retail/report_service.dart';
+import 'package:billberrylite/domain/services/common/report_export_service.dart';
+import 'package:billberrylite/domain/services/retail/report_service.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_page_scaffold.dart';
+import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_summary_card.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_table.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/quantity_format.dart';
 
-class TopSellingProductsReportScreen extends StatefulWidget {
+/// Best performers by revenue.
+///
+/// Same data as Product-wise Sales, capped at [_limit] — the service already
+/// returns it sorted by revenue.
+class TopSellingProductsReportScreen extends StatelessWidget {
   const TopSellingProductsReportScreen({super.key});
-  @override
-  State<TopSellingProductsReportScreen> createState() => _TopSellingProductsReportScreenState();
-}
 
-class _TopSellingProductsReportScreenState extends State<TopSellingProductsReportScreen> {
-  final ReportService _reportService = ReportService();
-  List<Map<String, dynamic>> _reportData = [];
-  bool _isLoading = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadReport();
-  }
-
-  Future<void> _loadReport() async {
-    setState(() => _isLoading = true);
-    final data = await _reportService.getTopSellingProductsReport(limit: 20);
-    setState(() {
-      _reportData = data;
-      _isLoading = false;
-    });
-  }
+  static const int _limit = 20;
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
-      appBar: AppBar(title: const Text('Top Selling Products'), centerTitle: true, backgroundColor: Colors.white, elevation: 0),
-      body: _isLoading ? const Center(child: CircularProgressIndicator()) : _reportData.isEmpty ? const Center(child: Text('No data')) : ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: _reportData.length,
-        itemBuilder: (context, index) {
-          final item = _reportData[index];
-          final rank = index + 1;
+    final service = ReportService();
 
-          return Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFE8E8E8)),
+    return ReportPageScaffold(
+      title: 'Top Selling Products',
+      subtitle: 'Top $_limit by revenue',
+      featureNoun: 'sales',
+      exportFileName: 'top_selling_products',
+      rowUnit: 'products',
+      emptyIcon: Icons.trending_up_rounded,
+      emptyTitle: 'No sales',
+      // Not "nothing was sold": a period CAN have sales and still rank nothing,
+      // when every product was returned as much as it sold. Top-Selling
+      // specific — the shared scaffold's behaviour is unchanged.
+      emptyMessage: 'No products had net sales above zero in this period.',
+      loader: (start, end) async {
+        final rows = await service.getTopSellingProductsReport(
+          limit: _limit,
+          startDate: start,
+          endDate: end,
+        );
+        // Stamp the rank now, while the revenue-desc order from the service is
+        // still intact — the table paginates, so index-in-page would be wrong.
+        return [
+          for (var i = 0; i < rows.length; i++) {...rows[i], '__rank': i + 1},
+        ];
+      },
+      summaryCards: (rows) => [
+        ReportSummaryCard(
+          title: 'Top Product',
+          value: rows.first['productName'] as String,
+          subtitle: formatMoney(rows.first['totalRevenue'] as double),
+          icon: Icons.emoji_events_rounded,
+          color: AppColors.accent,
+        ),
+        ReportSummaryCard(
+          // Net of returns, like the three sibling line-level reports.
+          title: 'Net Revenue',
+          value: formatMoney(
+            rows.fold<double>(0, (s, r) => s + (r['totalRevenue'] as double)),
+          ),
+          subtitle: 'from top ${rows.length}',
+          icon: Icons.payments_rounded,
+          color: AppColors.success,
+        ),
+      ],
+      columns: (context) => [
+        ReportTable.column(context, '#'),
+        ReportTable.column(context, 'Product'),
+        ReportTable.column(context, 'Qty', numeric: true),
+        ReportTable.column(context, 'Revenue', numeric: true),
+      ],
+      rowBuilder: (context, row) {
+        // Rank comes from the service's revenue-desc order, so it survives
+        // pagination.
+        final rank = row['__rank'] as int?;
+        return DataRow(
+          cells: [
+            DataCell(
+              Text(
+                rank == null ? '' : '$rank',
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.w700,
+                  color: rank != null && rank <= 3
+                      ? AppColors.accent
+                      : AppColors.textSecondary,
+                ),
+              ),
             ),
-            child: Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: rank <= 3 ? const Color(0xFFFFD700).withOpacity(0.2) : const Color(0xFFF5F5F5),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Center(
-                    child: Text(
-                      '#$rank',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: rank <= 3 ? const Color(0xFFFF9800) : const Color(0xFF6B6B6B),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(item['productName'], style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          const Icon(Icons.inventory_2, size: 14, color: Color(0xFF2196F3)),
-                          const SizedBox(width: 4),
-                          Text('${item['totalQuantity']} sold', style: const TextStyle(fontSize: 12, color: Color(0xFF6B6B6B))),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                Text('₹${(item['totalRevenue'] as double).toStringAsFixed(0)}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF4CAF50))),
+            DataCell(Text(row['productName'] as String)),
+            DataCell(Text(formatQty((row['totalQuantity'] as num).toDouble()))),
+            DataCell(Text(formatMoney(row['totalRevenue'] as double))),
+          ],
+        );
+      },
+      exportData: (rows) => ReportExportData(
+        headers: const ['Rank', 'Product', 'Qty', 'Revenue'],
+        rows: rows
+            .map(
+              (r) => [
+                r['__rank'],
+                r['productName'],
+                exportQty((r['totalQuantity'] as num).toDouble()),
+                ReportExportService.formatCurrency(r['totalRevenue'] as double),
               ],
-            ),
-          );
-        },
+            )
+            .toList(),
+        summary: {'Products': rows.length},
       ),
     );
   }

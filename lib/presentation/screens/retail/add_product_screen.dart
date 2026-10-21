@@ -1,20 +1,116 @@
+import 'dart:async';
+import 'package:billberrylite/presentation/widget/componets/retail/expiry_date_field.dart';
+import 'package:billberrylite/domain/services/retail/expiry_status.dart';
+import 'package:billberrylite/core/constants/item_units.dart';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
-import 'package:billberrylite/data/models/retail/hive_model/category_model_215.dart';
+import 'package:billberrylite/data/models/common/categorymodel_300.dart';
+import 'package:billberrylite/data/models/common/taxmodel_314.dart';
 import 'package:billberrylite/data/models/retail/hive_model/product_model_200.dart';
 import 'package:billberrylite/data/models/retail/hive_model/variante_model_201.dart';
-import 'package:billberrylite/domain/services/retail/variant_generator_service.dart';
+import 'package:billberrylite/data/models/retail/hive_model/attribute_model_219.dart';
+import 'package:billberrylite/data/models/retail/hive_model/bundle_model.dart';
+import 'package:billberrylite/data/models/retail/hive_model/bundle_component_model.dart';
+import 'package:billberrylite/domain/services/retail/simple_product_fields_service.dart';
+import 'package:billberrylite/domain/services/retail/variant_attribute_mapper.dart';
 import 'package:billberrylite/presentation/screens/retail/category_management_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/scanner_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/simple_product_fields_screen.dart';
+import 'package:billberrylite/presentation/widget/retail/bundle_builder_widget.dart';
 import 'package:billberrylite/presentation/widget/retail/product_attribute_selector.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/common/universal_image_picker.dart';
+import 'package:billberrylite/presentation/widget/componets/common/row_action_button.dart';
+import 'package:billberrylite/domain/services/common/notification_service.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/util/common/currency_helper.dart';
+import 'package:billberrylite/util/common/decimal_settings.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/di/service_locator.dart';
+import '../../../core/config/tariff_code_rule.dart';
+import '../../../core/config/tax_feature.dart';
+import 'package:billberrylite/core/plan/plan_guard.dart';
+import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
 
 const _uuid = Uuid();
 
+/// Money input — digits with at most two decimals, the same rule the checkout,
+/// expense and cash-drawer screens apply.
+final _moneyFormatters = <TextInputFormatter>[
+  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+];
+
+/// Whole-number input (stock counts) — what a piece product uses.
+final _qtyFormatters = <TextInputFormatter>[
+  FilteringTextInputFormatter.digitsOnly,
+];
+
+/// Fractional stock input for loose goods, at most 2 decimals — the same rule
+/// [_moneyFormatters] uses, so precision is consistent across the form.
+final _decimalQtyFormatters = <TextInputFormatter>[
+  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+];
+
+/// Prompts a soft warning confirmation when selling price < cost price.
+/// Returns true if confirmed or if selling price >= cost price.
+Future<bool> _confirmLossIfSellingBelowCost({
+  required BuildContext context,
+  required double sellingPrice,
+  required double? costPrice,
+}) async {
+  if (costPrice == null || costPrice <= 0 || sellingPrice >= costPrice) {
+    return true; // No loss, proceed directly
+  }
+
+  final loss = costPrice - sellingPrice;
+  final lossPct = ((loss / costPrice) * 100).toStringAsFixed(1);
+  final sym = CurrencyHelper.currentSymbol;
+
+  return await showAppConfirmDialog(
+    context: context,
+    title: 'Selling Below Cost Price?',
+    message:
+        'Selling Price ($sym${DecimalSettings.formatAmount(sellingPrice)}) '
+        'is lower than Cost Price ($sym${DecimalSettings.formatAmount(costPrice)}).\n\n'
+        'You will incur a loss of $sym${DecimalSettings.formatAmount(loss)} (-$lossPct% margin) per unit.',
+    confirmLabel: 'Continue & Save',
+    cancelLabel: 'Fix Price',
+    accent: AppColors.warning,
+    icon: Icons.warning_amber_rounded,
+  );
+}
+
+/// Single entry point for "Add Product" so the inventory list, its empty state
+/// and the Products hub all open the form the same way.
+Future<void> openAddProductScreen(BuildContext context) {
+  return Navigator.push(
+    context,
+    MaterialPageRoute(builder: (_) => const AddProductScreen()),
+  );
+}
+
+/// Reopens the same form pre-filled, for changing a product's name, category,
+/// brand, description, HSN or tax. Variants keep their own screen.
+Future<void> openEditProductScreen(BuildContext context, ProductModel product) {
+  return Navigator.push(
+    context,
+    MaterialPageRoute(builder: (_) => AddProductScreen(product: product)),
+  );
+}
+
 class AddProductScreen extends StatefulWidget {
-  const AddProductScreen({super.key});
+  /// Null creates a new product; non-null reopens that product for editing.
+  final ProductModel? product;
+
+  const AddProductScreen({super.key, this.product});
 
   @override
   State<AddProductScreen> createState() => _AddProductScreenState();
@@ -27,8 +123,8 @@ class CustomAttributeData {
   final TextEditingController valueController;
 
   CustomAttributeData({required this.id})
-      : keyController = TextEditingController(),
-        valueController = TextEditingController();
+    : keyController = TextEditingController(),
+      valueController = TextEditingController();
 
   void dispose() {
     keyController.dispose();
@@ -39,34 +135,53 @@ class CustomAttributeData {
 // Variant data model for form
 class VariantFormData {
   final String id;
-  final TextEditingController sizeController;
-  final TextEditingController colorController;
   final TextEditingController barcodeController;
   final TextEditingController costPriceController;
   final TextEditingController priceController;
   final TextEditingController mrpController;
   final TextEditingController stockController;
-  final TextEditingController weightController;
   final TextEditingController skuController;
   final List<CustomAttributeData> customAttributes;
 
-  VariantFormData({
-    required this.id,
-  })  : sizeController = TextEditingController(),
-        colorController = TextEditingController(),
-        barcodeController = TextEditingController(),
-        costPriceController = TextEditingController(),
-        priceController = TextEditingController(),
-        mrpController = TextEditingController(),
-        stockController = TextEditingController(),
-        weightController = TextEditingController(),
-        skuController = TextEditingController(),
-        customAttributes = [];
+  /// Configurable descriptor fields (Settings → Simple Product Fields), keyed
+  /// by attributeId. Replaces the previously hardcoded size/color/weight
+  /// controllers so a shop can use Flavour, Volume, Capacity instead.
+  final Map<String, TextEditingController> fieldControllers = {};
+
+  /// [onFilledChanged] fires whenever one of the fields that decides "is this
+  /// row filled in" changes, so the variant count in the header and on the save
+  /// button can stay truthful as the user types. Deliberately only the six
+  /// fields `_isVariantRowFilled` inspects — the descriptor fields never make a
+  /// row saveable on their own.
+  VariantFormData({required this.id, VoidCallback? onFilledChanged})
+    : barcodeController = TextEditingController(),
+      costPriceController = TextEditingController(),
+      priceController = TextEditingController(),
+      mrpController = TextEditingController(),
+      stockController = TextEditingController(),
+      skuController = TextEditingController(),
+      customAttributes = [] {
+    if (onFilledChanged == null) return;
+    for (final controller in [
+      barcodeController,
+      costPriceController,
+      priceController,
+      mrpController,
+      stockController,
+      skuController,
+    ]) {
+      controller.addListener(onFilledChanged);
+    }
+  }
+
+  /// Controller for a configured field, created on first use.
+  TextEditingController fieldController(String attributeId) =>
+      fieldControllers.putIfAbsent(attributeId, () => TextEditingController());
 
   void addCustomAttribute() {
-    customAttributes.add(CustomAttributeData(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-    ));
+    customAttributes.add(
+      CustomAttributeData(id: DateTime.now().millisecondsSinceEpoch.toString()),
+    );
   }
 
   void removeCustomAttribute(int index) {
@@ -87,19 +202,33 @@ class VariantFormData {
   }
 
   void dispose() {
-    sizeController.dispose();
-    colorController.dispose();
     barcodeController.dispose();
     costPriceController.dispose();
     priceController.dispose();
     mrpController.dispose();
     stockController.dispose();
-    weightController.dispose();
     skuController.dispose();
+    for (final controller in fieldControllers.values) {
+      controller.dispose();
+    }
     for (var attr in customAttributes) {
       attr.dispose();
     }
   }
+}
+
+/// One entry in the bundle/repack variant selector — see
+/// `_AddProductScreenState._buildBundleSection`.
+class _BundleVariantOption {
+  final String key;
+  final String label;
+  final double? sellingPrice;
+
+  const _BundleVariantOption({
+    required this.key,
+    required this.label,
+    this.sellingPrice,
+  });
 }
 
 class _AddProductScreenState extends State<AddProductScreen> {
@@ -107,22 +236,63 @@ class _AddProductScreenState extends State<AddProductScreen> {
   final _nameController = TextEditingController();
   final _brandController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final _taxRateController = TextEditingController();
+  final _hsnCodeController = TextEditingController();
+  String? _selectedTaxId;
+  // Once the user manually picks a tax, an HSN-based suggestion should never
+  // silently overwrite that choice again for this product.
+  bool _taxManuallyChanged = false;
+  Timer? _hsnLookupDebounce;
   final _defaultPriceController = TextEditingController();
   final _defaultCostController = TextEditingController();
   final _defaultMrpController = TextEditingController();
   final _defaultStockController = TextEditingController();
 
-  String? _selectedCategory;
-  CategoryModel? _selectedCategoryModel;
-  bool _hasVariants = false;
-  List<CategoryModel> _categories = [];
+  /// Unit of measure for every variant of this product.
+  ///
+  /// One switch for the whole product: a shop sells potatoes by weight, not
+  /// "this variant by weight and that one by piece". [_isDecimalQuantity] is
+  /// what unlocks a fractional quantity anywhere in the app for these variants;
+  /// left off (the default) the product behaves exactly as products always have.
+  bool _isDecimalQuantity = false;
+  String _unit = 'piece';
 
-  // Product type: 'simple' or 'variable'
-  String _productType = 'simple';
+  /// Optional expiry for this product's variants. Null = does not expire,
+  /// which is every product unless the shop says otherwise. Product-level
+  /// control, stored per variant (see the fan-out in [_updateProduct]).
+  DateTime? _expiryDate;
 
-  // For variable products - selected attributes
-  List<AttributeWithValues> _selectedAttributes = [];
+  /// Quantity-field wiring, branched once so every stock box on this form
+  /// agrees. A piece product keeps the digits-only keypad it always had.
+  List<TextInputFormatter> get _activeQtyFormatters =>
+      _isDecimalQuantity ? _decimalQtyFormatters : _qtyFormatters;
+
+  TextInputType get _qtyKeyboard => _isDecimalQuantity
+      ? const TextInputType.numberWithOptions(decimal: true)
+      : TextInputType.number;
+
+  Category? _selectedCategoryModel;
+  List<Category> _categories = [];
+
+  /// Product photo. Bytes rather than a path so it works on web too — the same
+  /// convention the restaurant Items model uses.
+  Uint8List? _imageBytes;
+
+  /// Distinguishes "never touched the image" from "removed it", which
+  /// copyWith cannot express on its own.
+  bool _imageCleared = false;
+
+  // Whether the bulk generator is expanded. Purely a UI toggle — there is no
+  // "variable product" mode any more, so revealing it never discards manually
+  // entered variants. The selector below stays mounted while collapsed so the
+  // attributes and values already picked survive a fold.
+  bool _showAttributeGenerator = false;
+
+  /// Stable id for this draft, used only for the SKUs the generator mints.
+  ///
+  /// It used to be `DateTime.now()...` evaluated inside build, so every rebuild
+  /// handed the selector a different product and regenerating produced a fresh
+  /// SKU prefix each time. The real productId is stamped on at save.
+  final String _draftProductId = _uuid.v4();
 
   // Generated variants from attributes
   List<VarianteModel> _generatedVariants = [];
@@ -137,42 +307,196 @@ class _AddProductScreenState extends State<AddProductScreen> {
   // List of variants (manual entry)
   final List<VariantFormData> _variants = [];
 
+  // Descriptor fields shown on each simple-product variant, from
+  // Settings → Simple Product Fields. Replaces the old hardcoded
+  // Color / Size / Weight boxes.
+  List<AttributeModel> _simpleFields = [];
+
+  /// Editing an existing product rather than creating one.
+  bool get _isEditing => widget.product != null;
+
+  // ── Bundle / Repack (stock mode) ──────────────────────────────────────
+  // See docs/retail_inventory_system_plan.md §3.2. `stockMode` is a
+  // separate field from `productType` (simple/variable) — see the doc
+  // comment on ProductModel.stockMode.
+  //
+  // Bundle/repack products can now have multiple variants (e.g. a "Combo
+  // Meal" in Small/Medium/Large), each with its OWN component list — so
+  // staging is keyed per variant rather than a single shared list. The key
+  // is: the variant's real `varianteId` when editing an existing product or
+  // configuring an attribute-generated variant, or the manual variant row's
+  // local [VariantFormData.id] before it has a real id (create flow only).
+  //
+  // Writes land here continuously as the user edits (BundleBuilderWidget's
+  // onChanged fires on every keystroke), so switching which variant is being
+  // configured never loses in-progress edits — see [_buildBundleBuilderFor].
+  String _stockMode = 'standard'; // 'standard' | 'bundle' | 'repack'
+
+  /// Sell on even at zero stock. Mirrors restaurant's
+  /// `Items.allowOrderWhenOutOfStock`; the only escape from the cart's
+  /// zero-stock refusal.
+  bool _allowOrderWhenOutOfStock = false;
+  final Map<String, List<BundleComponentModel>> _bundleComponentsByVariant = {};
+
+  /// Existing bundle row id/createdAt per variant key, reused across saves
+  /// so re-editing doesn't orphan the previous bundle row.
+  final Map<String, String> _bundleRowIdByVariant = {};
+  final Map<String, String> _bundleRowCreatedAtByVariant = {};
+
+  /// Which variant's components the builder is currently showing. Only
+  /// surfaced via a selector once there are 2+ variants.
+  String? _selectedBundleVariantKey;
+
   @override
   void initState() {
     super.initState();
-    // Add first variant by default
-    _addVariant();
+    final product = widget.product;
+    if (product == null) {
+      // Add first variant by default
+      _addVariant();
+    } else {
+      _nameController.text = product.productName;
+      _brandController.text = product.brandName ?? '';
+      _descriptionController.text = product.description ?? '';
+      _hsnCodeController.text = product.hsnCode ?? '';
+      _selectedTaxId = product.taxId;
+      // A saved tax is a deliberate choice — never let the HSN lookup
+      // silently replace it while editing.
+      _taxManuallyChanged = true;
+      _imageBytes = product.imageBytes;
+      _stockMode = product.effectiveStockMode;
+      _allowOrderWhenOutOfStock = product.sellsWhenOutOfStock;
+      // Unit of measure lives on the variants; they always agree, so the first
+      // one speaks for the product. Absent/legacy variants read as pieces.
+      final firstVariant = productStore
+          .variantsFor(product.productId)
+          .firstOrNull;
+      if (firstVariant != null) {
+        _isDecimalQuantity = firstVariant.isDecimalQuantity;
+        _unit = firstVariant.isDecimalQuantity
+            ? firstVariant.effectiveUnit
+            : 'piece';
+        // Expiry is product-level in the form, per-variant in storage — the
+        // first variant speaks for the product, same rule as the unit.
+        _expiryDate = firstVariant.expiryDateTime;
+      }
+      if (product.needsBundleComponents) {
+        // Load each variant's own bundle row, if any — see the field docs
+        // above for why staging is per-variant.
+        final existingVariants = productStore.variantsFor(product.productId);
+        for (final variant in existingVariants) {
+          final bundle = bundleRepository.getBundleForVariant(
+            variant.varianteId,
+          );
+          if (bundle != null) {
+            _bundleRowIdByVariant[variant.varianteId] = bundle.id;
+            _bundleRowCreatedAtByVariant[variant.varianteId] = bundle.createdAt;
+            _bundleComponentsByVariant[variant.varianteId] = List.of(
+              bundle.components,
+            );
+          }
+        }
+      }
+    }
     _loadCategories();
     // Load attributes
     attributeStore.loadAttributes();
+    taxStore.loadTaxes();
+    _loadSimpleFields();
+  }
+
+  Future<void> _loadSimpleFields() async {
+    final fields = await SimpleProductFieldsService().resolveFields();
+    if (!mounted) return;
+    setState(() => _simpleFields = fields);
+  }
+
+  /// Opens the shared Simple Product Fields configurator, then re-resolves the
+  /// list. Controllers for fields the user removed are disposed; their values
+  /// already stop being saved, since [_mapFieldValues] only reads
+  /// [_simpleFields].
+  Future<void> _openSimpleFieldSettings() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const SimpleProductFieldsScreen()),
+    );
+    if (!mounted) return;
+
+    final fields = await SimpleProductFieldsService().resolveFields();
+    if (!mounted) return;
+
+    final keptIds = fields.map((a) => a.attributeId).toSet();
+    for (final variant in _variants) {
+      for (final id in variant.fieldControllers.keys.toList()) {
+        if (!keptIds.contains(id))
+          variant.fieldControllers.remove(id)?.dispose();
+      }
+    }
+
+    setState(() => _simpleFields = fields);
   }
 
   Future<void> _loadCategories() async {
-    _categories = await categoryModelRepository.getAllCategories();
-    if (_categories.isEmpty) {
-      await categoryModelRepository.addDefaultCategories();
-      _categories = await categoryModelRepository.getAllCategories();
+    await categoryStore.loadCategories();
+    if (!mounted) return;
+    _categories = categoryStore.categories.toList();
+
+    // The dropdown holds a Category object, so the product's stored id can only
+    // be resolved once the list has arrived.
+    final product = widget.product;
+    if (product != null && _selectedCategoryModel == null) {
+      for (final category in _categories) {
+        if (category.id == product.category) {
+          _selectedCategoryModel = category;
+          break;
+        }
+      }
     }
     setState(() {});
   }
 
   @override
   void dispose() {
+    _hsnLookupDebounce?.cancel();
     _nameController.dispose();
     _brandController.dispose();
     _descriptionController.dispose();
-    _taxRateController.dispose();
+    _hsnCodeController.dispose();
+    _defaultPriceController.dispose();
+    _defaultCostController.dispose();
+    _defaultMrpController.dispose();
+    _defaultStockController.dispose();
     for (var variant in _variants) {
       variant.dispose();
     }
     super.dispose();
   }
 
+  /// Looks up the tax previously used with this HSN code (debounced so it
+  /// only fires once the user pauses typing) and pre-fills the Tax dropdown.
+  /// Never overrides a tax the user has already picked manually.
+  void _onHsnCodeChanged(String value) {
+    _hsnLookupDebounce?.cancel();
+    _hsnLookupDebounce = Timer(const Duration(milliseconds: 400), () {
+      if (_taxManuallyChanged || !mounted) return;
+      final suggestedTaxId = productStore.findTaxIdByHsnCode(value);
+      if (suggestedTaxId != null && suggestedTaxId != _selectedTaxId) {
+        setState(() => _selectedTaxId = suggestedTaxId);
+        NotificationService.instance.showInfo(
+          'Tax rate auto-filled from ${TariffCodeRule.shortLabel} $value',
+        );
+      }
+    });
+  }
+
   void _addVariant() {
     setState(() {
-      _variants.add(VariantFormData(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-      ));
+      _variants.add(
+        VariantFormData(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          onFilledChanged: _onVariantRowFilledChanged,
+        ),
+      );
     });
   }
 
@@ -180,45 +504,8 @@ class _AddProductScreenState extends State<AddProductScreen> {
     setState(() {
       _variants[index].dispose();
       _variants.removeAt(index);
+      _filledManualCount = _filledManualVariants.length;
     });
-  }
-
-  void _showAddCategoryDialog() {
-    final TextEditingController categoryController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add New Category'),
-        content: TextField(
-          controller: categoryController,
-          decoration: const InputDecoration(
-            labelText: 'Category Name',
-            hintText: 'Enter category name',
-          ),
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              final category = categoryController.text.trim();
-              if (category.isNotEmpty) {
-                productStore.addCategory(category);
-                setState(() {
-                  _selectedCategory = category;
-                });
-                Navigator.pop(context);
-              }
-            },
-            child: const Text('Add'),
-          ),
-        ],
-      ),
-    );
   }
 
   Future<void> _scanBarcode(VariantFormData variant) async {
@@ -232,293 +519,963 @@ class _AddProductScreenState extends State<AddProductScreen> {
     }
   }
 
+  /// Product-level fields only. Variants already exist and are managed by
+  /// [ProductDetailScreen], so nothing here touches them.
+  Future<void> _updateProduct() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (!PlanGuard.allowedOr(
+      context,
+      RetailEntKeys.catalogProductsEdit,
+      featureName: 'Edit Products',
+    )) {
+      return;
+    }
+
+    final existing = widget.product!;
+
+    // Bundle/repack products need at least one variant to attach components
+    // to — block the save rather than silently persisting a stockMode the
+    // product can't support.
+    if (_stockMode != 'standard') {
+      final variantCount = productStore.variantCountFor(existing.productId);
+      if (variantCount == 0) {
+        NotificationService.instance.showError(
+          'Add a variant to this product before setting it as Bundle or Repack/Kit.',
+        );
+        return;
+      }
+    }
+
+    // A stock-mode switch changes what a variant's own stockQty MEANS. A
+    // bundle holds none of its own (it sells from its components), so:
+    //  • into Bundle — real units would be stranded, invisible to sale and
+    //    count. Refused until they are adjusted away.
+    //  • out of Bundle — its own figure was typed at creation and never real;
+    //    left alone it would suddenly become sellable. Reset to 0 below.
+    final wasBundle = existing.isBundle;
+    final becomesBundle = _stockMode == 'bundle';
+    if (becomesBundle && !wasBundle) {
+      final withStock = productStore
+          .variantsFor(existing.productId)
+          .where((v) => v.stockQty != 0)
+          .toList();
+      if (withStock.isNotEmpty) {
+        NotificationService.instance.showError(
+          '${existing.productName} still has stock. A bundle holds none of its '
+          'own — adjust its stock to 0 before making it a Bundle.',
+        );
+        return;
+      }
+    }
+    final resetOwnStock = wasBundle && !becomesBundle;
+
+    final taxRate = _taxRateFor(_selectedTaxId);
+    final brand = _brandController.text.trim();
+    final description = _descriptionController.text.trim();
+    final hsnCode = _hsnCodeController.text.trim();
+
+    // MUST go through copyWith — productId, createdAt, imagePath, productType
+    // and the default* prices are carried over untouched. Hand-building the
+    // model is what used to silently wipe fields on the variant side.
+    final updated = existing.copyWith(
+      productName: _nameController.text.trim(),
+      brandName: brand.isEmpty ? null : brand,
+      clearBrandName: brand.isEmpty,
+      category: _selectedCategoryModel?.id ?? existing.category,
+      description: description.isEmpty ? null : description,
+      clearDescription: description.isEmpty,
+      hsnCode: hsnCode.isEmpty ? null : hsnCode,
+      clearHsnCode: hsnCode.isEmpty,
+      gstRate: taxRate,
+      taxId: _selectedTaxId,
+      clearTax: _selectedTaxId == null,
+      imageBytes: _imageBytes,
+      clearImage: _imageCleared,
+      stockMode: _stockMode == 'standard' ? null : _stockMode,
+      allowOrderWhenOutOfStock: _allowOrderWhenOutOfStock,
+      clearStockMode: _stockMode == 'standard',
+    );
+
+    await productStore.updateProduct(updated);
+
+    // Bundle/repack component persistence — one RetailBundleModel per
+    // variant, saved when it has at least one component, otherwise cleared
+    // (covers a mode switch back to standard, and a variant whose
+    // components were removed). See docs/retail_inventory_system_plan.md §3.2.
+    final existingVariants = productStore.variantsFor(existing.productId);
+
+    // Unit of measure is product-level but stored per variant, so a change
+    // here has to reach every variant — otherwise the toggle would appear to
+    // save and change nothing. Only writes when it actually differs.
+    final expiryIso = _expiryDate?.toIso8601String();
+    for (final variant in existingVariants) {
+      final unitChanged =
+          variant.isDecimalQuantity != _isDecimalQuantity ||
+          (_isDecimalQuantity && variant.unit != _unit);
+      // Expiry is product-level here but stored per variant, so a change has
+      // to reach every one of them — including CLEARING it, which needs the
+      // explicit flag because `?? this.x` can never write null back.
+      final expiryChanged = variant.expiryDate != expiryIso;
+      // Leaving Bundle: the phantom own figure goes to 0 in this SAME write —
+      // a separate pass would be overwritten by this loop's stale snapshot.
+      // updateVariant logs the change as a "Stock edited" movement.
+      final stockReset = resetOwnStock && variant.stockQty != 0;
+      if (unitChanged || expiryChanged || stockReset) {
+        await productStore.updateVariant(
+          variant.copyWith(
+            isDecimalQuantity: _isDecimalQuantity,
+            unit: _isDecimalQuantity ? _unit : 'piece',
+            expiryDate: expiryIso,
+            clearExpiryDate: expiryIso == null,
+            stockQty: stockReset ? 0 : null,
+          ),
+        );
+      }
+    }
+
+    for (final variant in existingVariants) {
+      final variantId = variant.varianteId;
+      final components = _bundleComponentsByVariant[variantId] ?? const [];
+      if (_stockMode != 'standard' && components.isNotEmpty) {
+        final now = DateTime.now().toIso8601String();
+        await bundleRepository.saveBundle(
+          RetailBundleModel(
+            id: _bundleRowIdByVariant[variantId] ?? _uuid.v4(),
+            productId: existing.productId,
+            variantId: variantId,
+            components: components,
+            createdAt: _bundleRowCreatedAtByVariant[variantId] ?? now,
+            updatedAt: now,
+          ),
+        );
+      } else {
+        await bundleRepository.deleteBundleForVariant(variantId);
+      }
+    }
+
+    if (!mounted) return;
+    NotificationService.instance.showSuccess('${updated.productName} updated');
+    Navigator.pop(context);
+  }
+
+  /// Percentage behind a tax id, or null when nothing is picked.
+  double? _taxRateFor(String? taxId) {
+    if (taxId == null) return null;
+    return taxStore.taxes
+        .firstWhere(
+          (t) => t.id == taxId,
+          orElse: () => Tax(id: '', taxname: '', taxperecentage: null),
+        )
+        .taxperecentage;
+  }
+
+  /// A manual variant row the user actually put something in. The form seeds one
+  /// empty row, which must not become a phantom variant for someone who only
+  /// generates from attributes.
+  bool _isVariantRowFilled(VariantFormData variant) =>
+      variant.priceController.text.trim().isNotEmpty ||
+      variant.costPriceController.text.trim().isNotEmpty ||
+      variant.mrpController.text.trim().isNotEmpty ||
+      variant.stockController.text.trim().isNotEmpty ||
+      variant.barcodeController.text.trim().isNotEmpty ||
+      variant.skuController.text.trim().isNotEmpty;
+
+  /// The manual rows that will actually be written.
+  ///
+  /// `_variants` always carries at least one row, and an untouched one is
+  /// dropped on save — so counting the raw list told the user "13 variants"
+  /// while creating 12. One definition, shared by the section header, the save
+  /// button and the save itself, so the three can never disagree again.
+  List<VariantFormData> get _filledManualVariants =>
+      _variants.where(_isVariantRowFilled).toList();
+
+  /// How many variants this form will create, manual + generated.
+  int get _effectiveVariantCount =>
+      _filledManualVariants.length + _generatedVariants.length;
+
+  /// Whether to show the manual rows and their "Add variant" button.
+  ///
+  /// They step aside while the Bulk add panel is open: the two paths were
+  /// competing for the same screen, with an empty "Variant 1" sitting directly
+  /// above the generator and no way to tell which one was in charge.
+  bool get _showManualVariants =>
+      !_showAttributeGenerator || !_manualHiddenByBulk;
+
+  /// Snapshotted when the Bulk add panel is OPENED, not recomputed each build.
+  ///
+  /// Two reasons. Rows the user has already filled in must stay visible — they
+  /// will be saved, and hiding data that still gets written is worse than the
+  /// clutter. And deciding once means the section cannot appear or vanish under
+  /// the user's fingers as they clear a field mid-edit.
+  bool _manualHiddenByBulk = false;
+
+  /// Rebuild when a row crosses the empty↔filled line, so the variant count
+  /// stays truthful. Guarded on the count actually changing, so ordinary typing
+  /// inside an already-filled row costs nothing.
+  int _filledManualCount = 0;
+
+  void _onVariantRowFilledChanged() {
+    if (!mounted) return;
+    final filled = _filledManualVariants.length;
+    if (filled == _filledManualCount) return;
+    setState(() => _filledManualCount = filled);
+  }
+
   Future<void> _saveProduct() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
-    // Validate based on product type
-    if (_productType == 'variable') {
-      // Variable product - check generated variants
-      if (_generatedVariants.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please generate variants by selecting attributes'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
-    } else {
-      // Simple product - check manual variants
-      if (_variants.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please add at least one variant'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
+    final manualVariants = _filledManualVariants;
 
-      // Validate all manual variants
-      for (var variant in _variants) {
-        if (variant.costPriceController.text.trim().isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Please enter cost price for all variants'),
-              backgroundColor: Colors.red,
-            ),
-          );
-          return;
-        }
-        if (variant.priceController.text.trim().isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Please enter selling price for all variants'),
-              backgroundColor: Colors.red,
-            ),
-          );
-          return;
-        }
-        if (variant.stockController.text.trim().isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Please enter stock for all variants'),
-              backgroundColor: Colors.red,
-            ),
-          );
-          return;
-        }
+    if (manualVariants.isEmpty && _generatedVariants.isEmpty) {
+      NotificationService.instance.showError(
+        'Add at least one variant, or generate them from attributes',
+      );
+      return;
+    }
+
+    // Selling price and stock are what the POS needs; cost is bookkeeping and
+    // stays optional, matching the variant screen.
+    final seenBarcodes = <String>{};
+    for (final variant in manualVariants) {
+      if (variant.priceController.text.trim().isEmpty) {
+        NotificationService.instance.showError(
+          'Please enter selling price for all variants',
+        );
+        return;
+      }
+      if (variant.stockController.text.trim().isEmpty) {
+        NotificationService.instance.showError(
+          'Please enter stock for all variants',
+        );
+        return;
+      }
+      // Against the catalogue AND against the other rows in this same form —
+      // neither is caught by the other.
+      final barcode = variant.barcodeController.text.trim();
+      if (barcode.isEmpty) continue;
+      if (productStore.isBarcodeTaken(barcode) || !seenBarcodes.add(barcode)) {
+        NotificationService.instance.showError(
+          'Barcode "$barcode" is already used by another variant',
+        );
+        return;
       }
     }
 
-    // Get GST rate from input or category
-    final taxRate = _taxRateController.text.trim().isEmpty
-        ? (_selectedCategoryModel?.gstRate)
-        : double.tryParse(_taxRateController.text.trim());
+    // Generated rows need a selling price exactly like manual ones. They were
+    // never checked, so an unfilled row saved as null and billed at MRP or ₹0.
+    // Named, because a bulk run can produce a dozen near-identical rows.
+    final unpriced = _generatedVariants
+        .where((v) => v.sellingPrice == null)
+        .map((v) => v.hasAttributes ? v.variantDescription : (v.sku ?? 'Variant'))
+        .toList();
+    if (unpriced.isNotEmpty) {
+      NotificationService.instance.showError(
+        'Enter a selling price for: ${unpriced.join(', ')}',
+      );
+      return;
+    }
+
+    // Attribute-generated rows carry their OWN editable/scannable barcode and
+    // were previously written straight through unchecked — against the
+    // catalogue, against each other, and against the manual rows above. They
+    // share `seenBarcodes` so a code typed in both halves of the form is caught.
+    for (final variant in _generatedVariants) {
+      final barcode = variant.barcode?.trim() ?? '';
+      if (barcode.isEmpty) continue;
+      if (productStore.isBarcodeTaken(barcode) || !seenBarcodes.add(barcode)) {
+        NotificationService.instance.showError(
+          'Barcode "$barcode" is already used by another variant',
+        );
+        return;
+      }
+    }
+
+    // Warn if any manual variant is being saved below cost price
+    for (final variant in manualVariants) {
+      final sp = double.tryParse(variant.priceController.text.trim()) ?? 0.0;
+      final cpText = variant.costPriceController.text.trim();
+      final cp = cpText.isEmpty ? null : double.tryParse(cpText);
+
+      if (!await _confirmLossIfSellingBelowCost(
+        context: context,
+        sellingPrice: sp,
+        costPrice: cp,
+      )) {
+        return;
+      }
+    }
+
+    // Warn if any generated variant is being saved below cost price
+    for (final variant in _generatedVariants) {
+      if (!await _confirmLossIfSellingBelowCost(
+        context: context,
+        sellingPrice: variant.sellingPrice ?? 0.0,
+        costPrice: variant.costPrice,
+      )) {
+        return;
+      }
+    }
+
+    // GST rate is set per product/variant, not inherited from category.
+    // taxRate is resolved once from the selected shared Tax entity and kept
+    // as a cached percentage on the model, exactly like before — only the
+    // source of the number changed, from free-typed to a named picklist.
+    final taxRate = _selectedTaxId == null
+        ? null
+        : taxStore.taxes
+              .firstWhere(
+                (t) => t.id == _selectedTaxId,
+                orElse: () => Tax(id: '', taxname: '', taxperecentage: null),
+              )
+              .taxperecentage;
+
+    // Plan gate — block a NEW product once the products cap is reached.
+    // No-op until a retail manifest is present (see PlanEnforce).
+    if (!productStore.canAddProduct) {
+      final max = productStore.productLimit;
+      NotificationService.instance.showError(
+        'Product limit reached${max != null ? ' (max $max)' : ''}. Upgrade your plan to add more.',
+      );
+      return;
+    }
 
     // Create ProductModel
     final productId = _uuid.v4();
+    final variantCount = manualVariants.length + _generatedVariants.length;
+
+    // Derived, never asked. Nothing at runtime reads productType — the POS
+    // decides how to behave by counting variants — so these exist only to keep
+    // stored data meaningful.
     final product = ProductModel.fromProduct(
       productId: productId,
       productName: _nameController.text.trim(),
-      brandName: _brandController.text.trim().isEmpty ? null : _brandController.text.trim(),
-      category: _selectedCategory ?? 'Uncategorized',
+      brandName: _brandController.text.trim().isEmpty
+          ? null
+          : _brandController.text.trim(),
+      category: _selectedCategoryModel?.id ?? '',
       imagePath: null,
-      description: _descriptionController.text.trim().isEmpty ? null : _descriptionController.text.trim(),
-      hasVariants: _hasVariants || _productType == 'variable',
-      productType: _productType,
+      description: _descriptionController.text.trim().isEmpty
+          ? null
+          : _descriptionController.text.trim(),
+      hasVariants: variantCount > 1,
+      productType: variantCount > 1 ? 'variable' : 'simple',
       gstRate: taxRate,
+      hsnCode: _hsnCodeController.text.trim().isEmpty
+          ? null
+          : _hsnCodeController.text.trim(),
+      taxId: _selectedTaxId,
+      imageBytes: _imageBytes,
+      stockMode: _stockMode == 'standard' ? null : _stockMode,
+      allowOrderWhenOutOfStock: _allowOrderWhenOutOfStock,
     );
 
     await productStore.addProduct(product);
 
-    int variantCount = 0;
-
-    if (_productType == 'variable') {
-      // Save generated variants
-      for (var variant in _generatedVariants) {
-        // Update product ID to the actual one we created
-        final updatedVariant = variant.copyWith(
+    // Attribute-generated variants.
+    for (final variant in _generatedVariants) {
+      // Point them at the id we just created.
+      await productStore.addVariant(
+        variant.copyWith(
           productId: productId,
           taxRate: taxRate,
-        );
-        await productStore.addVariant(updatedVariant);
-        variantCount++;
-      }
-    } else {
-      // Save manual variants
-      for (var i = 0; i < _variants.length; i++) {
-        final variantData = _variants[i];
-        final variantId = _uuid.v4();
+          taxId: _selectedTaxId,
+          isDecimalQuantity: _isDecimalQuantity,
+          unit: _unit,
+          expiryDate: _expiryDate?.toIso8601String(),
+        ),
+      );
+      // The generated variant's own varianteId was already used as its
+      // bundle-staging key (see _addModeBundleVariantOptions), so it doubles
+      // as both the staging key and the real variant id here.
+      await _persistBundleForNewVariant(
+        stagingKey: variant.varianteId,
+        productId: productId,
+        variantId: variant.varianteId,
+      );
+    }
 
-        final variant = VarianteModel.create(
+    // Manually entered variants.
+    for (final variantData in manualVariants) {
+      final fieldValues = _mapFieldValues(variantData);
+      final variantId = _uuid.v4();
+
+      await productStore.addVariant(
+        VarianteModel.create(
           varianteId: variantId,
           productId: productId,
-          size: variantData.sizeController.text.trim().isEmpty
-              ? null
-              : variantData.sizeController.text.trim(),
-          color: variantData.colorController.text.trim().isEmpty
-              ? null
-              : variantData.colorController.text.trim(),
-          weight: variantData.weightController.text.trim().isEmpty
-              ? null
-              : variantData.weightController.text.trim(),
           sku: variantData.skuController.text.trim().isEmpty
               ? null
               : variantData.skuController.text.trim(),
           barcode: variantData.barcodeController.text.trim().isEmpty
               ? null
               : variantData.barcodeController.text.trim(),
-          mrp: variantData.priceController.text.trim().isEmpty
+          // The field labelled "Selling Price" must land in sellingPrice — that
+          // is what the cart bills (cart_store: sellingPrice ?? mrp ?? 0). It
+          // used to be written to mrp, leaving sellingPrice null and the MRP box
+          // discarded entirely.
+          sellingPrice:
+              double.tryParse(variantData.priceController.text.trim()) ?? 0.0,
+          mrp: variantData.mrpController.text.trim().isEmpty
               ? null
-              : double.tryParse(variantData.priceController.text.trim()),
-          costPrice: double.tryParse(variantData.costPriceController.text.trim()) ?? 0.0,
-          stockQty: int.tryParse(variantData.stockController.text.trim()) ?? 0,
+              : double.tryParse(variantData.mrpController.text.trim()),
+          costPrice: variantData.costPriceController.text.trim().isEmpty
+              ? null
+              : double.tryParse(variantData.costPriceController.text.trim()),
+          stockQty:
+              double.tryParse(variantData.stockController.text.trim()) ?? 0,
           taxRate: taxRate,
-          customAttributes: variantData.getCustomAttributesMap(),
-        );
-
-        await productStore.addVariant(variant);
-        variantCount++;
-      }
+          taxId: _selectedTaxId,
+          isDecimalQuantity: _isDecimalQuantity,
+          unit: _unit,
+          expiryDate: _expiryDate?.toIso8601String(),
+          customAttributes: fieldValues,
+        ),
+      );
+      // Manual rows are keyed by their local form id while staging (see
+      // _addModeBundleVariantOptions) — translate to the real variant id
+      // just minted above.
+      await _persistBundleForNewVariant(
+        stagingKey: variantData.id,
+        productId: productId,
+        variantId: variantId,
+      );
     }
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${product.productName} with $variantCount variant(s) added successfully'),
-          backgroundColor: const Color(0xFF4CAF50),
-        ),
+      NotificationService.instance.showSuccess(
+        '${product.productName} with $variantCount variant(s) added',
       );
       Navigator.pop(context);
     }
   }
 
+  /// Saves the bundle row staged under [stagingKey] (see
+  /// [_addModeBundleVariantOptions]) against the real [variantId] just
+  /// created — only when there's something to save; an empty component list
+  /// just means "not configured yet" for that variant.
+  Future<void> _persistBundleForNewVariant({
+    required String stagingKey,
+    required String productId,
+    required String variantId,
+  }) async {
+    if (_stockMode == 'standard') return;
+    final components = _bundleComponentsByVariant[stagingKey];
+    if (components == null || components.isEmpty) return;
+    final now = DateTime.now().toIso8601String();
+    await bundleRepository.saveBundle(
+      RetailBundleModel(
+        id: _bundleRowIdByVariant[stagingKey] ?? _uuid.v4(),
+        productId: productId,
+        variantId: variantId,
+        components: components,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+  }
+
+  /// Descriptor inputs for one variant, laid out two per row like the fields
+  /// they replaced. Empty when the shop has configured no fields — price,
+  /// stock, barcode and SKU are always shown regardless.
+  List<Widget> _buildConfiguredFields(VariantFormData variant) {
+    if (_simpleFields.isEmpty) return const [];
+
+    final rows = <Widget>[];
+    for (var i = 0; i < _simpleFields.length; i += 2) {
+      final left = _simpleFields[i];
+      final right = i + 1 < _simpleFields.length ? _simpleFields[i + 1] : null;
+
+      rows.add(
+        Row(
+          children: [
+            Expanded(child: _buildFieldInput(variant, left)),
+            SizedBox(width: AppResponsive.mediumSpacing(context)),
+            if (right != null)
+              Expanded(child: _buildFieldInput(variant, right))
+            else
+              const Expanded(child: SizedBox.shrink()),
+          ],
+        ),
+      );
+      rows.add(SizedBox(height: AppResponsive.mediumSpacing(context)));
+    }
+    return rows;
+  }
+
+  /// A single descriptor input. Offers the attribute's preset values as a
+  /// dropdown while still allowing free text, so the shared vocabulary is
+  /// reused without blocking one-off values.
+  Widget _buildFieldInput(VariantFormData variant, AttributeModel attribute) {
+    final controller = variant.fieldController(attribute.attributeId);
+    final values = attributeStore.getValues(attribute.attributeId);
+
+    return _buildTextField(
+      controller: controller,
+      label: attribute.name,
+      hint: values.isEmpty ? null : 'e.g. ${values.first.value}',
+      suffixIcon: values.isEmpty
+          ? null
+          : PopupMenuButton<String>(
+              icon: Icon(
+                Icons.keyboard_arrow_down_rounded,
+                size: AppResponsive.iconSize(context),
+                color: AppColors.textSecondary,
+              ),
+              tooltip: 'Choose ${attribute.name}',
+              // M3 tints menu surfaces by default; keep them plain white.
+              color: AppColors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(
+                  AppResponsive.borderRadius(context),
+                ),
+              ),
+              onSelected: (value) => setState(() => controller.text = value),
+              itemBuilder: (_) => values
+                  .map(
+                    (v) => PopupMenuItem<String>(
+                      value: v.value,
+                      child: Text(
+                        v.value,
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.bodyFontSize(context),
+                        ),
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+    );
+  }
+
+  /// Fold the configured descriptor fields (plus any ad-hoc custom attribute
+  /// rows) into what VarianteModel stores.
+  ///
+  /// A field named Size / Color / Colour / Weight still writes the legacy
+  /// column, so receipts and reports that read `variant.size` keep working —
+  /// the same rule VariantGeneratorService applies for variable products.
+  /// Everything else goes to `customAttributes`.
+  Map<String, String>? _mapFieldValues(VariantFormData variantData) {
+    final entered = <String, String>{};
+    for (final attribute in _simpleFields) {
+      final value =
+          variantData.fieldControllers[attribute.attributeId]?.text.trim() ??
+          '';
+      if (value.isNotEmpty) entered[attribute.name] = value;
+    }
+
+    // Ad-hoc per-variant rows stay supported alongside configured fields.
+    return mergeVariantAttributes(
+      entered,
+      extraCustomAttributes: variantData.getCustomAttributesMap(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
-      appBar: AppBar(
-        title: const Text('Add Product'),
-        backgroundColor: Colors.white,
-        elevation: 0,
+      backgroundColor: AppColors.surfaceLight,
+      appBar: buildPrimaryAppBar(
+        title: _isEditing ? 'Edit Product' : 'Add Product',
       ),
       body: Observer(
         builder: (context) => Form(
           key: _formKey,
-          child: ListView(
-            padding: const EdgeInsets.all(20),
-            children: [
-              // Product Information Section
-              _buildSectionHeader('Product Information'),
-              const SizedBox(height: 12),
-              _buildTextField(
-                controller: _nameController,
-                label: 'Product Name',
-                hint: 'e.g., Puma T-Shirt',
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter product name';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 12),
-              _buildTextField(
-                controller: _brandController,
-                label: 'Brand Name (Optional)',
-                hint: 'e.g., Puma, Nike',
-              ),
-              const SizedBox(height: 12),
-              _buildCategoryDropdown(),
-              const SizedBox(height: 12),
-              _buildTextField(
-                controller: _descriptionController,
-                label: 'Description (Optional)',
-                hint: 'Enter product description',
-                maxLines: 3,
-              ),
-              const SizedBox(height: 12),
-              _buildTextField(
-                controller: _taxRateController,
-                label: 'Tax Rate % (Optional)',
-                hint: '0.00',
-                keyboardType: TextInputType.number,
-              ),
-              const SizedBox(height: 16),
-
-              // Product Type Selector
-              _buildProductTypeSelector(),
-
-              const SizedBox(height: 24),
-
-              // Show different UI based on product type
-              if (_productType == 'variable') ...[
-                // Attribute Selector Section (WooCommerce-style)
-                _buildSectionHeader('Product Attributes'),
-                const SizedBox(height: 12),
-                _buildAttributeSelector(),
-
-                // Generated Variants Section
-                if (_generatedVariants.isNotEmpty) ...[
-                  const SizedBox(height: 24),
-                  _buildSectionHeader('Generated Variants (${_generatedVariants.length})'),
-                  const SizedBox(height: 12),
-
-                  // Bulk Edit Bar
-                  _buildBulkEditBar(),
-                  const SizedBox(height: 12),
-
-                  _buildGeneratedVariantsList(),
+          // A single column of form fields stretched across a laptop is
+          // unreadable — cap it at the form width like the other retail forms.
+          child: AppResponsive.constrainedContent(
+            context: context,
+            alignment: Alignment.topCenter,
+            maxWidth: AppResponsive.maxCardWidth(context),
+            child: ListView(
+              padding: AppResponsive.screenPadding(context),
+              children: [
+                // Product Information Section
+                _buildSectionHeader('Product Information'),
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
+                UniversalImageUploader(
+                  imageBytes: _imageBytes,
+                  height: 160,
+                  uploadLabel: 'Add Product Photo',
+                  sizeHint: 'Optional • shown on the billing screen',
+                  onTap: () async {
+                    final bytes = await UniversalImagePicker.showPicker(
+                      context,
+                    );
+                    if (bytes == null || !mounted) return;
+                    setState(() {
+                      _imageBytes = bytes;
+                      _imageCleared = false;
+                    });
+                  },
+                  onDelete: _imageBytes == null
+                      ? null
+                      : () => setState(() {
+                          _imageBytes = null;
+                          _imageCleared = true;
+                        }),
+                ),
+                SizedBox(height: AppResponsive.largeSpacing(context)),
+                _buildTextField(
+                  controller: _nameController,
+                  label: 'Product Name',
+                  hint: 'e.g., Puma T-Shirt',
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter product name';
+                    }
+                    return null;
+                  },
+                ),
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
+                _buildTextField(
+                  controller: _brandController,
+                  label: 'Brand Name (Optional)',
+                  hint: 'e.g., Puma, Nike',
+                ),
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
+                _buildCategoryDropdown(),
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
+                _buildTextField(
+                  controller: _descriptionController,
+                  label: 'Description (Optional)',
+                  hint: 'Enter product description',
+                  maxLines: 3,
+                ),
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
+                _buildTextField(
+                  controller: _hsnCodeController,
+                  label: '${TariffCodeRule.label} (Optional)',
+                  hint: 'e.g., 6109',
+                  onChanged: _onHsnCodeChanged,
+                ),
+                if (TaxFeature.enabled) ...[
+                  SizedBox(height: AppResponsive.mediumSpacing(context)),
+                  _buildTaxDropdown(),
                 ],
-              ] else ...[
-                // Simple product - Manual Variants Section
-                _buildSectionHeader('Variants (${_variants.length})'),
-                const SizedBox(height: 12),
+                SizedBox(height: AppResponsive.largeSpacing(context)),
 
-                // List all variants
-                ..._variants.asMap().entries.map((entry) {
-                  final index = entry.key;
-                  final variant = entry.value;
-                  return _buildVariantCard(variant, index);
-                }).toList(),
+                // ── Stock Mode ────────────────────────────────────────────
+                // See docs/retail_inventory_system_plan.md §3.2. Shown for
+                // both create and edit — editing hides the variants section
+                // below (variants are managed on the product's own screen)
+                // but a product's stock mode is still a product-level field.
+                _buildSectionHeader('Stock Mode'),
+                SizedBox(height: AppResponsive.smallSpacing(context)),
+                _buildStockModeSection(),
+                SizedBox(height: AppResponsive.smallSpacing(context)),
+                _buildAllowOutOfStockSection(),
+                SizedBox(height: AppResponsive.largeSpacing(context)),
 
-                // Add Variant Button
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  onPressed: _addVariant,
-                  icon: const Icon(Icons.add, color: Color(0xFF2196F3)),
-                  label: const Text('Add Another Variant'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF2196F3),
-                    side: const BorderSide(color: Color(0xFF2196F3)),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                // ── Unit of Measure ───────────────────────────────────────
+                // Product-level, because a shop sells potatoes by weight — not
+                // "this variant by weight, that one by piece".
+                _buildSectionHeader('Unit of Measure'),
+                SizedBox(height: AppResponsive.smallSpacing(context)),
+                _buildUnitOfMeasureSection(),
+                SizedBox(height: AppResponsive.largeSpacing(context)),
+
+                // ── Expiry ────────────────────────────────────────────────
+                // Optional for EVERY product — there is no perishable/food
+                // classification in retail, so non-expiring products simply
+                // leave it unset. NOT batch tracking: one date per variant.
+                _buildSectionHeader('Expiry'),
+                SizedBox(height: AppResponsive.smallSpacing(context)),
+                _buildExpirySection(),
+                SizedBox(height: AppResponsive.largeSpacing(context)),
+
+                // Editing touches product fields only — variants are managed on
+                // the product's own screen, which is where you came from.
+                if (!_isEditing) ...[
+                  SizedBox(height: AppResponsive.smallSpacing(context)),
+
+                  // ── One Variants section for every product ──────────────
+                  // There is no Simple/Variable mode: a product simply has
+                  // variants. Type them in, generate them from attributes, or
+                  // both. The POS already decides how to behave by counting
+                  // them (posscreen: variants.length == 1 → straight to cart).
+                  _buildSectionHeader(
+                    'Variants ($_effectiveVariantCount)',
+                    trailing: IconButton(
+                      icon: Icon(
+                        Icons.tune,
+                        size: AppResponsive.iconSize(context),
+                        color: AppColors.primary,
+                      ),
+                      tooltip: 'Choose which detail fields appear',
+                      visualDensity: VisualDensity.compact,
+                      onPressed: _openSimpleFieldSettings,
+                    ),
+                  ),
+                  SizedBox(height: AppResponsive.mediumSpacing(context)),
+
+                  // Manually entered variants — hidden while Bulk add is open
+                  // unless one is filled in. See [_showManualVariants].
+                  if (_showManualVariants) ...[
+                    ..._variants.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final variant = entry.value;
+                      return _buildVariantCard(variant, index);
+                    }),
+
+                    // Bundle/repack products can have multiple variants too
+                    // (e.g. a "Combo Meal" in Small/Medium/Large) — "Add
+                    // variant" and bulk-generate work exactly like a standard
+                    // product; each variant gets its own component list below.
+                    SizedBox(height: AppResponsive.mediumSpacing(context)),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _addVariant,
+                        icon: Icon(
+                          Icons.add,
+                          size: AppResponsive.smallIconSize(context),
+                          color: AppColors.primary,
+                        ),
+                        label: Text(
+                          'Add variant',
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                          side: const BorderSide(color: AppColors.primary),
+                          padding: EdgeInsets.symmetric(
+                            vertical: AppResponsive.mediumSpacing(context),
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ] else
+                    // Hiding the manual path must not lose it. Closing Bulk add
+                    // brings the rows straight back — nothing typed is
+                    // discarded, the controllers stay alive either way.
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        onPressed: () =>
+                            setState(() => _showAttributeGenerator = false),
+                        icon: Icon(
+                          Icons.edit_outlined,
+                          size: AppResponsive.smallIconSize(context),
+                        ),
+                        label: Text(
+                          'Type variants in manually instead',
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                        ),
+                      ),
+                    ),
+
+                  // ── Bulk add: many variants at once, from attributes ─────
+                  SizedBox(height: AppResponsive.largeSpacing(context)),
+                  _buildBulkAddPanel(),
+
+                  if (_generatedVariants.isNotEmpty) ...[
+                    SizedBox(height: AppResponsive.extraLargeSpacing(context)),
+                    _buildSectionHeader(
+                      'Generated Variants (${_generatedVariants.length})',
+                    ),
+                    SizedBox(height: AppResponsive.mediumSpacing(context)),
+                    _buildBulkEditBar(),
+                    SizedBox(height: AppResponsive.mediumSpacing(context)),
+                    _buildGeneratedVariantsList(),
+                  ],
+                ],
+
+                // ── Bundle / Repack components ───────────────────────────
+                if (_stockMode != 'standard') ...[
+                  SizedBox(height: AppResponsive.smallSpacing(context)),
+                  _buildBundleSection(),
+                ],
+
+                SizedBox(height: AppResponsive.extraLargeSpacing(context)),
+
+                // Save Button
+                SizedBox(
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: _isEditing ? _updateProduct : _saveProduct,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: AppColors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: Text(
+                      _isEditing
+                          ? 'Save Changes'
+                          : 'Add Product with $_effectiveVariantCount Variant(s)',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.subheadingFontSize(context),
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ),
               ],
-
-              const SizedBox(height: 32),
-
-              // Save Button
-              SizedBox(
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: _saveProduct,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF4CAF50),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  child: Text(
-                    _productType == 'variable'
-                        ? 'Add Product with ${_generatedVariants.length} Variant(s)'
-                        : 'Add Product with ${_variants.length} Variant(s)',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
     );
   }
 
+  /// Bulk add: pick attributes (Size, Colour…) and get one variant per
+  /// combination, the same accelerator the setup wizard offers.
+  ///
+  /// This used to hide behind a button labelled only "Generate", sitting beside
+  /// "Add variant" as if it were an alternative to it — so the whole bulk path
+  /// went unnoticed. The header now says what it does and stays on screen; only
+  /// the picker folds away.
+  Widget _buildBulkAddPanel() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
+        border: Border.all(
+          color: _showAttributeGenerator
+              ? AppColors.info.withValues(alpha: 0.5)
+              : AppColors.divider,
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x08000000),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(
+              AppResponsive.borderRadius(context),
+            ),
+            onTap: () => setState(() {
+              _showAttributeGenerator = !_showAttributeGenerator;
+              // Decide ONCE, on open, whether the manual rows step aside —
+              // see [_manualHiddenByBulk].
+              if (_showAttributeGenerator) {
+                _manualHiddenByBulk = _filledManualVariants.isEmpty;
+              }
+            }),
+            child: Padding(
+              padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
+              child: Row(
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(
+                      AppResponsive.smallSpacing(context),
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.info.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(
+                        AppResponsive.smallBorderRadius(context),
+                      ),
+                    ),
+                    child: Icon(
+                      Icons.auto_awesome,
+                      size: AppResponsive.iconSize(context),
+                      color: AppColors.info,
+                    ),
+                  ),
+                  SizedBox(width: AppResponsive.mediumSpacing(context)),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Bulk add variants',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.bodyFontSize(context),
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _generatedVariants.isEmpty
+                              ? 'Pick Size, Colour… and get one variant per combination'
+                              : '${_generatedVariants.length} generated — tap to change',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.captionFontSize(context),
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    _showAttributeGenerator
+                        ? Icons.expand_less_rounded
+                        : Icons.expand_more_rounded,
+                    color: AppColors.textSecondary,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // maintainState keeps the picked attributes and values alive while
+          // folded — collapsing the panel used to dispose the selector and
+          // throw the whole selection away.
+          Visibility(
+            visible: _showAttributeGenerator,
+            maintainState: true,
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                AppResponsive.mediumSpacing(context),
+                0,
+                AppResponsive.mediumSpacing(context),
+                AppResponsive.mediumSpacing(context),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Divider(height: 1, color: AppColors.divider),
+                  SizedBox(height: AppResponsive.mediumSpacing(context)),
+                  _buildAttributeSelector(),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildVariantCard(VariantFormData variant, int index) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
+      margin: EdgeInsets.only(bottom: AppResponsive.largeSpacing(context)),
+      padding: AppResponsive.cardPadding(context),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE8E8E8)),
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
+        border: Border.all(color: AppColors.divider),
+        // Same soft lift the POS and report cards use.
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x08000000),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -527,16 +1484,19 @@ class _AddProductScreenState extends State<AddProductScreen> {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppResponsive.smallSpacing(context),
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF2196F3),
+                  color: AppColors.info,
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
                   'Variant ${index + 1}',
-                  style: const TextStyle(
+                  style: GoogleFonts.poppins(
                     color: Colors.white,
-                    fontSize: 12,
+                    fontSize: AppResponsive.smallFontSize(context),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -544,91 +1504,69 @@ class _AddProductScreenState extends State<AddProductScreen> {
               const Spacer(),
               if (_variants.length > 1)
                 IconButton(
-                  icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                  icon: Icon(
+                    Icons.delete_outline,
+                    color: AppColors.danger,
+                    size: AppResponsive.iconSize(context),
+                  ),
                   onPressed: () => _removeVariant(index),
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          // Variant Fields
-          Row(
-            children: [
-              Expanded(
-                child: _buildTextField(
-                  controller: variant.colorController,
-                  label: 'Color',
-                  hint: 'e.g., Green',
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildTextField(
-                  controller: variant.sizeController,
-                  label: 'Size',
-                  hint: 'e.g., M',
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          Row(
-            children: [
-              Expanded(
-                flex: 2,
-                child: TextFormField(
-                  controller: variant.barcodeController,
-                  decoration: InputDecoration(
-                    labelText: 'Barcode',
-                    hintText: 'Scan or enter',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    isDense: true,
-                    suffixIcon: IconButton(
-                      icon: const Icon(Icons.qr_code_scanner, color: Color(0xFF4CAF50), size: 20),
-                      onPressed: () => _scanBarcode(variant),
-                    ),
+                  constraints: const BoxConstraints(
+                    minWidth: 32,
+                    minHeight: 32,
                   ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildTextField(
-                  controller: variant.weightController,
-                  label: 'Weight',
-                  hint: 'e.g., 500g',
-                ),
-              ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
+
+          // Configurable descriptor fields (Settings → Simple Product Fields).
+          ..._buildConfiguredFields(variant),
+
+          _buildTextField(
+            controller: variant.barcodeController,
+            label: 'Barcode',
+            // Blank is fine and normal: VariantRepository.addVariant mints an
+            // internal code, so the field is only for a real one off the packet.
+            hint: 'Scan, or leave blank to auto-generate',
+            suffixIcon: IconButton(
+              icon: Icon(
+                Icons.qr_code_scanner,
+                color: AppColors.primary,
+                size: AppResponsive.iconSize(context),
+              ),
+              onPressed: () => _scanBarcode(variant),
+            ),
+          ),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
 
           Row(
             children: [
               Expanded(
                 child: _buildTextField(
                   controller: variant.costPriceController,
-                  label: 'Cost Price*',
+                  // No asterisk: _saveProduct validates selling price and stock
+                  // only — cost is bookkeeping and has always been optional.
+                  // The marker claimed otherwise for every product ever added.
+                  label: 'Cost Price',
                   hint: '0.00',
                   keyboardType: TextInputType.number,
+                  inputFormatters: _moneyFormatters,
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: AppResponsive.mediumSpacing(context)),
               Expanded(
                 child: _buildTextField(
                   controller: variant.priceController,
                   label: 'Selling Price*',
                   hint: '0.00',
                   keyboardType: TextInputType.number,
+                  inputFormatters: _moneyFormatters,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
 
           Row(
             children: [
@@ -638,9 +1576,10 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   label: 'MRP',
                   hint: '0.00',
                   keyboardType: TextInputType.number,
+                  inputFormatters: _moneyFormatters,
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: AppResponsive.mediumSpacing(context)),
               Expanded(
                 child: _buildTextField(
                   controller: variant.skuController,
@@ -650,33 +1589,34 @@ class _AddProductScreenState extends State<AddProductScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
 
           Row(
             children: [
               Expanded(
                 child: _buildTextField(
                   controller: variant.stockController,
-                  label: 'Stock*',
+                  label: _isDecimalQuantity ? 'Stock* ($_unit)' : 'Stock*',
                   hint: '0',
-                  keyboardType: TextInputType.number,
+                  keyboardType: _qtyKeyboard,
+                  inputFormatters: _activeQtyFormatters,
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: AppResponsive.mediumSpacing(context)),
               const Expanded(child: SizedBox()),
             ],
           ),
 
           // Custom Attributes Section
-          const SizedBox(height: 16),
+          SizedBox(height: AppResponsive.largeSpacing(context)),
           Row(
             children: [
-              const Text(
-                'Custom Attributes',
-                style: TextStyle(
-                  fontSize: 13,
+              Text(
+                'One-off details (this product only)',
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.smallFontSize(context),
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF6B6B6B),
+                  color: AppColors.textSecondary,
                 ),
               ),
               const Spacer(),
@@ -686,11 +1626,16 @@ class _AddProductScreenState extends State<AddProductScreen> {
                     variant.addCustomAttribute();
                   });
                 },
-                icon: const Icon(Icons.add, size: 16),
+                icon: Icon(
+                  Icons.add,
+                  size: AppResponsive.smallIconSize(context),
+                ),
                 label: const Text('Add'),
                 style: TextButton.styleFrom(
-                  foregroundColor: const Color(0xFF4CAF50),
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  foregroundColor: AppColors.primary,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: AppResponsive.smallSpacing(context),
+                  ),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
@@ -698,22 +1643,47 @@ class _AddProductScreenState extends State<AddProductScreen> {
             ],
           ),
           if (variant.customAttributes.isNotEmpty) ...[
-            const SizedBox(height: 8),
+            SizedBox(height: AppResponsive.smallSpacing(context)),
             ...variant.customAttributes.asMap().entries.map((entry) {
               final attrIndex = entry.key;
               final attr = entry.value;
               return Padding(
-                padding: const EdgeInsets.only(bottom: 8),
+                padding: EdgeInsets.only(
+                  bottom: AppResponsive.smallSpacing(context),
+                ),
                 child: Row(
                   children: [
                     Expanded(
-                      child: _buildTextField(
-                        controller: attr.keyController,
-                        label: 'Attribute',
-                        hint: 'e.g., Material',
+                      // Suggests existing global attributes so repeated
+                      // free-text keys don't fragment the vocabulary
+                      // ("Flavour" vs "Flavor" vs "flavor").
+                      child: Autocomplete<String>(
+                        optionsBuilder: (value) {
+                          final query = value.text.trim().toLowerCase();
+                          if (query.isEmpty)
+                            return const Iterable<String>.empty();
+                          return attributeStore.attributes
+                              .map((a) => a.name)
+                              .where((n) => n.toLowerCase().contains(query));
+                        },
+                        onSelected: (selection) =>
+                            attr.keyController.text = selection,
+                        fieldViewBuilder:
+                            (context, controller, focusNode, onSubmitted) {
+                              // Mirror the shared controller so save-time reads
+                              // still see what was typed.
+                              controller.value = attr.keyController.value;
+                              return _buildTextField(
+                                controller: controller,
+                                focusNode: focusNode,
+                                label: 'Detail',
+                                hint: 'e.g., Material',
+                                onChanged: (v) => attr.keyController.text = v,
+                              );
+                            },
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: AppResponsive.smallSpacing(context)),
                     Expanded(
                       child: _buildTextField(
                         controller: attr.valueController,
@@ -722,27 +1692,34 @@ class _AddProductScreenState extends State<AddProductScreen> {
                       ),
                     ),
                     IconButton(
-                      icon: const Icon(Icons.remove_circle_outline, color: Colors.red, size: 20),
+                      icon: Icon(
+                        Icons.remove_circle_outline,
+                        color: AppColors.danger,
+                        size: AppResponsive.iconSize(context),
+                      ),
                       onPressed: () {
                         setState(() {
                           variant.removeCustomAttribute(attrIndex);
                         });
                       },
                       padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                      constraints: const BoxConstraints(
+                        minWidth: 32,
+                        minHeight: 32,
+                      ),
                     ),
                   ],
                 ),
               );
-            }).toList(),
+            }),
           ] else ...[
             const SizedBox(height: 4),
             Text(
-              'Add custom attributes like Material, Flavor, Capacity, etc.',
-              style: TextStyle(
-                fontSize: 11,
-                color: Colors.grey[500],
-                fontStyle: FontStyle.italic,
+              'For details you record just this once. Fields you use on every '
+              'product belong in Settings → Simple Product Fields.',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.captionFontSize(context),
+                color: AppColors.textSecondary,
               ),
             ),
           ],
@@ -751,13 +1728,443 @@ class _AddProductScreenState extends State<AddProductScreen> {
     );
   }
 
-  Widget _buildSectionHeader(String title) {
-    return Text(
+  /// Section heading. [trailing] holds a secondary action (small icon, right
+  /// aligned) — never a second full-width button.
+  Widget _buildSectionHeader(String title, {Widget? trailing}) {
+    final text = Text(
       title,
-      style: const TextStyle(
-        fontSize: 16,
+      style: GoogleFonts.poppins(
+        fontSize: AppResponsive.subheadingFontSize(context) - 2,
         fontWeight: FontWeight.w600,
-        color: Color(0xFF1A1A1A),
+        color: AppColors.textPrimary,
+      ),
+    );
+
+    if (trailing == null) return text;
+    return Row(children: [text, const Spacer(), trailing]);
+  }
+
+  // ── Stock Mode (Standard / Bundle / Repack) ───────────────────────────
+  // See docs/retail_inventory_system_plan.md §3.2.
+
+  /// Switches this product between whole pieces and fractional (loose) goods,
+  /// and names the unit when it is fractional.
+  ///
+  /// Off by default, which is why every existing product keeps its whole-number
+  /// behaviour untouched. Turning it on is the ONLY thing that lets a decimal
+  /// be typed into a quantity field anywhere in the app for these variants.
+  /// Optional expiry date for this product's variants.
+  ///
+  /// A switch reveals the picker, mirroring the Unit of Measure control above.
+  /// Turning it OFF clears the date, so nothing stale can survive — the same
+  /// reason that control resets `_unit` to 'piece'.
+  Widget _buildExpirySection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SwitchListTile.adaptive(
+          value: _expiryDate != null,
+          onChanged: (on) => setState(() {
+            // Default to a week out so the picker opens somewhere sensible;
+            // switching off must leave nothing behind.
+            _expiryDate = on
+                ? dateOnly(DateTime.now().add(const Duration(days: 7)))
+                : null;
+          }),
+          contentPadding: EdgeInsets.zero,
+          dense: true,
+          title: Text(
+            'Has an expiry date',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.bodyFontSize(context),
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          subtitle: Text(
+            _expiryDate == null
+                ? 'This product does not expire'
+                : 'Alerts $kExpiryWarningDays days before it expires',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.smallFontSize(context),
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ),
+        if (_expiryDate != null) ...[
+          SizedBox(height: AppResponsive.smallSpacing(context)),
+          ExpiryDateField(
+            value: _expiryDate,
+            onPick: (picked) => setState(() => _expiryDate = picked),
+            onClear: () => setState(() => _expiryDate = null),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildUnitOfMeasureSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SwitchListTile.adaptive(
+          value: _isDecimalQuantity,
+          onChanged: (v) => setState(() {
+            _isDecimalQuantity = v;
+            // Collapsing back to pieces must not leave a stale 'kg' behind.
+            if (!v)
+              _unit = 'piece';
+            else if (_unit == 'piece')
+              _unit = 'kg';
+          }),
+          contentPadding: EdgeInsets.zero,
+          dense: true,
+          title: Text(
+            'Sold by weight / volume',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.bodyFontSize(context),
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          subtitle: Text(
+            _isDecimalQuantity
+                ? 'Quantities may be fractional, e.g. 1.75 $_unit'
+                : 'Counted in whole pieces',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.smallFontSize(context),
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ),
+        if (_isDecimalQuantity) ...[
+          SizedBox(height: AppResponsive.smallSpacing(context)),
+          DropdownButtonFormField<String>(
+            initialValue: kItemUnits.contains(_unit) ? _unit : 'kg',
+            // _pickerDecoration, like the Tax Rate picker below. A bare
+            // InputDecoration with isDense made this sit SHORTER than the
+            // AppTextFields stacked around it and floated its label into the
+            // top border — the exact case _pickerDecoration documents.
+            decoration: _pickerDecoration('Unit'),
+            // Reuses restaurant's canonical list so the two sides can never
+            // drift apart on what a unit is called.
+            items: kItemUnits
+                .where((u) => u != 'piece')
+                .map((u) => DropdownMenuItem(value: u, child: Text(u)))
+                .toList(),
+            onChanged: (v) {
+              if (v != null) setState(() => _unit = v);
+            },
+          ),
+        ],
+      ],
+    );
+  }
+
+  /// Lets a sale go through once stock hits zero. Off by default, so every
+  /// existing product keeps today's refusal untouched.
+  Widget _buildAllowOutOfStockSection() {
+    return SwitchListTile.adaptive(
+      value: _allowOrderWhenOutOfStock,
+      onChanged: (v) => setState(() => _allowOrderWhenOutOfStock = v),
+      contentPadding: EdgeInsets.zero,
+      dense: true,
+      title: Text(
+        'Allow Order When Out of Stock',
+        style: GoogleFonts.poppins(
+          fontSize: AppResponsive.bodyFontSize(context),
+          fontWeight: FontWeight.w600,
+          color: AppColors.textPrimary,
+        ),
+      ),
+      subtitle: Text(
+        _allowOrderWhenOutOfStock
+            ? 'Sells on at zero stock — the count goes negative'
+            : 'Refused once stock reaches zero',
+        style: GoogleFonts.poppins(
+          fontSize: AppResponsive.smallFontSize(context),
+          color: AppColors.textSecondary,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStockModeSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildStockModeCard(
+          value: 'standard',
+          icon: Icons.inventory_2_outlined,
+          title: 'Standard',
+          subtitle: "This product's own variant stock is what's sold",
+        ),
+        SizedBox(height: AppResponsive.smallSpacing(context)),
+        _buildStockModeCard(
+          value: 'bundle',
+          icon: Icons.widgets_rounded,
+          title: 'Bundle',
+          subtitle:
+              "No stock of its own — selling it deducts each component's stock",
+        ),
+        SizedBox(height: AppResponsive.smallSpacing(context)),
+        _buildStockModeCard(
+          value: 'repack',
+          icon: Icons.build_circle_outlined,
+          title: 'Repack / Kit',
+          subtitle: 'Has its own stock, replenished by assembling components',
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStockModeCard({
+    required String value,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
+    final isSelected = _stockMode == value;
+    return InkWell(
+      onTap: () => setState(() => _stockMode = value),
+      borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+      child: Container(
+        padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppColors.primary.withValues(alpha: 0.06)
+              : AppColors.white,
+          borderRadius: BorderRadius.circular(
+            AppResponsive.borderRadius(context),
+          ),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : AppColors.divider,
+            width: isSelected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
+              decoration: BoxDecoration(
+                color:
+                    (isSelected ? AppColors.primary : AppColors.textSecondary)
+                        .withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(
+                  AppResponsive.smallBorderRadius(context),
+                ),
+              ),
+              child: Icon(
+                icon,
+                size: AppResponsive.smallIconSize(context),
+                color: isSelected ? AppColors.primary : AppColors.textSecondary,
+              ),
+            ),
+            SizedBox(width: AppResponsive.mediumSpacing(context)),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.bodyFontSize(context),
+                      fontWeight: FontWeight.w600,
+                      color: isSelected
+                          ? AppColors.primary
+                          : AppColors.textPrimary,
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.captionFontSize(context),
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              isSelected
+                  ? Icons.radio_button_checked
+                  : Icons.radio_button_unchecked,
+              color: isSelected ? AppColors.primary : AppColors.textSecondary,
+              size: AppResponsive.iconSize(context),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// The Bundle Builder — one per variant. A product with a single variant
+  /// (the common case) shows the builder exactly as before, with no extra
+  /// chrome; 2+ variants get a chip selector above it so each one's
+  /// component list can be configured independently.
+  Widget _buildBundleSection() {
+    final options = _isEditing
+        ? productStore
+              .variantsFor(widget.product!.productId)
+              .map(
+                (v) => _BundleVariantOption(
+                  key: v.varianteId,
+                  label: v.displayName,
+                  sellingPrice: v.sellingPrice ?? v.mrp,
+                ),
+              )
+              .toList()
+        : _addModeBundleVariantOptions();
+
+    if (options.isEmpty) {
+      return _bundleNoVariantWarning();
+    }
+
+    // Keep the selection valid — falls back to the first option on the
+    // initial build, and again if the previously selected variant was
+    // removed (e.g. its row was deleted).
+    var selectedKey = _selectedBundleVariantKey;
+    if (selectedKey == null || options.every((o) => o.key != selectedKey)) {
+      selectedKey = options.first.key;
+    }
+    _selectedBundleVariantKey = selectedKey;
+    final selected = options.firstWhere((o) => o.key == selectedKey);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (options.length > 1) ...[
+          _buildBundleVariantSelector(options, selectedKey),
+          SizedBox(height: AppResponsive.smallSpacing(context)),
+        ],
+        // Keyed by the selected variant so switching remounts the builder
+        // with THAT variant's components — its own `initialComponents`,
+        // read fresh from the staging map below. Edits already made to the
+        // variant being left behind are never lost: BundleBuilderWidget's
+        // onChanged fires on every keystroke/add/remove, so the map is kept
+        // continuously up to date rather than only "on switch".
+        BundleBuilderWidget(
+          key: ValueKey('bundle_variant_$selectedKey'),
+          currentProductId: _isEditing
+              ? widget.product!.productId
+              : _draftProductId,
+          stockMode: _stockMode,
+          initialComponents:
+              _bundleComponentsByVariant[selectedKey] ?? const [],
+          sellingPrice: selected.sellingPrice,
+          onChanged: (components) =>
+              _bundleComponentsByVariant[selectedKey!] = components,
+        ),
+      ],
+    );
+  }
+
+  /// Chip strip for picking which variant's components are being edited.
+  Widget _buildBundleVariantSelector(
+    List<_BundleVariantOption> options,
+    String selectedKey,
+  ) {
+    return SizedBox(
+      height: 38,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: options.length,
+        separatorBuilder: (_, __) =>
+            SizedBox(width: AppResponsive.smallSpacing(context)),
+        itemBuilder: (context, index) {
+          final option = options[index];
+          final isSelected = option.key == selectedKey;
+          return ChoiceChip(
+            label: Text(option.label),
+            selected: isSelected,
+            onSelected: (_) =>
+                setState(() => _selectedBundleVariantKey = option.key),
+            labelStyle: GoogleFonts.poppins(
+              fontSize: AppResponsive.smallFontSize(context),
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+              color: isSelected ? AppColors.primary : AppColors.textPrimary,
+            ),
+            backgroundColor: AppColors.white,
+            selectedColor: AppColors.primary.withValues(alpha: 0.1),
+            side: BorderSide(
+              color: isSelected ? AppColors.primary : AppColors.divider,
+            ),
+            shape: RoundedRectangleBorder(
+              // Radius 10, not a 20 pill — the project's button/chip rule.
+              borderRadius: BorderRadius.circular(10),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// Candidate variants for the bundle/repack builder while creating a new
+  /// product: every manual row (keyed by its stable local id, so a row can
+  /// be staged before it's even filled in) plus every attribute-generated
+  /// variant (keyed by its real varianteId). `_variants` always has at least
+  /// one row — see [_removeVariant] — so this is never empty in create mode.
+  List<_BundleVariantOption> _addModeBundleVariantOptions() {
+    return [
+      for (var i = 0; i < _variants.length; i++)
+        _BundleVariantOption(
+          key: _variants[i].id,
+          label: _manualVariantLabel(_variants[i], i),
+          sellingPrice: double.tryParse(
+            _variants[i].priceController.text.trim(),
+          ),
+        ),
+      for (final v in _generatedVariants)
+        _BundleVariantOption(
+          key: v.varianteId,
+          label: v.displayName,
+          sellingPrice: v.sellingPrice,
+        ),
+    ];
+  }
+
+  /// Short label for a manual variant row in the bundle variant selector —
+  /// its configured descriptor values (e.g. "Small"), falling back to its
+  /// SKU, falling back to a positional label.
+  String _manualVariantLabel(VariantFormData variant, int index) {
+    final parts = <String>[];
+    for (final field in _simpleFields) {
+      final value = variant.fieldControllers[field.attributeId]?.text.trim();
+      if (value != null && value.isNotEmpty) parts.add(value);
+    }
+    if (parts.isNotEmpty) return parts.join(' • ');
+    final sku = variant.skuController.text.trim();
+    if (sku.isNotEmpty) return sku;
+    return 'Variant ${index + 1}';
+  }
+
+  Widget _bundleNoVariantWarning() {
+    return Container(
+      padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
+      margin: EdgeInsets.only(bottom: AppResponsive.largeSpacing(context)),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.warning_amber_rounded, color: AppColors.warning),
+          SizedBox(width: AppResponsive.smallSpacing(context)),
+          Expanded(
+            child: Text(
+              'Add a variant to this product before configuring it as a Bundle or Repack/Kit.',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.smallFontSize(context),
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -765,324 +2172,469 @@ class _AddProductScreenState extends State<AddProductScreen> {
   Widget _buildTextField({
     required TextEditingController controller,
     required String label,
-    required String hint,
+    String? hint,
     TextInputType? keyboardType,
     String? Function(String?)? validator,
     int maxLines = 1,
+    ValueChanged<String>? onChanged,
+    FocusNode? focusNode,
+    List<TextInputFormatter>? inputFormatters,
+    Widget? suffixIcon,
   }) {
-    return TextFormField(
+    // Shared field styling, same as the POS and inventory screens.
+    return AppTextField(
       controller: controller,
-      decoration: InputDecoration(
-        labelText: label,
-        hintText: hint,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Color(0xFFE8E8E8)),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Color(0xFFE8E8E8)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Color(0xFF4CAF50), width: 2),
-        ),
-        filled: true,
-        fillColor: Colors.white,
-        isDense: true,
-      ),
-      keyboardType: keyboardType,
+      focusNode: focusNode,
+      label: label,
+      hint: hint,
+      keyboardType: keyboardType ?? TextInputType.text,
       validator: validator,
       maxLines: maxLines,
+      onChanged: onChanged,
+      inputFormatters: inputFormatters,
+      suffixIcon: suffixIcon,
     );
   }
 
+  /// Dropdown chrome matching [AppTextField], so the pickers sit flush with
+  /// the text fields around them instead of using Material defaults.
+  InputDecoration _pickerDecoration(String label) => InputDecoration(
+    labelText: label,
+    // Matches AppTextField: a 13px label and NO isDense. With isDense and a
+    // 14px label the floated label collided with the top border, and the
+    // picker sat shorter than the text fields stacked above it.
+    labelStyle: GoogleFonts.poppins(
+      fontSize: AppResponsive.smallFontSize(context),
+      color: AppColors.textSecondary,
+    ),
+    filled: true,
+    fillColor: AppColors.surfaceLight,
+    contentPadding: EdgeInsets.symmetric(
+      horizontal: AppResponsive.cardPadding(context).left,
+      vertical: AppResponsive.mediumSpacing(context),
+    ),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+      borderSide: const BorderSide(color: AppColors.divider),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+      borderSide: const BorderSide(color: AppColors.divider),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+      borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+    ),
+  );
+
+  /// Category picker.
+  ///
+  /// A tappable field plus a bottom sheet, rather than a native dropdown —
+  /// the platform overlay covered the whole form and ignored the app's
+  /// surface styling. Wrapped in a [FormField] so validation still runs with
+  /// the rest of the form.
   Widget _buildCategoryDropdown() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        DropdownButtonFormField<String>(
-          value: _selectedCategory,
-          isExpanded: true,
-          decoration: InputDecoration(
-            labelText: 'Category',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Color(0xFFE8E8E8)),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: const BorderSide(color: Color(0xFFE8E8E8)),
-            ),
-            filled: true,
-            fillColor: Colors.white,
-          ),
-          items: [
-            ..._categories.map((category) {
-              return DropdownMenuItem(
-                value: category.categoryName,
-                child: Text(
-                  '${category.categoryName} (GST ${(category.gstRate ?? 0).toInt()}%)',
-                  overflow: TextOverflow.ellipsis,
+    return FormField<String>(
+      initialValue: _selectedCategoryModel?.id,
+      validator: (_) =>
+          _selectedCategoryModel == null ? 'Please select a category' : null,
+      builder: (state) {
+        final selected = _selectedCategoryModel;
+        final hasError = state.hasError;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            InkWell(
+              onTap: () async {
+                await _showCategoryPicker();
+                state.didChange(_selectedCategoryModel?.id);
+              },
+              borderRadius: BorderRadius.circular(
+                AppResponsive.borderRadius(context),
+              ),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 15,
                 ),
-              );
-            }),
-            const DropdownMenuItem(
-              value: '__manage__',
-              child: Row(
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceLight,
+                  borderRadius: BorderRadius.circular(
+                    AppResponsive.borderRadius(context),
+                  ),
+                  border: Border.all(
+                    color: hasError ? AppColors.danger : AppColors.divider,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.folder_outlined,
+                      size: AppResponsive.iconSize(context),
+                      color: selected == null
+                          ? AppColors.textSecondary
+                          : AppColors.primary,
+                    ),
+                    SizedBox(width: AppResponsive.mediumSpacing(context)),
+                    Expanded(
+                      child: Text(
+                        selected?.name ?? 'Select category',
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.bodyFontSize(context),
+                          fontWeight: selected == null
+                              ? FontWeight.w400
+                              : FontWeight.w500,
+                          color: selected == null
+                              ? AppColors.textSecondary
+                              : AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                    const Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: AppColors.textSecondary,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (hasError)
+              Padding(
+                padding: EdgeInsets.only(
+                  left: AppResponsive.mediumSpacing(context),
+                  top: 6,
+                ),
+                child: Text(
+                  state.errorText!,
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.smallFontSize(context),
+                    color: AppColors.danger,
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Bottom sheet listing the categories, with full add/edit/delete in place
+  /// and Manage pinned at the bottom.
+  ///
+  /// Every mutation routes through the shared entry points in
+  /// `category_management_screen.dart` — the same prompts and the same delete
+  /// confirmation the standalone screen uses, so the two can never disagree.
+  /// [StatefulBuilder] lets the sheet redraw its own list after a change
+  /// without being torn down and reopened.
+  Future<void> _showCategoryPicker() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.white,
+      isScrollControlled: true,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppResponsive.largeBorderRadius(context)),
+        ),
+      ),
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheetState) {
+          /// Reload the catalogue, re-resolve the current selection against it,
+          /// then repaint the sheet.
+          ///
+          /// The selection is re-read rather than kept: a rename must show its
+          /// new name on the closed field, and a delete must leave the field
+          /// empty so the form's validator stops the save instead of writing an
+          /// id that no longer exists.
+          Future<void> refresh() async {
+            await _loadCategories();
+            if (!mounted) return;
+            final selectedId = _selectedCategoryModel?.id;
+            if (selectedId != null) {
+              Category? stillThere;
+              for (final category in _categories) {
+                if (category.id == selectedId) {
+                  stillThere = category;
+                  break;
+                }
+              }
+              setState(() => _selectedCategoryModel = stillThere);
+            }
+            setSheetState(() {});
+          }
+
+          return SafeArea(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(sheetContext).size.height * 0.7,
+              ),
+              child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.settings, size: 20, color: Color(0xFF2196F3)),
-                  SizedBox(width: 8),
-                  Text('Manage Categories', style: TextStyle(color: Color(0xFF2196F3))),
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      AppResponsive.padding(context).left,
+                      AppResponsive.largeSpacing(context),
+                      AppResponsive.smallSpacing(context),
+                      AppResponsive.smallSpacing(context),
+                    ),
+                    child: Row(
+                      children: [
+                        Text(
+                          'Select Category',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.subheadingFontSize(context),
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const Spacer(),
+                        TextButton.icon(
+                          onPressed: () async {
+                            await showAddCategoryDialog(sheetContext);
+                            await refresh();
+                          },
+                          icon: Icon(
+                            Icons.add_rounded,
+                            size: AppResponsive.smallIconSize(context),
+                          ),
+                          label: Text(
+                            'Add',
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.smallFontSize(context),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppColors.primary,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(
+                            Icons.close_rounded,
+                            color: AppColors.textSecondary,
+                          ),
+                          onPressed: () => Navigator.pop(sheetContext),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1, color: AppColors.divider),
+                  Flexible(
+                    child: _categories.isEmpty
+                        ? Padding(
+                            padding: AppResponsive.padding(context),
+                            child: Text(
+                              'No categories yet. Tap Add to create one.',
+                              style: GoogleFonts.poppins(
+                                fontSize: AppResponsive.smallFontSize(context),
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          )
+                        : ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: _categories.length,
+                            itemBuilder: (_, i) {
+                              final category = _categories[i];
+                              final isSelected =
+                                  _selectedCategoryModel?.id == category.id;
+                              final productCount = categoryStore
+                                  .getItemCountForCategory(category.id);
+
+                              return ListTile(
+                                leading: Icon(
+                                  isSelected
+                                      ? Icons.radio_button_checked
+                                      : Icons.radio_button_unchecked,
+                                  color: isSelected
+                                      ? AppColors.primary
+                                      : AppColors.textSecondary,
+                                  size: AppResponsive.iconSize(context),
+                                ),
+                                title: Text(
+                                  category.name,
+                                  style: GoogleFonts.poppins(
+                                    fontSize: AppResponsive.bodyFontSize(
+                                      context,
+                                    ),
+                                    fontWeight: isSelected
+                                        ? FontWeight.w600
+                                        : FontWeight.w400,
+                                    color: isSelected
+                                        ? AppColors.primary
+                                        : AppColors.textPrimary,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  '$productCount product'
+                                  '${productCount == 1 ? '' : 's'}',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: AppResponsive.smallFontSize(
+                                      context,
+                                    ),
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    RowActionButton(
+                                      icon: Icons.edit_outlined,
+                                      color: AppColors.primary,
+                                      tooltip: 'Rename',
+                                      onTap: () async {
+                                        await showEditCategoryDialog(
+                                          sheetContext,
+                                          category,
+                                        );
+                                        await refresh();
+                                      },
+                                    ),
+                                    const SizedBox(width: 6),
+                                    RowActionButton(
+                                      icon: Icons.delete_outline_rounded,
+                                      color: AppColors.danger,
+                                      tooltip: 'Delete',
+                                      onTap: () async {
+                                        await confirmDeleteCategory(
+                                          sheetContext,
+                                          category,
+                                        );
+                                        await refresh();
+                                      },
+                                    ),
+                                  ],
+                                ),
+                                onTap: () {
+                                  setState(
+                                    () => _selectedCategoryModel = category,
+                                  );
+                                  Navigator.pop(sheetContext);
+                                },
+                              );
+                            },
+                          ),
+                  ),
+                  const Divider(height: 1, color: AppColors.divider),
+                  ListTile(
+                    leading: Icon(
+                      Icons.tune_rounded,
+                      color: AppColors.primary,
+                      size: AppResponsive.iconSize(context),
+                    ),
+                    title: Text(
+                      'Manage Categories',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.bodyFontSize(context),
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    onTap: () async {
+                      Navigator.pop(sheetContext);
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const CategoryManagementScreen(),
+                        ),
+                      );
+                      await _loadCategories();
+                    },
+                  ),
                 ],
               ),
             ),
-          ],
-          onChanged: (value) async {
-            if (value == '__manage__') {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const CategoryManagementScreen()),
-              );
-              // Reload categories after returning
-              await _loadCategories();
-            } else {
-              setState(() {
-                _selectedCategory = value;
-                _selectedCategoryModel = _categories.firstWhere(
-                  (c) => c.categoryName == value,
-                  orElse: () => _categories.first,
-                );
-                // Auto-fill tax rate from category if not set
-                if (_taxRateController.text.isEmpty && _selectedCategoryModel != null) {
-                  _taxRateController.text = (_selectedCategoryModel!.gstRate ?? 0).toString();
-                }
-              });
-            }
-          },
-          validator: (value) {
-            if (value == null || value.isEmpty || value == '__manage__') {
-              return 'Please select a category';
-            }
-            return null;
-          },
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildTaxDropdown() {
+    final taxes = taxStore.taxes;
+    return DropdownButtonFormField<String>(
+      value: taxes.any((t) => t.id == _selectedTaxId) ? _selectedTaxId : null,
+      isExpanded: true,
+      decoration: _pickerDecoration('Tax Rate (Optional)'),
+      dropdownColor: AppColors.white,
+      borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+      menuMaxHeight: 320,
+      elevation: 3,
+      icon: const Icon(
+        Icons.keyboard_arrow_down_rounded,
+        color: AppColors.textSecondary,
+      ),
+      items: [
+        DropdownMenuItem(
+          value: null,
+          child: Text(
+            'No tax',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.bodyFontSize(context),
+            ),
+          ),
         ),
-        if (_selectedCategoryModel != null && (_selectedCategoryModel!.gstRate ?? 0) > 0)
-          Padding(
-            padding: const EdgeInsets.only(top: 4, left: 4),
+        ...taxes.map(
+          (tax) => DropdownMenuItem(
+            value: tax.id,
             child: Text(
-              'Category GST: ${(_selectedCategoryModel!.gstRate ?? 0).toInt()}% will be applied if no product/variant GST is set',
-              style: TextStyle(
-                fontSize: 11,
-                color: Colors.grey[600],
-                fontStyle: FontStyle.italic,
+              '${tax.taxname} (${tax.taxperecentage ?? 0}%)',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
               ),
             ),
           ),
+        ),
       ],
+      onChanged: (value) => setState(() {
+        _selectedTaxId = value;
+        _taxManuallyChanged = true;
+      }),
     );
   }
 
-  Widget _buildVariantSwitch() {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE8E8E8)),
-      ),
-      child: Row(
-        children: [
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Has Variants',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF1A1A1A),
-                  ),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  'Enable if product has multiple variants',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Color(0xFF9E9E9E),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Switch(
-            value: _hasVariants,
-            onChanged: (value) {
-              setState(() {
-                _hasVariants = value;
-              });
-            },
-            activeColor: const Color(0xFF4CAF50),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Product type selector (Simple / Variable)
-  Widget _buildProductTypeSelector() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE8E8E8)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Product Type',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF1A1A1A),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _buildTypeOption(
-                  title: 'Simple',
-                  subtitle: 'Single product, enter variants manually',
-                  icon: Icons.inventory_2_outlined,
-                  isSelected: _productType == 'simple',
-                  onTap: () {
-                    setState(() {
-                      _productType = 'simple';
-                      _hasVariants = false;
-                      _generatedVariants = [];
-                    });
-                  },
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildTypeOption(
-                  title: 'Variable',
-                  subtitle: 'Auto-generate variants from attributes',
-                  icon: Icons.auto_awesome,
-                  isSelected: _productType == 'variable',
-                  onTap: () {
-                    setState(() {
-                      _productType = 'variable';
-                      _hasVariants = true;
-                    });
-                  },
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTypeOption({
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF4CAF50).withOpacity(0.1) : Colors.grey[100],
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isSelected ? const Color(0xFF4CAF50) : Colors.grey[300]!,
-            width: isSelected ? 2 : 1,
-          ),
-        ),
-        child: Column(
-          children: [
-            Icon(
-              icon,
-              size: 28,
-              color: isSelected ? const Color(0xFF4CAF50) : Colors.grey[600],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: isSelected ? const Color(0xFF4CAF50) : Colors.grey[700],
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              subtitle,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 11,
-                color: Colors.grey[600],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Attribute selector widget for variable products
+  /// Optional accelerator: pick attributes and values, get one variant per
+  /// combination. Available to any product — it is a bulk-create tool, not a
+  /// product mode.
   Widget _buildAttributeSelector() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE8E8E8)),
-      ),
-      child: ProductAttributeSelector(
-        key: _attributeSelectorKey,
-        productId: DateTime.now().millisecondsSinceEpoch.toString(),
-        defaultPrice: double.tryParse(_defaultPriceController.text),
-        defaultCostPrice: double.tryParse(_defaultCostController.text),
-        existingVariants: _generatedVariants.isNotEmpty ? _generatedVariants : null,
-        onAttributesChanged: (attributes) {
-          setState(() {
-            _selectedAttributes = attributes;
-          });
-        },
-        onVariantsGenerated: (variants) {
-          setState(() {
-            _generatedVariants = variants;
-          });
-        },
-      ),
+    // Chrome lives on _buildBulkAddPanel now — a second bordered card here
+    // just nested one box inside another.
+    return ProductAttributeSelector(
+      key: _attributeSelectorKey,
+      productId: _draftProductId,
+      defaultPrice: double.tryParse(_defaultPriceController.text),
+      defaultCostPrice: double.tryParse(_defaultCostController.text),
+      existingVariants: _generatedVariants.isNotEmpty
+          ? _generatedVariants
+          : null,
+      // Attribute picks are owned by the selector; the parent only needs a
+      // rebuild so the sections below stay in sync.
+      onAttributesChanged: (_) => setState(() {}),
+      onVariantsGenerated: (variants) {
+        setState(() {
+          _generatedVariants = variants;
+        });
+      },
     );
   }
 
   /// Bulk Edit Bar - WooCommerce-style "Set prices for all"
   Widget _buildBulkEditBar() {
-    final allSelected = _selectedVariantsForBulk.length == _generatedVariants.length;
+    final allSelected =
+        _selectedVariantsForBulk.length == _generatedVariants.length;
     final noneSelected = _selectedVariantsForBulk.isEmpty;
     final selectedCount = _selectedVariantsForBulk.length;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: AppResponsive.cardPadding(context),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF8E1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFFFE082)),
+        color: AppColors.warning.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.smallBorderRadius(context),
+        ),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.35)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1090,168 +2642,164 @@ class _AddProductScreenState extends State<AddProductScreen> {
           // Header with Select All / Unselect All
           Row(
             children: [
-              const Icon(Icons.edit_note, color: Color(0xFFF57C00), size: 20),
-              const SizedBox(width: 8),
+              Icon(
+                Icons.edit_note,
+                color: AppColors.warning,
+                size: AppResponsive.iconSize(context),
+              ),
+              SizedBox(width: AppResponsive.smallSpacing(context)),
               Expanded(
                 child: Text(
                   'Bulk Edit - $selectedCount / ${_generatedVariants.length} selected',
-                  style: const TextStyle(
-                    fontSize: 14,
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.bodyFontSize(context),
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFFF57C00),
+                    color: AppColors.warning,
                   ),
                 ),
               ),
               // Select All button
               TextButton(
-                onPressed: allSelected ? null : () {
-                  setState(() {
-                    _selectedVariantsForBulk.clear();
-                    for (var v in _generatedVariants) {
-                      _selectedVariantsForBulk.add(v.varianteId);
-                    }
-                  });
-                },
+                onPressed: allSelected
+                    ? null
+                    : () {
+                        setState(() {
+                          _selectedVariantsForBulk.clear();
+                          for (var v in _generatedVariants) {
+                            _selectedVariantsForBulk.add(v.varianteId);
+                          }
+                        });
+                      },
                 style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: AppResponsive.smallSpacing(context),
+                  ),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
                 child: Text(
                   'Select All',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: allSelected ? Colors.grey : const Color(0xFFF57C00),
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.smallFontSize(context),
+                    color: allSelected
+                        ? AppColors.textSecondary
+                        : AppColors.warning,
                   ),
                 ),
               ),
-              const Text(' | ', style: TextStyle(color: Colors.grey)),
+              Text(
+                ' | ',
+                style: GoogleFonts.poppins(color: AppColors.textSecondary),
+              ),
               // Unselect All button
               TextButton(
-                onPressed: noneSelected ? null : () {
-                  setState(() {
-                    _selectedVariantsForBulk.clear();
-                  });
-                },
+                onPressed: noneSelected
+                    ? null
+                    : () {
+                        setState(() {
+                          _selectedVariantsForBulk.clear();
+                        });
+                      },
                 style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: AppResponsive.smallSpacing(context),
+                  ),
                   minimumSize: Size.zero,
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
                 child: Text(
                   'Unselect All',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: noneSelected ? Colors.grey : Colors.red,
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.smallFontSize(context),
+                    color: noneSelected
+                        ? AppColors.textSecondary
+                        : AppColors.danger,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
 
           // First Row: Cost Price, Selling Price
           Row(
             children: [
               Expanded(
-                child: TextField(
+                child: _buildTextField(
                   controller: _defaultCostController,
-                  decoration: const InputDecoration(
-                    labelText: 'Cost Price',
-                    hintText: '0.00',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                    filled: true,
-                    fillColor: Colors.white,
-                  ),
+                  label: 'Cost Price',
+                  hint: '0.00',
                   keyboardType: TextInputType.number,
+                  inputFormatters: _moneyFormatters,
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: AppResponsive.smallSpacing(context)),
               Expanded(
-                child: TextField(
+                child: _buildTextField(
                   controller: _defaultPriceController,
-                  decoration: const InputDecoration(
-                    labelText: 'Selling Price',
-                    hintText: '0.00',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                    filled: true,
-                    fillColor: Colors.white,
-                  ),
+                  label: 'Selling Price',
+                  hint: '0.00',
                   keyboardType: TextInputType.number,
+                  inputFormatters: _moneyFormatters,
                 ),
               ),
-
             ],
           ),
 
-          const SizedBox(height: 8),
-          // Second Row: MRP with Apply button
+          SizedBox(height: AppResponsive.smallSpacing(context)),
+          // Second Row: MRP, Stock
           Row(
             children: [
               Expanded(
-                child: TextField(
+                child: _buildTextField(
                   controller: _defaultMrpController,
-                  decoration: const InputDecoration(
-                    labelText: 'MRP',
-                    hintText: '0.00',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                    filled: true,
-                    fillColor: Colors.white,
-                  ),
+                  label: 'MRP',
+                  hint: '0.00',
                   keyboardType: TextInputType.number,
+                  inputFormatters: _moneyFormatters,
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: AppResponsive.smallSpacing(context)),
               Expanded(
-                child: TextField(
+                child: _buildTextField(
                   controller: _defaultStockController,
-                  decoration: const InputDecoration(
-                    labelText: 'Stock',
-                    hintText: '0',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                    filled: true,
-                    fillColor: Colors.white,
-                  ),
-                  keyboardType: TextInputType.number,
+                  label: _isDecimalQuantity ? 'Stock ($_unit)' : 'Stock',
+                  hint: '0',
+                  keyboardType: _qtyKeyboard,
+                  inputFormatters: _activeQtyFormatters,
                 ),
               ),
-            /*  const SizedBox(width: 8),
-              ElevatedButton(
-                onPressed: _applyBulkPricesAndStock,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFF57C00),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                ),
-                child: const Text('Apply'),
-              ),*/
             ],
           ),
-          const SizedBox(width: 8),
-          Center(
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
+          SizedBox(
+            width: double.infinity,
             child: ElevatedButton(
               onPressed: _applyBulkPricesAndStock,
               style: ElevatedButton.styleFrom(
-                minimumSize:Size(400,20),
-                backgroundColor: const Color(0xFFF57C00),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                backgroundColor: AppColors.warning,
+                foregroundColor: AppColors.white,
+                elevation: 0,
+                padding: EdgeInsets.symmetric(
+                  vertical: AppResponsive.mediumSpacing(context),
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
-              child: const Text('Apply'),
+              child: Text(
+                'Apply',
+                style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+              ),
             ),
           ),
 
-          const SizedBox(height: 8),
+          SizedBox(height: AppResponsive.smallSpacing(context)),
           Text(
             'Enter values and click Apply to update all variants at once',
-            style: TextStyle(
-              fontSize: 11,
-              color: Colors.grey[600],
-              fontStyle: FontStyle.italic,
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.captionFontSize(context),
+              color: AppColors.textSecondary,
             ),
           ),
         ],
@@ -1264,14 +2812,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
     final costPrice = double.tryParse(_defaultCostController.text);
     final sellingPrice = double.tryParse(_defaultPriceController.text);
     final mrp = double.tryParse(_defaultMrpController.text);
-    final stock = int.tryParse(_defaultStockController.text);
+    final stock = double.tryParse(_defaultStockController.text);
 
     if (costPrice == null && sellingPrice == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter at least one price value'),
-          backgroundColor: Colors.orange,
-        ),
+      NotificationService.instance.showWarning(
+        'Please enter at least one price value',
       );
       return;
     }
@@ -1283,53 +2828,24 @@ class _AddProductScreenState extends State<AddProductScreen> {
         ? _generatedVariants.length
         : _selectedVariantsForBulk.length;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Applied to $appliedCount variant(s)'),
-        backgroundColor: const Color(0xFF4CAF50),
-        duration: const Duration(seconds: 1),
-      ),
+    NotificationService.instance.showSuccess(
+      'Applied to $appliedCount variant(s)',
     );
   }
-
-  /// Apply bulk MRP and Stock to all variants
-  // void _applyBulkMrpStock() {
-  //   final mrp = double.tryParse(_defaultMrpController.text);
-  //   final stock = int.tryParse(_defaultStockController.text);
-  //
-  //   if (mrp == null && stock == null) {
-  //     ScaffoldMessenger.of(context).showSnackBar(
-  //       const SnackBar(
-  //         content: Text('Please enter MRP or Stock value'),
-  //         backgroundColor: Colors.orange,
-  //       ),
-  //     );
-  //     return;
-  //   }
-  //
-  //   _applyToAllVariants(mrp: mrp, stock: stock);
-  //
-  //   ScaffoldMessenger.of(context).showSnackBar(
-  //     SnackBar(
-  //       content: Text('Applied to ${_generatedVariants.length} variant(s)'),
-  //       backgroundColor: const Color(0xFF4CAF50),
-  //       duration: const Duration(seconds: 1),
-  //     ),
-  //   );
-  // }
 
   /// Apply values to selected variants only
   void _applyToAllVariants({
     double? costPrice,
     double? sellingPrice,
     double? mrp,
-    int? stock,
+    double? stock,
   }) {
     setState(() {
       for (var i = 0; i < _generatedVariants.length; i++) {
         final variant = _generatedVariants[i];
         // Only apply to selected variants (or all if none selected)
-        if (_selectedVariantsForBulk.isEmpty || _selectedVariantsForBulk.contains(variant.varianteId)) {
+        if (_selectedVariantsForBulk.isEmpty ||
+            _selectedVariantsForBulk.contains(variant.varianteId)) {
           _generatedVariants[i] = variant.copyWith(
             costPrice: costPrice ?? variant.costPrice,
             sellingPrice: sellingPrice ?? variant.sellingPrice,
@@ -1357,14 +2873,20 @@ class _AddProductScreenState extends State<AddProductScreen> {
 
     // Use Key to force rebuild when variant data changes
     return Container(
-      key: ValueKey('${variant.varianteId}_${variant.costPrice}_${variant.sellingPrice}_${variant.mrp}_${variant.stockQty}_$isSelected'),
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
+      key: ValueKey(
+        '${variant.varianteId}_${variant.costPrice}_${variant.sellingPrice}_${variant.mrp}_${variant.stockQty}_$isSelected',
+      ),
+      margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
+      padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
-        color: isSelected ? const Color(0xFFFFF8E1) : Colors.white,
-        borderRadius: BorderRadius.circular(8),
+        color: isSelected
+            ? AppColors.warning.withValues(alpha: 0.10)
+            : AppColors.white,
+        borderRadius: BorderRadius.circular(
+          AppResponsive.smallBorderRadius(context),
+        ),
         border: Border.all(
-          color: isSelected ? const Color(0xFFF57C00) : const Color(0xFFE8E8E8),
+          color: isSelected ? AppColors.warning : AppColors.divider,
           width: isSelected ? 2 : 1,
         ),
       ),
@@ -1389,47 +2911,57 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   width: 24,
                   height: 24,
                   decoration: BoxDecoration(
-                    color: isSelected ? const Color(0xFFF57C00) : Colors.white,
+                    color: isSelected ? AppColors.warning : AppColors.white,
                     borderRadius: BorderRadius.circular(4),
                     border: Border.all(
-                      color: isSelected ? const Color(0xFFF57C00) : Colors.grey[400]!,
+                      color: isSelected ? AppColors.warning : AppColors.divider,
                       width: 2,
                     ),
                   ),
                   child: isSelected
-                    ? const Icon(Icons.check, size: 16, color: Colors.white)
-                    : null,
+                      ? Icon(
+                          Icons.check,
+                          size: AppResponsive.smallIconSize(context),
+                          color: AppColors.white,
+                        )
+                      : null,
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: AppResponsive.smallSpacing(context)),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppResponsive.smallSpacing(context),
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF9C27B0),
+                  color: AppColors.primary,
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
                   variant.shortDescription,
-                  style: const TextStyle(
+                  style: GoogleFonts.poppins(
                     color: Colors.white,
-                    fontSize: 12,
+                    fontSize: AppResponsive.smallFontSize(context),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
               if (variant.isDefault) ...[
-                const SizedBox(width: 8),
+                SizedBox(width: AppResponsive.smallSpacing(context)),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.green[100],
                     borderRadius: BorderRadius.circular(4),
                   ),
-                  child: const Text(
+                  child: Text(
                     'Default',
-                    style: TextStyle(
+                    style: GoogleFonts.poppins(
                       color: Colors.green,
-                      fontSize: 10,
+                      fontSize: AppResponsive.captionFontSize(context),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -1438,14 +2970,14 @@ class _AddProductScreenState extends State<AddProductScreen> {
               const Spacer(),
               Text(
                 'SKU: ${variant.sku ?? "Auto"}',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.grey[600],
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.captionFontSize(context),
+                  color: AppColors.textSecondary,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
 
           // Editable fields - using key to force rebuild on value change
           Row(
@@ -1456,64 +2988,76 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   value: variant.costPrice?.toString() ?? '',
                   label: 'Cost Price',
                   onChanged: (value) {
-                    _updateGeneratedVariant(index, costPrice: double.tryParse(value));
+                    _updateGeneratedVariant(
+                      index,
+                      costPrice: double.tryParse(value),
+                    );
                   },
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: AppResponsive.smallSpacing(context)),
               Expanded(
                 child: _buildVariantTextField(
                   key: 'sell_$index',
                   value: variant.sellingPrice?.toString() ?? '',
                   label: 'Selling Price',
                   onChanged: (value) {
-                    _updateGeneratedVariant(index, sellingPrice: double.tryParse(value));
+                    _updateGeneratedVariant(
+                      index,
+                      sellingPrice: double.tryParse(value),
+                    );
                   },
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: AppResponsive.smallSpacing(context)),
               Expanded(
                 child: _buildVariantTextField(
                   key: 'stock_$index',
                   value: variant.stockQty.toString(),
-                  label: 'Stock',
+                  label: _isDecimalQuantity ? 'Stock ($_unit)' : 'Stock',
+                  inputFormatters: _activeQtyFormatters,
                   onChanged: (value) {
-                    _updateGeneratedVariant(index, stockQty: int.tryParse(value));
+                    _updateGeneratedVariant(
+                      index,
+                      stockQty: double.tryParse(value),
+                    );
                   },
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: AppResponsive.smallSpacing(context)),
           Row(
             children: [
               Expanded(
-                child: TextFormField(
+                child: AppTextField(
                   key: ValueKey('barcode_${index}_${variant.barcode}'),
                   initialValue: variant.barcode ?? '',
-                  decoration: InputDecoration(
-                    labelText: 'Barcode',
-                    border: const OutlineInputBorder(),
-                    isDense: true,
-                    suffixIcon: IconButton(
-                      icon: const Icon(Icons.qr_code_scanner, size: 20),
-                      onPressed: () async {
-                        final barcode = await Navigator.push<String>(
-                          context,
-                          MaterialPageRoute(builder: (_) => const ScannerScreen()),
-                        );
-                        if (barcode != null) {
-                          _updateGeneratedVariant(index, barcode: barcode);
-                        }
-                      },
+                  label: 'Barcode',
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      Icons.qr_code_scanner,
+                      color: AppColors.primary,
+                      size: AppResponsive.iconSize(context),
                     ),
+                    onPressed: () async {
+                      final barcode = await Navigator.push<String>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const ScannerScreen(),
+                        ),
+                      );
+                      if (barcode != null) {
+                        _updateGeneratedVariant(index, barcode: barcode);
+                      }
+                    },
                   ),
                   onChanged: (value) {
                     _updateGeneratedVariant(index, barcode: value);
                   },
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: AppResponsive.smallSpacing(context)),
               Expanded(
                 child: _buildVariantTextField(
                   key: 'mrp_$index',
@@ -1537,16 +3081,14 @@ class _AddProductScreenState extends State<AddProductScreen> {
     required String value,
     required String label,
     required Function(String) onChanged,
+    List<TextInputFormatter>? inputFormatters,
   }) {
-    return TextFormField(
+    return AppTextField(
       key: ValueKey('${key}_$value'),
       initialValue: value,
-      decoration: InputDecoration(
-        labelText: label,
-        border: const OutlineInputBorder(),
-        isDense: true,
-      ),
+      label: label,
       keyboardType: TextInputType.number,
+      inputFormatters: inputFormatters ?? _moneyFormatters,
       onChanged: onChanged,
     );
   }
@@ -1556,7 +3098,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
     double? costPrice,
     double? sellingPrice,
     double? mrp,
-    int? stockQty,
+    double? stockQty,
     String? barcode,
   }) {
     setState(() {

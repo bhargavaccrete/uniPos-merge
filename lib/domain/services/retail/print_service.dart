@@ -5,20 +5,26 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:printing/printing.dart';
 import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:billberrylite/util/common/short_ref.dart';
+import 'package:billberrylite/domain/services/common/notification_service.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:billberrylite/domain/services/retail/receipt_pdf_service.dart';
+import 'package:billberrylite/domain/services/restaurant/esc_pos_image.dart';
 import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
-import 'package:billberrylite/domain/services/retail/retail_printer_settings_service.dart';
-import 'package:billberrylite/core/config/app_config.dart';
+import 'package:billberrylite/core/config/tax_id_rule.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/core/config/tax_feature.dart';
 import 'package:billberrylite/domain/services/restaurant/esc_pos_receipt_builder.dart';
+import 'package:billberrylite/domain/services/common/windows_spooler/windows_pdf_output.dart';
 
-import '../../../data/models/retail/hive_model/customer_model_208.dart';
+import '../../../data/models/common/customer_model_125.dart';
 import '../../../data/models/retail/hive_model/sale_item_model_204.dart';
 import '../../../data/models/retail/hive_model/sale_model_203.dart';
+import 'label_pdf_service.dart';
 
 /// Enum for receipt format types
 enum ReceiptFormat {
@@ -28,6 +34,16 @@ enum ReceiptFormat {
 
 /// Service for handling all print operations
 class PrintService {
+  /// Sends a rendered PDF to a Windows print queue. Defaults to the real
+  /// Windows printing API; tests inject a fake so the routing can be verified
+  /// without a printer.
+  final WindowsPdfSender _windowsPdfSender;
+
+  PrintService({WindowsPdfSender? windowsPdfSender})
+      : _windowsPdfSender = windowsPdfSender ?? platformWindowsPdfSend;
+
+  final LabelPdfService _labelPdfService = const LabelPdfService();
+
   final ReceiptPdfService _receiptPdfService = ReceiptPdfService();
   final StoreSettingsService _storeSettingsService = StoreSettingsService();
 
@@ -59,7 +75,7 @@ class PrintService {
     required BuildContext context,
     required SaleModel sale,
     required List<SaleItemModel> items,
-    CustomerModel? customer,
+    Customer? customer,
     ReceiptFormat format = ReceiptFormat.thermal,
     String? storeName,
     String? storeAddress,
@@ -78,6 +94,7 @@ class PrintService {
     String? kotRemark, // Restaurant: order-level kitchen note (KOT only)
     double? itemTotal, // Restaurant: Pre-calculated from CartCalculationService
     int? loyaltyPointsDiscount, // Loyalty points redeemed
+    int paperWidth = 80, // Target paper width
   }) async {
     // Load logo for all bills
     final logoBytes = await _loadStoreLogo();
@@ -91,7 +108,8 @@ class PrintService {
       storeAddress: storeAddress,
       storePhone: storePhone,
       storeEmail: storeEmail,
-      gstNumber: gstNumber,
+      gstNumber: TaxIdRule.numberForRecord(sale.storeGstNumber, gstNumber),
+      taxEnabled: TaxFeature.forRecord(sale.taxEnabled),
       orderType: orderType,
       tableNo: tableNo,
       kotNumber: kotNumber,
@@ -111,22 +129,168 @@ class PrintService {
     );
 
     final pdf = format == ReceiptFormat.thermal
-        ? await _receiptPdfService.generateThermalReceipt(receiptData)
+        ? await _receiptPdfService.generateThermalReceipt(receiptData, paperWidth: paperWidth)
         : await _receiptPdfService.generateInvoice(receiptData);
 
+    final pageFormat = format == ReceiptFormat.thermal
+        ? (paperWidth <= 58
+            ? const PdfPageFormat(58 * PdfPageFormat.mm, double.infinity, marginAll: 0)
+            : const PdfPageFormat(80 * PdfPageFormat.mm, double.infinity, marginAll: 0))
+        : PdfPageFormat.a4;
+
     await Printing.layoutPdf(
-      onLayout: (PdfPageFormat pageFormat) async => pdf.save(),
-      name: 'Receipt_${sale.saleId.length > 8 ? sale.saleId.substring(0, 8) : sale.saleId}',
-      format: format == ReceiptFormat.thermal ? PdfPageFormat.roll80 : PdfPageFormat.a4,
+      onLayout: (PdfPageFormat _) async => pdf.save(),
+      name: 'Receipt_${sale.displayNumber}',
+      format: pageFormat,
     );
   }
 
   /// Show print preview dialog
+  /// Print the thermal receipt to a Windows PDF/document printer.
+  ///
+  /// Uses the SAME `generateThermalReceipt` output as every other path — the
+  /// receipt layout is untouched. The difference is only the last hop: a
+  /// rendered PDF goes to the Windows printing API instead of ESC/POS bytes
+  /// going to the spooler, because a PDF writer cannot read control codes.
+  ///
+  /// The page size handed to Windows is measured from the generated document,
+  /// never the authoring format's `double.infinity` height.
+  Future<bool> printThermalPdfToWindowsQueue({
+    required ReceiptData data,
+    required String queueName,
+    required int paperWidth,
+    String jobName = 'Receipt',
+  }) async {
+    try {
+      final pdf = await _receiptPdfService.generateThermalReceipt(data,
+          paperWidth: paperWidth);
+      final bytes = await pdf.save();
+      final format = thermalPageFormatOf(pdf, paperWidth);
+      return await _windowsPdfSender(
+        queueName: queueName,
+        pdfBytes: bytes,
+        format: format,
+        jobName: jobName,
+      );
+    } catch (e, s) {
+      debugPrint('[WIN-PDF] queue="$queueName" failed: $e\n$s');
+      return false;
+    }
+  }
+
+  /// Rasterize an already-built thermal [ReceiptData] (bill OR KOT) to a complete
+  /// ESC/POS ticket, so a DIRECT print looks identical to the PDF. Reused by both
+  /// the bill path (below) and the KOT path. Null on any failure → caller falls
+  /// back to the plain text ESC/POS builder.
+  Future<List<int>?> rasterizeThermalReceipt(
+    ReceiptData data, {
+    required int paperWidth,
+  }) async {
+    try {
+      final pdf = await _receiptPdfService.generateThermalReceipt(data, paperWidth: paperWidth);
+      final pdfBytes = await pdf.save();
+      final targetW = paperWidth <= 58 ? 384 : 576;
+      await for (final page in Printing.raster(pdfBytes, dpi: 203)) {
+        final png = await page.toPng();
+        final raster = await EscPosImage.toRaster(png, targetWidth: targetW);
+        if (raster == null) return null;
+        return <int>[
+          0x1B, 0x40, // ESC @  — init
+          0x1B, 0x61, 0x01, // ESC a 1 — center
+          ...raster,
+          0x0A, 0x0A, 0x0A, 0x0A, // feed
+          0x1D, 0x56, 0x01, // GS V 1 — partial cut
+        ];
+      }
+      return null;
+    } catch (e, s) {
+      debugPrint('Error in rasterizeThermalReceipt: $e\n$s');
+      return null;
+    }
+  }
+
+  /// Direct thermal: render the SAME thermal PDF (logo + QR + Poppins font) to a
+  /// raster image and return a complete ESC/POS ticket, so a direct print looks
+  /// IDENTICAL to the downloaded PDF. Returns null on any failure so the caller
+  /// falls back to the plain text-based ESC/POS builder.
+  Future<List<int>?> buildThermalRasterTicket({
+    required SaleModel sale,
+    required List<SaleItemModel> items,
+    Customer? customer,
+    String? storeName,
+    String? storeAddress,
+    String? storePhone,
+    String? storeEmail,
+    String? gstNumber,
+    String? orderType,
+    String? tableNo,
+    List<int>? kotNumbers,
+    int? billNumber,
+    double? itemTotal,
+    String? paymentBreakdown,
+    int? loyaltyPointsDiscount,
+    double? serviceCharge,
+    bool? isDeliveryOrder,
+    bool? isTaxInclusive,
+    double? roundOff,
+    required int paperWidth,
+  }) async {
+    try {
+      final logoBytes = await _loadStoreLogo();
+      final upi = await _loadUpiConfig();
+      final receiptData = ReceiptData(
+        sale: sale,
+        items: items,
+        customer: customer,
+        storeName: storeName,
+        storeAddress: storeAddress,
+        storePhone: storePhone,
+        storeEmail: storeEmail,
+        gstNumber: TaxIdRule.numberForRecord(sale.storeGstNumber, gstNumber),
+        taxEnabled: TaxFeature.forRecord(sale.taxEnabled),
+        orderType: orderType,
+        tableNo: tableNo,
+        kotNumbers: kotNumbers,
+        billNumber: billNumber,
+        logoBytes: logoBytes,
+        itemTotal: itemTotal,
+        loyaltyPointsDiscount: loyaltyPointsDiscount,
+        serviceCharge: serviceCharge,
+        isDeliveryOrder: isDeliveryOrder,
+        roundOff: roundOff,
+        paymentBreakdown: paymentBreakdown,
+        isTaxInclusive: isTaxInclusive,
+        upiId: upi.id,
+        upiPayeeName: upi.payee,
+        upiQrImageBytes: upi.qr,
+      );
+      final pdf = await _receiptPdfService.generateThermalReceipt(receiptData, paperWidth: paperWidth);
+      final pdfBytes = await pdf.save();
+      final targetW = paperWidth <= 58 ? 384 : 576;
+      await for (final page in Printing.raster(pdfBytes, dpi: 203)) {
+        final png = await page.toPng();
+        final raster = await EscPosImage.toRaster(png, targetWidth: targetW);
+        if (raster == null) return null;
+        return <int>[
+          0x1B, 0x40, // ESC @  — init
+          0x1B, 0x61, 0x01, // ESC a 1 — center
+          ...raster,
+          0x0A, 0x0A, 0x0A, 0x0A, // feed
+          0x1D, 0x56, 0x01, // GS V 1 — partial cut
+        ];
+      }
+      return null;
+    } catch (e, s) {
+      debugPrint('Error in buildThermalRasterTicket: $e\n$s');
+      return null;
+    }
+  }
+
   Future<void> showPrintPreview({
     required BuildContext context,
     required SaleModel sale,
     required List<SaleItemModel> items,
-    CustomerModel? customer,
+    Customer? customer,
     ReceiptFormat format = ReceiptFormat.a4Invoice,
     String? storeName,
     String? storeAddress,
@@ -151,52 +315,72 @@ class PrintService {
     bool? isDeliveryOrder,
     bool? isTaxInclusive,
     double? roundOff, // Rounding adjustment applied to reach grand total
+    int paperWidth = 80, // Target paper width
   }) async {
-    // Load logo for all bills
-    final logoBytes = await _loadStoreLogo();
-    final upi = await _loadUpiConfig();
+    // Grab the navigator BEFORE any await.
+    //
+    // Rendering the PDF (logo raster + UPI QR) takes long enough that the
+    // widget which opened this can be gone by the time it finishes — the print
+    // options sheet is popped on tap, and re-checking `context.mounted`
+    // afterwards then returned silently. That is why a receipt "sometimes"
+    // never appeared: a race between the sheet's dismiss animation and the
+    // render. A captured NavigatorState survives it.
+    final navigator = Navigator.of(context, rootNavigator: true);
 
-    final receiptData = ReceiptData(
-      sale: sale,
-      items: items,
-      customer: customer,
-      storeName: storeName,
-      storeAddress: storeAddress,
-      storePhone: storePhone,
-      storeEmail: storeEmail,
-      gstNumber: gstNumber,
-      orderType: orderType,
-      tableNo: tableNo,
-      kotNumber: kotNumber,
-      kotStatus: kotStatus,
-      cancelReference: cancelReference,
-      kotNumbers: kotNumbers,
-      orderTimestamp: orderTimestamp,
-      orderNo: orderNo,
-      isAddonKot: isAddonKot,
-      kotRemark: kotRemark,
-      billNumber: billNumber,
-      logoBytes: logoBytes,
-      itemTotal: itemTotal,
-      loyaltyPointsDiscount: loyaltyPointsDiscount,
-      serviceCharge: serviceCharge,
-      isDeliveryOrder: isDeliveryOrder,
-      roundOff: roundOff,
-      paymentBreakdown: paymentBreakdown,
-      isTaxInclusive: isTaxInclusive,
-      upiId: upi.id,
-      upiPayeeName: upi.payee,
-      upiQrImageBytes: upi.qr,
-    );
+    final pw.Document pdf;
+    try {
+      // Load logo for all bills
+      final logoBytes = await _loadStoreLogo();
+      final upi = await _loadUpiConfig();
 
-    final pdf = format == ReceiptFormat.thermal
-        ? await _receiptPdfService.generateThermalReceipt(receiptData)
-        : await _receiptPdfService.generateInvoice(receiptData);
+      final receiptData = ReceiptData(
+        sale: sale,
+        items: items,
+        customer: customer,
+        storeName: storeName,
+        storeAddress: storeAddress,
+        storePhone: storePhone,
+        storeEmail: storeEmail,
+        gstNumber: TaxIdRule.numberForRecord(sale.storeGstNumber, gstNumber),
+        taxEnabled: TaxFeature.forRecord(sale.taxEnabled),
+        orderType: orderType,
+        tableNo: tableNo,
+        kotNumber: kotNumber,
+        kotStatus: kotStatus,
+        cancelReference: cancelReference,
+        kotNumbers: kotNumbers,
+        orderTimestamp: orderTimestamp,
+        orderNo: orderNo,
+        isAddonKot: isAddonKot,
+        kotRemark: kotRemark,
+        billNumber: billNumber,
+        logoBytes: logoBytes,
+        itemTotal: itemTotal,
+        loyaltyPointsDiscount: loyaltyPointsDiscount,
+        serviceCharge: serviceCharge,
+        isDeliveryOrder: isDeliveryOrder,
+        roundOff: roundOff,
+        paymentBreakdown: paymentBreakdown,
+        isTaxInclusive: isTaxInclusive,
+        upiId: upi.id,
+        upiPayeeName: upi.payee,
+        upiQrImageBytes: upi.qr,
+      );
 
-    if (!context.mounted) return;
+      pdf = format == ReceiptFormat.thermal
+          ? await _receiptPdfService.generateThermalReceipt(receiptData,
+              paperWidth: paperWidth)
+          : await _receiptPdfService.generateInvoice(receiptData);
+    } catch (e, s) {
+      // A throw here used to unwind past the caller with nothing on screen.
+      debugPrint('Error building receipt preview: $e\n$s');
+      NotificationService.instance.showError('Could not build the receipt');
+      return;
+    }
 
-    await Navigator.push(
-      context,
+    if (!navigator.mounted) return;
+
+    await navigator.push(
       MaterialPageRoute(
         builder: (context) => Scaffold(
           backgroundColor: const Color(0xFFF7F8FA),
@@ -216,11 +400,23 @@ class PrintService {
           ),
           body: PdfPreview(
             build: (pageFormat) async => pdf.save(),
+            // Without these the print button is silent in every outcome: the
+            // plugin's Windows path returns false for a cancelled OR a failed
+            // Print Setup dialog, and PdfPreview simply skips onPrinted. A
+            // cancel should stay quiet, but a real error must not.
+            onPrinted: (_) =>
+                NotificationService.instance.showSuccess('Sent to printer'),
+            onPrintError: (_, error) => NotificationService.instance
+                .showError('Could not print: $error'),
             canChangePageFormat: false,
             canChangeOrientation: false,
             canDebug: false,
-            pdfFileName: 'Receipt_${sale.saleId.length > 8 ? sale.saleId.substring(0, 8) : sale.saleId}.pdf',
-            initialPageFormat: format == ReceiptFormat.thermal ? PdfPageFormat.roll80 : PdfPageFormat.a4,
+            pdfFileName: 'Receipt_${sale.displayNumber}.pdf',
+            initialPageFormat: format == ReceiptFormat.thermal
+                ? (paperWidth <= 58
+                    ? const PdfPageFormat(58 * PdfPageFormat.mm, double.infinity, marginAll: 0)
+                    : const PdfPageFormat(80 * PdfPageFormat.mm, double.infinity, marginAll: 0))
+                : PdfPageFormat.a4,
           ),
         ),
       ),
@@ -231,7 +427,7 @@ class PrintService {
   Future<void> sharePdf({
     required SaleModel sale,
     required List<SaleItemModel> items,
-    CustomerModel? customer,
+    Customer? customer,
     ReceiptFormat format = ReceiptFormat.a4Invoice,
     String? storeName,
     String? storeAddress,
@@ -249,6 +445,7 @@ class PrintService {
     double? serviceCharge,
     bool? isDeliveryOrder,
     bool? isTaxInclusive,
+    double? roundOff, // Rounding adjustment baked into the total
   }) async {
     // Load logo for all bills
     final logoBytes = await _loadStoreLogo();
@@ -262,7 +459,8 @@ class PrintService {
       storeAddress: storeAddress,
       storePhone: storePhone,
       storeEmail: storeEmail,
-      gstNumber: gstNumber,
+      gstNumber: TaxIdRule.numberForRecord(sale.storeGstNumber, gstNumber),
+      taxEnabled: TaxFeature.forRecord(sale.taxEnabled),
       orderType: orderType,
       tableNo: tableNo,
       kotNumber: kotNumber,
@@ -289,14 +487,14 @@ class PrintService {
     if (kIsWeb) {
       await Printing.sharePdf(
         bytes: bytes,
-        filename: 'Receipt_${sale.saleId.length > 8 ? sale.saleId.substring(0, 8) : sale.saleId}.pdf',
+        filename: 'Receipt_${sale.displayNumber}.pdf',
       );
       return;
     }
 
     // Save to temp file
     final tempDir = await getTemporaryDirectory();
-    final safeId = sale.saleId.length > 8 ? sale.saleId.substring(0, 8) : sale.saleId;
+    final safeId = sale.displayNumber;
     final fileName = 'Receipt_${safeId}_${DateTime.now().millisecondsSinceEpoch}.pdf';
     final file = File('${tempDir.path}/$fileName');
     await file.writeAsBytes(bytes);
@@ -312,7 +510,7 @@ class PrintService {
   Future<String?> savePdfToDownloads({
     required SaleModel sale,
     required List<SaleItemModel> items,
-    CustomerModel? customer,
+    Customer? customer,
     ReceiptFormat format = ReceiptFormat.a4Invoice,
     String? storeName,
     String? storeAddress,
@@ -326,6 +524,7 @@ class PrintService {
     double? serviceCharge,
     bool? isDeliveryOrder,
     bool? isTaxInclusive,
+    double? roundOff, // Rounding adjustment baked into the total
   }) async {
     // Load logo for all bills
     final logoBytes = await _loadStoreLogo();
@@ -339,7 +538,8 @@ class PrintService {
       storeAddress: storeAddress,
       storePhone: storePhone,
       storeEmail: storeEmail,
-      gstNumber: gstNumber,
+      gstNumber: TaxIdRule.numberForRecord(sale.storeGstNumber, gstNumber),
+      taxEnabled: TaxFeature.forRecord(sale.taxEnabled),
       billNumber: billNumber,
       logoBytes: logoBytes,
       itemTotal: itemTotal,
@@ -358,7 +558,7 @@ class PrintService {
         : await _receiptPdfService.generateInvoice(receiptData);
 
     final bytes = await pdf.save();
-    final safeId = sale.saleId.length > 8 ? sale.saleId.substring(0, 8) : sale.saleId;
+    final safeId = sale.displayNumber;
     final fileName = 'Receipt_${safeId}_${DateTime.now().millisecondsSinceEpoch}.pdf';
 
     if (kIsWeb) {
@@ -422,12 +622,83 @@ class PrintService {
     return file.path;
   }
 
+  // ==================== LABELS ====================
+
+  /// Send an A4 sticker sheet of barcode/price labels to the OS print dialog.
+  ///
+  /// Reuses the same `Printing.layoutPdf` path as an A4 invoice, so labels need
+  /// no printer role, no new transport and no second printer architecture.
+  ///
+  /// Read-only with respect to the catalogue: [labels] are already-resolved
+  /// values, so printing can never mint or change a barcode.
+  ///
+  /// [cutGuides] draws the cut grid — on for plain paper, off for a
+  /// pre-cut sticker sheet.
+  Future<void> printLabels(
+    List<LabelSpec> labels, {
+    bool cutGuides = true,
+  }) async {
+    if (labels.isEmpty) return;
+    final pdf = await _labelPdfService.build(labels, cutGuides: cutGuides);
+    await Printing.layoutPdf(
+      onLayout: (PdfPageFormat _) async => pdf.save(),
+      name: 'Labels_${labels.length}',
+      format: PdfPageFormat.a4,
+    );
+  }
+
+  /// On-screen preview of the label sheet, so a misaligned pitch is caught
+  /// before a sheet of stickers is spent. Mirrors [showPrintPreview].
+  Future<void> showLabelPreview({
+    required BuildContext context,
+    required List<LabelSpec> labels,
+    bool cutGuides = true,
+  }) async {
+    if (labels.isEmpty) return;
+    final pdf = await _labelPdfService.build(labels, cutGuides: cutGuides);
+
+    if (!context.mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          appBar: AppBar(
+            backgroundColor: AppColors.primary,
+            iconTheme: const IconThemeData(color: Colors.white),
+            elevation: 0,
+            title: Text(
+              'Label Preview',
+              style: GoogleFonts.poppins(
+                  color: Colors.white, fontWeight: FontWeight.w600),
+            ),
+            centerTitle: true,
+          ),
+          body: PdfPreview(
+            build: (pageFormat) async => pdf.save(),
+            // Without these the print button is silent in every outcome: the
+            // plugin's Windows path returns false for a cancelled OR a failed
+            // Print Setup dialog, and PdfPreview simply skips onPrinted. A
+            // cancel should stay quiet, but a real error must not.
+            onPrinted: (_) =>
+                NotificationService.instance.showSuccess('Sent to printer'),
+            onPrintError: (_, error) => NotificationService.instance
+                .showError('Could not print: $error'),
+            canChangePageFormat: false,
+            canChangeOrientation: false,
+            canDebug: false,
+            pdfFileName: 'Labels_${labels.length}.pdf',
+            initialPageFormat: PdfPageFormat.a4,
+          ),
+        ),
+      ),
+    );
+  }
+
   /// Show print options dialog
   Future<void> showPrintOptionsDialog({
     required BuildContext context,
     required SaleModel sale,
     required List<SaleItemModel> items,
-    CustomerModel? customer,
+    Customer? customer,
     String? storeName,
     String? storeAddress,
     String? storePhone,
@@ -437,16 +708,17 @@ class PrintService {
     int? billNumber, // Bill number for completed orders
     List<int>? kotNumbers, // KOT numbers for restaurant orders
     double? itemTotal, // Restaurant: Pre-calculated from CartCalculationService
-    String? paymentBreakdown, // Split payment breakdown (e.g., "cash: ₹100, card: ₹200")
+    String? paymentBreakdown, // Split payment breakdown (e.g., "cash: 100, card: 200")
     int? loyaltyPointsDiscount, // Loyalty points redeemed
     double? serviceCharge, // Service or delivery charge amount
     bool? isDeliveryOrder, // True if delivery order
     bool? isTaxInclusive, // Tax inclusive mode
+    double? roundOff, // Rounding adjustment baked into the total
   }) async {
     await showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
+      builder: (sheetContext) => Container(
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -482,14 +754,13 @@ class PrintService {
             // Direct Thermal Printer — only shown when a receipt printer is saved.
             // This is the fastest path: one tap → ESC/POS bytes → printer.
             // No PDF rendering, no system dialog.
-            if (AppConfig.isRestaurant &&
-                printerStore.hasDefaultReceiptPrinter)
+            if (printerStore.hasDefaultReceiptPrinter)
               _buildOptionTile(
                 icon: Icons.print,
                 title: 'Print to ${printerStore.defaultReceiptPrinter!.name}',
                 subtitle: 'Direct thermal print (${printerStore.defaultReceiptPrinter!.type.toUpperCase()})',
                 onTap: () async {
-                  Navigator.pop(context);
+                  Navigator.pop(sheetContext);
                   // Build the ReceiptData needed by the ESC/POS builder
                   final receiptData = ReceiptData(
                     sale: sale,
@@ -499,7 +770,8 @@ class PrintService {
                     storeAddress: storeAddress,
                     storePhone: storePhone,
                     storeEmail: storeEmail,
-                    gstNumber: gstNumber,
+                    gstNumber: TaxIdRule.numberForRecord(sale.storeGstNumber, gstNumber),
+                    taxEnabled: TaxFeature.forRecord(sale.taxEnabled),
                     orderType: orderType,
                     billNumber: billNumber,
                     kotNumbers: kotNumbers,
@@ -509,24 +781,32 @@ class PrintService {
                     isDeliveryOrder: isDeliveryOrder,
                     paymentBreakdown: paymentBreakdown,
                     isTaxInclusive: isTaxInclusive,
+                    roundOff: roundOff,
                   );
                   final printer = printerStore.defaultReceiptPrinter!;
-                  final bytes = EscPosReceiptBuilder.buildReceiptTicket(
-                    receiptData: receiptData,
-                    paperWidth: printer.paperSize,
-                  );
+                  // Raster the thermal PDF first: the PDF renderer is the only
+                  // path that reads RETAIL's own toggles (via _getRetailSettings)
+                  // — EscPosReceiptBuilder reads restaurant's PrintSettings map,
+                  // so a text ticket would ignore every retail setting. Text
+                  // stays as the fallback when rasterizing fails.
+                  final bytes = await rasterizeThermalReceipt(
+                        receiptData,
+                        paperWidth: printer.paperSize,
+                      ) ??
+                      EscPosReceiptBuilder.buildReceiptTicket(
+                        receiptData: receiptData,
+                        paperWidth: printer.paperSize,
+                      );
                   final success = await printerStore.sendBytes(bytes, printer);
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(success
-                            ? 'Receipt sent to ${printer.name}'
-                            : 'Print failed: ${printerStore.errorMessage ?? "Unknown error"}'),
-                        backgroundColor: success
-                            ? const Color(0xFF4CAF50)
-                            : const Color(0xFFC62828),
-                      ),
-                    );
+                  // NotificationService, not ScaffoldMessenger — the sheet that
+                  // owned the context is already gone by the time the printer
+                  // answers, which silently swallowed the result.
+                  if (success) {
+                    NotificationService.instance
+                        .showSuccess('Receipt sent to ${printer.name}');
+                  } else {
+                    NotificationService.instance.showError(
+                        'Print failed: ${printerStore.errorMessage ?? "Unknown error"}');
                   }
                 },
               ),
@@ -537,7 +817,7 @@ class PrintService {
               title: 'Print Invoice (A4)',
               subtitle: 'Full-size invoice for accounting',
               onTap: () {
-                Navigator.pop(context);
+                Navigator.pop(sheetContext);
                 showPrintPreview(
                   context: context,
                   sale: sale,
@@ -548,7 +828,7 @@ class PrintService {
                   storeAddress: storeAddress,
                   storePhone: storePhone,
                   storeEmail: storeEmail,
-                  gstNumber: gstNumber,
+                  gstNumber: TaxIdRule.numberForRecord(sale.storeGstNumber, gstNumber),
                   orderType: orderType,
                   billNumber: billNumber,
                   kotNumbers: kotNumbers,
@@ -558,6 +838,7 @@ class PrintService {
                   serviceCharge: serviceCharge,
                   isDeliveryOrder: isDeliveryOrder,
                   isTaxInclusive: isTaxInclusive,
+                  roundOff: roundOff,
                 );
               },
             ),
@@ -568,7 +849,7 @@ class PrintService {
               title: 'Print Receipt (Thermal)',
               subtitle: 'For 80mm thermal printers',
               onTap: () {
-                Navigator.pop(context);
+                Navigator.pop(sheetContext);
                 showPrintPreview(
                   context: context,
                   sale: sale,
@@ -579,7 +860,7 @@ class PrintService {
                   storeAddress: storeAddress,
                   storePhone: storePhone,
                   storeEmail: storeEmail,
-                  gstNumber: gstNumber,
+                  gstNumber: TaxIdRule.numberForRecord(sale.storeGstNumber, gstNumber),
                   orderType: orderType,
                   billNumber: billNumber,
                   kotNumbers: kotNumbers,
@@ -589,6 +870,7 @@ class PrintService {
                   serviceCharge: serviceCharge,
                   isDeliveryOrder: isDeliveryOrder,
                   isTaxInclusive: isTaxInclusive,
+                  roundOff: roundOff,
                 );
               },
             ),
@@ -599,7 +881,7 @@ class PrintService {
               title: 'Share Invoice',
               subtitle: 'Send via WhatsApp, Email, etc.',
               onTap: () async {
-                Navigator.pop(context);
+                Navigator.pop(sheetContext);
                 await sharePdf(
                   sale: sale,
                   items: items,
@@ -609,7 +891,7 @@ class PrintService {
                   storeAddress: storeAddress,
                   storePhone: storePhone,
                   storeEmail: storeEmail,
-                  gstNumber: gstNumber,
+                  gstNumber: TaxIdRule.numberForRecord(sale.storeGstNumber, gstNumber),
                   billNumber: billNumber,
                   itemTotal: itemTotal, // Pass item total
                   paymentBreakdown: paymentBreakdown, // Pass split payment breakdown
@@ -617,6 +899,7 @@ class PrintService {
                   serviceCharge: serviceCharge,
                   isDeliveryOrder: isDeliveryOrder,
                   isTaxInclusive: isTaxInclusive,
+                  roundOff: roundOff,
                 );
               },
             ),
@@ -627,7 +910,7 @@ class PrintService {
               title: 'Save to Device',
               subtitle: 'Save PDF to documents folder',
               onTap: () async {
-                Navigator.pop(context);
+                Navigator.pop(sheetContext);
                 final path = await savePdfToDownloads(
                   sale: sale,
                   items: items,
@@ -637,7 +920,7 @@ class PrintService {
                   storeAddress: storeAddress,
                   storePhone: storePhone,
                   storeEmail: storeEmail,
-                  gstNumber: gstNumber,
+                  gstNumber: TaxIdRule.numberForRecord(sale.storeGstNumber, gstNumber),
                   billNumber: billNumber,
                   itemTotal: itemTotal, // Pass item total
                   paymentBreakdown: paymentBreakdown, // Pass split payment breakdown
@@ -645,14 +928,10 @@ class PrintService {
                   serviceCharge: serviceCharge,
                   isDeliveryOrder: isDeliveryOrder,
                   isTaxInclusive: isTaxInclusive,
+                  roundOff: roundOff,
                 );
-                if (context.mounted && path != null) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Saved to: $path'),
-                      backgroundColor: const Color(0xFF4CAF50),
-                    ),
-                  );
+                if (path != null) {
+                  NotificationService.instance.showSuccess('Saved to: $path');
                 }
               },
             ),

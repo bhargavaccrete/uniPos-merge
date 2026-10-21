@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../../../../core/plan/entitlement_keys.dart';
+import '../../../../../../core/plan/plan_enforcement.dart';
 import '../../../../../../util/color.dart';
 
 /// Widget for toggling inventory management settings
@@ -19,6 +21,9 @@ class InventoryToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Stock tracking belongs to the `inventory` module — hide it entirely when
+    // the plan doesn't include it (the item is still sellable/editable).
+    if (!PlanEnforce.allows(EntKeys.inventory)) return const SizedBox.shrink();
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surfaceLight,
@@ -29,12 +34,14 @@ class InventoryToggle extends StatelessWidget {
         children: [
           // ── Track Inventory row ────────────────────────────────────
           Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             child: Row(
               children: [
-                Icon(Icons.inventory_2_outlined,
-                    size: 20, color: AppColors.primary),
+                Icon(
+                  Icons.inventory_2_outlined,
+                  size: 20,
+                  color: AppColors.primary,
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
@@ -58,12 +65,14 @@ class InventoryToggle extends StatelessWidget {
           if (trackInventory) ...[
             Divider(height: 1, color: AppColors.divider),
             Padding(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 14, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               child: Row(
                 children: [
-                  Icon(Icons.remove_shopping_cart_outlined,
-                      size: 20, color: Colors.orange.shade600),
+                  Icon(
+                    Icons.remove_shopping_cart_outlined,
+                    size: 20,
+                    color: Colors.orange.shade600,
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
@@ -107,8 +116,7 @@ class InventoryToggle extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        padding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.primary : Colors.white,
           borderRadius: BorderRadius.circular(20),

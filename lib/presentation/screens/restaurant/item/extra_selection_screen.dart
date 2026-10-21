@@ -349,6 +349,8 @@ class _ExtraSelectionScreenState extends State<ExtraSelectionScreen> {
   void _showAddExtraDialog() {
     showDialog(
       context: context,
+      // Nearest navigator — stays inside the setup wizard's pane.
+      useRootNavigator: false,
       builder: (_) => _AddExtraDialog(
         onAdded: () {
           if (mounted) _loadExtras();
@@ -778,6 +780,7 @@ Future<void> showAddExtraDialog(BuildContext context,
     {required VoidCallback onAdded}) {
   return showDialog(
     context: context,
+    useRootNavigator: false, // stays inside the setup wizard's pane
     builder: (_) => _AddExtraDialog(onAdded: onAdded),
   );
 }

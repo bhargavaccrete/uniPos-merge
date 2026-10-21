@@ -9,11 +9,7 @@ class TaxSelectorButton extends StatelessWidget {
   final double? taxRate;
   final VoidCallback onTap;
 
-  const TaxSelectorButton({
-    super.key,
-    this.taxRate,
-    required this.onTap,
-  });
+  const TaxSelectorButton({super.key, this.taxRate, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -30,11 +26,7 @@ class TaxSelectorButton extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Icon(
-              Icons.percent_rounded,
-              size: 20,
-              color: AppColors.primary,
-            ),
+            Icon(Icons.percent_rounded, size: 20, color: AppColors.primary),
             const SizedBox(width: 10),
             Expanded(
               child: Text(

@@ -1,5 +1,8 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/core/constants/image_sizes.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:billberrylite/util/common/image_picker_service.dart';
 import 'package:billberrylite/util/color.dart';
@@ -16,7 +19,7 @@ class UniversalImagePicker {
   }) async {
     if (kIsWeb || !showCameraOption) {
       // On web or if camera disabled, go directly to gallery
-      return await ImagePickerService.pickImageFromGallery();
+      return await ImagePickerService.pickProductImage();
     }
 
     // On mobile, show options dialog
@@ -33,8 +36,8 @@ class UniversalImagePicker {
             children: [
               Text(
                 'Select Image Source',
-                style: TextStyle(
-                  fontSize: 18,
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.subheadingFontSize(context),
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -47,10 +50,11 @@ class UniversalImagePicker {
                     icon: Icons.photo_library,
                     label: 'Gallery',
                     onTap: () async {
-                      final bytes = await ImagePickerService.pickImageFromGallery();
+                      final bytes =
+                          await ImagePickerService.pickProductImage();
                       Navigator.pop(context, bytes);
                     },
-                    color: AppColors.primary ,
+                    color: AppColors.primary,
                   ),
                   if (!kIsWeb)
                     _buildOption(
@@ -58,7 +62,8 @@ class UniversalImagePicker {
                       icon: Icons.camera_alt,
                       label: 'Camera',
                       onTap: () async {
-                        final bytes = await ImagePickerService.pickImageFromCamera();
+                        final bytes = await ImagePickerService
+                            .pickProductImageFromCamera();
                         Navigator.pop(context, bytes);
                       },
                       color: AppColors.primary,
@@ -93,16 +98,12 @@ class UniversalImagePicker {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              icon,
-              size: 50,
-              color: color ?? Colors.blue,
-            ),
+            Icon(icon, size: 50, color: color ?? Colors.blue),
             const SizedBox(height: 8),
             Text(
               label,
-              style: TextStyle(
-                fontSize: 14,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -147,10 +148,7 @@ class UniversalImageUploader extends StatelessWidget {
             width: double.infinity,
             height: height,
             decoration: BoxDecoration(
-              border: Border.all(
-                color: borderColor ?? Colors.grey,
-                width: 2,
-              ),
+              border: Border.all(color: borderColor ?? Colors.grey, width: 2),
               borderRadius: BorderRadius.circular(10),
               color: imageBytes != null ? Colors.black : Colors.grey.shade100,
             ),
@@ -165,6 +163,7 @@ class UniversalImageUploader extends StatelessWidget {
                           fit: BoxFit.contain,
                           width: double.infinity,
                           height: double.infinity,
+                          cacheWidth: ImageDecodeSizes.preview,
                         ),
                       ),
                       // Delete button
@@ -205,8 +204,8 @@ class UniversalImageUploader extends StatelessWidget {
                       const SizedBox(height: 10),
                       Text(
                         uploadLabel,
-                        style: TextStyle(
-                          fontSize: 16,
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.subheadingFontSize(context),
                           fontWeight: FontWeight.w600,
                           color: Colors.grey.shade700,
                         ),
@@ -214,8 +213,8 @@ class UniversalImageUploader extends StatelessWidget {
                       const SizedBox(height: 5),
                       Text(
                         sizeHint,
-                        style: TextStyle(
-                          fontSize: 12,
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.smallFontSize(context),
                           color: Colors.grey.shade600,
                         ),
                       ),
@@ -228,9 +227,9 @@ class UniversalImageUploader extends StatelessWidget {
               child: Text(
                 'Upload Image (png, jpg, jpeg) up to 3mb',
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: GoogleFonts.poppins(
                   color: Colors.grey,
-                  fontSize: 11,
+                  fontSize: AppResponsive.captionFontSize(context),
                 ),
               ),
             ),

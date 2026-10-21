@@ -5,6 +5,8 @@ import 'package:billberrylite/domain/services/common/auto_backup_service.dart';
 import 'package:billberrylite/domain/services/common/backup_encryption_service.dart';
 import 'package:billberrylite/domain/services/common/unified_backup_service.dart';
 import 'package:billberrylite/domain/services/common/notification_service.dart';
+import 'package:billberrylite/core/plan/plan_enforcement.dart';
+import 'package:billberrylite/core/plan/entitlement_keys.dart';
 
 /// Shows the start-of-day backup prompt if a backup hasn't been done today.
 /// Call from the welcome/home screen after the day is started.
@@ -19,6 +21,9 @@ class StartOfDayBackupPrompt {
   /// already shown this session (prevents re-triggering on every home navigation).
   static Future<void> show(BuildContext context) async {
     if (_shownThisSession) return;
+
+    // Plan gate — no backup prompt when the data_backup module isn't granted.
+    if (!PlanEnforce.allows(EntKeys.dataBackup)) return;
 
     // Respect the Daily Backup Reminder toggle in Settings
     final isEnabled = await AutoBackupService.isAutoBackupEnabled();

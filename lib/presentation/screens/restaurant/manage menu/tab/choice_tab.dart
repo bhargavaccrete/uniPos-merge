@@ -8,9 +8,13 @@ import 'package:billberrylite/presentation/widget/componets/common/app_dialog.da
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/common/list_sort_button.dart';
+import 'package:billberrylite/domain/services/common/list_sort_service.dart';
 import 'package:billberrylite/data/models/restaurant/db/choicemodel_306.dart';
 import 'package:billberrylite/data/models/restaurant/db/choiceoptionmodel_307.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/core/plan/plan_guard.dart';
+import 'package:billberrylite/core/plan/entitlement_keys.dart';
 import 'package:billberrylite/util/images.dart';
 import 'package:uuid/uuid.dart';
 
@@ -21,18 +25,31 @@ class ChoiceTab extends StatefulWidget {
   State<ChoiceTab> createState() => _ChoiceTabState();
 }
 
-class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixin {
+class _ChoiceTabState extends State<ChoiceTab>
+    with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
   TextEditingController choiceController = TextEditingController();
   TextEditingController optionController = TextEditingController();
   TextEditingController searchController = TextEditingController();
+
+  // Focus chain for the add/edit sheet: choice name → option input.
+  final _choiceNameFocus = FocusNode();
+  final _optionFocus = FocusNode();
+
   String query = '';
   List<ChoiceOption> tempOptions = [];
   ChoicesModel? editingChoice;
-  bool allowMultipleSelection = false; // Track if choice allows multiple selections
+  bool allowMultipleSelection =
+      false; // Track if choice allows multiple selections
 
-  bool get _canEdit => RestaurantSession.isAdmin || RestaurantSession.staffRole == 'Manager';
+  bool get _canEdit =>
+      RestaurantSession.isAdmin || RestaurantSession.staffRole == 'Manager';
+  // Plan entitlements layered on the role check (manage_menu.choices.*).
+  // Visibility = role only; entitlement enforced on action (openBottomSheet/_delete).
+  bool get _canAddChoice => _canEdit;
+  bool get _canEditChoice => _canEdit;
+  bool get _canDeleteChoice => _canEdit;
 
   @override
   void initState() {
@@ -49,10 +66,21 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
     choiceController.dispose();
     optionController.dispose();
     searchController.dispose();
+    _choiceNameFocus.dispose();
+    _optionFocus.dispose();
     super.dispose();
   }
 
   void openBottomSheet({ChoicesModel? choicemodel}) {
+    if (!PlanGuard.allowedOr(
+      context,
+      choicemodel == null
+          ? EntKeys.manageMenuChoicesAdd
+          : EntKeys.manageMenuChoicesEdit,
+      featureName: choicemodel == null ? 'Add Choices' : 'Edit Choices',
+    )) {
+      return;
+    }
     setState(() {
       if (choicemodel != null) {
         choiceController.text = choicemodel.name;
@@ -75,7 +103,10 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
         barrierDismissible: true,
         builder: (ctx) => Dialog(
           backgroundColor: Colors.transparent,
-          insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 40,
+            vertical: 24,
+          ),
           child: ConstrainedBox(
             constraints: BoxConstraints(
               maxWidth: 560,
@@ -91,7 +122,9 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
         context: context,
         backgroundColor: Colors.transparent,
         builder: (ctx) => Padding(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom,
+          ),
           child: _buildBottomSheet(isDialog: false),
         ),
       );
@@ -125,7 +158,10 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
               // ── Drag handle (sheet only) ───────────────────────────────
               if (!isDialog)
                 Padding(
-                  padding: const EdgeInsets.only(top: 10, bottom: 4),
+                  padding: EdgeInsets.only(
+                    top: AppResponsive.smallSpacing(context),
+                    bottom: 4,
+                  ),
                   child: Center(
                     child: Container(
                       width: 40,
@@ -144,18 +180,22 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
                 child: Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(10),
+                      padding: EdgeInsets.all(
+                        AppResponsive.smallSpacing(context),
+                      ),
                       decoration: BoxDecoration(
                         color: AppColors.primary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Icon(
-                        isEditing ? Icons.edit_rounded : Icons.checklist_rounded,
+                        isEditing
+                            ? Icons.edit_rounded
+                            : Icons.checklist_rounded,
                         color: AppColors.primary,
-                        size: 20,
+                        size: AppResponsive.iconSize(context),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: AppResponsive.mediumSpacing(context)),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -163,7 +203,9 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
                           Text(
                             isEditing ? 'Edit Choice' : 'Add Choice',
                             style: GoogleFonts.poppins(
-                              fontSize: 16,
+                              fontSize: AppResponsive.subheadingFontSize(
+                                context,
+                              ),
                               fontWeight: FontWeight.w600,
                               color: Colors.black87,
                             ),
@@ -173,7 +215,9 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
                                 ? 'Update this choice group'
                                 : 'Create a new customer choice group',
                             style: GoogleFonts.poppins(
-                                fontSize: 12, color: Colors.grey.shade500),
+                              fontSize: AppResponsive.smallFontSize(context),
+                              color: Colors.grey.shade500,
+                            ),
                           ),
                         ],
                       ),
@@ -197,28 +241,36 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-
                       // ── Choice Name ──────────────────────────────────
                       AppTextField(
                         controller: choiceController,
+                        focusNode: _choiceNameFocus,
+                        autofocus: true,
                         label: 'Choice Name',
                         hint: 'e.g. Spice Level, Add-ons',
                         icon: Icons.checklist_rounded,
                         required: true,
+                        textInputAction: TextInputAction.next,
+                        onFieldSubmitted: (_) => _optionFocus.requestFocus(),
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: AppResponsive.largeSpacing(context)),
 
                       // ── Selection Type ───────────────────────────────
-                      Text('Selection Type',
-                          style: GoogleFonts.poppins(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey.shade600)),
+                      Text(
+                        'Selection Type',
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.smallFontSize(context),
+                          fontWeight: FontWeight.w600,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
                       const SizedBox(height: 6),
                       Container(
                         decoration: BoxDecoration(
                           color: AppColors.surfaceLight,
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(
+                            AppResponsive.borderRadius(context),
+                          ),
                           border: Border.all(color: AppColors.divider),
                         ),
                         child: Row(
@@ -230,14 +282,16 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
                                 icon: Icons.radio_button_checked_rounded,
                                 isSelected: !allowMultipleSelection,
                                 onTap: () => setModalState(
-                                    () => allowMultipleSelection = false),
+                                  () => allowMultipleSelection = false,
+                                ),
                                 isLeft: true,
                               ),
                             ),
                             Container(
-                                width: 1,
-                                height: 56,
-                                color: AppColors.divider),
+                              width: 1,
+                              height: 56,
+                              color: AppColors.divider,
+                            ),
                             Expanded(
                               child: _selectionChip(
                                 label: 'Multiple',
@@ -245,39 +299,47 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
                                 icon: Icons.check_box_rounded,
                                 isSelected: allowMultipleSelection,
                                 onTap: () => setModalState(
-                                    () => allowMultipleSelection = true),
+                                  () => allowMultipleSelection = true,
+                                ),
                                 isLeft: false,
                               ),
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: AppResponsive.largeSpacing(context)),
 
                       // ── Options ──────────────────────────────────────
                       Row(
                         children: [
-                          Text('Options',
-                              style: GoogleFonts.poppins(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.grey.shade600)),
+                          Text(
+                            'Options',
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.smallFontSize(context),
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
                           const Spacer(),
                           if (tempOptions.isNotEmpty)
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 3),
+                                horizontal: 10,
+                                vertical: 3,
+                              ),
                               decoration: BoxDecoration(
-                                color:
-                                    AppColors.primary.withValues(alpha: 0.1),
+                                color: AppColors.primary.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(20),
                               ),
                               child: Text(
                                 '${tempOptions.length} added',
                                 style: GoogleFonts.poppins(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.primary),
+                                  fontSize: AppResponsive.captionFontSize(
+                                    context,
+                                  ),
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.primary,
+                                ),
                               ),
                             ),
                         ],
@@ -290,29 +352,43 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
                           Expanded(
                             child: AppTextField(
                               controller: optionController,
+                              focusNode: _optionFocus,
                               hint: 'e.g. Mild, Medium, Hot…',
                               icon: Icons.add_circle_outline_rounded,
-                              onFieldSubmitted: (_) => _addOption(),
+                              textInputAction: TextInputAction.next,
+                              // Add the option and keep focus here so the user can
+                              // type several options back-to-back.
+                              onFieldSubmitted: (_) {
+                                _addOption();
+                                _optionFocus.requestFocus();
+                              },
                             ),
                           ),
-                          const SizedBox(width: 8),
+                          SizedBox(width: AppResponsive.smallSpacing(context)),
                           InkWell(
                             onTap: _addOption,
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(
+                              AppResponsive.borderRadius(context),
+                            ),
                             child: Container(
                               width: 48,
                               height: 48,
                               decoration: BoxDecoration(
                                 color: AppColors.primary,
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(
+                                  AppResponsive.borderRadius(context),
+                                ),
                               ),
-                              child: const Icon(Icons.add_rounded,
-                                  color: Colors.white, size: 22),
+                              child: Icon(
+                                Icons.add_rounded,
+                                color: Colors.white,
+                                size: AppResponsive.iconSize(context),
+                              ),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 10),
+                      SizedBox(height: AppResponsive.smallSpacing(context)),
 
                       // Options list
                       if (tempOptions.isEmpty)
@@ -321,20 +397,36 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
                           padding: const EdgeInsets.symmetric(vertical: 20),
                           decoration: BoxDecoration(
                             color: AppColors.surfaceLight,
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(
+                              AppResponsive.borderRadius(context),
+                            ),
                             border: Border.all(
-                                color: AppColors.divider,
-                                style: BorderStyle.solid),
+                              color: AppColors.divider,
+                              style: BorderStyle.solid,
+                            ),
                           ),
                           child: Column(
                             children: [
-                              Icon(Icons.playlist_add_rounded,
-                                  size: 32, color: Colors.grey.shade300),
+                              Icon(
+                                Icons.playlist_add_rounded,
+                                size: AppResponsive.getValue(
+                                  context,
+                                  mobile: 32.0,
+                                  tablet: 36.0,
+                                  desktop: 40.0,
+                                ),
+                                color: Colors.grey.shade300,
+                              ),
                               const SizedBox(height: 6),
-                              Text('No options added yet',
-                                  style: GoogleFonts.poppins(
-                                      fontSize: 13,
-                                      color: Colors.grey.shade400)),
+                              Text(
+                                'No options added yet',
+                                style: GoogleFonts.poppins(
+                                  fontSize: AppResponsive.smallFontSize(
+                                    context,
+                                  ),
+                                  color: Colors.grey.shade400,
+                                ),
+                              ),
                             ],
                           ),
                         )
@@ -343,14 +435,17 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
                           final idx = entry.key;
                           final opt = entry.value;
                           return Container(
-                            margin: const EdgeInsets.only(bottom: 8),
+                            margin: EdgeInsets.only(
+                              bottom: AppResponsive.smallSpacing(context),
+                            ),
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 12),
+                              horizontal: 14,
+                              vertical: 12,
+                            ),
                             decoration: BoxDecoration(
                               color: AppColors.surfaceLight,
                               borderRadius: BorderRadius.circular(10),
-                              border:
-                                  Border.all(color: AppColors.divider),
+                              border: Border.all(color: AppColors.divider),
                             ),
                             child: Row(
                               children: [
@@ -358,43 +453,54 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
                                   width: 22,
                                   height: 22,
                                   decoration: BoxDecoration(
-                                    color: AppColors.primary
-                                        .withValues(alpha: 0.1),
+                                    color: AppColors.primary.withValues(
+                                      alpha: 0.1,
+                                    ),
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Center(
                                     child: Text(
                                       '${idx + 1}',
                                       style: GoogleFonts.poppins(
-                                        fontSize: 11,
+                                        fontSize: AppResponsive.captionFontSize(
+                                          context,
+                                        ),
                                         fontWeight: FontWeight.w700,
                                         color: AppColors.primary,
                                       ),
                                     ),
                                   ),
                                 ),
-                                const SizedBox(width: 12),
+                                SizedBox(
+                                  width: AppResponsive.mediumSpacing(context),
+                                ),
                                 Expanded(
-                                  child: Text(opt.name,
-                                      style: GoogleFonts.poppins(
-                                          fontSize: 14,
-                                          color: Colors.black87)),
+                                  child: Text(
+                                    opt.name,
+                                    style: GoogleFonts.poppins(
+                                      fontSize: AppResponsive.bodyFontSize(
+                                        context,
+                                      ),
+                                      color: Colors.black87,
+                                    ),
+                                  ),
                                 ),
                                 InkWell(
                                   onTap: () => setModalState(
-                                      () => tempOptions.removeAt(idx)),
+                                    () => tempOptions.removeAt(idx),
+                                  ),
                                   borderRadius: BorderRadius.circular(6),
                                   child: Container(
                                     padding: const EdgeInsets.all(5),
                                     decoration: BoxDecoration(
                                       color: Colors.red.shade50,
-                                      borderRadius:
-                                          BorderRadius.circular(6),
+                                      borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: const Icon(
-                                        Icons.close_rounded,
-                                        size: 15,
-                                        color: Colors.red),
+                                      Icons.close_rounded,
+                                      size: 15,
+                                      color: Colors.red,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -402,7 +508,7 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
                           );
                         }),
 
-                      const SizedBox(height: 20),
+                      SizedBox(height: AppResponsive.largeSpacing(context)),
 
                       // ── Action buttons ───────────────────────────────
                       Row(
@@ -411,46 +517,58 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
                             child: OutlinedButton(
                               onPressed: () => Navigator.pop(context),
                               style: OutlinedButton.styleFrom(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 13),
-                                side: BorderSide(
-                                    color: Colors.grey.shade300),
+                                padding: EdgeInsets.symmetric(
+                                  vertical: AppResponsive.mediumSpacing(
+                                    context,
+                                  ),
+                                ),
+                                side: BorderSide(color: Colors.grey.shade300),
                                 shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12)),
+                                  borderRadius: BorderRadius.circular(
+                                    AppResponsive.borderRadius(context),
+                                  ),
+                                ),
                               ),
-                              child: Text('Cancel',
-                                  style: GoogleFonts.poppins(
-                                      fontSize: 14,
-                                      color: Colors.grey.shade700,
-                                      fontWeight: FontWeight.w500)),
+                              child: Text(
+                                'Cancel',
+                                style: GoogleFonts.poppins(
+                                  fontSize: AppResponsive.bodyFontSize(context),
+                                  color: Colors.grey.shade700,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          SizedBox(width: AppResponsive.mediumSpacing(context)),
                           Expanded(
                             flex: 2,
                             child: ElevatedButton.icon(
-                              onPressed: () =>
-                                  _addOrEditChoice(tempOptions),
+                              onPressed: () => _addOrEditChoice(tempOptions),
                               icon: Icon(
                                 isEditing
                                     ? Icons.check_rounded
                                     : Icons.add_circle_outline_rounded,
-                                size: 18,
+                                size: AppResponsive.smallIconSize(context),
                                 color: Colors.white,
                               ),
                               label: Text(
                                 isEditing ? 'Update Choice' : 'Add Choice',
                                 style: GoogleFonts.poppins(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white),
+                                  fontSize: AppResponsive.bodyFontSize(context),
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
                               ),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppColors.primary,
                                 padding: const EdgeInsets.symmetric(
-                                    vertical: 13),
+                                  vertical: 13,
+                                ),
                                 shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12)),
+                                  borderRadius: BorderRadius.circular(
+                                    AppResponsive.borderRadius(context),
+                                  ),
+                                ),
                                 elevation: 0,
                               ),
                             ),
@@ -479,8 +597,12 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.horizontal(
-        left: isLeft ? const Radius.circular(12) : Radius.zero,
-        right: isLeft ? Radius.zero : const Radius.circular(12),
+        left: isLeft
+            ? Radius.circular(AppResponsive.borderRadius(context))
+            : Radius.zero,
+        right: isLeft
+            ? Radius.zero
+            : Radius.circular(AppResponsive.borderRadius(context)),
       ),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
@@ -497,23 +619,32 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon,
-                size: 18,
-                color: isSelected ? AppColors.primary : Colors.grey.shade400),
-            const SizedBox(width: 8),
+            Icon(
+              icon,
+              size: AppResponsive.smallIconSize(context),
+              color: isSelected ? AppColors.primary : Colors.grey.shade400,
+            ),
+            SizedBox(width: AppResponsive.smallSpacing(context)),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label,
-                    style: GoogleFonts.poppins(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: isSelected
-                            ? AppColors.primary
-                            : Colors.grey.shade600)),
-                Text(subtitle,
-                    style: GoogleFonts.poppins(
-                        fontSize: 10, color: Colors.grey.shade400)),
+                Text(
+                  label,
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.bodyFontSize(context),
+                    fontWeight: FontWeight.w600,
+                    color: isSelected
+                        ? AppColors.primary
+                        : Colors.grey.shade600,
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  style: GoogleFonts.poppins(
+                    fontSize: 10,
+                    color: Colors.grey.shade400,
+                  ),
+                ),
               ],
             ),
           ],
@@ -530,11 +661,15 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
     }
 
     // Duplicate name check (excluding current item when editing)
-    final exists = choiceStore.choices.any((c) =>
-        c.name.toLowerCase() == trimmedName.toLowerCase() &&
-        c.id != (editingChoice?.id ?? ''));
+    final exists = choiceStore.choices.any(
+      (c) =>
+          c.name.toLowerCase() == trimmedName.toLowerCase() &&
+          c.id != (editingChoice?.id ?? ''),
+    );
     if (exists) {
-      NotificationService.instance.showError('A choice with this name already exists');
+      NotificationService.instance.showError(
+        'A choice with this name already exists',
+      );
       return;
     }
 
@@ -556,7 +691,8 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
         choiceOption: option,
         createdTime: existingCreatedTime,
         lastEditedTime: DateTime.now(),
-        editedBy: RestaurantSession.staffName ?? RestaurantSession.effectiveRole,
+        editedBy:
+            RestaurantSession.staffName ?? RestaurantSession.effectiveRole,
         editCount: existingEditCount + 1,
         allowMultipleSelection: allowMultipleSelection,
       );
@@ -574,10 +710,17 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
   }
 
   Future<void> _delete(ChoicesModel choice) async {
+    if (!PlanGuard.allowedOr(
+      context,
+      EntKeys.manageMenuChoicesDelete,
+      featureName: 'Delete Choices',
+    ))
+      return;
     final confirmed = await showAppConfirmDialog(
       context: context,
       title: 'Delete "${choice.name}"?',
-      message: 'This choice and its ${choice.choiceOption.length} options will be removed.',
+      message:
+          'This choice and its ${choice.choiceOption.length} options will be removed.',
       confirmLabel: 'Delete',
       accent: AppColors.danger,
       icon: Icons.delete_outline,
@@ -588,7 +731,6 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
     }
   }
 
-
   @override
   @override
   Widget build(BuildContext context) {
@@ -598,33 +740,55 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
 
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      body: Column(
-        children: [
-          // Modern Search Bar
-          Padding(
-            padding: AppResponsive.padding(context),
-            child: AppTextField(
-              controller: searchController,
-              hint: 'Search choices…',
-              icon: Icons.search_rounded,
-              suffixIcon: query.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear, color: Colors.grey, size: 20),
-                      onPressed: () {
-                        searchController.clear();
-                      },
-                    )
-                  : null,
+      body: ListenableBuilder(
+        listenable: ListSortService.instance,
+        builder: (context, _) => Column(
+          children: [
+            // Modern Search Bar
+            Padding(
+              padding: AppResponsive.padding(context),
+              // IntrinsicHeight + stretch sizes the sort button to match
+              // AppTextField's height without hardcoding it.
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: AppTextField(
+                        controller: searchController,
+                        hint: 'Search choices…',
+                        icon: Icons.search_rounded,
+                        suffixIcon: query.isNotEmpty
+                            ? IconButton(
+                                icon: Icon(
+                                  Icons.clear,
+                                  color: Colors.grey,
+                                  size: AppResponsive.iconSize(context),
+                                ),
+                                onPressed: () {
+                                  searchController.clear();
+                                },
+                              )
+                            : null,
+                      ),
+                    ),
+                    SizedBox(width: AppResponsive.smallSpacing(context)),
+                    const ListSortButton(list: SortableList.choices),
+                  ],
+                ),
+              ),
             ),
-          ),
 
-          // Choices List
-          Expanded(
-            child: isTablet ? _buildTabletLayout(size) : _buildMobileLayout(size),
-          ),
+            // Choices List
+            Expanded(
+              child: isTablet
+                  ? _buildTabletLayout(size)
+                  : _buildMobileLayout(size),
+            ),
 
-          if (_canEdit) _buildAddButton(),
-        ],
+            if (_canAddChoice) _buildAddButton(),
+          ],
+        ),
       ),
     );
   }
@@ -662,8 +826,12 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
         // Masonry layout: each card keeps its natural height so all options are
         // reachable (a fixed-aspect grid clips long lists). Reuses the full
         // mobile card and distributes cards round-robin across columns.
-        final columns =
-            AppResponsive.gridColumns(context, mobile: 2, tablet: 2, desktop: 3);
+        final columns = AppResponsive.gridColumns(
+          context,
+          mobile: 2,
+          tablet: 2,
+          desktop: 3,
+        );
         final colLists = List.generate(columns, (_) => <Widget>[]);
         for (var i = 0; i < filteredChoices.length; i++) {
           colLists[i % columns].add(_buildMobileChoiceCard(filteredChoices[i]));
@@ -686,15 +854,23 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
     );
   }
 
+  /// Both layouts route through here, so the sort is applied once.
   List<ChoicesModel> _getFilteredChoices() {
     final allchoice = choiceStore.choices.toList();
-    return query.isEmpty
+    final filtered = query.isEmpty
         ? allchoice
         : allchoice.where((choice) {
             final name = choice.name.toLowerCase();
             final queryLower = query.toLowerCase();
             return name.contains(queryLower);
           }).toList();
+
+    return applySort(
+      filtered,
+      ListSortService.instance.optionFor(SortableList.choices),
+      nameOf: (choice) => choice.name,
+      createdAtOf: (choice) => choice.createdTime,
+    );
   }
 
   Widget _buildEmptyState(double height) {
@@ -703,11 +879,11 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Lottie.asset(AppImages.notfoundanimation, height: height * 0.25),
-          SizedBox(height: 16),
+          SizedBox(height: AppResponsive.largeSpacing(context)),
           Text(
             query.isEmpty ? 'No Choices Found' : 'No matching choices',
             style: GoogleFonts.poppins(
-              fontSize: 18,
+              fontSize: AppResponsive.subheadingFontSize(context),
               fontWeight: FontWeight.w600,
               color: Colors.grey.shade700,
             ),
@@ -718,7 +894,7 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
               child: Text(
                 'Add choices to customize your items',
                 style: GoogleFonts.poppins(
-                  fontSize: 14,
+                  fontSize: AppResponsive.bodyFontSize(context),
                   color: Colors.grey.shade500,
                 ),
               ),
@@ -733,7 +909,9 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
       margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: AppColors.divider.withOpacity(0.5)),
         boxShadow: [
           BoxShadow(
@@ -746,37 +924,105 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
-          tilePadding: EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-          childrenPadding: EdgeInsets.only(bottom: 8),
+          tilePadding: EdgeInsets.symmetric(
+            horizontal: AppResponsive.mediumSpacing(context),
+            vertical: 2,
+          ),
+          childrenPadding: EdgeInsets.only(
+            bottom: AppResponsive.smallSpacing(context),
+          ),
           leading: Container(
             padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
             decoration: BoxDecoration(
               color: AppColors.primary.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
+              borderRadius: BorderRadius.circular(
+                AppResponsive.smallBorderRadius(context),
+              ),
             ),
-            child: Icon(Icons.checklist, color: AppColors.primary, size: AppResponsive.iconSize(context)),
+            child: Icon(
+              Icons.checklist,
+              color: AppColors.primary,
+              size: AppResponsive.iconSize(context),
+            ),
           ),
-          title: Text(choice.name, style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context), fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-          subtitle: Text('${choice.choiceOption.length} options', style: GoogleFonts.poppins(fontSize: AppResponsive.smallFontSize(context), color: AppColors.textSecondary)),
+          title: Text(
+            choice.name,
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.bodyFontSize(context),
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          subtitle: Text(
+            '${choice.choiceOption.length} options',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.smallFontSize(context),
+              color: AppColors.textSecondary,
+            ),
+          ),
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (_canEdit) ...[
-                InkWell(onTap: () => openBottomSheet(choicemodel: choice), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: AppResponsive.smallIconSize(context), color: AppColors.primary))),
-                InkWell(onTap: () => _delete(choice), child: Padding(padding: EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: AppResponsive.smallIconSize(context), color: Colors.red))),
-              ],
+              if (_canEditChoice)
+                InkWell(
+                  onTap: () => openBottomSheet(choicemodel: choice),
+                  child: Padding(
+                    padding: EdgeInsets.all(6),
+                    child: Icon(
+                      Icons.edit_outlined,
+                      size: AppResponsive.smallIconSize(context),
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+              if (_canDeleteChoice)
+                InkWell(
+                  onTap: () => _delete(choice),
+                  child: Padding(
+                    padding: EdgeInsets.all(6),
+                    child: Icon(
+                      Icons.delete_outline,
+                      size: AppResponsive.smallIconSize(context),
+                      color: Colors.red,
+                    ),
+                  ),
+                ),
             ],
           ),
           children: choice.choiceOption.isEmpty
-              ? [Padding(padding: EdgeInsets.all(16), child: Text("No options", style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey.shade400)))]
+              ? [
+                  Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text(
+                      "No options",
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.smallFontSize(context),
+                        color: Colors.grey.shade400,
+                      ),
+                    ),
+                  ),
+                ]
               : choice.choiceOption.map((option) {
                   return Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16, vertical: 3),
                     child: Row(
                       children: [
-                        Container(width: 5, height: 5, decoration: BoxDecoration(color: AppColors.primary, shape: BoxShape.circle)),
-                        SizedBox(width: 10),
-                        Text(option.name, style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey.shade700)),
+                        Container(
+                          width: 5,
+                          height: 5,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        SizedBox(width: AppResponsive.smallSpacing(context)),
+                        Text(
+                          option.name,
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.bodyFontSize(context),
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
                       ],
                     ),
                   );
@@ -806,13 +1052,23 @@ class _ChoiceTabState extends State<ChoiceTab> with AutomaticKeepAliveClientMixi
           child: ElevatedButton.icon(
             onPressed: () => openBottomSheet(),
             icon: Icon(Icons.add, size: AppResponsive.iconSize(context)),
-            label: Text('Add Choice', style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context), fontWeight: FontWeight.w500)),
+            label: Text(
+              'Add Choice',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
               elevation: 0,
-              padding: EdgeInsets.symmetric(vertical: AppResponsive.mediumSpacing(context)),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              padding: EdgeInsets.symmetric(
+                vertical: AppResponsive.mediumSpacing(context),
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
           ),
         ),

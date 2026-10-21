@@ -1,12 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
+
 import 'package:intl/intl.dart';
 import '../../../core/di/service_locator.dart';
 import 'package:billberrylite/data/models/retail/hive_model/credit_payment_model_218.dart';
-import 'package:billberrylite/data/models/retail/hive_model/customer_model_208.dart';
+import 'package:billberrylite/data/repositories/retail/credit_payment_repository.dart';
+import 'package:billberrylite/domain/services/common/report_export_service.dart';
+import 'package:billberrylite/domain/services/retail/credit_report_export.dart';
+import 'package:billberrylite/domain/services/retail/report_service.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_export_button.dart';
+import 'package:billberrylite/data/models/common/customer_model_125.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
 
 import 'customer_detail_screen.dart';
-
+import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
 
 /// Credit Reports Screen - Credit Sales, Collection, Outstanding reports
 class CreditReportsScreen extends StatefulWidget {
@@ -16,19 +26,66 @@ class CreditReportsScreen extends StatefulWidget {
   State<CreditReportsScreen> createState() => _CreditReportsScreenState();
 }
 
+/// Query bounds for the user-facing range: midnight to midnight with an
+/// **exclusive** end.
+///
+/// The picker hands back midnight of the final day, and every retail query is
+/// exclusive at the end — so passing it straight through dropped that whole
+/// last day. [DateTimeRange] itself stays inclusive because it is what the
+/// filter chip displays.
+(DateTime, DateTime) _queryBounds(DateTimeRange range) {
+  final start = DateTime(range.start.year, range.start.month, range.start.day);
+  final end = DateTime(
+    range.end.year,
+    range.end.month,
+    range.end.day,
+  ).add(const Duration(days: 1));
+  return (start, end);
+}
+
+/// The period an export covers, in the words the filter chip uses.
+///
+/// "All time" rather than a blank: an export handed to an accountant has to say
+/// what it covers, and an unfiltered credit report legitimately covers
+/// everything the plan lets it see.
+String _periodLabel(DateTimeRange? range) {
+  if (range == null) return 'All time';
+  final f = DateFormat('dd MMM yyyy');
+  return '${f.format(range.start)} - ${f.format(range.end)}';
+}
+
 class _CreditReportsScreenState extends State<CreditReportsScreen>
     with SingleTickerProviderStateMixin {
+  /// Tab index of Outstanding — a CURRENT balance, with no date dimension.
+  static const int _outstandingTab = 2;
+
   late TabController _tabController;
   DateTimeRange? _dateFilter;
+  int _tabIndex = 0;
+
+  /// Outstanding is what customers owe RIGHT NOW; a date range means nothing to
+  /// it, and it never read one. The control used to stay lit above it anyway,
+  /// with a blue banner announcing a period the tab was quietly ignoring.
+  ///
+  /// The selection itself is KEPT, not cleared — switching back to Credit Sales
+  /// restores the range the user picked.
+  bool get _filterApplies => _tabIndex != _outstandingTab;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(_onTabChanged);
+  }
+
+  void _onTabChanged() {
+    if (!mounted || _tabController.index == _tabIndex) return;
+    setState(() => _tabIndex = _tabController.index);
   }
 
   @override
   void dispose() {
+    _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
     super.dispose();
   }
@@ -42,7 +99,7 @@ class _CreditReportsScreenState extends State<CreditReportsScreen>
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(primary: Color(0xFF4CAF50)),
+            colorScheme: const ColorScheme.light(primary: AppColors.success),
           ),
           child: child!,
         );
@@ -57,30 +114,34 @@ class _CreditReportsScreenState extends State<CreditReportsScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
-      appBar: AppBar(
-        title: const Text('Credit Reports'),
-        backgroundColor: Colors.white,
-        elevation: 0,
+      backgroundColor: AppColors.surfaceLight,
+      appBar: buildPrimaryAppBar(
+        title: 'Credit Reports',
         actions: [
-          IconButton(
-            icon: Icon(
-              Icons.filter_alt_outlined,
-              color: _dateFilter != null ? const Color(0xFF4CAF50) : null,
-            ),
-            onPressed: _selectDateRange,
-          ),
-          if (_dateFilter != null)
+          if (_filterApplies) ...[
             IconButton(
-              icon: const Icon(Icons.clear),
-              onPressed: () => setState(() => _dateFilter = null),
+              // White on the primary fill; the amber marks an active filter,
+              // which used to be green-on-white and is now invisible otherwise.
+              icon: Icon(
+                Icons.filter_alt_outlined,
+                color: _dateFilter != null ? AppColors.warning : Colors.white,
+              ),
+              tooltip: 'Filter by date',
+              onPressed: _selectDateRange,
             ),
+            if (_dateFilter != null)
+              IconButton(
+                icon: const Icon(Icons.clear, color: Colors.white),
+                tooltip: 'Clear filter',
+                onPressed: () => setState(() => _dateFilter = null),
+              ),
+          ],
         ],
         bottom: TabBar(
           controller: _tabController,
-          labelColor: const Color(0xFF4CAF50),
-          unselectedLabelColor: const Color(0xFF6B6B6B),
-          indicatorColor: const Color(0xFF4CAF50),
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white70,
+          indicatorColor: Colors.white,
           tabs: const [
             Tab(text: 'Credit Sales'),
             Tab(text: 'Collections'),
@@ -88,38 +149,60 @@ class _CreditReportsScreenState extends State<CreditReportsScreen>
           ],
         ),
       ),
-      body: Column(
-        children: [
-          // Date Filter Info
-          if (_dateFilter != null)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              color: const Color(0xFFE3F2FD),
-              child: Row(
-                children: [
-                  const Icon(Icons.calendar_today, size: 16, color: Color(0xFF1976D2)),
-                  const SizedBox(width: 8),
-                  Text(
-                    '${DateFormat('dd/MM/yy').format(_dateFilter!.start)} - ${DateFormat('dd/MM/yy').format(_dateFilter!.end)}',
-                    style: const TextStyle(color: Color(0xFF1976D2), fontSize: 13),
+      // Every amount here goes through formatMoney; MoneyScope is the single
+      // subscription that re-renders them when the store's currency or decimal
+      // precision changes.
+      body: MoneyScope(
+        child: AppResponsive.constrainedContent(
+          context: context,
+          alignment: Alignment.topCenter,
+          maxWidth: AppResponsive.maxContentWidth(context),
+          child: Column(
+            children: [
+              // Date Filter Info — not over Outstanding, which ignores it.
+              if (_dateFilter != null && _filterApplies)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
                   ),
-                ],
-              ),
-            ),
+                  color: const Color(0xFFE3F2FD),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.calendar_today,
+                        size: AppResponsive.smallIconSize(context),
+                        color: AppColors.info,
+                      ),
+                      SizedBox(width: AppResponsive.smallSpacing(context)),
+                      Text(
+                        '${DateFormat('dd/MM/yy').format(_dateFilter!.start)} - ${DateFormat('dd/MM/yy').format(_dateFilter!.end)}',
+                        style: GoogleFonts.poppins(
+                          color: AppColors.info,
+                          fontSize: AppResponsive.smallFontSize(context),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
 
-          // Tab Content
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _CreditSalesTab(dateFilter: _dateFilter),
-                _CollectionsTab(dateFilter: _dateFilter),
-                _OutstandingTab(dateFilter: _dateFilter),
-              ],
-            ),
+              // Tab Content
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _CreditSalesTab(dateFilter: _dateFilter),
+                    _CollectionsTab(dateFilter: _dateFilter),
+                    // No `dateFilter`: it never used one, and passing it in
+                    // implied otherwise.
+                    const _OutstandingTab(),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -157,15 +240,17 @@ class _CreditSalesTabState extends State<_CreditSalesTab> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
-      List<SaleModel> sales;
-      if (widget.dateFilter != null) {
-        sales = await saleStore.getCreditSalesByDateRange(
-          widget.dateFilter!.start,
-          widget.dateFilter!.end,
-        );
-      } else {
-        sales = await saleStore.getCreditSales();
-      }
+      // Through ReportService, so the plan's report-history cutoff applies the
+      // same way it does on every other retail report. Reading SaleRepository
+      // directly skipped it: a plan limited to 30 days still listed every
+      // credit sale ever made.
+      final (start, end) = widget.dateFilter == null
+          ? (null, null)
+          : _queryBounds(widget.dateFilter!);
+      final sales = await ReportService().getCreditSalesReport(
+        startDate: start,
+        endDate: end,
+      );
 
       final total = sales.fold<double>(0, (sum, s) => sum + s.totalAmount);
 
@@ -188,14 +273,14 @@ class _CreditSalesTabState extends State<_CreditSalesTab> {
       children: [
         // Summary
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: AppResponsive.cardPadding(context),
           color: Colors.white,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildSummaryItem(
                 'Total Credit Sales',
-                '₹${_totalCreditSales.toStringAsFixed(2)}',
+                formatMoney(_totalCreditSales),
                 Icons.credit_card,
                 Colors.orange,
               ),
@@ -203,11 +288,21 @@ class _CreditSalesTabState extends State<_CreditSalesTab> {
                 'Transactions',
                 _creditSales.length.toString(),
                 Icons.receipt_long,
-                const Color(0xFF4CAF50),
+                AppColors.success,
               ),
             ],
           ),
         ),
+        if (_creditSales.isNotEmpty)
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+              AppResponsive.cardPadding(context).left,
+              0,
+              AppResponsive.cardPadding(context).left,
+              AppResponsive.largeSpacing(context),
+            ),
+            child: ReportExportButton(onPressed: _export),
+          ),
         const Divider(height: 1),
 
         // List
@@ -217,7 +312,7 @@ class _CreditSalesTabState extends State<_CreditSalesTab> {
               : RefreshIndicator(
                   onRefresh: _loadData,
                   child: ListView.builder(
-                    padding: const EdgeInsets.all(16),
+                    padding: AppResponsive.cardPadding(context),
                     itemCount: _creditSales.length,
                     itemBuilder: (context, index) {
                       final sale = _creditSales[index];
@@ -230,37 +325,68 @@ class _CreditSalesTabState extends State<_CreditSalesTab> {
     );
   }
 
-  Widget _buildSummaryItem(String label, String value, IconData icon, Color color) {
+  Widget _buildSummaryItem(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
     return Column(
       children: [
         Icon(icon, size: 28, color: color),
         const SizedBox(height: 4),
         Text(
           value,
-          style: TextStyle(
-            fontSize: 18,
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.subheadingFontSize(context),
             fontWeight: FontWeight.w700,
             color: color,
           ),
         ),
         Text(
           label,
-          style: const TextStyle(fontSize: 12, color: Color(0xFF6B6B6B)),
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.captionFontSize(context),
+            color: AppColors.textSecondary,
+          ),
         ),
       ],
     );
   }
 
+  /// Exports the rows the tab is showing — not a re-query, so the file can
+  /// never cover a different period than the screen above it. The summary
+  /// reads the same two figures the cards do.
+  Future<void> _export() async {
+    final export = CreditReportExport.creditSales(
+      sales: _creditSales,
+      totalCreditSales: _totalCreditSales,
+      period: _periodLabel(widget.dateFilter),
+    );
+    await ReportExportService.showExportDialog(
+      context: context,
+      fileName: 'credit_sales',
+      reportTitle: 'Credit Sales',
+      headers: export.headers,
+      data: export.rows,
+      summary: export.summary,
+    );
+  }
+
   Widget _buildCreditSaleCard(SaleModel sale) {
     final date = DateTime.tryParse(sale.date);
-    final dateStr = date != null ? DateFormat('dd MMM yyyy, hh:mm a').format(date) : sale.date;
+    final dateStr = date != null
+        ? DateFormat('dd MMM yyyy, hh:mm a').format(date)
+        : sale.date;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+      margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
+      padding: AppResponsive.cardPadding(context),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.smallBorderRadius(context),
+        ),
         border: Border.all(color: const Color(0xFFFFF3E0)),
       ),
       child: Column(
@@ -270,22 +396,25 @@ class _CreditSalesTabState extends State<_CreditSalesTab> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'INV-${sale.saleId.substring(0, 8).toUpperCase()}',
-                style: const TextStyle(
-                  fontSize: 14,
+                sale.displayNumber,
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.bodyFontSize(context),
                   fontWeight: FontWeight.w600,
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppResponsive.smallSpacing(context),
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: _getStatusColor(sale.status).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
                   sale.statusDisplayText,
-                  style: TextStyle(
-                    fontSize: 11,
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.captionFontSize(context),
                     fontWeight: FontWeight.w600,
                     color: _getStatusColor(sale.status),
                   ),
@@ -293,26 +422,32 @@ class _CreditSalesTabState extends State<_CreditSalesTab> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: AppResponsive.smallSpacing(context)),
           Text(
             dateStr,
-            style: const TextStyle(fontSize: 12, color: Color(0xFF9E9E9E)),
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.captionFontSize(context),
+              color: AppColors.textSecondary,
+            ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: AppResponsive.smallSpacing(context)),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Total',
-                    style: TextStyle(fontSize: 11, color: Color(0xFF9E9E9E)),
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.captionFontSize(context),
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                   Text(
-                    '₹${sale.totalAmount.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontSize: 16,
+                    formatMoney(sale.totalAmount),
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.subheadingFontSize(context),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -321,14 +456,17 @@ class _CreditSalesTabState extends State<_CreditSalesTab> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  const Text(
+                  Text(
                     'Due',
-                    style: TextStyle(fontSize: 11, color: Color(0xFF9E9E9E)),
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.captionFontSize(context),
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                   Text(
-                    '₹${sale.dueAmount.toStringAsFixed(2)}',
-                    style: TextStyle(
-                      fontSize: 16,
+                    formatMoney(sale.dueAmount),
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.subheadingFontSize(context),
                       fontWeight: FontWeight.w600,
                       color: sale.dueAmount > 0 ? Colors.red : Colors.green,
                     ),
@@ -388,29 +526,21 @@ class _CollectionsTabState extends State<_CollectionsTab> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
-      List<CreditPaymentModel> payments;
-      Map<String, double> collections;
+      // One list, one window rule — bounds AND the plan's history cutoff, via
+      // ReportService like every other retail report.
+      final (start, end) = widget.dateFilter == null
+          ? (null, null)
+          : _queryBounds(widget.dateFilter!);
+      final payments = await ReportService().getCreditCollectionsReport(
+        startDate: start,
+        endDate: end,
+      );
 
-      if (widget.dateFilter != null) {
-        payments = await creditPaymentRepository.getPaymentsByDateRange(
-          widget.dateFilter!.start,
-          widget.dateFilter!.end,
-        );
-        collections = await creditPaymentRepository.getCollectionByModeInRange(
-          widget.dateFilter!.start,
-          widget.dateFilter!.end,
-        );
-      } else {
-        payments = await creditPaymentRepository.getAllPayments();
-        collections = {'cash': 0, 'card': 0, 'upi': 0, 'total': 0};
-        for (var p in payments) {
-          if (!(p.isWriteOff ?? false)) {
-            final mode = p.paymentMode.toLowerCase();
-            collections[mode] = (collections[mode] ?? 0) + p.amount;
-            collections['total'] = (collections['total'] ?? 0) + p.amount;
-          }
-        }
-      }
+      // The summary is bucketed from THAT list, so the cards can never describe
+      // a different set of rows than the one below them. `bucketCollections` is
+      // the single place deciding what counts as collected: write-offs and
+      // return adjustments are listed but not counted.
+      final collections = CreditPaymentRepository.bucketCollections(payments);
 
       setState(() {
         _payments = payments;
@@ -431,39 +561,78 @@ class _CollectionsTabState extends State<_CollectionsTab> {
       children: [
         // Summary Cards
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: AppResponsive.cardPadding(context),
           color: Colors.white,
           child: Column(
             children: [
               Row(
                 children: [
-                  Expanded(child: _buildModeCard('Cash', _collectionByMode['cash'] ?? 0, const Color(0xFF4CAF50))),
-                  const SizedBox(width: 12),
-                  Expanded(child: _buildModeCard('UPI', _collectionByMode['upi'] ?? 0, const Color(0xFF9C27B0))),
-                  const SizedBox(width: 12),
-                  Expanded(child: _buildModeCard('Card', _collectionByMode['card'] ?? 0, const Color(0xFF2196F3))),
+                  Expanded(
+                    child: _buildModeCard(
+                      'Cash',
+                      _collectionByMode['cash'] ?? 0,
+                      AppColors.success,
+                    ),
+                  ),
+                  SizedBox(width: AppResponsive.mediumSpacing(context)),
+                  Expanded(
+                    child: _buildModeCard(
+                      'UPI',
+                      _collectionByMode['upi'] ?? 0,
+                      const Color(0xFF9C27B0),
+                    ),
+                  ),
+                  SizedBox(width: AppResponsive.mediumSpacing(context)),
+                  Expanded(
+                    child: _buildModeCard(
+                      'Card',
+                      _collectionByMode['card'] ?? 0,
+                      const Color(0xFF2196F3),
+                    ),
+                  ),
+                  // Anything collected under a mode that is not one of the
+                  // three above. Without it those cards silently failed to add
+                  // up to the Total printed below them. Hidden when empty, so
+                  // the ordinary bill shows the same three cards as before.
+                  if ((_collectionByMode[CreditPaymentRepository.otherMode] ??
+                          0) >
+                      0) ...[
+                    SizedBox(width: AppResponsive.mediumSpacing(context)),
+                    Expanded(
+                      child: _buildModeCard(
+                        'Other',
+                        _collectionByMode[CreditPaymentRepository.otherMode]!,
+                        AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
                 ],
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: AppResponsive.mediumSpacing(context)),
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
                 decoration: BoxDecoration(
                   color: const Color(0xFFE8F5E9),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(
+                    AppResponsive.smallBorderRadius(context),
+                  ),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
+                    Text(
                       'Total Collections',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.bodyFontSize(context),
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                     Text(
-                      '₹${(_collectionByMode['total'] ?? 0).toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        fontSize: 18,
+                      formatMoney((_collectionByMode['total'] ?? 0)),
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.subheadingFontSize(context),
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF4CAF50),
+                        color: AppColors.success,
                       ),
                     ),
                   ],
@@ -472,6 +641,16 @@ class _CollectionsTabState extends State<_CollectionsTab> {
             ],
           ),
         ),
+        if (_payments.isNotEmpty)
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+              AppResponsive.cardPadding(context).left,
+              0,
+              AppResponsive.cardPadding(context).left,
+              AppResponsive.largeSpacing(context),
+            ),
+            child: ReportExportButton(onPressed: _export),
+          ),
         const Divider(height: 1),
 
         // List
@@ -481,7 +660,7 @@ class _CollectionsTabState extends State<_CollectionsTab> {
               : RefreshIndicator(
                   onRefresh: _loadData,
                   child: ListView.builder(
-                    padding: const EdgeInsets.all(16),
+                    padding: AppResponsive.cardPadding(context),
                     itemCount: _payments.length,
                     itemBuilder: (context, index) {
                       final payment = _payments[index];
@@ -494,24 +673,47 @@ class _CollectionsTabState extends State<_CollectionsTab> {
     );
   }
 
+  /// Exports the rows on screen, with the summary bucketed from the very map
+  /// the cards render — so the file cannot disagree with them.
+  Future<void> _export() async {
+    final export = CreditReportExport.collections(
+      payments: _payments,
+      buckets: _collectionByMode,
+      period: _periodLabel(widget.dateFilter),
+    );
+    await ReportExportService.showExportDialog(
+      context: context,
+      fileName: 'credit_collections',
+      reportTitle: 'Credit Collections',
+      headers: export.headers,
+      data: export.rows,
+      summary: export.summary,
+    );
+  }
+
   Widget _buildModeCard(String label, double amount, Color color) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
         color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.smallBorderRadius(context),
+        ),
       ),
       child: Column(
         children: [
           Text(
             label,
-            style: TextStyle(fontSize: 12, color: color),
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.captionFontSize(context),
+              color: color,
+            ),
           ),
           const SizedBox(height: 4),
           Text(
-            '₹${amount.toStringAsFixed(0)}',
-            style: TextStyle(
-              fontSize: 14,
+            formatMoney(amount),
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.bodyFontSize(context),
               fontWeight: FontWeight.w700,
               color: color,
             ),
@@ -523,15 +725,19 @@ class _CollectionsTabState extends State<_CollectionsTab> {
 
   Widget _buildPaymentCard(CreditPaymentModel payment) {
     final date = DateTime.tryParse(payment.date);
-    final dateStr = date != null ? DateFormat('dd MMM yyyy, hh:mm a').format(date) : payment.date;
+    final dateStr = date != null
+        ? DateFormat('dd MMM yyyy, hh:mm a').format(date)
+        : payment.date;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+      margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
+      padding: AppResponsive.cardPadding(context),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE8E8E8)),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.smallBorderRadius(context),
+        ),
+        border: Border.all(color: AppColors.divider),
       ),
       child: Row(
         children: [
@@ -541,41 +747,46 @@ class _CollectionsTabState extends State<_CollectionsTab> {
             decoration: BoxDecoration(
               color: payment.isDebtWriteOff
                   ? Colors.grey.withOpacity(0.1)
-                  : const Color(0xFF4CAF50).withOpacity(0.1),
+                  : AppColors.success.withOpacity(0.1),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Icon(
               payment.isDebtWriteOff ? Icons.delete_outline : Icons.payment,
-              color: payment.isDebtWriteOff ? Colors.grey : const Color(0xFF4CAF50),
-              size: 20,
+              color: payment.isDebtWriteOff ? Colors.grey : AppColors.success,
+              size: AppResponsive.iconSize(context),
             ),
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: AppResponsive.mediumSpacing(context)),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  payment.isDebtWriteOff ? 'Write-Off' : payment.paymentModeDisplayText,
-                  style: const TextStyle(
-                    fontSize: 14,
+                  payment.isDebtWriteOff
+                      ? 'Write-Off'
+                      : payment.paymentModeDisplayText,
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.bodyFontSize(context),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   dateStr,
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF9E9E9E)),
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.captionFontSize(context),
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ],
             ),
           ),
           Text(
-            '₹${payment.amount.toStringAsFixed(2)}',
-            style: TextStyle(
-              fontSize: 16,
+            formatMoney(payment.amount),
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.subheadingFontSize(context),
               fontWeight: FontWeight.w600,
-              color: payment.isDebtWriteOff ? Colors.grey : const Color(0xFF4CAF50),
+              color: payment.isDebtWriteOff ? Colors.grey : AppColors.success,
             ),
           ),
         ],
@@ -586,16 +797,14 @@ class _CollectionsTabState extends State<_CollectionsTab> {
 
 /// Outstanding Tab
 class _OutstandingTab extends StatefulWidget {
-  final DateTimeRange? dateFilter;
-
-  const _OutstandingTab({this.dateFilter});
+  const _OutstandingTab();
 
   @override
   State<_OutstandingTab> createState() => _OutstandingTabState();
 }
 
 class _OutstandingTabState extends State<_OutstandingTab> {
-  List<CustomerModel> _customersWithDue = [];
+  List<Customer> _customersWithDue = [];
   double _totalOutstanding = 0;
   bool _isLoading = true;
 
@@ -608,11 +817,14 @@ class _OutstandingTabState extends State<_OutstandingTab> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
-      final customers = await customerStoreRestail.getCustomersWithCredit();
-      final total = customers.fold<double>(0, (sum, c) => sum + c.creditBalance);
-
-      // Sort by credit balance descending
-      customers.sort((a, b) => b.creditBalance.compareTo(a.creditBalance));
+      // Already ordered by the repository: largest debt first, customer id as
+      // the tie-break. The screen used to re-sort with the same comparator and
+      // no tie-break, which just re-introduced the instability.
+      final customers = await customerStore.getCustomersWithCredit();
+      final total = customers.fold<double>(
+        0,
+        (sum, c) => sum + c.creditBalance,
+      );
 
       setState(() {
         _customersWithDue = customers;
@@ -633,7 +845,7 @@ class _OutstandingTabState extends State<_OutstandingTab> {
       children: [
         // Summary
         Container(
-          padding: const EdgeInsets.all(20),
+          padding: AppResponsive.padding(context),
           color: const Color(0xFFFFEBEE),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -641,15 +853,18 @@ class _OutstandingTabState extends State<_OutstandingTab> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     'Total Outstanding',
-                    style: TextStyle(fontSize: 14, color: Color(0xFF6B6B6B)),
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.bodyFontSize(context),
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '₹${_totalOutstanding.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontSize: 28,
+                    formatMoney(_totalOutstanding),
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.headingFontSize(context),
                       fontWeight: FontWeight.w700,
                       color: Colors.red,
                     ),
@@ -657,24 +872,29 @@ class _OutstandingTabState extends State<_OutstandingTab> {
                 ],
               ),
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(
+                    AppResponsive.smallBorderRadius(context),
+                  ),
                 ),
                 child: Column(
                   children: [
                     Text(
                       '${_customersWithDue.length}',
-                      style: const TextStyle(
-                        fontSize: 24,
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.headingFontSize(context),
                         fontWeight: FontWeight.w700,
                         color: Colors.red,
                       ),
                     ),
-                    const Text(
+                    Text(
                       'Customers',
-                      style: TextStyle(fontSize: 12, color: Colors.red),
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.captionFontSize(context),
+                        color: Colors.red,
+                      ),
                     ),
                   ],
                 ),
@@ -683,18 +903,36 @@ class _OutstandingTabState extends State<_OutstandingTab> {
           ),
         ),
 
+        if (_customersWithDue.isNotEmpty)
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+              AppResponsive.cardPadding(context).left,
+              AppResponsive.largeSpacing(context),
+              AppResponsive.cardPadding(context).left,
+              0,
+            ),
+            child: ReportExportButton(onPressed: _export),
+          ),
+
         // List
         Expanded(
           child: _customersWithDue.isEmpty
-              ? const Center(
+              ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.check_circle, size: 64, color: Color(0xFF4CAF50)),
-                      SizedBox(height: 16),
+                      Icon(
+                        Icons.check_circle,
+                        size: 64,
+                        color: AppColors.success,
+                      ),
+                      SizedBox(height: AppResponsive.largeSpacing(context)),
                       Text(
                         'No outstanding balance!',
-                        style: TextStyle(fontSize: 16, color: Color(0xFF6B6B6B)),
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.subheadingFontSize(context),
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                     ],
                   ),
@@ -702,7 +940,7 @@ class _OutstandingTabState extends State<_OutstandingTab> {
               : RefreshIndicator(
                   onRefresh: _loadData,
                   child: ListView.builder(
-                    padding: const EdgeInsets.all(16),
+                    padding: AppResponsive.cardPadding(context),
                     itemCount: _customersWithDue.length,
                     itemBuilder: (context, index) {
                       final customer = _customersWithDue[index];
@@ -715,20 +953,40 @@ class _OutstandingTabState extends State<_OutstandingTab> {
     );
   }
 
-  Widget _buildCustomerCard(CustomerModel customer) {
+  Future<void> _export() async {
+    final export = CreditReportExport.outstanding(
+      customers: _customersWithDue,
+      totalOutstanding: _totalOutstanding,
+      asAt: DateTime.now(),
+    );
+    await ReportExportService.showExportDialog(
+      context: context,
+      fileName: 'credit_outstanding',
+      reportTitle: 'Outstanding Credit',
+      headers: export.headers,
+      data: export.rows,
+      summary: export.summary,
+    );
+  }
+
+  Widget _buildCustomerCard(Customer customer) {
     final percentage = _totalOutstanding > 0
         ? (customer.creditBalance / _totalOutstanding * 100)
         : 0.0;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.smallBorderRadius(context),
+        ),
         border: Border.all(color: const Color(0xFFFFCDD2)),
       ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.smallBorderRadius(context),
+        ),
         onTap: () {
           Navigator.push(
             context,
@@ -738,7 +996,7 @@ class _OutstandingTabState extends State<_OutstandingTab> {
           );
         },
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: AppResponsive.cardPadding(context),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -748,30 +1006,32 @@ class _OutstandingTabState extends State<_OutstandingTab> {
                     radius: 20,
                     backgroundColor: Colors.red.withOpacity(0.1),
                     child: Text(
-                      customer.name[0].toUpperCase(),
-                      style: const TextStyle(
+                      (customer.name?.isNotEmpty ?? false)
+                          ? customer.name![0].toUpperCase()
+                          : '?',
+                      style: GoogleFonts.poppins(
                         fontWeight: FontWeight.w700,
                         color: Colors.red,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: AppResponsive.mediumSpacing(context)),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          customer.name,
-                          style: const TextStyle(
-                            fontSize: 14,
+                          customer.name ?? '',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.bodyFontSize(context),
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                         Text(
-                          customer.phone,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF9E9E9E),
+                          customer.phone ?? '',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.captionFontSize(context),
+                            color: AppColors.textSecondary,
                           ),
                         ),
                       ],
@@ -781,25 +1041,25 @@ class _OutstandingTabState extends State<_OutstandingTab> {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        '₹${customer.creditBalance.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          fontSize: 16,
+                        formatMoney(customer.creditBalance),
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.subheadingFontSize(context),
                           fontWeight: FontWeight.w700,
                           color: Colors.red,
                         ),
                       ),
                       Text(
                         '${percentage.toStringAsFixed(1)}%',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: Color(0xFF9E9E9E),
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.captionFontSize(context),
+                          color: AppColors.textSecondary,
                         ),
                       ),
                     ],
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: AppResponsive.smallSpacing(context)),
               // Progress bar showing percentage of total
               ClipRRect(
                 borderRadius: BorderRadius.circular(4),

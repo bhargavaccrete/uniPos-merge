@@ -1,4 +1,5 @@
 import 'package:hive/hive.dart';
+import 'package:billberrylite/core/config/fiscal_year_rule.dart';
 import 'package:billberrylite/core/constants/hive_box_names.dart';
 import '../../models/restaurant/db/ordermodel_309.dart';
 import '../../models/restaurant/db/cartmodel_308.dart';
@@ -84,15 +85,15 @@ class OrderRepository {
     return newNumber;
   }
 
-  /// Get next bill number (Resets yearly on April 1st)
+  /// Get next bill number (resets at the start of the financial year)
+  ///
+  /// The boundary comes from [FiscalYearRule], not a hardcoded April, so this
+  /// counter and every `DocumentNumberService` series turn over on the same
+  /// day — and a shop outside India gets its own country's year.
   Future<int> getNextBillNumber() async {
     final lastResetYear = await _counterBox.get('lastBillResetYear');
-    final today = DateTime.now();
 
-    // Determine current fiscal year start year
-    // If today is April 1st or later, current FY starts in current year (e.g., April 1, 2026 -> FY 2026-27)
-    // If today is before April 1st, current FY started in previous year (e.g., Feb 5, 2026 -> FY 2025-26)
-    final currentFiscalYearStartYear = today.month >= 4 ? today.year : today.year - 1;
+    final currentFiscalYearStartYear = FiscalYearRule.startOfCurrent.year;
 
     // If we haven't reset for this fiscal year yet, reset now
     if (lastResetYear != currentFiscalYearStartYear) {

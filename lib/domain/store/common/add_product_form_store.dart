@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/di/service_locator.dart';
+import '../../services/retail/variant_attribute_mapper.dart';
 
 // Retail Models
 import '../../../data/models/retail/hive_model/product_model_200.dart';
@@ -81,11 +82,28 @@ abstract class _AddProductFormStore with Store {
   @observable
   String barcode = '';
 
+  /// RETAIL opening stock. `double` so loose goods can start at 10.5 kg.
+  /// (Restaurant keeps its own [restaurantStockQuantity], already a double.)
   @observable
-  int stockQuantity = 0;
+  double stockQuantity = 0;
 
   @observable
-  int minStock = 0;
+  double minStock = 0;
+
+  /// Selected shared Tax entity. The canonical link — [taxRate] is only a
+  /// cached percentage derived from it (see [setSelectedTaxId]).
+  @observable
+  String? selectedTaxId;
+
+  /// Sells by weight/volume rather than whole pieces. The one switch that lets
+  /// a fractional quantity be typed anywhere in the app for these variants;
+  /// when on, [unit] names the measure.
+  @observable
+  bool isDecimalQuantity = false;
+
+  /// Optional expiry for this product's variants. Null = does not expire.
+  @observable
+  DateTime? expiryDate;
 
   @observable
   String productType = 'simple'; // 'simple' or 'variable'
@@ -99,11 +117,19 @@ abstract class _AddProductFormStore with Store {
   @observable
   ObservableList<VariantFormData> retailVariants = ObservableList<VariantFormData>();
 
+  /// Descriptor values for a SIMPLE product, keyed by attribute NAME
+  /// (Settings → Simple Product Fields). Variable products carry their
+  /// descriptors on each generated variant instead.
+  @observable
+  ObservableMap<String, String> simpleFieldValues = ObservableMap<String, String>();
+
   // ==================== RESTAURANT-SPECIFIC FIELDS ====================
 
   @observable
   String isVeg = 'veg'; // 'veg' or 'non-veg'
 
+  /// Unit of measure. Restaurant always sets it; retail sets it only when
+  /// [isDecimalQuantity] is on (otherwise the variant is counted in pieces).
   @observable
   String? unit;
 
@@ -263,10 +289,10 @@ abstract class _AddProductFormStore with Store {
   void setBarcode(String value) => barcode = value;
 
   @action
-  void setStockQuantity(int value) => stockQuantity = value;
+  void setStockQuantity(double value) => stockQuantity = value;
 
   @action
-  void setMinStock(int value) => minStock = value;
+  void setMinStock(double value) => minStock = value;
 
   @action
   void setProductType(String value) {
@@ -275,6 +301,19 @@ abstract class _AddProductFormStore with Store {
       retailVariants.clear();
       selectedAttributeIds.clear();
       selectedAttributeValues.clear();
+    } else {
+      // Variable products describe themselves per generated variant.
+      simpleFieldValues.clear();
+    }
+  }
+
+  @action
+  void setSimpleFieldValue(String attributeName, String value) {
+    final v = value.trim();
+    if (v.isEmpty) {
+      simpleFieldValues.remove(attributeName);
+    } else {
+      simpleFieldValues[attributeName] = v;
     }
   }
 
@@ -339,8 +378,13 @@ abstract class _AddProductFormStore with Store {
         attributes: Map.fromEntries(
           combo.entries.map((e) => MapEntry(e.key, e.value.value)),
         ),
+        // Keyed by attributeId, NOT by name — every reader
+        // (AttributeStore.attributesOf, VariantPickerDialog) resolves the key
+        // with getAttributeById. A name key silently resolved to null, which
+        // dropped these variants to the frozen customAttributes fallback so a
+        // renamed attribute value never reached them.
         attributeValueIds: Map.fromEntries(
-          combo.entries.map((e) => MapEntry(e.key, e.value.valueId)),
+          combo.entries.map((e) => MapEntry(e.value.attributeId, e.value.valueId)),
         ),
         price: price,
         costPrice: costPrice,
@@ -404,6 +448,34 @@ abstract class _AddProductFormStore with Store {
   }
 
   // ==================== ACTIONS - RESTAURANT ====================
+
+  /// Sets the tax link AND refreshes the cached [taxRate] from it, so the two
+  /// can never disagree. Passing null clears both.
+  @action
+  void setSelectedTaxId(String? value) {
+    selectedTaxId = value;
+    if (value == null) {
+      taxRate = 0;
+      return;
+    }
+    for (final t in taxStore.taxes) {
+      if (t.id == value) {
+        taxRate = (t.taxperecentage ?? 0).toDouble();
+        return;
+      }
+    }
+    taxRate = 0;
+  }
+
+  @action
+  void setIsDecimalQuantity(bool value) {
+    isDecimalQuantity = value;
+    // Collapsing back to pieces must not leave a stale 'kg' behind.
+    unit = value ? (unit == null || unit == 'piece' ? 'kg' : unit) : 'piece';
+  }
+
+  @action
+  void setExpiryDate(DateTime? value) => expiryDate = value;
 
   @action
   void setIsVeg(String value) => isVeg = value;
@@ -497,7 +569,12 @@ abstract class _AddProductFormStore with Store {
       if (isRetail) {
         await _submitRetailProduct();
       } else {
-        await _submitRestaurantItem();
+        if (!await _submitRestaurantItem()) {
+          // addItem refused (plan item cap, duplicate name/code, etc.) without
+          // throwing — report it as a failure so the UI doesn't claim success.
+          errorMessage = itemStore.errorMessage ?? 'Could not save item.';
+          return false;
+        }
       }
 
       isSubmitted = true;
@@ -510,8 +587,36 @@ abstract class _AddProductFormStore with Store {
     }
   }
 
+  /// Resolves the display name of [selectedCategoryId], used as the SKU
+  /// prefix. Returns null if no category is selected/found (the generator
+  /// falls back to a generic prefix in that case).
+  String? get _selectedCategoryName {
+    for (final c in categoryStore.categories) {
+      if (c.id == selectedCategoryId) return c.name;
+    }
+    return null;
+  }
+
+  /// Auto-generates a SKU only when [currentSku] is blank — an existing SKU
+  /// (user-typed or previously generated) is never touched.
+  Future<String> _skuOrGenerated(String currentSku) async {
+    if (currentSku.trim().isNotEmpty) return currentSku;
+    return skuGeneratorService.generate(_selectedCategoryName);
+  }
+
   Future<void> _submitRetailProduct() async {
     final productStore = locator<ProductStore>();
+
+    // Plan gate — a capped plan must not be seeded past its product limit
+    // during onboarding either. Same guard the POS add-product screen uses.
+    if (!productStore.canAddProduct) {
+      final max = productStore.productLimit;
+      throw StateError(
+        'Product limit reached${max != null ? ' (max $max)' : ''}. '
+        'Upgrade your plan to add more.',
+      );
+    }
+
     final productId = _uuid.v4();
 
     // Create product
@@ -522,6 +627,7 @@ abstract class _AddProductFormStore with Store {
       subCategory: subCategory,
       brandName: brandName,
       imagePath: imagePath,
+      imageBytes: imageBytes,
       description: description.isNotEmpty ? description : null,
       hasVariants: isVariableProduct,
       productType: productType,
@@ -529,23 +635,23 @@ abstract class _AddProductFormStore with Store {
       defaultMrp: isSimpleProduct ? mrp : null,
       defaultCostPrice: isSimpleProduct ? costPrice : null,
       gstRate: taxRate > 0 ? taxRate : null,
+      taxId: selectedTaxId,
       hsnCode: hsnCode,
+      allowOrderWhenOutOfStock: allowOrderWhenOutOfStock,
     );
 
     await productStore.addProduct(product);
 
-    // Create variants
+    // Create variants — every variant gets its own SKU (auto-generated only
+    // when left blank; each call advances the shared global sequence).
     if (isVariableProduct) {
       for (final variantData in retailVariants) {
         final variant = VarianteModel.create(
           varianteId: variantData.id,
           productId: productId,
-          sku: variantData.sku,
+          sku: await _skuOrGenerated(variantData.sku),
           barcode: variantData.barcode,
-          size: variantData.attributes['Size'],
-          color: variantData.attributes['Color'],
-          weight: variantData.attributes['Weight'],
-          customAttributes: variantData.attributes,
+          customAttributes: mergeVariantAttributes(variantData.attributes),
           attributeValueIds: variantData.attributeValueIds,
           mrp: variantData.mrp,
           costPrice: variantData.costPrice,
@@ -553,15 +659,25 @@ abstract class _AddProductFormStore with Store {
           stockQty: variantData.stockQuantity,
           minStock: minStock,
           taxRate: taxRate > 0 ? taxRate : null,
+          taxId: selectedTaxId,
+          isDecimalQuantity: isDecimalQuantity,
+          unit: unit,
+          expiryDate: expiryDate?.toIso8601String(),
         );
-        await productStore.addVariant(variant);
+        // A refused variant must not pass silently — the product is already
+        // written, so ignoring this would leave it with no variant at all.
+        // `submit()` catches and reports via errorMessage.
+        final result = await productStore.addVariant(variant);
+        if (!result.success) {
+          throw StateError(result.errorMessage ?? 'Could not save variant.');
+        }
       }
     } else {
       // Create default variant for simple product
       final variant = VarianteModel.create(
         varianteId: _uuid.v4(),
         productId: productId,
-        sku: sku,
+        sku: await _skuOrGenerated(sku),
         barcode: barcode,
         mrp: mrp,
         costPrice: costPrice,
@@ -570,12 +686,20 @@ abstract class _AddProductFormStore with Store {
         minStock: minStock,
         isDefault: true,
         taxRate: taxRate > 0 ? taxRate : null,
+        taxId: selectedTaxId,
+        isDecimalQuantity: isDecimalQuantity,
+        unit: unit,
+        expiryDate: expiryDate?.toIso8601String(),
+        customAttributes: mergeVariantAttributes(Map.of(simpleFieldValues)),
       );
-      await productStore.addVariant(variant);
+      final result = await productStore.addVariant(variant);
+      if (!result.success) {
+        throw StateError(result.errorMessage ?? 'Could not save variant.');
+      }
     }
   }
 
-  Future<void> _submitRestaurantItem() async {
+  Future<bool> _submitRestaurantItem() async {
     final itemId = _uuid.v4();
 
     // Create item variants if has portion sizes
@@ -636,7 +760,9 @@ abstract class _AddProductFormStore with Store {
       createdTime: DateTime.now(),
     );
 
-    await itemStore.addItem(item);
+    // Propagate the store result so a plan-cap / duplicate rejection surfaces as
+    // a real failure instead of a false "added successfully".
+    return await itemStore.addItem(item);
   }
 
   // ==================== RESET ====================
@@ -663,6 +789,9 @@ abstract class _AddProductFormStore with Store {
     barcode = '';
     stockQuantity = 0;
     minStock = 0;
+    selectedTaxId = null;
+    isDecimalQuantity = false;
+    expiryDate = null;
     productType = 'simple';
     selectedAttributeIds.clear();
     selectedAttributeValues.clear();
@@ -700,7 +829,7 @@ class VariantFormData {
   double price;
   double costPrice;
   double mrp;
-  int stockQuantity;
+  double stockQuantity;
 
   VariantFormData({
     required this.id,
@@ -724,7 +853,7 @@ class VariantFormData {
     double? price,
     double? costPrice,
     double? mrp,
-    int? stockQuantity,
+    double? stockQuantity,
   }) {
     return VariantFormData(
       id: id,

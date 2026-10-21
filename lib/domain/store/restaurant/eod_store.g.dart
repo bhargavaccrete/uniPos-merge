@@ -142,6 +142,15 @@ mixin _$EodStore on _EodStore, Store {
     return _$getEODByDateAsyncAction.run(() => super.getEODByDate(date));
   }
 
+  late final _$getEODBySessionAsyncAction =
+      AsyncAction('_EodStore.getEODBySession', context: context);
+
+  @override
+  Future<EndOfDayReport?> getEODBySession(String sessionId) {
+    return _$getEODBySessionAsyncAction
+        .run(() => super.getEODBySession(sessionId));
+  }
+
   late final _$getLatestEODAsyncAction =
       AsyncAction('_EodStore.getLatestEOD', context: context);
 

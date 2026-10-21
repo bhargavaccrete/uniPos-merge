@@ -3,6 +3,8 @@
 import 'dart:convert';
 import 'package:hive/hive.dart';
 import 'package:billberrylite/core/constants/hive_type_ids.dart';
+import 'package:billberrylite/util/common/short_ref.dart';
+import 'package:billberrylite/util/common/tax_split.dart';
 
 part 'sale_model_203.g.dart';
 
@@ -22,7 +24,7 @@ class SaleModel extends HiveObject {
   final String? customerId;
 
   @HiveField(2)
-  final int totalItems;
+  final double totalItems;
 
   @HiveField(3)
   final double subtotal;
@@ -93,6 +95,107 @@ class SaleModel extends HiveObject {
   @HiveField(24, defaultValue: 'paid')
   final String status; // paid / partially_paid / due
 
+  // ==================== BILL COMPOSITION ====================
+  // Stored so a settled sale can be re-rendered exactly as it was charged.
+  // `discountAmount` (field 4) holds the resolved currency value; these record
+  // HOW that value was arrived at, which a receipt reprint otherwise can't show.
+
+  @HiveField(25)
+  final String? discountType; // 'amount' | 'percentage'
+
+  @HiveField(26)
+  final double? discountValue; // raw input, e.g. 10 for "10%"
+
+  @HiveField(27)
+  final String? discountReason;
+
+  @HiveField(28)
+  final int? loyaltyPointsUsed;
+
+  /// Rounding adjustment baked into [totalAmount]; may be negative.
+  /// Persisted rather than re-derived at print time, so changing the round-off
+  /// setting later cannot make a reprint disagree with the original receipt.
+  @HiveField(29)
+  final double? roundOff;
+
+  /// Tax mode in force when this sale was made. Frozen here so an old invoice
+  /// renders with the labels it was charged under.
+  @HiveField(30)
+  final bool? isTaxInclusive;
+
+  /// How much of [discountAmount] came from PER-LINE discounts rather than the
+  /// order-level one.
+  ///
+  /// Stored so the receipt can print "Item Discounts" and "Bill Discount" as
+  /// separate rows without folding over the sale's items, and so the split is
+  /// explicit in the record rather than inferred. `discountType`/`discountValue`
+  /// describe only the ORDER-level part.
+  ///
+  /// Null on every sale written before line discounts existed, which correctly
+  /// reads as "all of the discount was order-level".
+  @HiveField(31)
+  final double? lineDiscountTotal;
+
+  /// Links the two halves of an EXCHANGE: the return document and the
+  /// replacement sale both carry the same `EXC-YYYYMMDD-NNN`.
+  ///
+  /// An exchange is deliberately NOT its own accounting document — it is an
+  /// ordinary return plus an ordinary sale, so every report, EOD aggregate and
+  /// ledger already understands both halves without being taught anything. This
+  /// field is the only thing that says they belong together.
+  ///
+  /// Null on every sale that is not part of an exchange, which is also how all
+  /// pre-existing records read back.
+  @HiveField(32)
+  final String? exchangeGroupId;
+
+  /// The staff shift this sale was rung up on, or null.
+  ///
+  /// Retail's Shift Report and Staff Performance attribute a sale to a shift by
+  /// this link first, falling back to the shift's time window for rows written
+  /// before shifts existed — the same two-step `PastOrderModel.shiftId` gives
+  /// the restaurant side. Nullable, so every pre-existing sale reads back as
+  /// null and simply takes the time-window path.
+  @HiveField(33)
+  final String? shiftId;
+
+  /// Why the goods came back — a [SaleReturnReason] code, never a label.
+  ///
+  /// Set only on a return document (`isReturn == true`); null on every forward
+  /// sale, which is also how all pre-existing records read back. A code rather
+  /// than free text so the Sales Refund report can group by it — the same
+  /// choice `lineDiscountReason` and `overrideReason` made on the sale line.
+  @HiveField(34)
+  final String? returnReason;
+
+  /// Free text accompanying [returnReason]. The picker demands it when the
+  /// chosen reason says so — today that is `other`, where the code alone
+  /// explains nothing.
+  @HiveField(35)
+  final String? returnNote;
+
+  /// The customer-facing document number — `INV-00001`, or `CRN-00001` on a
+  /// return. **Not an id:** [saleId] is the key every foreign key points at,
+  /// and this restarts at 1 each financial year, so it repeats across years by
+  /// design (CGST Rule 46(b) requires uniqueness only within a year).
+  ///
+  /// Null on every sale written before invoice numbering existed — read it
+  /// through [displayNumber], never directly.
+  @HiveField(36)
+  final String? invoiceNumber;
+
+  /// Whether tax was on for this business when the sale was made. Frozen so a
+  /// reprint after a change to tax registration shows the tax this bill carried.
+  /// Null on sales written before the stamp — read via `TaxFeature.forRecord`.
+  @HiveField(37)
+  final bool? taxEnabled;
+
+  /// The store's GSTIN / tax number when the sale was made, so a reprint after
+  /// the business re-registers shows the number this invoice was issued under.
+  /// '' = the store had none; null = written before the stamp (use the live one).
+  @HiveField(38)
+  final String? storeGstNumber;
+
   SaleModel({
     required this.saleId,
     this.customerId,
@@ -119,6 +222,20 @@ class SaleModel extends HiveObject {
     double? paidAmount,
     double? dueAmount,
     String? status,
+    this.discountType,
+    this.discountValue,
+    this.discountReason,
+    this.loyaltyPointsUsed,
+    this.roundOff,
+    this.isTaxInclusive,
+    this.lineDiscountTotal,
+    this.exchangeGroupId,
+    this.shiftId,
+    this.returnReason,
+    this.returnNote,
+    this.invoiceNumber,
+    this.taxEnabled,
+    this.storeGstNumber,
   })  : isReturn = isReturn ?? false,
         paidAmount = paidAmount ?? totalAmount,
         dueAmount = dueAmount ?? 0.0,
@@ -127,7 +244,7 @@ class SaleModel extends HiveObject {
   factory SaleModel.create({
     required String saleId,
     String? customerId,
-    required int totalItems,
+    required double totalItems,
     required double subtotal,
     double discountAmount = 0,
     double taxAmount = 0,
@@ -140,6 +257,7 @@ class SaleModel extends HiveObject {
     double? totalCgstAmount,
     double? totalSgstAmount,
     double? grandTotal,
+    String? shiftId,
   }) {
     final now = DateTime.now().toIso8601String();
 
@@ -162,6 +280,7 @@ class SaleModel extends HiveObject {
       totalCgstAmount: totalCgstAmount,
       totalSgstAmount: totalSgstAmount,
       grandTotal: grandTotal,
+      shiftId: shiftId,
     );
   }
 
@@ -169,7 +288,7 @@ class SaleModel extends HiveObject {
   factory SaleModel.createWithGst({
     required String saleId,
     String? customerId,
-    required int totalItems,
+    required double totalItems,
     required double subtotal,
     required double discountAmount,
     required double totalTaxableAmount,
@@ -178,10 +297,13 @@ class SaleModel extends HiveObject {
     required String paymentType,
     bool isReturn = false,
     String? originalSaleId,
+    String? shiftId,
+    bool? taxEnabled,
   }) {
     final now = DateTime.now().toIso8601String();
-    final cgst = double.parse((totalGstAmount / 2).toStringAsFixed(2));
-    final sgst = double.parse((totalGstAmount / 2).toStringAsFixed(2));
+    final halves = TaxSplit.halves(totalGstAmount);
+    final cgst = halves.cgst;
+    final sgst = halves.sgst;
 
     return SaleModel(
       saleId: saleId,
@@ -202,6 +324,8 @@ class SaleModel extends HiveObject {
       totalCgstAmount: cgst,
       totalSgstAmount: sgst,
       grandTotal: grandTotal,
+      shiftId: shiftId,
+      taxEnabled: taxEnabled,
     );
   }
 
@@ -209,7 +333,7 @@ class SaleModel extends HiveObject {
   factory SaleModel.createWithSplitPayment({
     required String saleId,
     String? customerId,
-    required int totalItems,
+    required double totalItems,
     required double subtotal,
     required double discountAmount,
     required double totalTaxableAmount,
@@ -220,10 +344,37 @@ class SaleModel extends HiveObject {
     required double changeReturn,
     bool isReturn = false,
     String? originalSaleId,
+    String? discountType,
+    double? discountValue,
+    String? discountReason,
+    int? loyaltyPointsUsed,
+    double? roundOff,
+    bool? isTaxInclusive,
+    double? lineDiscountTotal,
+    /// Set when this sale is the replacement half of an exchange.
+    String? exchangeGroupId,
+    String? shiftId,
+    /// When the customer tenders less than [grandTotal], pass what was actually
+    /// collected. The remainder is recorded as due and the sale is marked
+    /// partially paid rather than paid.
+    double? amountCollected,
+    /// The customer-facing number printed on the bill — `INV-00001`. Separate
+    /// from [saleId], which stays the internal key.
+    String? invoiceNumber,
+    bool? taxEnabled,
+    String? storeGstNumber,
   }) {
     final now = DateTime.now().toIso8601String();
-    final cgst = double.parse((totalGstAmount / 2).toStringAsFixed(2));
-    final sgst = double.parse((totalGstAmount / 2).toStringAsFixed(2));
+    final halves = TaxSplit.halves(totalGstAmount);
+    final cgst = halves.cgst;
+    final sgst = halves.sgst;
+
+    // Clamp to the bill: tendering more than the total is change, not an
+    // over-payment, so paidAmount must never exceed totalAmount.
+    final collected =
+        (amountCollected ?? grandTotal).clamp(0.0, grandTotal).toDouble();
+    final due = double.parse((grandTotal - collected).toStringAsFixed(2));
+    final isShort = due > 0.009;
 
     // Determine primary payment type (method with highest amount)
     String primaryPaymentType = 'split';
@@ -255,6 +406,21 @@ class SaleModel extends HiveObject {
       changeReturn: changeReturn,
       totalPaid: totalPaid,
       isSplitPayment: paymentList.length > 1,
+      discountType: discountType,
+      discountValue: discountValue,
+      discountReason: discountReason,
+      loyaltyPointsUsed: loyaltyPointsUsed,
+      roundOff: roundOff,
+      isTaxInclusive: isTaxInclusive,
+      lineDiscountTotal: lineDiscountTotal,
+      exchangeGroupId: exchangeGroupId,
+      shiftId: shiftId,
+      invoiceNumber: invoiceNumber,
+      taxEnabled: taxEnabled,
+      storeGstNumber: storeGstNumber,
+      paidAmount: collected,
+      dueAmount: isShort ? due : 0.0,
+      status: isShort ? SaleStatus.partiallyPaid : SaleStatus.paid,
     );
   }
 
@@ -280,7 +446,7 @@ class SaleModel extends HiveObject {
   factory SaleModel.createCreditSale({
     required String saleId,
     required String customerId, // Customer is REQUIRED for credit sales
-    required int totalItems,
+    required double totalItems,
     required double subtotal,
     required double discountAmount,
     required double totalTaxableAmount,
@@ -288,13 +454,28 @@ class SaleModel extends HiveObject {
     required double grandTotal,
     bool isReturn = false,
     String? originalSaleId,
+    String? discountType,
+    double? discountValue,
+    String? discountReason,
+    int? loyaltyPointsUsed,
+    double? roundOff,
+    bool? isTaxInclusive,
+    double? lineDiscountTotal,
+    String? exchangeGroupId,
+    String? shiftId,
+    /// The customer-facing number printed on the bill — `INV-00001`.
+    String? invoiceNumber,
+    bool? taxEnabled,
+    String? storeGstNumber,
   }) {
     final now = DateTime.now().toIso8601String();
-    final cgst = double.parse((totalGstAmount / 2).toStringAsFixed(2));
-    final sgst = double.parse((totalGstAmount / 2).toStringAsFixed(2));
+    final halves = TaxSplit.halves(totalGstAmount);
+    final cgst = halves.cgst;
+    final sgst = halves.sgst;
 
     return SaleModel(
       saleId: saleId,
+      invoiceNumber: invoiceNumber,
       customerId: customerId,
       totalItems: totalItems,
       subtotal: subtotal,
@@ -319,7 +500,28 @@ class SaleModel extends HiveObject {
       paidAmount: 0, // No payment made
       dueAmount: grandTotal, // Full amount is due
       status: SaleStatus.due, // Status is due
+      discountType: discountType,
+      discountValue: discountValue,
+      discountReason: discountReason,
+      loyaltyPointsUsed: loyaltyPointsUsed,
+      roundOff: roundOff,
+      isTaxInclusive: isTaxInclusive,
+      lineDiscountTotal: lineDiscountTotal,
+      exchangeGroupId: exchangeGroupId,
+      shiftId: shiftId,
+      taxEnabled: taxEnabled,
+      storeGstNumber: storeGstNumber,
     );
+  }
+
+  /// What to print or show anywhere a customer or a report names this sale.
+  ///
+  /// Falls back to a short reference over [saleId] for sales written before
+  /// invoice numbering — a UUID, or one of the transitional `INV-YYYYMMDD-NNN`
+  /// ids — so history never renders blank.
+  String get displayNumber {
+    final number = invoiceNumber?.trim();
+    return (number == null || number.isEmpty) ? saleRef(saleId) : number;
   }
 
   /// Check if this sale has any due amount
@@ -346,7 +548,7 @@ class SaleModel extends HiveObject {
   SaleModel copyWith({
     String? saleId,
     String? customerId,
-    int? totalItems,
+    double? totalItems,
     double? subtotal,
     double? discountAmount,
     double? taxAmount,
@@ -369,6 +571,20 @@ class SaleModel extends HiveObject {
     double? paidAmount,
     double? dueAmount,
     String? status,
+    String? discountType,
+    double? discountValue,
+    String? discountReason,
+    int? loyaltyPointsUsed,
+    double? roundOff,
+    bool? isTaxInclusive,
+    double? lineDiscountTotal,
+    String? exchangeGroupId,
+    String? shiftId,
+    String? returnReason,
+    String? returnNote,
+    String? invoiceNumber,
+    bool? taxEnabled,
+    String? storeGstNumber,
   }) {
     return SaleModel(
       saleId: saleId ?? this.saleId,
@@ -396,6 +612,29 @@ class SaleModel extends HiveObject {
       paidAmount: paidAmount ?? this.paidAmount,
       dueAmount: dueAmount ?? this.dueAmount,
       status: status ?? this.status,
+      // Bill composition must survive every copy. A credit instalment goes
+      // through here, and dropping these silently rewrote settled invoices:
+      // roundOff and isTaxInclusive are persisted precisely so a reprint can't
+      // drift (see their field docs), and discountReason is the only record of
+      // why a discount was given.
+      discountType: discountType ?? this.discountType,
+      discountValue: discountValue ?? this.discountValue,
+      discountReason: discountReason ?? this.discountReason,
+      loyaltyPointsUsed: loyaltyPointsUsed ?? this.loyaltyPointsUsed,
+      roundOff: roundOff ?? this.roundOff,
+      isTaxInclusive: isTaxInclusive ?? this.isTaxInclusive,
+      lineDiscountTotal: lineDiscountTotal ?? this.lineDiscountTotal,
+      exchangeGroupId: exchangeGroupId ?? this.exchangeGroupId,
+      shiftId: shiftId ?? this.shiftId,
+      // Must survive a copy for the same reason discountReason must:
+      // `ExchangeService._stamp` copyWith's the freshly written return document
+      // to rewrite its payment legs, so dropping these would wipe the reason on
+      // every exchange leg while leaving plain refunds correct.
+      returnReason: returnReason ?? this.returnReason,
+      returnNote: returnNote ?? this.returnNote,
+      invoiceNumber: invoiceNumber ?? this.invoiceNumber,
+      taxEnabled: taxEnabled ?? this.taxEnabled,
+      storeGstNumber: storeGstNumber ?? this.storeGstNumber,
     );
   }
 
@@ -433,23 +672,48 @@ class SaleModel extends HiveObject {
       'paidAmount': paidAmount,
       'dueAmount': dueAmount,
       'status': status,
+      'discountType': discountType,
+      'discountValue': discountValue,
+      'discountReason': discountReason,
+      'loyaltyPointsUsed': loyaltyPointsUsed,
+      'roundOff': roundOff,
+      'isTaxInclusive': isTaxInclusive,
+      'lineDiscountTotal': lineDiscountTotal,
+      'exchangeGroupId': exchangeGroupId,
+      'shiftId': shiftId,
+      'returnReason': returnReason,
+      'returnNote': returnNote,
+      'invoiceNumber': invoiceNumber,
+      'taxEnabled': taxEnabled,
+      'storeGstNumber': storeGstNumber,
     };
   }
 
   // Create from Map (for backup restore)
   factory SaleModel.fromMap(Map<String, dynamic> map) {
+    // `date` and `createdAt` must never diverge — reports, EOD and the
+    // dashboard all key off them. Each falls back to its sibling before any
+    // default, so a backup carrying only one of them restores with both set to
+    // the SAME instant rather than reclassifying the sale into the restore date.
+    //
+    // Defaulted rather than hard-cast because this runs on the restore path:
+    // one missing key used to throw and abort the entire restore.
+    final restoredCreatedAt = (map['createdAt'] ?? map['date']) as String? ??
+        DateTime.now().toIso8601String();
+    final restoredDate = (map['date'] as String?) ?? restoredCreatedAt;
+
     return SaleModel(
       saleId: map['saleId'] as String,
       customerId: map['customerId'] as String?,
-      totalItems: (map['totalItems'] as num).toInt(),
-      subtotal: (map['subtotal'] as num).toDouble(),
-      discountAmount: (map['discountAmount'] as num).toDouble(),
-      taxAmount: (map['taxAmount'] as num).toDouble(),
-      totalAmount: (map['totalAmount'] as num).toDouble(),
-      paymentType: map['paymentType'] as String,
-      date: map['date'] as String,
-      createdAt: map['createdAt'] as String,
-      updatedAt: map['updatedAt'] as String,
+      totalItems: (map['totalItems'] as num?)?.toDouble() ?? 0.0,
+      subtotal: (map['subtotal'] as num?)?.toDouble() ?? 0.0,
+      discountAmount: (map['discountAmount'] as num?)?.toDouble() ?? 0.0,
+      taxAmount: (map['taxAmount'] as num?)?.toDouble() ?? 0.0,
+      totalAmount: (map['totalAmount'] as num?)?.toDouble() ?? 0.0,
+      paymentType: (map['paymentType'] as String?) ?? 'cash',
+      date: restoredDate,
+      createdAt: restoredCreatedAt,
+      updatedAt: (map['updatedAt'] as String?) ?? restoredCreatedAt,
       isReturn: (map['isReturn'] as bool?) ?? false,
       originalSaleId: map['originalSaleId'] as String?,
       totalTaxableAmount: (map['totalTaxableAmount'] as num?)?.toDouble(),
@@ -464,6 +728,21 @@ class SaleModel extends HiveObject {
       paidAmount: (map['paidAmount'] as num?)?.toDouble(),
       dueAmount: (map['dueAmount'] as num?)?.toDouble(),
       status: (map['status'] as String?) ?? SaleStatus.paid,
+      discountType: map['discountType'] as String?,
+      discountValue: (map['discountValue'] as num?)?.toDouble(),
+      discountReason: map['discountReason'] as String?,
+      loyaltyPointsUsed: (map['loyaltyPointsUsed'] as num?)?.toInt(),
+      roundOff: (map['roundOff'] as num?)?.toDouble(),
+      isTaxInclusive: map['isTaxInclusive'] as bool?,
+      lineDiscountTotal:
+          (map['lineDiscountTotal'] as num?)?.toDouble(),
+      exchangeGroupId: map['exchangeGroupId'] as String?,
+      shiftId: map['shiftId'] as String?,
+      returnReason: map['returnReason'] as String?,
+      returnNote: map['returnNote'] as String?,
+      invoiceNumber: map['invoiceNumber'] as String?,
+      taxEnabled: map['taxEnabled'] as bool?,
+      storeGstNumber: map['storeGstNumber'] as String?,
     );
   }
 }

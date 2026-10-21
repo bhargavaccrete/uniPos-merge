@@ -21,11 +21,9 @@ class CartItemModelAdapter extends TypeAdapter<CartItemModel> {
       variantId: fields[1] as String,
       productId: fields[2] as String,
       productName: fields[3] as String,
-      size: fields[4] as String?,
-      color: fields[5] as String?,
-      weight: fields[6] as String?,
+      attributes: (fields[21] as Map?)?.cast<String, String>(),
       price: fields[7] as double,
-      qty: fields[8] as int,
+      qty: fields[8] as double,
       total: fields[9] as double,
       barcode: fields[10] as String?,
       addedAt: fields[11] as String,
@@ -38,13 +36,21 @@ class CartItemModelAdapter extends TypeAdapter<CartItemModel> {
       discountAmount: fields[18] as double?,
       categoryName: fields[19] as String?,
       tabIndex: fields[20] as int?,
+      originalPrice: fields[22] as double?,
+      overrideReason: fields[23] as String?,
+      overrideNote: fields[24] as String?,
+      lineDiscountType: fields[25] as String?,
+      lineDiscountValue: fields[26] as double?,
+      lineDiscountAmount: fields[27] as double?,
+      lineDiscountReason: fields[28] as String?,
+      lineDiscountNote: fields[29] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, CartItemModel obj) {
     writer
-      ..writeByte(21)
+      ..writeByte(27)
       ..writeByte(0)
       ..write(obj.cartItemId)
       ..writeByte(1)
@@ -53,12 +59,6 @@ class CartItemModelAdapter extends TypeAdapter<CartItemModel> {
       ..write(obj.productId)
       ..writeByte(3)
       ..write(obj.productName)
-      ..writeByte(4)
-      ..write(obj.size)
-      ..writeByte(5)
-      ..write(obj.color)
-      ..writeByte(6)
-      ..write(obj.weight)
       ..writeByte(7)
       ..write(obj.price)
       ..writeByte(8)
@@ -86,7 +86,25 @@ class CartItemModelAdapter extends TypeAdapter<CartItemModel> {
       ..writeByte(19)
       ..write(obj.categoryName)
       ..writeByte(20)
-      ..write(obj.tabIndex);
+      ..write(obj.tabIndex)
+      ..writeByte(21)
+      ..write(obj.attributes)
+      ..writeByte(22)
+      ..write(obj.originalPrice)
+      ..writeByte(23)
+      ..write(obj.overrideReason)
+      ..writeByte(24)
+      ..write(obj.overrideNote)
+      ..writeByte(25)
+      ..write(obj.lineDiscountType)
+      ..writeByte(26)
+      ..write(obj.lineDiscountValue)
+      ..writeByte(27)
+      ..write(obj.lineDiscountAmount)
+      ..writeByte(28)
+      ..write(obj.lineDiscountReason)
+      ..writeByte(29)
+      ..write(obj.lineDiscountNote);
   }
 
   @override

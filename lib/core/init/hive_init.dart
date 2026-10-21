@@ -8,6 +8,7 @@ import 'package:billberrylite/core/constants/hive_box_names.dart';
 // Common Models
 import 'package:billberrylite/models/payment_method.dart' as pm;
 import 'package:billberrylite/models/tax_details.dart';
+import 'package:billberrylite/models/legacy/legacy_tax_rate_item.dart';
 import 'package:billberrylite/data/models/common/business_type.dart';
 import 'package:billberrylite/data/models/common/business_details.dart';
 
@@ -18,29 +19,51 @@ import 'package:billberrylite/data/models/retail/hive_model/cart_model_202.dart'
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_item_model_204.dart';
 import 'package:billberrylite/data/models/retail/hive_model/supplier_model_205.dart';
-import 'package:billberrylite/data/models/retail/hive_model/purchase_Item_model_206.dart';
-import 'package:billberrylite/data/models/retail/hive_model/purchase_model_207.dart';
-import 'package:billberrylite/data/models/retail/hive_model/customer_model_208.dart';
+import 'package:billberrylite/data/models/retail/hive_model/purchase_return_model_174.dart';
+import 'package:billberrylite/data/models/retail/hive_model/purchase_return_item_model_175.dart';
+import 'package:billberrylite/data/models/retail/hive_model/supplier_claim_model_176.dart';
+import 'package:billberrylite/data/models/retail/hive_model/supplier_claim_item_model_177.dart';
+import 'package:billberrylite/data/models/retail/hive_model/inventory_loss_model_178.dart';
+import 'package:billberrylite/data/models/retail/hive_model/supplier_ledger_entry_model_179.dart';
+import 'package:billberrylite/data/models/retail/hive_model/stock_take_model_180.dart';
+import 'package:billberrylite/data/models/retail/hive_model/bundle_model.dart';
+import 'package:billberrylite/data/models/retail/hive_model/bundle_component_model.dart';
+import 'package:billberrylite/data/models/retail/hive_model/kit_assembly_model.dart';
+import 'package:billberrylite/data/models/retail/hive_model/stock_take_item_model_181.dart';
+import 'package:billberrylite/data/models/common/customer_model_125.dart';
 import 'package:billberrylite/data/models/retail/hive_model/hold_sale_model_209.dart';
 import 'package:billberrylite/data/models/retail/hive_model/hold_sale_item_model_210.dart';
 import 'package:billberrylite/data/models/retail/hive_model/purchase_order_model_211.dart';
 import 'package:billberrylite/data/models/retail/hive_model/purchase_order_item_model_212.dart';
 import 'package:billberrylite/data/models/retail/hive_model/grn_model_213.dart';
 import 'package:billberrylite/data/models/retail/hive_model/grn_item_model_214.dart';
-import 'package:billberrylite/data/models/retail/hive_model/category_model_215.dart';
 import 'package:billberrylite/data/models/retail/hive_model/payment_entry_model_216.dart';
-import 'package:billberrylite/data/models/retail/hive_model/admin_model_217.dart';
 import 'package:billberrylite/data/models/retail/hive_model/credit_payment_model_218.dart';
 import 'package:billberrylite/data/models/retail/hive_model/attribute_model_219.dart';
 import 'package:billberrylite/data/models/retail/hive_model/attribute_value_model_220.dart';
 import 'package:billberrylite/data/models/retail/hive_model/product_attribute_model_221.dart';
-import 'package:billberrylite/data/models/retail/hive_model/staff_model_222.dart';
+import 'package:billberrylite/data/models/common/staffModel_310.dart';
 import 'package:billberrylite/data/models/retail/hive_model/billing_tab_model_173.dart';
 
 // Restaurant Models
-import 'package:billberrylite/data/models/restaurant/db/categorymodel_300.dart';
-import 'package:billberrylite/data/models/restaurant/db/companymodel_301.dart';
+import 'package:billberrylite/data/models/common/categorymodel_300.dart';
 import 'package:billberrylite/data/models/restaurant/db/itemmodel_302.dart';
+import 'package:billberrylite/data/models/restaurant/db/recipe_ingredient_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/recipe_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/recipe_production_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/restaurant_supplier_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/restaurant_purchase_order_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/restaurant_purchase_order_item_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/restaurant_grn_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/restaurant_grn_item_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/restaurant_purchase_return_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/restaurant_purchase_return_item_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/restaurant_supplier_claim_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/restaurant_supplier_claim_item_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/restaurant_inventory_loss_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/restaurant_stock_take_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/restaurant_stock_take_item_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/restaurant_supplier_ledger_entry_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/extramodel_303.dart';
 import 'package:billberrylite/data/models/restaurant/db/toppingmodel_304.dart';
 import 'package:billberrylite/data/models/restaurant/db/variantmodel_305.dart';
@@ -48,24 +71,22 @@ import 'package:billberrylite/data/models/restaurant/db/choicemodel_306.dart';
 import 'package:billberrylite/data/models/restaurant/db/choiceoptionmodel_307.dart';
 import 'package:billberrylite/data/models/restaurant/db/cartmodel_308.dart';
 import 'package:billberrylite/data/models/restaurant/db/ordermodel_309.dart';
-import 'package:billberrylite/data/models/restaurant/db/staffModel_310.dart';
 import 'package:billberrylite/data/models/restaurant/db/table_Model_311.dart';
 import 'package:billberrylite/data/models/restaurant/db/itemvariantemodel_312.dart';
 import 'package:billberrylite/data/models/restaurant/db/pastordermodel_313.dart';
-import 'package:billberrylite/data/models/restaurant/db/taxmodel_314.dart';
+import 'package:billberrylite/data/models/common/taxmodel_314.dart';
 import 'package:billberrylite/data/models/restaurant/db/expensemodel_315.dart';
 import 'package:billberrylite/data/models/restaurant/db/expensel_316.dart';
 import 'package:billberrylite/data/models/restaurant/db/eodmodel_317.dart';
 import 'package:billberrylite/data/models/restaurant/db/testbillmodel_318.dart';
-import 'package:billberrylite/data/models/restaurant/db/customer_model_125.dart';
-import 'package:billberrylite/data/models/restaurant/db/shift_model.dart';
+import 'package:billberrylite/data/models/common/shift_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/cash_movement_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/stock_movement_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/cash_handover_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/saved_printer_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/session_model.dart';
-import 'package:billberrylite/data/models/restaurant/db/attendance_model.dart';
-import 'package:billberrylite/data/models/restaurant/db/app_notification_model.dart';
+import 'package:billberrylite/data/models/common/attendance_model.dart';
+import 'package:billberrylite/data/models/common/app_notification_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/item_cancellation_model_134.dart';
 
 /// Hive Initialization Class
@@ -103,13 +124,39 @@ class HiveInit {
     if (!Hive.isAdapterRegistered(HiveTypeIds.businessDetails)) {
       Hive.registerAdapter(BusinessDetailsAdapter());
     }
-    // TaxRateItem - typeId: 5
-    if (!Hive.isAdapterRegistered(HiveTypeIds.taxRateItem)) {
-      Hive.registerAdapter(TaxRateItemAdapter());
+    // TaxRateItem - typeId: 5. Retired as a model, but pre-retirement taxBox
+    // records still hold a List<TaxRateItem> in TaxDetails field 7, and Hive
+    // resolves every field on disk before discarding unknown ones. This
+    // read-only adapter lets those boxes open; the data is dropped on read.
+    if (!Hive.isAdapterRegistered(HiveTypeIds.legacyTaxRateItem)) {
+      Hive.registerAdapter(LegacyTaxRateItemAdapter());
     }
     // PaymentMethod - typeId: 6
     if (!Hive.isAdapterRegistered(HiveTypeIds.paymentMethod)) {
       Hive.registerAdapter(pm.PaymentMethodAdapter());
+    }
+    // SavedPrinterModel - typeId: 130. Lives in the restaurant typeId range for
+    // historical reasons, but printer pairing is COMMON to both modes — retail
+    // pairs through the same shared UI, so the adapter must be registered
+    // regardless of business mode.
+    if (!Hive.isAdapterRegistered(HiveTypeIds.savedPrinter)) {
+      Hive.registerAdapter(SavedPrinterModelAdapter());
+    }
+    // AppNotificationModel - typeId: 133. Same story as SavedPrinterModel: it
+    // sits in the restaurant range for historical reasons, but the notification
+    // feed is COMMON to both modes (retail raises low-stock and expiry events
+    // through the same store), so it registers regardless of business mode.
+    if (!Hive.isAdapterRegistered(HiveTypeIds.appNotification)) {
+      Hive.registerAdapter(AppNotificationModelAdapter());
+    }
+    // ShiftModel - 127 and AttendanceModel - 132. Both sit in the restaurant
+    // typeId range for historical reasons, but staff shifts and clock-in/out
+    // are COMMON to both modes, so they register regardless of business mode.
+    if (!Hive.isAdapterRegistered(HiveTypeIds.shift)) {
+      Hive.registerAdapter(ShiftModelAdapter());
+    }
+    if (!Hive.isAdapterRegistered(HiveTypeIds.attendance)) {
+      Hive.registerAdapter(AttendanceModelAdapter());
     }
   }
 
@@ -123,6 +170,25 @@ class HiveInit {
     await Hive.openBox<TaxDetails>(HiveBoxNames.taxBox);
     await Hive.openBox<BusinessType>(HiveBoxNames.businessTypeBox);
     await Hive.openBox<BusinessDetails>(HiveBoxNames.businessDetailsBox);
+    // Generic named-sequence counters (bill/order/KOT numbers, SKU sequence,
+    // etc.) — shared across both business modes.
+    await Hive.openBox(HiveBoxNames.appCounters);
+    // Saved thermal printers (Bluetooth/WiFi/USB) — one physical box for both
+    // modes. PrinterRepository's constructor does a synchronous Hive.box()
+    // lookup, so this must be open before the service locator builds it.
+    await Hive.openBox<SavedPrinterModel>(HiveBoxNames.restaurantPrinters);
+
+    // Persisted app notifications — one physical box for both modes.
+    // NotificationRepository does a synchronous Hive.box() lookup, so this
+    // must be open before the service locator builds the store.
+    await Hive.openBox<AppNotificationModel>(HiveBoxNames.appNotifications);
+
+    // Staff shifts + attendance — one physical box each for both modes.
+    // ShiftRepository / AttendanceRepository do synchronous Hive.box() lookups
+    // in their constructors, so these must be open before the service locator
+    // builds them.
+    await Hive.openBox<ShiftModel>(HiveBoxNames.shift);
+    await Hive.openBox<AttendanceModel>(HiveBoxNames.attendance);
 
     // Open and initialize payment methods box with defaults
     final paymentBox = await Hive.openBox<pm.PaymentMethod>(HiveBoxNames.paymentMethods);
@@ -199,6 +265,11 @@ class HiveInit {
 
   /// Register all retail adapters (typeIds: 150-223)
   static Future<void> registerRetailAdapters() async {
+    // Self-sufficient: a mode's adapters are meaningless without the common
+    // ones (ShiftModel, AttendanceModel, SavedPrinterModel, AppNotification…).
+    // `init()` normally runs this first and every registration is individually
+    // guarded by isAdapterRegistered, so calling it again is a no-op.
+    await _registerCommonAdapters();
     // Product - 150
     if (!Hive.isAdapterRegistered(HiveTypeIds.retailProduct)) {
       Hive.registerAdapter(ProductModelAdapter());
@@ -223,17 +294,47 @@ class HiveInit {
     if (!Hive.isAdapterRegistered(HiveTypeIds.retailSupplier)) {
       Hive.registerAdapter(SupplierModelAdapter());
     }
-    // PurchaseItem - 156
-    if (!Hive.isAdapterRegistered(HiveTypeIds.retailPurchaseItem)) {
-      Hive.registerAdapter(PurchaseItemModelAdapter());
+    // Damaged-goods workflow raised from a GRN - 174..178
+    if (!Hive.isAdapterRegistered(HiveTypeIds.retailPurchaseReturn)) {
+      Hive.registerAdapter(PurchaseReturnModelAdapter());
     }
-    // Purchase - 157
-    if (!Hive.isAdapterRegistered(HiveTypeIds.retailPurchase)) {
-      Hive.registerAdapter(PurchaseModelAdapter());
+    if (!Hive.isAdapterRegistered(HiveTypeIds.retailPurchaseReturnItem)) {
+      Hive.registerAdapter(PurchaseReturnItemModelAdapter());
     }
-    // Customer - 158
-    if (!Hive.isAdapterRegistered(HiveTypeIds.retailCustomer)) {
-      Hive.registerAdapter(CustomerModelAdapter());
+    if (!Hive.isAdapterRegistered(HiveTypeIds.retailSupplierClaim)) {
+      Hive.registerAdapter(SupplierClaimModelAdapter());
+    }
+    if (!Hive.isAdapterRegistered(HiveTypeIds.retailSupplierClaimItem)) {
+      Hive.registerAdapter(SupplierClaimItemModelAdapter());
+    }
+    if (!Hive.isAdapterRegistered(HiveTypeIds.retailInventoryLoss)) {
+      Hive.registerAdapter(InventoryLossModelAdapter());
+    }
+    if (!Hive.isAdapterRegistered(HiveTypeIds.retailSupplierLedgerEntry)) {
+      Hive.registerAdapter(SupplierLedgerEntryModelAdapter());
+    }
+    // Stock take - 180/181: physical count paperwork. Registered in retail only;
+    // restaurant counts stock through its own StockMovement flow.
+    if (!Hive.isAdapterRegistered(HiveTypeIds.retailStockTake)) {
+      Hive.registerAdapter(StockTakeModelAdapter());
+    }
+    if (!Hive.isAdapterRegistered(HiveTypeIds.retailStockTakeItem)) {
+      Hive.registerAdapter(StockTakeItemModelAdapter());
+    }
+    // Bundle/kit products - 182/183/184: see docs/retail_inventory_system_plan.md §3.2.
+    if (!Hive.isAdapterRegistered(HiveTypeIds.retailBundle)) {
+      Hive.registerAdapter(RetailBundleModelAdapter());
+    }
+    if (!Hive.isAdapterRegistered(HiveTypeIds.retailBundleComponent)) {
+      Hive.registerAdapter(BundleComponentModelAdapter());
+    }
+    if (!Hive.isAdapterRegistered(HiveTypeIds.retailKitAssembly)) {
+      Hive.registerAdapter(RetailKitAssemblyModelAdapter());
+    }
+    // Customer - shared with restaurant (typeId 125, see restaurant section
+    // below) — same adapter, retail's own box.
+    if (!Hive.isAdapterRegistered(HiveTypeIds.customer)) {
+      Hive.registerAdapter(CustomerAdapter());
     }
     // HoldSale - 159
     if (!Hive.isAdapterRegistered(HiveTypeIds.retailHoldSale)) {
@@ -259,17 +360,14 @@ class HiveInit {
     if (!Hive.isAdapterRegistered(HiveTypeIds.retailGrnItem)) {
       Hive.registerAdapter(GRNItemModelAdapter());
     }
-    // Category - 165
-    if (!Hive.isAdapterRegistered(HiveTypeIds.retailCategory)) {
-      Hive.registerAdapter(CategoryModelAdapter());
+    // Category - shared with restaurant (id/name only, no GST/HSN — those
+    // live on the product/variant). Same adapter, retail's own box.
+    if (!Hive.isAdapterRegistered(HiveTypeIds.category)) {
+      Hive.registerAdapter(CategoryAdapter());
     }
     // PaymentEntry - 166
     if (!Hive.isAdapterRegistered(HiveTypeIds.retailPaymentEntry)) {
       Hive.registerAdapter(PaymentEntryModelAdapter());
-    }
-    // Admin - 167
-    if (!Hive.isAdapterRegistered(HiveTypeIds.retailAdmin)) {
-      Hive.registerAdapter(AdminModelAdapter());
     }
     // CreditPayment - 168
     if (!Hive.isAdapterRegistered(HiveTypeIds.retailCreditPayment)) {
@@ -287,9 +385,15 @@ class HiveInit {
     if (!Hive.isAdapterRegistered(HiveTypeIds.retailProductAttribute)) {
       Hive.registerAdapter(ProductAttributeModelAdapter());
     }
-    // RetailStaff - 172
-    if (!Hive.isAdapterRegistered(HiveTypeIds.retailStaff)) {
-      Hive.registerAdapter(RetailStaffModelAdapter());
+    // Staff - shared with restaurant (typeId 110, see restaurant section
+    // below) — same adapter, retail's own box.
+    if (!Hive.isAdapterRegistered(HiveTypeIds.staff)) {
+      Hive.registerAdapter(StaffModelAdapter());
+    }
+    // Tax - shared with restaurant (typeId 114, see restaurant section
+    // below) — same adapter, same box.
+    if (!Hive.isAdapterRegistered(HiveTypeIds.tax)) {
+      Hive.registerAdapter(TaxAdapter());
     }
     // BillingTab - 173
     if (!Hive.isAdapterRegistered(HiveTypeIds.retailBillingTab)) {
@@ -344,6 +448,13 @@ class HiveInit {
     if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantStockLog)) {
       Hive.registerAdapter(StockMovementModelAdapter());
     }
+
+    // RestaurantSessionModel - 131 (shared with restaurant mode). The open
+    // business day is stored as a session record, so Start Day and EOD need
+    // this adapter in retail too.
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantSession)) {
+      Hive.registerAdapter(RestaurantSessionModelAdapter());
+    }
   }
 
   /// Clean up old incorrectly-named attribute boxes
@@ -379,26 +490,37 @@ class HiveInit {
     await Hive.openBox<SaleModel>(HiveBoxNames.sales);
     await Hive.openBox<SaleItemModel>(HiveBoxNames.saleItems);
     await Hive.openBox<SupplierModel>(HiveBoxNames.suppliers);
-    await Hive.openBox<PurchaseItemModel>(HiveBoxNames.purchaseItems);
-    await Hive.openBox<PurchaseModel>(HiveBoxNames.purchases);
-    await Hive.openBox<CustomerModel>(HiveBoxNames.customers);
+    await Hive.openBox<SupplierLedgerEntryModel>(HiveBoxNames.supplierLedger);
+    await Hive.openBox<PurchaseReturnModel>(HiveBoxNames.purchaseReturns);
+    await Hive.openBox<PurchaseReturnItemModel>(HiveBoxNames.purchaseReturnItems);
+    await Hive.openBox<SupplierClaimModel>(HiveBoxNames.supplierClaims);
+    await Hive.openBox<SupplierClaimItemModel>(HiveBoxNames.supplierClaimItems);
+    await Hive.openBox<InventoryLossModel>(HiveBoxNames.inventoryLosses);
+    await Hive.openBox<StockTakeModel>(HiveBoxNames.stockTakes);
+    await Hive.openBox<StockTakeItemModel>(HiveBoxNames.stockTakeItems);
+    await Hive.openBox<RetailBundleModel>(HiveBoxNames.bundles);
+    await Hive.openBox<RetailKitAssemblyModel>(HiveBoxNames.kitAssemblies);
+    await Hive.openBox<Customer>(HiveBoxNames.customer);
     await Hive.openBox<HoldSaleModel>(HiveBoxNames.holdSales);
     await Hive.openBox<HoldSaleItemModel>(HiveBoxNames.holdSaleItems);
     await Hive.openBox<PurchaseOrderModel>(HiveBoxNames.purchaseOrders);
     await Hive.openBox<PurchaseOrderItemModel>(HiveBoxNames.purchaseOrderItems);
     await Hive.openBox<GRNModel>(HiveBoxNames.grns);
     await Hive.openBox<GRNItemModel>(HiveBoxNames.grnItems);
-    // Note: Retail categories use Box<String> named 'retail_categories' to avoid conflict
+    // Legacy string-keyed category box — kept open only for not-yet-migrated
+    // callers (bulk import, sample data, backup's legacy path). Not used by
+    // the main Add Product / Category Management / Cart flows anymore.
     await Hive.openBox<String>(HiveBoxNames.retailCategories);
-    // CategoryModel box for GST support
-    await Hive.openBox<CategoryModel>(HiveBoxNames.categoryModels);
+    // Retail categories — shared `Category` model (same as restaurant), own box.
+    await Hive.openBox<Category>(HiveBoxNames.category);
     await Hive.openBox<PaymentEntryModel>(HiveBoxNames.paymentEntries);
-    await Hive.openBox<AdminModel>(HiveBoxNames.adminBox);
     await Hive.openBox<CreditPaymentModel>(HiveBoxNames.creditPayments);
     await Hive.openBox<AttributeModel>(HiveBoxNames.attributes);
     await Hive.openBox<AttributeValueModel>(HiveBoxNames.attributeValues);
     await Hive.openBox<ProductAttributeModel>(HiveBoxNames.productAttributes);
-    await Hive.openBox<RetailStaffModel>(HiveBoxNames.retailStaff);
+    await Hive.openBox<StaffModel>(HiveBoxNames.staff);
+    // Tax - shared with restaurant, same box.
+    await Hive.openBox<Tax>(HiveBoxNames.tax);
 
     // Fix for typeId 252 corruption - delete and recreate billingTabs box
     try {
@@ -426,6 +548,11 @@ class HiveInit {
     // Day Management box (for opening balance tracking)
     await Hive.openBox(HiveBoxNames.dayManagementBox);
 
+    // Session box (shared with restaurant mode). DayManagementService stores the
+    // open day as a session record, so Start Day / EOD need this box in retail
+    // too — without it both throw "Box not found".
+    await Hive.openBox<RestaurantSessionModel>(HiveBoxNames.restaurantSessions);
+
     // Expense boxes (shared with restaurant mode - needed for EOD)
     await Hive.openBox<ExpenseCategory>(HiveBoxNames.retailExpenseCategory);
     await Hive.openBox<Expense>(HiveBoxNames.retailExpense);
@@ -440,13 +567,14 @@ class HiveInit {
 
   /// Register all restaurant adapters (typeIds: 100-149)
   static Future<void> registerRestaurantAdapters() async {
+    // Self-sufficient: a mode's adapters are meaningless without the common
+    // ones (ShiftModel, AttendanceModel, SavedPrinterModel, AppNotification…).
+    // `init()` normally runs this first and every registration is individually
+    // guarded by isAdapterRegistered, so calling it again is a no-op.
+    await _registerCommonAdapters();
     // Category - 100
-    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantCategory)) {
+    if (!Hive.isAdapterRegistered(HiveTypeIds.category)) {
       Hive.registerAdapter(CategoryAdapter());
-    }
-    // Company - 101
-    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantCompany)) {
-      Hive.registerAdapter(CompanyAdapter());
     }
     // Items - 102
     if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantItem)) {
@@ -480,8 +608,8 @@ class HiveInit {
     if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantOrder)) {
       Hive.registerAdapter(OrderModelAdapter());
     }
-    // Staff - 110
-    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantStaff)) {
+    // Staff - 110, shared with retail (see retail section above)
+    if (!Hive.isAdapterRegistered(HiveTypeIds.staff)) {
       Hive.registerAdapter(StaffModelAdapter());
     }
     // TableModel - 111
@@ -496,8 +624,8 @@ class HiveInit {
     if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantPastOrder)) {
       Hive.registerAdapter(PastOrderModelAdapter());
     }
-    // Tax - 114
-    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantTax)) {
+    // Tax - 114, shared with retail (see retail section above)
+    if (!Hive.isAdapterRegistered(HiveTypeIds.tax)) {
       Hive.registerAdapter(TaxAdapter());
     }
     // ExpenseCategory - 115
@@ -536,14 +664,11 @@ class HiveInit {
     if (!Hive.isAdapterRegistered(HiveTypeIds.TestBill)) {
       Hive.registerAdapter(TestBillModelAdapter());
     }
-    // RestaurantCustomer - 125
-    if (!Hive.isAdapterRegistered(HiveTypeIds.RestaurantCustomer)) {
-      Hive.registerAdapter(RestaurantCustomerAdapter());
+    // Customer - 125, shared with retail (see retail section above)
+    if (!Hive.isAdapterRegistered(HiveTypeIds.customer)) {
+      Hive.registerAdapter(CustomerAdapter());
     }
-    // ShiftModel - 127
-    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantShift)) {
-      Hive.registerAdapter(ShiftModelAdapter());
-    }
+    // ShiftModel (127) moved to _registerCommonAdapters — shared with retail.
     // CashMovementModel - 128: records every Cash In / Cash Out during the day
     if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantCashMovement)) {
       Hive.registerAdapter(CashMovementModelAdapter());
@@ -556,25 +681,82 @@ class HiveInit {
     if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantCashHandover)) {
       Hive.registerAdapter(CashHandoverModelAdapter());
     }
-    // SavedPrinterModel - 130: BT/WiFi thermal printer configuration
-    if (!Hive.isAdapterRegistered(HiveTypeIds.savedPrinter)) {
-      Hive.registerAdapter(SavedPrinterModelAdapter());
-    }
+    // SavedPrinterModel (130) moved to _registerCommonAdapters — printer
+    // pairing is shared with retail.
     // RestaurantSessionModel - 131: Session-based day management
     if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantSession)) {
       Hive.registerAdapter(RestaurantSessionModelAdapter());
     }
-    // AttendanceModel - 132: Staff clock-in/clock-out records
-    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantAttendance)) {
-      Hive.registerAdapter(AttendanceModelAdapter());
-    }
-    // AppNotificationModel - 133: persisted notifications
-    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantAppNotification)) {
-      Hive.registerAdapter(AppNotificationModelAdapter());
-    }
+    // AttendanceModel (132) moved to _registerCommonAdapters — shared with retail.
     // ItemCancellationModel - 134: item-level cancellation audit
     if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantItemCancellation)) {
       Hive.registerAdapter(ItemCancellationModelAdapter());
+    }
+    // RecipeIngredientModel - 136: embedded line in RecipeModel.ingredients
+    // (registered before RecipeModel since RecipeModel embeds it)
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantRecipeIngredient)) {
+      Hive.registerAdapter(RecipeIngredientModelAdapter());
+    }
+    // RecipeModel - 135: Bill of Materials for Semi-Finished/Recipe-Based items
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantRecipe)) {
+      Hive.registerAdapter(RecipeModelAdapter());
+    }
+    // RecipeProductionModel - 137: "batch produced" log for Semi-Finished items
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantRecipeProduction)) {
+      Hive.registerAdapter(RecipeProductionModelAdapter());
+    }
+    // RestaurantSupplierModel - 138: raw-material suppliers
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantSupplier)) {
+      Hive.registerAdapter(RestaurantSupplierModelAdapter());
+    }
+    // RestaurantPurchaseOrderModel - 139
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantPurchaseOrder)) {
+      Hive.registerAdapter(RestaurantPurchaseOrderModelAdapter());
+    }
+    // RestaurantPurchaseOrderItemModel - 140
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantPurchaseOrderItem)) {
+      Hive.registerAdapter(RestaurantPurchaseOrderItemModelAdapter());
+    }
+    // RestaurantGRNModel - 141
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantGrn)) {
+      Hive.registerAdapter(RestaurantGRNModelAdapter());
+    }
+    // RestaurantGRNItemModel - 142
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantGrnItem)) {
+      Hive.registerAdapter(RestaurantGRNItemModelAdapter());
+    }
+    // RestaurantPurchaseReturnModel - 143
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantPurchaseReturn)) {
+      Hive.registerAdapter(RestaurantPurchaseReturnModelAdapter());
+    }
+    // RestaurantPurchaseReturnItemModel - 144
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantPurchaseReturnItem)) {
+      Hive.registerAdapter(RestaurantPurchaseReturnItemModelAdapter());
+    }
+    // RestaurantSupplierClaimModel - 145
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantSupplierClaim)) {
+      Hive.registerAdapter(RestaurantSupplierClaimModelAdapter());
+    }
+    // RestaurantSupplierClaimItemModel - 146
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantSupplierClaimItem)) {
+      Hive.registerAdapter(RestaurantSupplierClaimItemModelAdapter());
+    }
+    // RestaurantInventoryLossModel - 147
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantInventoryLoss)) {
+      Hive.registerAdapter(RestaurantInventoryLossModelAdapter());
+    }
+    // RestaurantStockTakeModel - 148
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantStockTake)) {
+      Hive.registerAdapter(RestaurantStockTakeModelAdapter());
+    }
+    // RestaurantStockTakeItemModel - 149
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantStockTakeItem)) {
+      Hive.registerAdapter(RestaurantStockTakeItemModelAdapter());
+    }
+    // RestaurantSupplierLedgerEntryModel - 185: first model in the restaurant
+    // overflow range (185-199); the 100-149 block is full. See HiveTypeIds.
+    if (!Hive.isAdapterRegistered(HiveTypeIds.restaurantSupplierLedgerEntry)) {
+      Hive.registerAdapter(RestaurantSupplierLedgerEntryModelAdapter());
     }
   }
 
@@ -585,8 +767,7 @@ class HiveInit {
     }
 
     // Core restaurant boxes - use actual box names from database files
-    await Hive.openBox<Category>(HiveBoxNames.restaurantCategories);
-    await Hive.openBox<Company>(HiveBoxNames.restaurantCompany);
+    await Hive.openBox<Category>(HiveBoxNames.category);
     await Hive.openBox<Items>(HiveBoxNames.restaurantItems);
     await Hive.openBox<Extramodel>(HiveBoxNames.restaurantExtras);
     await Hive.openBox<VariantModel>(HiveBoxNames.restaurantVariants);
@@ -597,16 +778,16 @@ class HiveInit {
 
     // Orders
     await Hive.openBox<OrderModel>(HiveBoxNames.restaurantOrders);
-    await Hive.openBox(HiveBoxNames.appCounters);
+    // appCounters is opened in openCommonBoxes() now (shared with retail).
 
-    await Hive.openBox<StaffModel>(HiveBoxNames.restaurantStaff);
+    await Hive.openBox<StaffModel>(HiveBoxNames.staff);
     await Hive.openBox<TableModel>(HiveBoxNames.restaurantTables);
 
     // Past Orders
     await Hive.openBox<PastOrderModel>(HiveBoxNames.restaurantPastOrders);
 
-    // Tax - use unique name to avoid conflict with retail 'taxBox'
-    await Hive.openBox<Tax>(HiveBoxNames.restaurantTaxes);
+    // Tax - shared with retail, same box.
+    await Hive.openBox<Tax>(HiveBoxNames.tax);
 
     // Expenses (restaurant-specific)
     await Hive.openBox<ExpenseCategory>(HiveBoxNames.restaurantExpenseCategory);
@@ -620,29 +801,48 @@ class HiveInit {
 
     await Hive.openBox<TestBillModel>(HiveBoxNames.testBillBox);
 
-    // Restaurant Customer
-    await Hive.openBox<RestaurantCustomer>(HiveBoxNames.restaurantCustomer);
+    // Restaurant Customer (shared Customer model, own box)
+    await Hive.openBox<Customer>(HiveBoxNames.customer);
 
-    // Restaurant Shifts
-    await Hive.openBox<ShiftModel>(HiveBoxNames.restaurantShift);
+    // Shifts box moved to openCommonBoxes — shared with retail.
 
     // Cash Management — movements (Cash In/Out) and handovers (shift transfers)
     await Hive.openBox<CashMovementModel>(HiveBoxNames.restaurantCashMovements);
     await Hive.openBox<StockMovementModel>(HiveBoxNames.restaurantStockMovements);
     await Hive.openBox<CashHandoverModel>(HiveBoxNames.restaurantCashHandovers);
 
-    // Saved thermal printers (Bluetooth/WiFi configuration)
-    await Hive.openBox<SavedPrinterModel>(HiveBoxNames.restaurantPrinters);
+    // Saved thermal printers box moved to openCommonBoxes — shared with retail.
 
     // Restaurant POS Sessions
     await Hive.openBox<RestaurantSessionModel>(HiveBoxNames.restaurantSessions);
 
-    // Staff attendance
-    await Hive.openBox<AttendanceModel>(HiveBoxNames.restaurantAttendance);
-    // App notifications
-    await Hive.openBox<AppNotificationModel>(HiveBoxNames.restaurantNotifications);
+    // Staff attendance box moved to openCommonBoxes — shared with retail.
     // Item-level cancellation audit
     await Hive.openBox<ItemCancellationModel>(HiveBoxNames.restaurantItemCancellations);
+
+    // Recipes (BOM) and batch-production log — see docs/inventory_recipe_system_plan.md
+    await Hive.openBox<RecipeModel>(HiveBoxNames.restaurantRecipes);
+    await Hive.openBox<RecipeProductionModel>(HiveBoxNames.restaurantRecipeProductions);
+
+    // Restaurant Purchase Order / GRN pipeline (raw-material procurement)
+    await Hive.openBox<RestaurantSupplierModel>(HiveBoxNames.restaurantSuppliers);
+    await Hive.openBox<RestaurantPurchaseOrderModel>(HiveBoxNames.restaurantPurchaseOrders);
+    await Hive.openBox<RestaurantPurchaseOrderItemModel>(HiveBoxNames.restaurantPurchaseOrderItems);
+    await Hive.openBox<RestaurantGRNModel>(HiveBoxNames.restaurantGrns);
+    await Hive.openBox<RestaurantGRNItemModel>(HiveBoxNames.restaurantGrnItems);
+
+    // Damaged-goods/loss/stock-take chain (returns, claims, write-offs, counts)
+    await Hive.openBox<RestaurantPurchaseReturnModel>(HiveBoxNames.restaurantPurchaseReturns);
+    await Hive.openBox<RestaurantPurchaseReturnItemModel>(HiveBoxNames.restaurantPurchaseReturnItems);
+    await Hive.openBox<RestaurantSupplierClaimModel>(HiveBoxNames.restaurantSupplierClaims);
+    await Hive.openBox<RestaurantSupplierClaimItemModel>(HiveBoxNames.restaurantSupplierClaimItems);
+    await Hive.openBox<RestaurantInventoryLossModel>(HiveBoxNames.restaurantInventoryLosses);
+    await Hive.openBox<RestaurantStockTakeModel>(HiveBoxNames.restaurantStockTakes);
+    await Hive.openBox<RestaurantStockTakeItemModel>(HiveBoxNames.restaurantStockTakeItems);
+
+    // Supplier balance journal — one row per balance movement.
+    await Hive.openBox<RestaurantSupplierLedgerEntryModel>(
+        HiveBoxNames.restaurantSupplierLedger);
 
     _areRestaurantBoxesOpen = true;
   }
@@ -697,9 +897,9 @@ class HiveInit {
   /// Check if restaurant boxes are open
   static bool get areRestaurantBoxesOpen {
     try {
-      return Hive.isBoxOpen(HiveBoxNames.restaurantCategories) &&
+      return Hive.isBoxOpen(HiveBoxNames.category) &&
              Hive.isBoxOpen(HiveBoxNames.restaurantItems) &&
-             Hive.isBoxOpen(HiveBoxNames.restaurantTaxes) &&
+             Hive.isBoxOpen(HiveBoxNames.tax) &&
              Hive.isBoxOpen(HiveBoxNames.restaurantExtras) &&
              Hive.isBoxOpen(HiveBoxNames.restaurantVariants) &&
              Hive.isBoxOpen(HiveBoxNames.restaurantChoices) &&

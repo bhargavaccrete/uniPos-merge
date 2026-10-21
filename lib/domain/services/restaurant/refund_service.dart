@@ -1,4 +1,6 @@
 import '../../../core/di/service_locator.dart';
+import '../../../core/plan/entitlement_keys.dart';
+import '../../../core/plan/plan_enforcement.dart';
 import '../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../data/models/restaurant/db/pastordermodel_313.dart';
 import '../../../util/restaurant/restaurant_session.dart';
@@ -29,6 +31,10 @@ class RefundService {
     required PastOrderModel order,
     required PartialRefundResult refundResult,
   }) async {
+    // Plan gate — refunds are the Returns capability (billing.returns).
+    if (!PlanEnforce.allows(EntKeys.billingReturns)) {
+      throw Exception('Refunds aren’t available on your current plan.');
+    }
     try {
 
       // Update refunded quantities for each item.
@@ -64,7 +70,9 @@ class RefundService {
         return refundedQty >= originalQty;
       });
 
-      final newStatus = allItemsRefunded ? 'FULLY_REFUNDED' : 'PARTIALLY_REFUNDED';
+      final newStatus = order.orderStatus == 'VOIDED'
+          ? 'VOIDED'
+          : (allItemsRefunded ? 'FULLY_REFUNDED' : 'PARTIALLY_REFUNDED');
 
       final _staffLabel = RestaurantSession.isAdmin
           ? 'Admin'
@@ -97,7 +105,7 @@ class RefundService {
             : 0.0;
         final pointsToRestore = (pointsUsed * refundRatio).round();
         if (pointsToRestore > 0) {
-          await restaurantCustomerStore.addLoyaltyPoints(cid, pointsToRestore);
+          await customerStore.addLoyaltyPoints(cid, pointsToRestore);
         }
       }
 
@@ -194,6 +202,10 @@ class RefundService {
     required String reason,
   }) async {
     try {
+      // Plan gate — voiding a completed order (billing.invoice.void).
+      if (!PlanEnforce.allows(EntKeys.billingInvoiceVoid)) {
+        throw Exception('Voiding orders isn’t available on your current plan.');
+      }
 
       final _staffLabel = RestaurantSession.isAdmin
           ? 'Admin'

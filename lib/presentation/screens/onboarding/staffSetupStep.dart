@@ -1,3 +1,4 @@
+import 'package:billberrylite/util/common/staff_roles.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 import 'package:flutter_mobx/flutter_mobx.dart';
@@ -5,12 +6,14 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/stores/setup_wizard_store.dart';
 import '../../../util/common/app_responsive.dart';
 import 'package:billberrylite/core/config/app_config.dart';
-import 'package:billberrylite/data/models/retail/hive_model/staff_model_222.dart';
-import 'package:billberrylite/data/models/restaurant/db/staffModel_310.dart';
+import 'package:billberrylite/core/config/phone_rule.dart';
+import 'package:billberrylite/data/models/common/staffModel_310.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
-import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/di/service_locator.dart';
+import 'package:billberrylite/core/plan/entitlement_keys.dart';
+import 'package:billberrylite/core/plan/entitlements.dart';
+import 'package:billberrylite/domain/store/restaurant/license_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../util/restaurant/restaurant_auth_helper.dart';
 import '../../../util/color.dart';
@@ -52,31 +55,6 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
   final _pinFocus = FocusNode();
 
   String _selectedRole = 'Cashier';
-  final List<String> _retailRoles = ['Manager', 'Cashier', 'Sales', 'Inventory'];
-  final List<String> _restaurantRoles = ['Manager', 'Cashier', 'Waiter'];
-
-  static const _roleIcons = {
-    'Manager':   Icons.manage_accounts_rounded,
-    'Cashier':   Icons.point_of_sale_rounded,
-    'Sales':     Icons.storefront_rounded,
-    'Inventory': Icons.inventory_2_rounded,
-    'Waiter':    Icons.restaurant_rounded,
-    'Chef':      Icons.soup_kitchen_rounded,
-  };
-
-  static const _roleColors = {
-    'Manager':   Color(0xFF7C3AED),
-    'Cashier':   Color(0xFF059669),
-    'Sales':     Color(0xFFD97706),
-    'Inventory': Color(0xFF0284C7),
-    'Waiter':    Color(0xFFDB2777),
-    'Chef':      Color(0xFFDC2626),
-  };
-
-  // Retail-specific permissions
-  bool _canGiveDiscounts = false;
-  bool _canAccessReports = false;
-  bool _canManageInventory = false;
 
   // UI state
   bool _isPinVisible = false;
@@ -87,7 +65,7 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
   // Inline error for first name
   String? _firstNameError;
 
-  List<dynamic> _staffMembers = [];
+  List<StaffModel> _staffMembers = [];
 
   @override
   void initState() {
@@ -100,19 +78,16 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
   /// and back (the PageView can dispose this off-screen step, wiping local
   /// state). Storage is the source of truth — staff are persisted on Add.
   Future<void> _loadExistingStaff() async {
-    if (AppConfig.isRetail) {
-      if (!Hive.isBoxOpen('retail_staff')) return;
-      final box = Hive.box<RetailStaffModel>('retail_staff');
-      setState(() => _staffMembers = box.values.toList());
-    } else {
-      await staffStore.loadStaff();
-      if (mounted) setState(() => _staffMembers = staffStore.staff.toList());
-    }
+    await staffStore.loadStaff();
+    if (mounted) setState(() => _staffMembers = staffStore.staff.toList());
   }
 
   void _syncUsernameFromFirstName() {
     if (_usernameManuallyEdited) return;
-    final generated = _firstNameController.text.trim().toLowerCase().replaceAll(RegExp(r'\s+'), '_');
+    final generated = _firstNameController.text.trim().toLowerCase().replaceAll(
+      RegExp(r'\s+'),
+      '_',
+    );
     if (_usernameController.text != generated) {
       _usernameController.value = _usernameController.value.copyWith(
         text: generated,
@@ -138,22 +113,8 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
     super.dispose();
   }
 
-  // ── Permissions reset when role changes ──────────────────────────────────
-
   void _applyRoleDefaults(String role) {
-    setState(() {
-      _selectedRole = role;
-      if (role == 'Manager') {
-        _canGiveDiscounts = true;
-        _canAccessReports = true;
-        _canManageInventory = true;
-      } else {
-        // Reset to non-manager defaults
-        _canGiveDiscounts = false;
-        _canAccessReports = false;
-        _canManageInventory = false;
-      }
-    });
+    setState(() => _selectedRole = role);
   }
 
   // ── Add staff member ─────────────────────────────────────────────────────
@@ -181,8 +142,13 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
       _pinFocus.requestFocus();
       return;
     }
-    if (phone.isNotEmpty && phone.length != 10) {
-      NotificationService.instance.showError('Mobile number must be exactly 10 digits');
+    // Country-aware, and optional. Uses PhoneRule's SAVED-country getters
+    // rather than the `*For(country, …)` forms the Store Details step needs:
+    // that step calls `saveBusinessDetails()` on Continue, so by the time this
+    // step renders the country is already persisted.
+    final phoneErr = PhoneRule.validate(phone, required: false);
+    if (phoneErr != null) {
+      NotificationService.instance.showError(phoneErr);
       _phoneFocus.requestFocus();
       return;
     }
@@ -193,30 +159,25 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
         : _usernameController.text.trim();
 
     // Duplicate username check
-    final usernameExists = _staffMembers.any((s) {
-      if (s is RetailStaffModel) return s.username.toLowerCase() == username.toLowerCase();
-      if (s is StaffModel) return s.userName.toLowerCase() == username.toLowerCase();
-      return false;
-    });
+    final usernameExists = _staffMembers.any(
+      (s) => s.userName.toLowerCase() == username.toLowerCase(),
+    );
     if (usernameExists) {
-      NotificationService.instance
-          .showError('Username "$username" is already taken. Choose a different one.');
+      NotificationService.instance.showError(
+        'Username "$username" is already taken. Choose a different one.',
+      );
       _usernameFocus.requestFocus();
       return;
     }
 
-    // Duplicate PIN check (compare plaintext PINs before hashing)
-    final pinExists = _staffMembers.any((s) {
-      if (s is RetailStaffModel) return s.pin == pin;
-      if (s is StaffModel) {
-        // The stored pinNo is already hashed; verify against the new pin
-        return RestaurantAuthHelper.verifyPassword(pin, s.pinNo);
-      }
-      return false;
-    });
+    // Duplicate PIN check — pinNo is stored hashed, verify against the new pin
+    final pinExists = _staffMembers.any(
+      (s) => RestaurantAuthHelper.verifyPassword(pin, s.pinNo),
+    );
     if (pinExists) {
-      NotificationService.instance
-          .showError('This PIN is already in use. Choose a different one.');
+      NotificationService.instance.showError(
+        'This PIN is already in use. Choose a different one.',
+      );
       _pinFocus.requestFocus();
       return;
     }
@@ -230,10 +191,32 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
         ? RestaurantAuthHelper.verifyPassword(pin, adminPass)
         : pin == '123456';
     if (adminCollision) {
-      NotificationService.instance
-          .showError('This PIN is already in use. Choose a different one.');
+      NotificationService.instance.showError(
+        'This PIN is already in use. Choose a different one.',
+      );
       _pinFocus.requestFocus();
       return;
+    }
+
+    // Plan limit — staff module + user cap. Enforced once the manifest is live
+    // (activation now happens at the Verify Email step, before this one).
+    final lic = locator<LicenseStore>();
+    if (!lic.licenseBypassed && Entitlements.instance.hasManifest) {
+      if (!Entitlements.instance.can(EntKeys.users)) {
+        NotificationService.instance.showError(
+          'Your plan does not include staff management.',
+        );
+        return;
+      }
+      // TODO(backend): confirm whether users.max INCLUDES the admin/owner.
+      // Currently caps the staff list at users.max (admin not counted).
+      final maxUsers = Entitlements.instance.limit(EntKeys.usersMax);
+      if (maxUsers > 0 && _staffMembers.length >= maxUsers) {
+        NotificationService.instance.showError(
+          'Your plan allows up to $maxUsers staff. Upgrade to add more.',
+        );
+        return;
+      }
     }
 
     setState(() => _isSaving = true);
@@ -241,50 +224,24 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
     try {
       // Persist immediately so the staff survives leaving and returning to this
       // step (storage is the source of truth — see _loadExistingStaff).
-      final bool saved;
-      if (AppConfig.isRetail) {
-        final newStaff = RetailStaffModel(
-          id: _uuid.v4(),
-          firstName: firstName,
-          lastName: _lastNameController.text.trim(),
-          email: _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
-          phone: phone.isEmpty ? null : phone,
-          username: username,
-          pin: pin,
-          role: _selectedRole,
-          canProcessSales: true,
-          canProcessReturns: _selectedRole == 'Manager',
-          canGiveDiscounts: _canGiveDiscounts,
-          maxDiscountPercent: _canGiveDiscounts ? 20.0 : 0.0,
-          canAccessReports: _canAccessReports,
-          canManageInventory: _canManageInventory,
-          canManageStaff: _selectedRole == 'Manager',
-          canVoidTransactions: _selectedRole == 'Manager',
-          canOpenCashDrawer: true,
-          createdAt: DateTime.now(),
-        );
-        await Hive.box<RetailStaffModel>('retail_staff').put(newStaff.id, newStaff);
-        _staffMembers.add(newStaff);
-        saved = true;
-      } else {
-        final newStaff = StaffModel(
-          id: _uuid.v4(),
-          userName: username,
-          firstName: firstName,
-          lastName: _lastNameController.text.trim(),
-          isCashier: _selectedRole,
-          mobileNo: phone,
-          emailId: _emailController.text.trim(),
-          pinNo: RestaurantAuthHelper.hashPassword(pin),
-          createdAt: DateTime.now(),
-        );
-        saved = await staffStore.addStaff(newStaff);
-        if (saved) _staffMembers.add(newStaff);
-      }
+      final newStaff = StaffModel(
+        id: _uuid.v4(),
+        userName: username,
+        firstName: firstName,
+        lastName: _lastNameController.text.trim(),
+        isCashier: _selectedRole,
+        mobileNo: phone,
+        emailId: _emailController.text.trim(),
+        pinNo: RestaurantAuthHelper.hashPassword(pin),
+        createdAt: DateTime.now(),
+      );
+      final saved = await staffStore.addStaff(newStaff);
+      if (saved) _staffMembers.add(newStaff);
 
       if (!saved) {
-        NotificationService.instance
-            .showError(staffStore.errorMessage ?? 'Failed to add staff member');
+        NotificationService.instance.showError(
+          staffStore.errorMessage ?? 'Failed to add staff member',
+        );
         return;
       }
 
@@ -307,47 +264,39 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
     final staff = _staffMembers[index];
     // Remove from storage too — staff are persisted on Add, so a list-only
     // removal would reappear after _loadExistingStaff.
-    if (staff is RetailStaffModel) {
-      await Hive.box<RetailStaffModel>('retail_staff').delete(staff.id);
-    } else if (staff is StaffModel) {
-      await staffStore.deleteStaff(staff.id);
-    }
+    await staffStore.deleteStaff(staff.id);
     if (mounted) setState(() => _staffMembers.removeAt(index));
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────────
 
-  String _staffDisplayName(dynamic staff) {
-    if (staff is RetailStaffModel) return '${staff.firstName} ${staff.lastName}'.trim();
-    if (staff is StaffModel) return '${staff.firstName} ${staff.lastName}'.trim();
-    return 'Unknown';
-  }
+  String _staffDisplayName(StaffModel staff) =>
+      '${staff.firstName} ${staff.lastName}'.trim();
 
-  String _staffRole(dynamic staff) {
-    if (staff is RetailStaffModel) return staff.role;
-    if (staff is StaffModel) return staff.isCashier;
-    return '';
-  }
+  String _staffRole(StaffModel staff) => staff.isCashier;
 
-  String _staffUsername(dynamic staff) {
-    if (staff is RetailStaffModel) return '@${staff.username}';
-    if (staff is StaffModel) return '@${staff.userName}';
-    return '';
-  }
+  String _staffUsername(StaffModel staff) => '@${staff.userName}';
 
   // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     final isRetail = AppConfig.isRetail;
-    final roles = isRetail ? _retailRoles : _restaurantRoles;
+    final roles = StaffRoles.forCurrentMode;
 
     final hPad = AppResponsive.getValue<double>(
-        context, mobile: 20, tablet: 32, desktop: 40);
+      context,
+      mobile: 20,
+      tablet: 32,
+      desktop: 40,
+    );
     final vPad = AppResponsive.getValue<double>(
-        context, mobile: 16, tablet: 20, desktop: 24);
-    final maxWidth = AppResponsive.getValue<double>(
-        context, mobile: double.infinity, tablet: 680, desktop: 760);
+      context,
+      mobile: 16,
+      tablet: 20,
+      desktop: 24,
+    );
+    final maxWidth = AppResponsive.maxFormWidth(context);
     return Column(
       children: [
         Expanded(
@@ -359,267 +308,353 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-          // ── Header ──
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      AppColors.primary,
-                      AppColors.primary.withValues(alpha: 0.75),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.3),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
+                    // ── Header ──
+                    Row(
+                      children: [
+                        Container(
+                          padding: EdgeInsets.all(
+                            AppResponsive.mediumSpacing(context),
+                          ),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                AppColors.primary,
+                                AppColors.primary.withValues(alpha: 0.75),
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(
+                              AppResponsive.borderRadius(context),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.primary.withValues(alpha: 0.3),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Icon(
+                            Icons.badge_rounded,
+                            color: Colors.white,
+                            size: AppResponsive.largeIconSize(context),
+                          ),
+                        ),
+                        SizedBox(width: AppResponsive.largeSpacing(context)),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Staff Setup',
+                                style: GoogleFonts.poppins(
+                                  fontSize: AppResponsive.getValue(
+                                    context,
+                                    mobile: 22.0,
+                                    tablet: 26.0,
+                                    desktop: 30.0,
+                                  ),
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              Text(
+                                'Add staff who will use the ${isRetail ? "POS" : "restaurant"} system',
+                                style: GoogleFonts.poppins(
+                                  fontSize: AppResponsive.smallFontSize(
+                                    context,
+                                  ),
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                child: const Icon(Icons.badge_rounded, color: Colors.white, size: 28),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Staff Setup',
-                        style: GoogleFonts.poppins(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary)),
-                    Text(
-                      'Add staff who will use the ${isRetail ? "POS" : "restaurant"} system',
-                      style: GoogleFonts.poppins(
-                          fontSize: 13, color: AppColors.textSecondary),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
+                    SizedBox(height: AppResponsive.extraLargeSpacing(context)),
 
-          // ── Add Staff Form ──
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: AppColors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.divider),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
-                  blurRadius: 10,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.person_add_rounded,
-                        color: AppColors.primary, size: 20),
-                    const SizedBox(width: 8),
-                    Text('Add Staff Member',
-                        style: GoogleFonts.poppins(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary)),
-                  ],
-                ),
-                const SizedBox(height: 20),
-
-                // First + Last name
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
+                    // ── Add Staff Form ──
+                    Container(
+                      padding: EdgeInsets.all(
+                        AppResponsive.getValue(
+                          context,
+                          mobile: 20.0,
+                          tablet: 24.0,
+                          desktop: 28.0,
+                        ),
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.white,
+                        borderRadius: BorderRadius.circular(
+                          AppResponsive.largeBorderRadius(context),
+                        ),
+                        border: Border.all(color: AppColors.divider),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.04),
+                            blurRadius: 10,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          AppTextField(
-                            controller: _firstNameController,
-                            focusNode: _firstNameFocus,
-                            label: 'First Name',
-                            hint: 'e.g. John',
-                            icon: Icons.person_outline,
-                            required: true,
-                            onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_lastNameFocus),
-                            onChanged: (_) {
-                              if (_firstNameError != null) setState(() => _firstNameError = null);
-                            },
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.person_add_rounded,
+                                color: AppColors.primary,
+                                size: AppResponsive.iconSize(context),
+                              ),
+                              SizedBox(
+                                width: AppResponsive.smallSpacing(context),
+                              ),
+                              Text(
+                                'Add Staff Member',
+                                style: GoogleFonts.poppins(
+                                  fontSize: AppResponsive.subheadingFontSize(
+                                    context,
+                                  ),
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ],
                           ),
-                          if (_firstNameError != null)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 4, left: 4),
-                              child: Text(_firstNameError!,
-                                  style: GoogleFonts.poppins(fontSize: 12, color: AppColors.danger)),
+                          SizedBox(height: AppResponsive.largeSpacing(context)),
+
+                          // First + Last name
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    AppTextField(
+                                      controller: _firstNameController,
+                                      autofocus: true,
+                                      focusNode: _firstNameFocus,
+                                      label: 'First Name',
+                                      hint: 'e.g. John',
+                                      icon: Icons.person_outline,
+                                      required: true,
+                                      textInputAction: TextInputAction.next,
+                                      onFieldSubmitted: (_) => FocusScope.of(
+                                        context,
+                                      ).requestFocus(_lastNameFocus),
+                                      onChanged: (_) {
+                                        if (_firstNameError != null)
+                                          setState(
+                                            () => _firstNameError = null,
+                                          );
+                                      },
+                                    ),
+                                    if (_firstNameError != null)
+                                      Padding(
+                                        padding: const EdgeInsets.only(
+                                          top: 4,
+                                          left: 4,
+                                        ),
+                                        child: Text(
+                                          _firstNameError!,
+                                          style: GoogleFonts.poppins(
+                                            fontSize:
+                                                AppResponsive.smallFontSize(
+                                                  context,
+                                                ),
+                                            color: AppColors.danger,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              SizedBox(
+                                width: AppResponsive.mediumSpacing(context),
+                              ),
+                              Expanded(
+                                child: AppTextField(
+                                  controller: _lastNameController,
+                                  focusNode: _lastNameFocus,
+                                  label: 'Last Name',
+                                  hint: 'e.g. Doe',
+                                  icon: Icons.person_outline,
+                                  textInputAction: TextInputAction.next,
+                                  onFieldSubmitted: (_) => FocusScope.of(
+                                    context,
+                                  ).requestFocus(_emailFocus),
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(
+                            height: AppResponsive.mediumSpacing(context),
+                          ),
+
+                          // Email + Phone
+                          Row(
+                            children: [
+                              Expanded(
+                                child: AppTextField(
+                                  controller: _emailController,
+                                  focusNode: _emailFocus,
+                                  label: 'Email',
+                                  hint: 'Optional',
+                                  icon: Icons.email_outlined,
+                                  keyboardType: TextInputType.emailAddress,
+                                  textInputAction: TextInputAction.next,
+                                  onFieldSubmitted: (_) => FocusScope.of(
+                                    context,
+                                  ).requestFocus(_phoneFocus),
+                                ),
+                              ),
+                              SizedBox(
+                                width: AppResponsive.mediumSpacing(context),
+                              ),
+                              Expanded(
+                                child: AppTextField(
+                                  controller: _phoneController,
+                                  focusNode: _phoneFocus,
+                                  label: 'Phone',
+                                  hint: 'Optional, ${PhoneRule.lengthLabel}',
+                                  icon: Icons.phone_outlined,
+                                  keyboardType: TextInputType.phone,
+                                  maxLength: PhoneRule.maxLength,
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.digitsOnly,
+                                  ],
+                                  textInputAction: TextInputAction.next,
+                                  // Username field is hidden (auto-generated), so skip it and
+                                  // jump straight to PIN — the next visible field.
+                                  onFieldSubmitted: (_) => FocusScope.of(
+                                    context,
+                                  ).requestFocus(_pinFocus),
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(
+                            height: AppResponsive.mediumSpacing(context),
+                          ),
+
+                          // PIN (username hidden — auto-generated from first name)
+                          Row(
+                            children: [
+                              Expanded(
+                                child: AppTextField(
+                                  controller: _pinController,
+                                  focusNode: _pinFocus,
+                                  label: 'PIN',
+                                  hint: '4–6 digits',
+                                  icon: Icons.lock_outline_rounded,
+                                  required: true,
+                                  keyboardType: TextInputType.number,
+                                  maxLength: 6,
+                                  obscureText: !_isPinVisible,
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.digitsOnly,
+                                  ],
+                                  textInputAction: TextInputAction.done,
+                                  onFieldSubmitted: (_) => _addStaff(),
+                                  suffixIcon: IconButton(
+                                    icon: Icon(
+                                      _isPinVisible
+                                          ? Icons.visibility_off
+                                          : Icons.visibility,
+                                      size: AppResponsive.smallIconSize(
+                                        context,
+                                      ),
+                                      color: AppColors.textSecondary,
+                                    ),
+                                    onPressed: () => setState(
+                                      () => _isPinVisible = !_isPinVisible,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(
+                            height: AppResponsive.mediumSpacing(context),
+                          ),
+
+                          // Role selector — inline chips
+                          _buildRoleSelector(roles),
+                          SizedBox(
+                            height: AppResponsive.mediumSpacing(context),
+                          ),
+
+                          // Add button
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: _isSaving ? null : _addStaff,
+                              icon: _isSaving
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : Icon(
+                                      Icons.add,
+                                      color: AppColors.white,
+                                      size: AppResponsive.smallIconSize(
+                                        context,
+                                      ),
+                                    ),
+                              label: Text(
+                                _isSaving ? 'Adding…' : 'Add Staff Member',
+                                style: GoogleFonts.poppins(
+                                  fontSize: AppResponsive.bodyFontSize(context),
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.white,
+                                ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                disabledBackgroundColor: AppColors.primary
+                                    .withValues(alpha: 0.5),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(
+                                    AppResponsive.borderRadius(context),
+                                  ),
+                                ),
+                                elevation: 0,
+                              ),
                             ),
+                          ),
                         ],
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: AppTextField(
-                        controller: _lastNameController,
-                        focusNode: _lastNameFocus,
-                        label: 'Last Name',
-                        hint: 'e.g. Doe',
-                        icon: Icons.person_outline,
-                        onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_emailFocus),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
 
-                // Email + Phone
-                Row(
-                  children: [
-                    Expanded(
-                      child: AppTextField(
-                        controller: _emailController,
-                        focusNode: _emailFocus,
-                        label: 'Email',
-                        hint: 'Optional',
-                        icon: Icons.email_outlined,
-                        keyboardType: TextInputType.emailAddress,
-                        onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_phoneFocus),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: AppTextField(
-                        controller: _phoneController,
-                        focusNode: _phoneFocus,
-                        label: 'Phone',
-                        hint: 'Optional, 10 digits',
-                        icon: Icons.phone_outlined,
-                        keyboardType: TextInputType.phone,
-                        maxLength: 10,
-                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                        onFieldSubmitted: (_) => FocusScope.of(context).requestFocus(_usernameFocus),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
+                    SizedBox(height: AppResponsive.largeSpacing(context)),
 
-                // PIN (username hidden — auto-generated from first name)
-                Row(
-                  children: [
-                    Expanded(
-                      child: AppTextField(
-                        controller: _pinController,
-                        focusNode: _pinFocus,
-                        label: 'PIN',
-                        hint: '4–6 digits',
-                        icon: Icons.lock_outline_rounded,
-                        required: true,
-                        keyboardType: TextInputType.number,
-                        maxLength: 6,
-                        obscureText: !_isPinVisible,
-                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _isPinVisible ? Icons.visibility_off : Icons.visibility,
-                            size: 18,
-                            color: AppColors.textSecondary,
-                          ),
-                          onPressed: () => setState(() => _isPinVisible = !_isPinVisible),
+                    // ── Added staff list ──
+                    if (_staffMembers.isNotEmpty) ...[
+                      Text(
+                        'Added Staff (${_staffMembers.length})',
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.subheadingFontSize(context),
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-
-                // Role selector — inline chips
-                _buildRoleSelector(roles),
-                const SizedBox(height: 12),
-
-                // Retail permissions
-                if (isRetail) ...[
-                  Text('POS Permissions',
-                      style: GoogleFonts.poppins(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textSecondary)),
-                  const SizedBox(height: 6),
-                  _buildPermissionTile(
-                    label: 'Can Give Discounts',
-                    value: _canGiveDiscounts,
-                    onChanged: (v) => setState(() => _canGiveDiscounts = v!),
-                  ),
-                  _buildPermissionTile(
-                    label: 'Can Access Reports',
-                    value: _canAccessReports,
-                    onChanged: (v) => setState(() => _canAccessReports = v!),
-                  ),
-                  _buildPermissionTile(
-                    label: 'Can Manage Inventory',
-                    value: _canManageInventory,
-                    onChanged: (v) => setState(() => _canManageInventory = v!),
-                  ),
-                  const SizedBox(height: 4),
-                ],
-
-                // Add button
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: _isSaving ? null : _addStaff,
-                    icon: _isSaving
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white))
-                        : const Icon(Icons.add, color: AppColors.white, size: 18),
-                    label: Text(
-                      _isSaving ? 'Adding…' : 'Add Staff Member',
-                      style: GoogleFonts.poppins(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.white),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      disabledBackgroundColor:
-                          AppColors.primary.withValues(alpha: 0.5),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                      elevation: 0,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 20),
-
-          // ── Added staff list ──
-          if (_staffMembers.isNotEmpty) ...[
-            Text('Added Staff (${_staffMembers.length})',
-                style: GoogleFonts.poppins(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary)),
-            const SizedBox(height: 12),
-            ...List.generate(_staffMembers.length, (i) => _buildStaffCard(i)),
-          ],
-
+                      SizedBox(height: AppResponsive.mediumSpacing(context)),
+                      ...List.generate(
+                        _staffMembers.length,
+                        (i) => _buildStaffCard(i),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -670,65 +705,88 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
   }
 
   Widget _buildNavSection() {
-    return Observer(builder: (_) {
-      return Row(
-        children: [
-          Expanded(
-            child: OutlinedButton.icon(
-              onPressed: widget.onPrevious,
-              icon: const Icon(Icons.arrow_back, size: 16),
-              label: Text('Back',
+    return Observer(
+      builder: (_) {
+        return Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: widget.onPrevious,
+                icon: Icon(
+                  Icons.arrow_back,
+                  size: AppResponsive.smallIconSize(context),
+                ),
+                label: Text(
+                  'Back',
                   style: GoogleFonts.poppins(
-                      fontSize: 14, fontWeight: FontWeight.w600)),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.textSecondary,
-                side: const BorderSide(color: AppColors.divider),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            flex: 2,
-            child: ElevatedButton.icon(
-              onPressed: (widget.store.isLoading || _isSavingAll)
-                  ? null
-                  : _handleNext,
-              icon: (widget.store.isLoading || _isSavingAll)
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.arrow_forward,
-                      size: 16, color: AppColors.white),
-              label: Text(
-                _isSavingAll
-                    ? 'Saving…'
-                    : _staffMembers.isEmpty
-                        ? 'Skip (Add Later)'
-                        : 'Save & Continue',
-                style: GoogleFonts.poppins(
-                    fontSize: 14,
+                    fontSize: AppResponsive.bodyFontSize(context),
                     fontWeight: FontWeight.w600,
-                    color: AppColors.white),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                disabledBackgroundColor:
-                    AppColors.primary.withValues(alpha: 0.5),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-                elevation: 0,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.textSecondary,
+                  side: const BorderSide(color: AppColors.divider),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(
+                      AppResponsive.borderRadius(context),
+                    ),
+                  ),
+                ),
               ),
             ),
-          ),
-        ],
-      );
-    });
+            SizedBox(width: AppResponsive.mediumSpacing(context)),
+            Expanded(
+              flex: 2,
+              child: ElevatedButton.icon(
+                onPressed: (widget.store.isLoading || _isSavingAll)
+                    ? null
+                    : _handleNext,
+                icon: (widget.store.isLoading || _isSavingAll)
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Icon(
+                        Icons.arrow_forward,
+                        size: AppResponsive.smallIconSize(context),
+                        color: AppColors.white,
+                      ),
+                label: Text(
+                  _isSavingAll
+                      ? 'Saving…'
+                      : _staffMembers.isEmpty
+                      ? 'Skip (Add Later)'
+                      : 'Save & Continue',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.bodyFontSize(context),
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.white,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  disabledBackgroundColor: AppColors.primary.withValues(
+                    alpha: 0.5,
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(
+                      AppResponsive.borderRadius(context),
+                    ),
+                  ),
+                  elevation: 0,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   // ── Staff card ────────────────────────────────────────────────────────────
@@ -753,7 +811,9 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: AppColors.divider),
         boxShadow: [
           BoxShadow(
@@ -769,57 +829,77 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
           children: [
             // Avatar
             CircleAvatar(
-              radius: 22,
+              radius: AppResponsive.getValue(
+                context,
+                mobile: 22.0,
+                tablet: 24.0,
+                desktop: 26.0,
+              ),
               backgroundColor: AppColors.primary.withValues(alpha: 0.1),
               child: Text(
                 name.isNotEmpty ? name[0].toUpperCase() : '?',
                 style: GoogleFonts.poppins(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.primary),
+                  fontSize: AppResponsive.subheadingFontSize(context),
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primary,
+                ),
               ),
             ),
-            const SizedBox(width: 14),
+            SizedBox(width: AppResponsive.mediumSpacing(context)),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(name,
-                      style: GoogleFonts.poppins(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary)),
+                  Text(
+                    name,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.bodyFontSize(context),
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
                   const SizedBox(height: 4),
                   Row(
                     children: [
                       // Role chip
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 2),
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: roleColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(20),
                         ),
-                        child: Text(role,
-                            style: GoogleFonts.poppins(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: roleColor)),
+                        child: Text(
+                          role,
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.captionFontSize(context),
+                            fontWeight: FontWeight.w600,
+                            color: roleColor,
+                          ),
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 2),
                   // Masked PIN
-                  Text('PIN: ●●●●',
-                      style: GoogleFonts.poppins(
-                          fontSize: 11,
-                          color: AppColors.textSecondary)),
+                  Text(
+                    'PIN: ●●●●',
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.captionFontSize(context),
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
                 ],
               ),
             ),
             IconButton(
-              icon: Icon(Icons.delete_outline,
-                  color: AppColors.danger.withValues(alpha: 0.8), size: 20),
+              icon: Icon(
+                Icons.delete_outline,
+                color: AppColors.danger.withValues(alpha: 0.8),
+                size: AppResponsive.iconSize(context),
+              ),
               onPressed: () => _deleteStaff(index),
               tooltip: 'Remove',
               splashRadius: 20,
@@ -836,17 +916,20 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Role',
-            style: GoogleFonts.poppins(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: AppColors.textSecondary)),
-        const SizedBox(height: 8),
+        Text(
+          'Role',
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.smallFontSize(context),
+            fontWeight: FontWeight.w500,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        SizedBox(height: AppResponsive.smallSpacing(context)),
         Row(
           children: roles.map((role) {
             final isSelected = _selectedRole == role;
-            final color = _roleColors[role] ?? AppColors.primary;
-            final icon = _roleIcons[role] ?? Icons.person_rounded;
+            final color = StaffRoles.colorFor(role);
+            final icon = StaffRoles.iconFor(role);
             return Expanded(
               child: Padding(
                 padding: EdgeInsets.only(right: role != roles.last ? 8 : 0),
@@ -859,7 +942,9 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
                       color: isSelected
                           ? color.withValues(alpha: 0.1)
                           : AppColors.surfaceLight,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(
+                        AppResponsive.borderRadius(context),
+                      ),
                       border: Border.all(
                         color: isSelected ? color : AppColors.divider,
                         width: isSelected ? 1.5 : 1,
@@ -868,19 +953,23 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(icon,
-                            size: 22,
-                            color: isSelected ? color : AppColors.textSecondary),
+                        Icon(
+                          icon,
+                          size: AppResponsive.iconSize(context),
+                          color: isSelected ? color : AppColors.textSecondary,
+                        ),
                         const SizedBox(height: 4),
-                        Text(role,
-                            style: GoogleFonts.poppins(
-                              fontSize: 11,
-                              fontWeight: isSelected
-                                  ? FontWeight.w700
-                                  : FontWeight.w500,
-                              color: isSelected ? color : AppColors.textSecondary,
-                            ),
-                            textAlign: TextAlign.center),
+                        Text(
+                          role,
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.captionFontSize(context),
+                            fontWeight: isSelected
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                            color: isSelected ? color : AppColors.textSecondary,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
                       ],
                     ),
                   ),
@@ -890,36 +979,6 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
           }).toList(),
         ),
       ],
-    );
-  }
-
-  Widget _buildPermissionTile({
-    required String label,
-    required bool value,
-    required ValueChanged<bool?> onChanged,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 24,
-            height: 24,
-            child: Checkbox(
-              value: value,
-              onChanged: onChanged,
-              activeColor: AppColors.primary,
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(4)),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(label,
-              style: GoogleFonts.poppins(
-                  fontSize: 13, color: AppColors.textPrimary)),
-        ],
-      ),
     );
   }
 }

@@ -5,6 +5,7 @@ import '../../../../../core/di/service_locator.dart';
 
 import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../../data/models/restaurant/db/itemvariantemodel_312.dart';
+import '../../../../../data/models/restaurant/db/product_type.dart';
 
 enum SellingMethod { byUnit, byWeight }
 
@@ -26,6 +27,26 @@ class AddItemFormState extends ChangeNotifier {
   // Image
   Uint8List? selectedImage;
 
+  // Active / Enabled state
+  bool isEnabled = true;
+
+  void setIsEnabled(bool value) {
+    isEnabled = value;
+    notifyListeners();
+  }
+
+  // Product Type — determines whether this item is a menu item (Finished Good /
+  // Recipe-Based → needs a category + selling price) or a back-of-house
+  // ingredient/prep item (Raw Material / Semi-Finished → those are optional).
+  // See docs/inventory_recipe_system_plan.md §3/§8.1.
+  String productType = ProductType.finishedGood;
+
+  /// Menu items appear on the POS grid and therefore need a category + a
+  /// selling price. Back-of-house types (raw materials, prep) do not.
+  bool get isMenuType =>
+      productType == ProductType.finishedGood ||
+      productType == ProductType.recipeBased;
+
   // Selling method
   SellingMethod sellingMethod = SellingMethod.byUnit;
   String selectedUnit = 'kg';
@@ -46,11 +67,16 @@ class AddItemFormState extends ChangeNotifier {
   bool allowOrderWhenOutOfStock = true;
   bool lowStockAlertEnabled = false;
 
+  // POS visibility override — Raw Material only; null follows the type's
+  // default (hidden). See Items.sellDirectlyAtPos.
+  bool? sellDirectlyAtPos;
+
   // Variants, Choices, Extras
   List<Map<String, dynamic>> selectedVariants = [];
   List<String> selectedChoiceIds = [];
   List<String> selectedExtraIds = [];
-  List<String> defaultChoiceOptionIds = []; // per-item default-selected choice options
+  List<String> defaultChoiceOptionIds =
+      []; // per-item default-selected choice options
 
   /// Reset all form fields to default values
   void reset() {
@@ -61,6 +87,7 @@ class AddItemFormState extends ChangeNotifier {
     lowStockThresholdController.clear();
     lowStockAlertEnabled = false;
     selectedImage = null;
+    productType = ProductType.finishedGood;
     sellingMethod = SellingMethod.byUnit;
     selectedUnit = 'kg';
     selectedCategoryId = null;
@@ -70,6 +97,7 @@ class AddItemFormState extends ChangeNotifier {
     selectedTaxRate = null;
     trackInventory = false;
     allowOrderWhenOutOfStock = true;
+    sellDirectlyAtPos = null;
     selectedVariants.clear();
     selectedChoiceIds.clear();
     selectedExtraIds.clear();
@@ -86,16 +114,32 @@ class AddItemFormState extends ChangeNotifier {
       errors.add('Item Name');
     }
 
-    if (priceController.text.trim().isEmpty) {
-      errors.add('Price');
-    } else {
-      final price = double.tryParse(priceController.text.trim());
+    // Price: mandatory only for menu types (Finished Good / Recipe-Based).
+    // For raw materials / prep it's an optional cost figure — but if the user
+    // did type something, it still has to be a valid positive number.
+    final priceText = priceController.text.trim();
+    if (isMenuType) {
+      if (priceText.isEmpty) {
+        errors.add(
+          productType == ProductType.recipeBased ? 'Selling Price' : 'Price',
+        );
+      } else {
+        final price = double.tryParse(priceText);
+        if (price == null || price <= 0) {
+          errors.add('Valid Price (greater than 0)');
+        }
+      }
+    } else if (priceText.isNotEmpty) {
+      final price = double.tryParse(priceText);
       if (price == null || price <= 0) {
-        errors.add('Valid Price (greater than 0)');
+        errors.add('Valid Cost Price (greater than 0)');
       }
     }
 
-    if (selectedCategoryId == null || selectedCategoryId!.isEmpty) {
+    // Category: mandatory only for menu types. A raw material / prep item is
+    // classified by its Product Type, not a menu category.
+    if (isMenuType &&
+        (selectedCategoryId == null || selectedCategoryId!.isEmpty)) {
       errors.add('Category');
     }
 
@@ -112,32 +156,53 @@ class AddItemFormState extends ChangeNotifier {
       }
     }
 
-    return ValidationResult(
-      isValid: errors.isEmpty,
-      missingFields: errors,
-    );
+    return ValidationResult(isValid: errors.isEmpty, missingFields: errors);
   }
 
   /// Convert form state to Items model
   Future<Items> toItem() async {
-    final itemVariants = selectedVariants
-        .map((v) => ItemVariante(
-              variantId: v['variantId'],
-              price: v['price'],
-              stockQuantity: (v['stockQuantity'] as num?)?.toDouble() ?? 0.0,
-            ))
-        .toList();
+    final isRawOrSemi =
+        productType == ProductType.rawMaterial ||
+        productType == ProductType.semiFinished;
+    final itemVariants = isRawOrSemi
+        ? <ItemVariante>[]
+        : selectedVariants
+              .map(
+                (v) => ItemVariante(
+                  variantId: v['variantId'],
+                  price: v['price'],
+                  stockQuantity:
+                      (v['stockQuantity'] as num?)?.toDouble() ?? 0.0,
+                ),
+              )
+              .toList();
 
     return Items(
       id: const Uuid().v4(),
       name: itemNameController.text.trim(),
       price: double.tryParse(priceController.text.trim()),
+      // Raw Material only: also seed lastPurchaseCost from the same Cost
+      // Price input, since that's what recipe costing actually reads (B1).
+      lastPurchaseCost: ProductType.seededLastPurchaseCost(
+        productType,
+        double.tryParse(priceController.text.trim()),
+      ),
+      productType: productType,
       description: descriptionController.text.trim(),
       categoryOfItem: selectedCategoryId ?? "",
       imageBytes: selectedImage,
       isVeg: vegCategory,
       isSoldByWeight: sellingMethod == SellingMethod.byWeight,
-      unit: sellingMethod == SellingMethod.byWeight ? selectedUnit : null,
+      // By Weight carries the chosen unit. By Unit means whole pieces — spelled
+      // out as 'piece' for Raw Material/Semi-Finished because the inventory
+      // screens decide whole-vs-decimal counting from this field, and left null
+      // for Finished Good/Recipe-Based exactly as before.
+      unit: sellingMethod == SellingMethod.byWeight
+          ? selectedUnit
+          : ((productType == ProductType.rawMaterial ||
+                    productType == ProductType.semiFinished)
+                ? 'piece'
+                : null),
       // Item-level stock only for simple items; variant items track per variant.
       stockQuantity: (trackInventory && selectedVariants.isEmpty)
           ? (double.tryParse(stockController.text.trim()) ?? 0.0)
@@ -150,11 +215,17 @@ class AddItemFormState extends ChangeNotifier {
           : null,
       trackInventory: trackInventory,
       allowOrderWhenOutOfStock: allowOrderWhenOutOfStock,
+      sellDirectlyAtPos:
+          (productType == ProductType.rawMaterial ||
+              productType == ProductType.semiFinished)
+          ? sellDirectlyAtPos
+          : null,
       variant: itemVariants,
       choiceIds: selectedChoiceIds,
       extraId: selectedExtraIds,
       defaultChoiceOptionIds: defaultChoiceOptionIds,
       itemCode: itemCodeController.text.trim(),
+      isEnabled: isEnabled,
       createdTime: DateTime.now(),
       editCount: 0,
     );
@@ -165,6 +236,7 @@ class AddItemFormState extends ChangeNotifier {
     return {
       'itemName': itemNameController.text.trim(),
       'price': priceController.text.trim(),
+      'productType': productType,
       'description': descriptionController.text.trim(),
       'selectedVegCategory': vegCategory,
       'selectedCategory': selectedCategoryId,
@@ -181,10 +253,14 @@ class AddItemFormState extends ChangeNotifier {
 
   /// Update variants, choices, extras and tax from AddMoreInfo result
   void updateFromMoreInfo(Map<String, dynamic> result) {
-    selectedVariants = List<Map<String, dynamic>>.from(result['variants'] ?? []);
+    selectedVariants = List<Map<String, dynamic>>.from(
+      result['variants'] ?? [],
+    );
     selectedChoiceIds = List<String>.from(result['choiceIds'] ?? []);
     selectedExtraIds = List<String>.from(result['extraIds'] ?? []);
-    defaultChoiceOptionIds = List<String>.from(result['defaultChoiceOptionIds'] ?? []);
+    defaultChoiceOptionIds = List<String>.from(
+      result['defaultChoiceOptionIds'] ?? [],
+    );
     // More Info can also set the tax — keep it in sync so it isn't lost.
     if (result.containsKey('taxIds') || result.containsKey('taxRate')) {
       selectedTaxIds = List<String>.from(result['taxIds'] ?? selectedTaxIds);
@@ -226,9 +302,41 @@ class AddItemFormState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Set track inventory
+  /// Set the product type. Back-of-house types are stocked directly, so
+  /// inventory tracking is turned on for them by default; a Recipe-Based item
+  /// has no stock of its own (it's derived from ingredients), so tracking is
+  /// turned off. Either way, becoming stock-governed defaults Allow-OOS to
+  /// "block" (matches Edit's existing "enforce limits by default" policy —
+  /// see [setTrackInventory]); Recipe-Based is always stock-governed via its
+  /// ingredients, so it gets the same default. All of this stays
+  /// user-overridable via the toggle/switch.
+  void setProductType(String type) {
+    productType = type;
+    if (type == ProductType.rawMaterial || type == ProductType.semiFinished) {
+      trackInventory = true;
+      allowOrderWhenOutOfStock = false;
+      sellDirectlyAtPos = false;
+    } else if (type == ProductType.recipeBased) {
+      trackInventory = false;
+      allowOrderWhenOutOfStock = false;
+      sellDirectlyAtPos = null;
+    } else {
+      sellDirectlyAtPos = null;
+    }
+    notifyListeners();
+  }
+
+  /// Set track inventory. Enabling it defaults Allow-OOS to "block" (NO) —
+  /// matches Edit Item's existing policy so both screens agree.
   void setTrackInventory(bool value) {
     trackInventory = value;
+    if (value) allowOrderWhenOutOfStock = false;
+    notifyListeners();
+  }
+
+  /// Set the Raw Material "Sell directly at POS" override.
+  void setSellDirectlyAtPos(bool value) {
+    sellDirectlyAtPos = value;
     notifyListeners();
   }
 
@@ -267,10 +375,7 @@ class ValidationResult {
   final bool isValid;
   final List<String> missingFields;
 
-  ValidationResult({
-    required this.isValid,
-    required this.missingFields,
-  });
+  ValidationResult({required this.isValid, required this.missingFields});
 
   String get errorMessage {
     if (isValid) return '';

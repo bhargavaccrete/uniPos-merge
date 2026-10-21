@@ -1,10 +1,20 @@
 import 'package:intl/intl.dart';
+import 'package:billberrylite/core/config/food_license_rule.dart';
 import 'package:billberrylite/domain/services/retail/receipt_pdf_service.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/util/restaurant/print_settings.dart';
+import 'package:billberrylite/core/plan/plan_enforcement.dart';
+import 'package:billberrylite/core/plan/mode_keys.dart';
+import 'package:billberrylite/core/config/app_config.dart';
+import 'package:billberrylite/core/config/tax_label_rule.dart';
+import 'package:billberrylite/core/config/tax_id_rule.dart';
 import 'package:billberrylite/domain/services/restaurant/tax_breakdown.dart';
 import 'package:billberrylite/core/di/service_locator.dart' show taxStore;
+// describeAttributeMap only — NOT the store, which is retail-only and would
+// throw here. See that function's doc.
+import 'package:billberrylite/domain/store/retail/attribute_store.dart'
+    show describeAttributeMap;
 
 /// Builds raw ESC/POS byte arrays for thermal printers.
 ///
@@ -53,8 +63,8 @@ class EscPosReceiptBuilder {
   /// The kitchen needs to know WHAT to make, not how much it costs.
   ///
   /// Layout:
+  /// No restaurant name — the ticket opens with the KOT number.
   /// ```
-  ///      RESTAURANT NAME
   ///      KOT #12 (ADD-ON)
   ///   Table: T3  |  Dine In
   ///   Order #7   |  14:30
@@ -86,15 +96,8 @@ class EscPosReceiptBuilder {
       bytes.addAll(_text('\n'));
     }
 
-    // ── HEADER: Store name + KOT number ──
+    // ── HEADER: KOT number ──
     bytes.addAll(_alignCenter);
-    if (PrintSettings.showRestaurantName && receiptData.storeName != null) {
-      bytes.addAll(_boldOn);
-      bytes.addAll(_sizeDouble);
-      bytes.addAll(_text(receiptData.storeName!));
-      bytes.addAll(_sizeNormal);
-      bytes.addAll(_boldOff);
-    }
 
     // KOT number — always shown (critical for kitchen)
     bytes.addAll(_boldOn);
@@ -122,7 +125,7 @@ class EscPosReceiptBuilder {
     if (receiptData.tableNo != null && receiptData.tableNo!.isNotEmpty) {
       infoLine += 'Table: ${receiptData.tableNo}';
     }
-    if (receiptData.orderType != null) {
+    if (PrintSettings.showOrderType && receiptData.orderType != null) {
       if (infoLine.isNotEmpty) infoLine += '  |  ';
       infoLine += receiptData.orderType!;
     }
@@ -152,10 +155,10 @@ class EscPosReceiptBuilder {
 
     // ── ITEMS: Name + qty, choices, extras, instructions ──
     // This is the core of the KOT — what the kitchen reads
-    int totalQty = 0;
+    double totalQty = 0;
     for (final item in receiptData.items) {
-      final qty = item.qty;
-      totalQty += qty;
+      final qty = _qtyLabel(item.qty);
+      totalQty += item.qty;
 
       // Item name with variant: "2x Chicken Biryani (Large)"
       String itemName = item.productName ?? 'Item';
@@ -185,7 +188,8 @@ class EscPosReceiptBuilder {
 
     // ── FOOTER: Item count + total quantity ──
     bytes.addAll(_divider(cols));
-    bytes.addAll(_text('Items: ${receiptData.items.length}   Qty: $totalQty'));
+    bytes.addAll(
+        _text('Items: ${receiptData.items.length}   Qty: ${_qtyLabel(totalQty)}'));
 
     // Feed paper + cut
     bytes.addAll(_feed(4));
@@ -225,6 +229,7 @@ class EscPosReceiptBuilder {
   static List<int> buildReceiptTicket({
     required ReceiptData receiptData,
     required int paperWidth,
+    List<int>? logoRaster, // pre-encoded ESC/POS raster of the store logo
   }) {
     final cols = _columnsForPaper(paperWidth);
     final bytes = <int>[];
@@ -236,6 +241,12 @@ class EscPosReceiptBuilder {
 
     // ── STORE HEADER ──
     bytes.addAll(_alignCenter);
+
+    // Store logo (raster) — centered above the name when one is configured.
+    if (logoRaster != null && logoRaster.isNotEmpty) {
+      bytes.addAll(logoRaster);
+      bytes.addAll(_newline);
+    }
 
     // Store name in large bold text
     if (PrintSettings.showRestaurantName && receiptData.storeName != null) {
@@ -257,8 +268,19 @@ class EscPosReceiptBuilder {
         receiptData.storePhone!.isNotEmpty) {
       bytes.addAll(_text('Tel: ${receiptData.storePhone}'));
     }
-    if (receiptData.gstNumber != null && receiptData.gstNumber!.isNotEmpty) {
-      bytes.addAll(_text('GSTIN: ${receiptData.gstNumber}'));
+    if (receiptData.taxEnabled &&
+        receiptData.gstNumber != null &&
+        receiptData.gstNumber!.isNotEmpty) {
+      bytes.addAll(
+        _text('${TaxIdRule.printLabel}: ${receiptData.gstNumber}'),
+      );
+    }
+    // Food licence (FSSAI in India) — read live rather than threaded through
+    // ReceiptData: it is a standing business identifier, not a per-order value.
+    // NOT gated on taxEnabled; a food licence is not a tax registration.
+    final foodLicense = FoodLicenseRule.number;
+    if (foodLicense != null) {
+      bytes.addAll(_text('${FoodLicenseRule.label}: $foodLicense'));
     }
 
     bytes.addAll(_alignLeft);
@@ -279,7 +301,7 @@ class EscPosReceiptBuilder {
     }
 
     // Order type + table
-    if (receiptData.orderType != null) {
+    if (PrintSettings.showOrderType && receiptData.orderType != null) {
       String typeLine = 'Type: ${receiptData.orderType}';
       if (receiptData.tableNo != null && receiptData.tableNo!.isNotEmpty) {
         typeLine += '  Table: ${receiptData.tableNo}';
@@ -295,7 +317,7 @@ class EscPosReceiptBuilder {
     // Customer name
     if (PrintSettings.showCustomerName &&
         receiptData.customer != null &&
-        receiptData.customer!.name.isNotEmpty) {
+        (receiptData.customer!.name?.isNotEmpty ?? false)) {
       bytes.addAll(_text('Customer: ${receiptData.customer!.name}'));
     }
 
@@ -310,10 +332,20 @@ class EscPosReceiptBuilder {
 
     // ── ITEM ROWS ──
     for (final item in receiptData.items) {
-      // Item name (truncated to fit) + variant
+      // Item name (truncated to fit) + variant.
+      // Labelled only when real attribute names exist → "(Storage: 1tb)".
+      // Restaurant items carry no map and fall back to the legacy columns,
+      // where `size` holds the variant name — those stay bare: "(Large)".
       String name = item.productName ?? 'Item';
-      if (item.size != null && item.size!.isNotEmpty) {
-        name += ' (${item.size})';
+      final hasNamedAttributes = item.attributes?.isNotEmpty ?? false;
+      final descriptor = describeAttributeMap(
+        item.attributes,
+        size: item.size,
+        color: item.color,
+        labelled: hasNamedAttributes,
+      );
+      if (descriptor.isNotEmpty) {
+        name += ' ($descriptor)';
       }
 
       // Truncate name to fit columns (leave room for qty + amount)
@@ -322,9 +354,19 @@ class EscPosReceiptBuilder {
         name = '${name.substring(0, maxNameLen - 2)}..';
       }
 
-      final amount = _fmt(item.price * item.qty);
+      // Same basis the Sub Total and tax table use, so the Amount column
+      // sums to Sub Total in both modes (restaurant's price is mode-adjusted).
+      final amount = _fmt(receiptLineGross(item));
       bytes.addAll(_text(
           _formatRow(name, '${item.qty}', amount, cols)));
+
+      // This line's OWN discount, indented under it. RETAIL ONLY — restaurant
+      // has no per-line discount concept and its output must not change. The
+      // Amount column above stays gross so it still sums to Sub Total.
+      if (AppConfig.isRetail && receiptLineDiscount(item) > 0.009) {
+        bytes.addAll(_text(
+            '  ${receiptLineDiscountLabel(item)} -$currency${_fmt(receiptLineDiscount(item))}'));
+      }
 
       // Extras/choices info (indented, stored in weight field)
       if (item.weight != null && item.weight!.isNotEmpty) {
@@ -339,14 +381,11 @@ class EscPosReceiptBuilder {
     // ── TOTALS SECTION ──
     // This mirrors the bill summary from customerdetails.dart
 
-    // Per-rate base for the GST table. item.price is mode-adjusted (divided by
-    // 1+rate for exclusive display), so use item.total — which restores the true
-    // base and sums to Sub Total.
     // Derive the tax mode from the order totals (stored flag can be stale).
     // Fall back to the receipt's own line gross so the detector never has to
     // rely on the stale inclusive flag (which mis-classified exclusive bills).
     final double itemsGross =
-        receiptData.items.fold<double>(0, (s, it) => s + it.total);
+        receiptData.items.fold<double>(0, (s, it) => s + receiptLineGross(it));
     final double grossTotal = receiptData.itemTotal ?? itemsGross;
     final isTaxInclusive = (grossTotal > 0)
         ? TaxBreakdown.isInclusiveFromTotals(
@@ -367,8 +406,21 @@ class EscPosReceiptBuilder {
       bytes.addAll(_text(_formatTotalRow('Sub Total', _fmt(subValue), cols)));
     }
 
-    // Discount (only show if > 0)
-    if ((sale.discountAmount ?? 0) > 0.009) {
+    // Discount. Retail splits it into the per-line part and the order-level
+    // remainder, so a line discount is not passed off as a bill discount.
+    // Restaurant keeps its single row, byte-for-byte as before.
+    final double escLineDiscTotal = AppConfig.isRetail
+        ? receiptLineDiscountTotal(receiptData.items)
+        : 0;
+    if (escLineDiscTotal > 0.009) {
+      bytes.addAll(_text(_formatTotalRow(
+          'Item Discounts', '-$currency${_fmt(escLineDiscTotal)}', cols)));
+      final remainder = (sale.discountAmount ?? 0) - escLineDiscTotal;
+      if (remainder > 0.009) {
+        bytes.addAll(_text(_formatTotalRow(
+            'Bill Discount', '-$currency${_fmt(remainder)}', cols)));
+      }
+    } else if ((sale.discountAmount ?? 0) > 0.009) {
       bytes.addAll(_text(
           _formatTotalRow('Discount', '-$currency${_fmt(sale.discountAmount ?? 0)}', cols)));
     }
@@ -384,27 +436,51 @@ class EscPosReceiptBuilder {
 
     // Tax block — per-rate GST summary, shown in BOTH modes when GST applies.
     // (0% bills produce no lines and skip the whole block.)
-    final taxLines = TaxBreakdown.compute(
-      items: receiptData.items
-          .map((it) => (gross: it.total, ratePercent: it.gstRate ?? 0))
-          .toList(),
-      billDiscount: sale.discountAmount ?? 0,
-      isTaxInclusive: isTaxInclusive,
-      reconcileToGst: sale.totalGstAmount ?? 0, // lines must sum to the order's GST
-    );
-    if (PrintSettings.showTax && taxLines.isNotEmpty) {
+    // Retail: a line discount belongs to its own GST bucket, and only the
+    // order-level remainder is spread proportionally. Restaurant keeps calling
+    // `compute`, whose behaviour is unchanged.
+    final taxLines = AppConfig.isRetail
+        ? TaxBreakdown.computeWithLineDiscounts(
+            items: receiptData.items
+                .map((it) => (
+                      gross: receiptLineGross(it),
+                      lineDiscount: receiptLineDiscount(it),
+                      ratePercent: it.gstRate ?? 0,
+                    ))
+                .toList(),
+            billDiscount:
+                receiptBillDiscountRemainder(sale, receiptData.items),
+            isTaxInclusive: isTaxInclusive,
+            reconcileToGst: sale.totalGstAmount ?? 0,
+          )
+        : TaxBreakdown.compute(
+            items: receiptData.items
+                .map((it) =>
+                    (gross: receiptLineGross(it), ratePercent: it.gstRate ?? 0))
+                .toList(),
+            billDiscount: sale.discountAmount ?? 0,
+            isTaxInclusive: isTaxInclusive,
+            reconcileToGst: sale.totalGstAmount ?? 0, // lines must sum to the order's GST
+          );
+    if (receiptData.taxEnabled && PrintSettings.showTax && taxLines.isNotEmpty) {
       final totalGst = sale.totalGstAmount ?? 0; // authoritative — matches order
       bytes.addAll(_divider(cols));
       bytes.addAll(
-          _text(_formatRow4('Tax', 'Taxable', 'GST', 'Total', cols)));
+          _text(_formatRow4('Tax', 'Taxable', TaxLabelRule.name, 'Total', cols)));
       for (final l in taxLines) {
         bytes.addAll(_text(_formatRow4(_taxLabel(l.ratePercent),
             _fmt(l.taxable), _fmt(l.gst), _fmt(l.taxable + l.gst), cols)));
       }
       bytes.addAll(_divider(cols));
       bytes.addAll(_text(_formatTotalRow(
-          isTaxInclusive ? 'Total GST (Incl)' : 'Total GST:',
+          isTaxInclusive ? 'Total Tax (Incl)' : 'Total Tax:',
           _fmt(totalGst),
+          cols)));
+    } else if (receiptData.taxEnabled && !PrintSettings.showTax && (sale.totalGstAmount ?? 0) > 0.009) {
+      // Tax toggle OFF → single summary line so the bill still reconciles.
+      bytes.addAll(_text(_formatTotalRow(
+          isTaxInclusive ? 'Tax (Incl.)' : 'Tax',
+          _fmt(sale.totalGstAmount ?? 0),
           cols)));
     }
 
@@ -456,21 +532,24 @@ class EscPosReceiptBuilder {
 
     // ── FOOTER ──
     bytes.addAll(_alignCenter);
-    if (isTaxInclusive) {
-      bytes.addAll(_text('All prices include GST'));
+    if (receiptData.taxEnabled && isTaxInclusive) {
+      bytes.addAll(_text('All prices include ${TaxLabelRule.name}'));
     }
-    // Order-type-aware thank you message
-    final orderType = receiptData.orderType?.toLowerCase() ?? '';
-    if (orderType.contains('dine')) {
-      bytes.addAll(_text('Thank you for dining with us!'));
-    } else if (orderType.contains('delivery')) {
-      bytes.addAll(_text('Thank you for your order!'));
-    } else {
-      bytes.addAll(_text('Thank you! Enjoy your meal!'));
+    // Custom footer / "Thank You" message — owner-editable in Print
+    // Customization. Multi-line via \n; blank prints nothing.
+    final footer = PrintSettings.footerMessage.trim();
+    if (footer.isNotEmpty) {
+      for (final line in footer.split('\n')) {
+        bytes.addAll(_text(line));
+      }
     }
-    bytes.addAll(_text('Visit us again!'));
-    if (PrintSettings.showPoweredBy) {
+    // "Powered by Bill Berry Lite" + company line. Forced when the admin keeps
+    // `billing.invoice.print` on; otherwise the shop's "Powered By" toggle decides.
+    if (PlanEnforce.allows(ModeKeys.billingInvoicePrint) ||
+        PrintSettings.showPoweredBy) {
       bytes.addAll(_text('Powered by Bill Berry Lite'));
+      bytes.addAll(_text('Accrete Infosolution Technologies Private Limited'));
+      bytes.addAll(_text('Ph: 7041046049'));
     }
 
     // Feed paper and cut
@@ -509,6 +588,11 @@ class EscPosReceiptBuilder {
     required double drawerBalance,
     required double withdrawalCash,
     required double cashDifference,
+    /// Cash left in the till after the safe drop. Optional because
+    /// `drawerBalance` above is the system-EXPECTED figure, not what physically
+    /// stays — without this the slip never says how much is actually in the
+    /// drawer. Null hides the row, so existing callers are unchanged.
+    double? cashKept,
     required List<({String name, double amount})> paymentMethods,
     required int noOfBill,
     required int reprintBill,
@@ -573,6 +657,9 @@ class EscPosReceiptBuilder {
     b.addAll(_text(_formatTotalRow('TOTAL EXPENSE:', _fmt(totalExpense), cols)));
     b.addAll(_text(_formatTotalRow('DRAWER BALANCE:', _fmt(drawerBalance), cols)));
     b.addAll(_text(_formatTotalRow('WITHDRAWAL CASH:', _fmt(withdrawalCash), cols)));
+    if (cashKept != null) {
+      b.addAll(_text(_formatTotalRow('LEFT IN DRAWER:', _fmt(cashKept), cols)));
+    }
     b.addAll(_text(_formatTotalRow('CASH DIFFERENCE:', _fmt(cashDifference), cols)));
     b.addAll(_divider(cols));
 
@@ -648,6 +735,17 @@ class EscPosReceiptBuilder {
 
   /// Convert a string to bytes + newline.
   /// ESC/POS printers expect raw ASCII bytes terminated by LF (0x0A).
+  /// Renders a line quantity for the ticket. Whole quantities print exactly as
+  /// they always have ("2x"), never "2.0x"; a fractional one (retail loose
+  /// goods, e.g. 1.75 kg) prints its decimals trimmed of trailing zeros.
+  static String _qtyLabel(double qty) {
+    if (qty == qty.roundToDouble()) return qty.toInt().toString();
+    return qty
+        .toStringAsFixed(2)
+        .replaceAll(RegExp(r'0+$'), '')
+        .replaceAll(RegExp(r'\.$'), '');
+  }
+
   static List<int> _text(String text) {
     return [...text.codeUnits, ..._newline];
   }
@@ -717,7 +815,7 @@ class EscPosReceiptBuilder {
     final rateStr = ratePercent % 1 == 0
         ? ratePercent.toStringAsFixed(0)
         : ratePercent.toStringAsFixed(2);
-    String name = 'GST';
+    String name = TaxLabelRule.name;
     for (final t in taxStore.taxes) {
       if (((t.taxperecentage ?? 0) - ratePercent).abs() < 0.001 &&
           t.taxname.trim().isNotEmpty) {

@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../data/models/restaurant/db/staffModel_310.dart';
+import '../../core/config/app_config.dart';
+import '../../data/models/common/staffModel_310.dart';
 
 /// Tracks who is currently logged in to the restaurant POS.
 /// Persists across hot-restarts via SharedPreferences.
@@ -184,37 +185,102 @@ class RestaurantSession {
 
   static Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
-    _isLoggedIn = prefs.getBool(_isLoggedInKey) ?? false;
+    // SECURITY: load() runs only on a COLD START (fresh process launch). A full
+    // close / swipe-from-recents kills the process WITHOUT a graceful logout, so
+    // the persisted "logged in" flag is stale. Never auto-login from it — force
+    // re-authentication so a killed-and-relaunched app asks for the PIN again.
+    // (A background→resume does NOT re-run load(), so simply minimizing keeps the
+    // session alive, subject to the inactivity timeout.)
+    _isLoggedIn = false;
+    await prefs.setBool(_isLoggedInKey, false);
     loginTypeNotifier.value = prefs.getString(_loginTypeKey) ?? 'admin';
     staffRoleNotifier.value = prefs.getString(_staffRoleKey);
     staffNameNotifier.value = prefs.getString(_staffNameKey);
     _currentShiftId = prefs.getString(_currentShiftIdKey);
     timeoutMinutesNotifier.value =
         prefs.getInt(_timeoutMinutesKey) ?? _defaultTimeoutMinutes;
-    if (_isLoggedIn) resetInactivityTimer();
+    // Not logged in on cold start → no inactivity timer until the PIN is entered
+    // (saveAdminSession / saveStaffSession start it on successful login).
   }
 
   // ── Permission check ─────────────────────────────────────────────────────
+
+  /// What a RESTAURANT Cashier may NOT do.
+  ///
+  /// 'settings' covers the whole store/admin config cluster — Settings and its
+  /// sub-screens, Licensing, Payment Methods, admin password, Order Settings,
+  /// Data Generator — so one rule locks them all.
+  static const Set<String> _restaurantCashierBlocked = {
+    'reports',
+    'manageStaff',
+    'cashDrawer',
+    'settings',
+    'taxSettings',
+  };
+
+  /// What a RETAIL Cashier may NOT do.
+  ///
+  /// Deliberately NOT the restaurant set:
+  /// * `cashDrawer` is absent — a retail cashier records their own cash in/out.
+  /// * The catalogue, procurement and backup keys have no restaurant analogue.
+  ///
+  /// Note the view/modify split: `catalog` and `inventory` stay OPEN so a
+  /// cashier can look up a price or check stock at the counter; `catalogEdit`
+  /// and `inventoryAdjust` are the gates that stop them changing anything.
+  ///
+  /// `settings` is blocked, but retail's Settings *hub* is deliberately not
+  /// gated on it — Start Day, End of Day and Logout live inside that hub, so
+  /// locking the door would leave a cashier unable to close the day or log out.
+  /// The sensitive tiles inside carry the gate instead.
+  static const Set<String> _retailCashierBlocked = {
+    'reports',
+    'manageStaff',
+    'settings',
+    'taxSettings',
+    'catalogEdit',
+    'inventoryAdjust',
+    'suppliers',
+    'purchase',
+    'dataBackup',
+    // Money-sensitive POS actions. Each is read through a named service getter
+    // (PriceOverrideService.canOverride and friends) whose callers HIDE the
+    // control rather than showing it and refusing.
+    'billingOverride',
+    'billingDiscount',
+    'billingExchange',
+  };
+
   /// Returns true if the current session can access the given feature key.
-  /// Feature keys: 'startOrder', 'manageMenu', 'manageStaff', 'customers',
-  ///               'reports', 'taxSettings', 'expenses', 'inventory', 'settings'
+  ///
+  /// **Admin and Manager get everything, in both business modes.** Only the
+  /// Cashier rule differs, and it is a DENYLIST: anything not named is allowed.
+  /// That means a feature key added later is Cashier-accessible until someone
+  /// adds it to the relevant set — check this when adding a sensitive screen.
+  ///
+  /// Restaurant keys: 'startOrder', 'manageMenu', 'manageStaff', 'customers',
+  ///   'reports', 'taxSettings', 'expenses', 'inventory', 'settings',
+  ///   'cashDrawer', 'endDay'.
+  /// Retail keys: 'billing', 'customers', 'catalog', 'catalogEdit',
+  ///   'inventory', 'inventoryAdjust', 'suppliers', 'purchase', 'reports',
+  ///   'manageStaff', 'settings', 'taxSettings', 'dataBackup', 'cashDrawer',
+  ///   'endDay', 'attendance', 'billingOverride', 'billingDiscount',
+  ///   'billingExchange'.
   static bool canAccess(String feature) {
+    // Fail CLOSED when nobody is signed in. `clearSession` resets loginType to
+    // 'admin' (its default), so `isAdmin` reads TRUE after a logout — without
+    // this line every permission would be granted to a logged-out session.
+    // RestaurantGuard checks isLoggedIn before calling here, but the service
+    // getters (PriceOverrideService.canOverride and friends) do not, and
+    // RetailGuard has no login check at all.
+    if (!isLoggedIn) return false;
     if (isAdmin || staffRole == 'Manager') return true;
     if (staffRole == 'Cashier') {
-      // Cashier may take orders, manage customers, and view/adjust inventory —
-      // but NOT reports, staff, cash drawer, or store/admin configuration
-      // (Settings, its sub-screens, Licensing, Payment Methods, admin password,
-      // Order Settings, Data Generator — all gated by 'settings' — and Tax).
-      const blocked = {
-        'reports',
-        'manageStaff',
-        'cashDrawer',
-        'settings',
-        'taxSettings',
-      };
+      final blocked =
+          AppConfig.isRetail ? _retailCashierBlocked : _restaurantCashierBlocked;
       return !blocked.contains(feature);
     }
-    // Other staff roles: orders only
+    // Other staff roles (restaurant's Waiter): orders only. Retail has no third
+    // role — StaffRoles.retail stops at Manager/Cashier.
     return feature == 'startOrder';
   }
 }

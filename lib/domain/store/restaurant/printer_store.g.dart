@@ -38,6 +38,13 @@ mixin _$PrinterStore on _PrinterStore, Store {
           Computed<List<SavedPrinterModel>>(() => super.wifiPrinters,
               name: '_PrinterStore.wifiPrinters'))
       .value;
+  Computed<List<SavedPrinterModel>>? _$windowsPrintersComputed;
+
+  @override
+  List<SavedPrinterModel> get windowsPrinters => (_$windowsPrintersComputed ??=
+          Computed<List<SavedPrinterModel>>(() => super.windowsPrinters,
+              name: '_PrinterStore.windowsPrinters'))
+      .value;
 
   late final _$savedPrintersAtom =
       Atom(name: '_PrinterStore.savedPrinters', context: context);
@@ -226,9 +233,35 @@ mixin _$PrinterStore on _PrinterStore, Store {
       required String ip,
       int port = 9100,
       int paperSize = 80,
-      String role = 'both'}) {
+      String role = 'both',
+      String? assignRole}) {
     return _$addWifiPrinterAsyncAction.run(() => super.addWifiPrinter(
-        name: name, ip: ip, port: port, paperSize: paperSize, role: role));
+        name: name,
+        ip: ip,
+        port: port,
+        paperSize: paperSize,
+        role: role,
+        assignRole: assignRole));
+  }
+
+  late final _$saveWindowsPrinterAsyncAction =
+      AsyncAction('_PrinterStore.saveWindowsPrinter', context: context);
+
+  @override
+  Future<void> saveWindowsPrinter(
+      {required String name,
+      required String queueName,
+      int paperSize = 80,
+      String role = 'both',
+      String? assignRole,
+      bool asPdfPrinter = false}) {
+    return _$saveWindowsPrinterAsyncAction.run(() => super.saveWindowsPrinter(
+        name: name,
+        queueName: queueName,
+        paperSize: paperSize,
+        role: role,
+        assignRole: assignRole,
+        asPdfPrinter: asPdfPrinter));
   }
 
   late final _$testWifiConnectionAsyncAction =
@@ -265,9 +298,14 @@ mixin _$PrinterStore on _PrinterStore, Store {
       {required DiscoveredPrinter device,
       required String name,
       int paperSize = 80,
-      String role = 'both'}) {
+      String role = 'both',
+      String? assignRole}) {
     return _$saveUsbPrinterAsyncAction.run(() => super.saveUsbPrinter(
-        device: device, name: name, paperSize: paperSize, role: role));
+        device: device,
+        name: name,
+        paperSize: paperSize,
+        role: role,
+        assignRole: assignRole));
   }
 
   late final _$saveBluetoothPrinterAsyncAction =
@@ -278,18 +316,25 @@ mixin _$PrinterStore on _PrinterStore, Store {
       {required DiscoveredPrinter device,
       required String name,
       int paperSize = 80,
-      String role = 'both'}) {
+      String role = 'both',
+      String? assignRole}) {
     return _$saveBluetoothPrinterAsyncAction.run(() => super
         .saveBluetoothPrinter(
-            device: device, name: name, paperSize: paperSize, role: role));
+            device: device,
+            name: name,
+            paperSize: paperSize,
+            role: role,
+            assignRole: assignRole));
   }
 
   late final _$sendBytesAsyncAction =
       AsyncAction('_PrinterStore.sendBytes', context: context);
 
   @override
-  Future<bool> sendBytes(List<int> bytes, SavedPrinterModel printer) {
-    return _$sendBytesAsyncAction.run(() => super.sendBytes(bytes, printer));
+  Future<bool> sendBytes(List<int> bytes, SavedPrinterModel printer,
+      {bool verifyDelivery = false}) {
+    return _$sendBytesAsyncAction.run(
+        () => super.sendBytes(bytes, printer, verifyDelivery: verifyDelivery));
   }
 
   late final _$testPrintAsyncAction =
@@ -329,7 +374,8 @@ isPrinting: ${isPrinting},
 hasDefaultKotPrinter: ${hasDefaultKotPrinter},
 hasDefaultReceiptPrinter: ${hasDefaultReceiptPrinter},
 bluetoothPrinters: ${bluetoothPrinters},
-wifiPrinters: ${wifiPrinters}
+wifiPrinters: ${wifiPrinters},
+windowsPrinters: ${windowsPrinters}
     ''';
   }
 }

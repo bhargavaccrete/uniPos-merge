@@ -18,11 +18,17 @@ import '../../../../../util/common/currency_helper.dart';
 import '../../../../../util/restaurant/staticswitch.dart';
 import '../../../../../util/restaurant/restaurant_session.dart';
 
-import '../../../../../data/models/restaurant/db/customer_model_125.dart';
+import '../../../../../data/models/common/customer_model_125.dart';
 import '../../../../../core/di/service_locator.dart';
+import '../../../../../core/config/tax_feature.dart';
+import '../../../../../domain/services/retail/store_settings_service.dart';
+import '../../../../../core/plan/plan_enforcement.dart';
+import '../../../../../core/plan/plan_guard.dart';
+import '../../../../../core/plan/entitlement_keys.dart';
 import '../../../../../data/models/restaurant/db/item_cancellation_model_134.dart';
 import '../../../../../data/repositories/restaurant/item_cancellation_repository.dart';
 import '../../../../widget/componets/common/app_text_field.dart';
+import '../../../../widget/componets/common/dialog_dispose_scope.dart';
 import '../../tabbar/table.dart';
 import '../startorder.dart';
 import 'customerdetails.dart';
@@ -30,6 +36,7 @@ import '../../util/restaurant_print_helper.dart';
 import '../../../../../server/websocket.dart' as ws;
 import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/stores/payment_method_store.dart';
+
 class Takeaway extends StatefulWidget {
   bool isexisting = false;
   final OrderModel? existingModel;
@@ -38,34 +45,42 @@ class Takeaway extends StatefulWidget {
   final bool isDineIn;
   final List<CartItemStatus> cartItems;
   final String? tableid;
+  final VoidCallback? onAddItems;
   final Function(CartItem) onAddtoCart;
   final Function(CartItem) onIncreseQty;
   final Function(CartItem) onDecreseQty;
-  final Function(CartItem, int)? onSetQty; // Set quantity directly (typed input)
+  final Function(CartItem, int)?
+  onSetQty; // Set quantity directly (typed input)
+  // Called AFTER an active item's cancellation is committed immediately, so the
+  // parent can drop it from both the working list and the diff baseline.
+  final void Function(CartItem item, int qty)? onCommitCancel;
   final int? Function(CartItem)? availableStockOf; // null = unlimited stock
   final List<CartItem>? originalActiveItems;
   final Map<String, int>? originalQuantities;
   final List<int>? currentKotBoundaries;
   final List<int>? currentKotNumbers;
 
-  Takeaway(
-      {super.key,
-        this.tableid,
-        this.existingModel,
-        required this.isexisting,
-        required this.isdelivery,
-        required this.cartItems,
-        required this.onAddtoCart,
-        required this.onIncreseQty,
-        required this.onDecreseQty,
-        this.onSetQty,
-        this.availableStockOf,
-        required this.isDineIn,
-        this.selectedTableNo,
-        this.originalActiveItems,
-        this.originalQuantities,
-        this.currentKotBoundaries,
-        this.currentKotNumbers});
+  Takeaway({
+    super.key,
+    this.tableid,
+    this.existingModel,
+    required this.isexisting,
+    required this.isdelivery,
+    required this.cartItems,
+    this.onAddItems,
+    required this.onAddtoCart,
+    required this.onIncreseQty,
+    required this.onDecreseQty,
+    this.onSetQty,
+    this.onCommitCancel,
+    this.availableStockOf,
+    required this.isDineIn,
+    this.selectedTableNo,
+    this.originalActiveItems,
+    this.originalQuantities,
+    this.currentKotBoundaries,
+    this.currentKotNumbers,
+  });
 
   @override
   State<Takeaway> createState() => _TakeawayState();
@@ -86,7 +101,9 @@ class _TakeawayState extends State<Takeaway> {
 
   TextEditingController _qtyController(CartItem item) {
     final c = _qtyControllers.putIfAbsent(
-        item.id, () => TextEditingController(text: item.quantity.toString()));
+      item.id,
+      () => TextEditingController(text: item.quantity.toString()),
+    );
     // Re-sync to the live quantity (e.g. after − / +), but never while the user
     // is mid-edit, or has an over-stock value we want to keep on screen.
     final focused = _qtyFocusNodes[item.id]?.hasFocus ?? false;
@@ -117,7 +134,9 @@ class _TakeawayState extends State<Takeaway> {
     });
     // Warn once, when it first goes over (not on every keystroke).
     if (nowOver && !wasOver) {
-      NotificationService.instance.showError('Only $avail ${item.title} in stock');
+      NotificationService.instance.showError(
+        'Only $avail ${item.title} in stock',
+      );
     }
   }
 
@@ -152,18 +171,16 @@ class _TakeawayState extends State<Takeaway> {
       if (_overStock.containsKey(it.id)) {
         final avail = _overStock[it.id]!;
         final entered = _qtyControllers[it.id]?.text.trim() ?? '';
-        lines.add(entered.isEmpty
-            ? '${it.title}: only $avail in stock'
-            : '${it.title}: only $avail in stock, you entered $entered');
+        lines.add(
+          entered.isEmpty
+              ? '${it.title}: only $avail in stock'
+              : '${it.title}: only $avail in stock, you entered $entered',
+        );
       }
     }
     NotificationService.instance.showError(lines.join('\n'));
     return false;
   }
-
-
-
-
 
   // Active/NEW Label
   Widget _buildGroupedCartItems() {
@@ -173,7 +190,9 @@ class _TakeawayState extends State<Takeaway> {
     }
 
     // Otherwise, use the active/new grouping for new orders
-    final activeItems = widget.cartItems.where((item) => item.isActive).toList();
+    final activeItems = widget.cartItems
+        .where((item) => item.isActive)
+        .toList();
     final newItems = widget.cartItems.where((item) => !item.isActive).toList();
 
     return ListView(
@@ -183,8 +202,7 @@ class _TakeawayState extends State<Takeaway> {
           _buildItemSection('ACTIVE', AppColors.success, activeItems),
 
         // Add spacing between sections
-        if (activeItems.isNotEmpty && newItems.isNotEmpty)
-          SizedBox(height: 16),
+        if (activeItems.isNotEmpty && newItems.isNotEmpty) SizedBox(height: 16),
 
         // New Items Section
         if (newItems.isNotEmpty)
@@ -198,8 +216,10 @@ class _TakeawayState extends State<Takeaway> {
     if (widget.existingModel == null) return SizedBox();
 
     final existingModel = widget.existingModel!;
-    final List<int> kotNumbers = widget.currentKotNumbers ?? existingModel.kotNumbers;
-    final List<int> kotBoundaries = widget.currentKotBoundaries ?? existingModel.kotBoundaries;
+    final List<int> kotNumbers =
+        widget.currentKotNumbers ?? existingModel.kotNumbers;
+    final List<int> kotBoundaries =
+        widget.currentKotBoundaries ?? existingModel.kotBoundaries;
 
     List<List<Widget>> kotGroups = []; // one entry per KOT, built oldest→newest
     final allItems = widget.cartItems;
@@ -211,23 +231,39 @@ class _TakeawayState extends State<Takeaway> {
 
       // Get items for this KOT
       if (startIndex < allItems.length) {
-        int actualEndIndex = endIndex > allItems.length ? allItems.length : endIndex;
-        List<CartItemStatus> kotItems = allItems.sublist(startIndex, actualEndIndex);
+        int actualEndIndex = endIndex > allItems.length
+            ? allItems.length
+            : endIndex;
+        List<CartItemStatus> kotItems = allItems.sublist(
+          startIndex,
+          actualEndIndex,
+        );
 
         if (kotItems.isNotEmpty) {
           // Separate active and new items within this KOT
-          final activeKotItems = kotItems.where((item) => item.isActive).toList();
+          final activeKotItems = kotItems
+              .where((item) => item.isActive)
+              .toList();
           final newKotItems = kotItems.where((item) => !item.isActive).toList();
 
           final kotStatus = existingModel.getKotStatus(kotNum).toLowerCase();
-          final isCooked = kotStatus == 'cooked' || kotStatus == 'ready' || kotStatus == 'served' || kotStatus == 'completed';
+          final isCooked =
+              kotStatus == 'cooked' ||
+              kotStatus == 'ready' ||
+              kotStatus == 'served' ||
+              kotStatus == 'completed';
 
           final group = <Widget>[];
 
           // Show ACTIVE items for this KOT
           if (activeKotItems.isNotEmpty) {
             group.add(
-                _buildItemSection('KOT #$kotNum - ACTIVE${isCooked ? ' (Cooked)' : ''}', isCooked ? AppColors.warning : AppColors.success, activeKotItems, isCooked: isCooked)
+              _buildItemSection(
+                'KOT #$kotNum - ACTIVE${isCooked ? ' (Cooked)' : ''}',
+                isCooked ? AppColors.warning : AppColors.success,
+                activeKotItems,
+                isCooked: isCooked,
+              ),
             );
             group.add(SizedBox(height: 16));
           }
@@ -235,7 +271,7 @@ class _TakeawayState extends State<Takeaway> {
           // Show NEW items for this KOT
           if (newKotItems.isNotEmpty) {
             group.add(
-                _buildItemSection('KOT #$kotNum - NEW', Colors.blue, newKotItems)
+              _buildItemSection('KOT #$kotNum - NEW', Colors.blue, newKotItems),
             );
             group.add(SizedBox(height: 16));
           }
@@ -254,7 +290,12 @@ class _TakeawayState extends State<Takeaway> {
       List<CartItemStatus> newItems = allItems.sublist(startIndex);
       if (newItems.isNotEmpty) {
         pendingSection.add(
-            _buildItemSection('NEW ITEMS (Pending KOT)', AppColors.warning, newItems));
+          _buildItemSection(
+            'NEW ITEMS (Pending KOT)',
+            AppColors.warning,
+            newItems,
+          ),
+        );
         pendingSection.add(SizedBox(height: 16));
       }
     }
@@ -265,9 +306,24 @@ class _TakeawayState extends State<Takeaway> {
     );
   }
 
-  Widget _buildItemSection(String title, Color color, List<CartItemStatus> items, {bool isCooked = false}) {
-    final sectionFs = AppResponsive.getValue<double>(context, mobile: 11, tablet: 13, desktop: 14);
-    final countFs = AppResponsive.getValue<double>(context, mobile: 10, tablet: 12, desktop: 13);
+  Widget _buildItemSection(
+    String title,
+    Color color,
+    List<CartItemStatus> items, {
+    bool isCooked = false,
+  }) {
+    final sectionFs = AppResponsive.getValue<double>(
+      context,
+      mobile: 11,
+      tablet: 13,
+      desktop: 14,
+    );
+    final countFs = AppResponsive.getValue<double>(
+      context,
+      mobile: 10,
+      tablet: 12,
+      desktop: 13,
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -275,28 +331,53 @@ class _TakeawayState extends State<Takeaway> {
           padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           child: Row(
             children: [
-              Container(width: 3, height: 14, decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2))),
+              Container(
+                width: 3,
+                height: 14,
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
               SizedBox(width: 6),
-              Text(title, style: GoogleFonts.poppins(fontSize: sectionFs, fontWeight: FontWeight.w500, color: color)),
+              Text(
+                title,
+                style: GoogleFonts.poppins(
+                  fontSize: sectionFs,
+                  fontWeight: FontWeight.w500,
+                  color: color,
+                ),
+              ),
               SizedBox(width: 6),
-              Text('${items.length}', style: GoogleFonts.poppins(fontSize: countFs, color: AppColors.textSecondary)),
+              Text(
+                '${items.length}',
+                style: GoogleFonts.poppins(
+                  fontSize: countFs,
+                  color: AppColors.textSecondary,
+                ),
+              ),
             ],
           ),
         ),
-        ...items.map((item) => buildCartItemRow(item, isCooked: isCooked)).toList(),
+        ...items
+            .map((item) => buildCartItemRow(item, isCooked: isCooked))
+            .toList(),
       ],
     );
   }
-
 
   Widget buildCartItemRow(CartItemStatus wrapped, {bool isCooked = false}) {
     final item = wrapped.item;
 
     // Variant + weight on their own line, e.g. "Medium • 12 Inch"
     final List<String> detailParts = [];
-    if (item.variantName != null && item.variantName!.isNotEmpty) detailParts.add(item.variantName!);
-    if (item.weightDisplay != null && item.weightDisplay!.isNotEmpty) detailParts.add(item.weightDisplay!);
-    final String? detailLine = detailParts.isNotEmpty ? detailParts.join(' • ') : null;
+    if (item.variantName != null && item.variantName!.isNotEmpty)
+      detailParts.add(item.variantName!);
+    if (item.weightDisplay != null && item.weightDisplay!.isNotEmpty)
+      detailParts.add(item.weightDisplay!);
+    final String? detailLine = detailParts.isNotEmpty
+        ? detailParts.join(' • ')
+        : null;
 
     // Choices — deduplicated, on a labeled line
     String? choiceLine;
@@ -310,9 +391,11 @@ class _TakeawayState extends State<Takeaway> {
       Map<String, Map<String, dynamic>> groupedExtras = {};
       for (var extra in item.extras!) {
         String displayName;
-        if (extra['displayName'] != null && extra['displayName'].toString().isNotEmpty) {
+        if (extra['displayName'] != null &&
+            extra['displayName'].toString().isNotEmpty) {
           displayName = extra['displayName'];
-        } else if (extra['categoryName'] != null && extra['categoryName'].toString().isNotEmpty) {
+        } else if (extra['categoryName'] != null &&
+            extra['categoryName'].toString().isNotEmpty) {
           displayName = '${extra['categoryName']} - ${extra['name']}';
         } else {
           displayName = extra['name'] ?? 'Unknown';
@@ -321,9 +404,14 @@ class _TakeawayState extends State<Takeaway> {
         final int itemQuantity = extra['quantity']?.toInt() ?? 1;
         String key = '$displayName-${price.toStringAsFixed(2)}';
         if (groupedExtras.containsKey(key)) {
-          groupedExtras[key]!['quantity'] = (groupedExtras[key]!['quantity'] as int) + itemQuantity;
+          groupedExtras[key]!['quantity'] =
+              (groupedExtras[key]!['quantity'] as int) + itemQuantity;
         } else {
-          groupedExtras[key] = {'displayName': displayName, 'price': price, 'quantity': itemQuantity};
+          groupedExtras[key] = {
+            'displayName': displayName,
+            'price': price,
+            'quantity': itemQuantity,
+          };
         }
       }
       final parts = groupedExtras.entries.map((e) {
@@ -331,21 +419,73 @@ class _TakeawayState extends State<Takeaway> {
         final qty = d['quantity'] as int;
         final name = d['displayName'] as String;
         final price = d['price'] as double;
-        return qty > 1 ? '${qty}x $name(${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(price)})' : '$name(${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(price)})';
+        return qty > 1
+            ? '${qty}x $name(${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(price)})'
+            : '$name(${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(price)})';
       }).toList();
       if (parts.isNotEmpty) extraLine = 'Extra: ${parts.join(', ')}';
     }
 
-    final nameFs = AppResponsive.getValue<double>(context, mobile: 14, tablet: 16, desktop: 17);
-    final variantFs = AppResponsive.getValue<double>(context, mobile: 12, tablet: 14, desktop: 15);
-    final modFs = AppResponsive.getValue<double>(context, mobile: 11, tablet: 13, desktop: 14);
-    final qtyFs = AppResponsive.getValue<double>(context, mobile: 15, tablet: 17, desktop: 18);
-    final priceFs = AppResponsive.getValue<double>(context, mobile: 14, tablet: 16, desktop: 17);
-    final iconSize = AppResponsive.getValue<double>(context, mobile: 16, tablet: 18, desktop: 20);
-    final btnPad = AppResponsive.getValue<double>(context, mobile: 5, tablet: 7, desktop: 8);
-    final priceWidth = AppResponsive.getValue<double>(context, mobile: 75, tablet: 95, desktop: 115);
-    final hPad = AppResponsive.getValue<double>(context, mobile: 12, tablet: 16, desktop: 20);
-    final vPad = AppResponsive.getValue<double>(context, mobile: 5, tablet: 7, desktop: 8);
+    final nameFs = AppResponsive.getValue<double>(
+      context,
+      mobile: 14,
+      tablet: 16,
+      desktop: 17,
+    );
+    final variantFs = AppResponsive.getValue<double>(
+      context,
+      mobile: 12,
+      tablet: 14,
+      desktop: 15,
+    );
+    final modFs = AppResponsive.getValue<double>(
+      context,
+      mobile: 11,
+      tablet: 13,
+      desktop: 14,
+    );
+    final qtyFs = AppResponsive.getValue<double>(
+      context,
+      mobile: 15,
+      tablet: 17,
+      desktop: 18,
+    );
+    final priceFs = AppResponsive.getValue<double>(
+      context,
+      mobile: 14,
+      tablet: 16,
+      desktop: 17,
+    );
+    final iconSize = AppResponsive.getValue<double>(
+      context,
+      mobile: 16,
+      tablet: 18,
+      desktop: 20,
+    );
+    final btnPad = AppResponsive.getValue<double>(
+      context,
+      mobile: 5,
+      tablet: 7,
+      desktop: 8,
+    );
+    final priceWidth = AppResponsive.getValue<double>(
+      context,
+      mobile: 75,
+      tablet: 95,
+      desktop: 115,
+    );
+    final hPad = AppResponsive.getValue<double>(
+      context,
+      mobile: 12,
+      tablet: 16,
+      desktop: 20,
+    );
+    final vPad = AppResponsive.getValue<double>(
+      context,
+      mobile: 5,
+      tablet: 7,
+      desktop: 8,
+    );
 
     return Container(
       padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad + 3),
@@ -363,7 +503,10 @@ class _TakeawayState extends State<Takeaway> {
                 // Item name
                 Text(
                   item.title,
-                  style: GoogleFonts.poppins(fontSize: nameFs, fontWeight: FontWeight.w600),
+                  style: GoogleFonts.poppins(
+                    fontSize: nameFs,
+                    fontWeight: FontWeight.w600,
+                  ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -371,19 +514,37 @@ class _TakeawayState extends State<Takeaway> {
                 if (detailLine != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
-                    child: Text(detailLine, style: GoogleFonts.poppins(fontSize: variantFs, color: AppColors.textSecondary)),
+                    child: Text(
+                      detailLine,
+                      style: GoogleFonts.poppins(
+                        fontSize: variantFs,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
                   ),
                 // Choices — labeled line
                 if (choiceLine != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
-                    child: Text(choiceLine, style: GoogleFonts.poppins(fontSize: modFs, color: AppColors.textSecondary)),
+                    child: Text(
+                      choiceLine,
+                      style: GoogleFonts.poppins(
+                        fontSize: modFs,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
                   ),
                 // Extras — labeled line
                 if (extraLine != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 2),
-                    child: Text(extraLine, style: GoogleFonts.poppins(fontSize: modFs, color: AppColors.textSecondary)),
+                    child: Text(
+                      extraLine,
+                      style: GoogleFonts.poppins(
+                        fontSize: modFs,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
                   ),
               ],
             ),
@@ -396,13 +557,22 @@ class _TakeawayState extends State<Takeaway> {
               if (!wrapped.isActive) ...[
                 InkWell(
                   onTap: () {
-                    _overStock.remove(item.id); // adjusting via buttons clears the flag
+                    _overStock.remove(
+                      item.id,
+                    ); // adjusting via buttons clears the flag
                     widget.onDecreseQty(item);
                   },
                   child: Container(
                     padding: EdgeInsets.all(btnPad),
-                    decoration: BoxDecoration(border: Border.all(color: AppColors.divider), borderRadius: BorderRadius.circular(6)),
-                    child: Icon(Icons.remove, size: iconSize, color: AppColors.textSecondary),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: AppColors.divider),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Icon(
+                      Icons.remove,
+                      size: iconSize,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                 ),
                 Container(
@@ -414,11 +584,19 @@ class _TakeawayState extends State<Takeaway> {
                     textAlign: TextAlign.center,
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    style: GoogleFonts.poppins(fontSize: qtyFs, fontWeight: FontWeight.w600),
+                    style: GoogleFonts.poppins(
+                      fontSize: qtyFs,
+                      fontWeight: FontWeight.w600,
+                    ),
                     decoration: InputDecoration(
                       isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 8,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(6),
+                      ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(6),
                         borderSide: BorderSide(color: AppColors.divider),
@@ -437,28 +615,48 @@ class _TakeawayState extends State<Takeaway> {
                 ),
                 InkWell(
                   onTap: () {
-                    _overStock.remove(item.id); // adjusting via buttons clears the flag
+                    _overStock.remove(
+                      item.id,
+                    ); // adjusting via buttons clears the flag
                     widget.onIncreseQty(item);
                   },
                   child: Container(
                     padding: EdgeInsets.all(btnPad),
-                    decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(6)),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
                     child: Icon(Icons.add, size: iconSize, color: Colors.white),
                   ),
                 ),
               ] else ...[
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: 10),
-                  child: Text('${item.quantity}x', style: GoogleFonts.poppins(fontSize: qtyFs, fontWeight: FontWeight.w600)),
+                  child: Text(
+                    '${item.quantity}x',
+                    style: GoogleFonts.poppins(
+                      fontSize: qtyFs,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
                 SizedBox(width: 8),
-                if (isCooked)
+                if (isCooked || (widget.existingModel?.isFullyPaid ?? false))
                   Tooltip(
-                    message: 'Cannot cancel cooked items',
+                    message: isCooked
+                        ? 'Cannot cancel cooked items'
+                        : 'Order is paid — start a new order to change items',
                     child: Container(
                       padding: EdgeInsets.all(btnPad),
-                      decoration: BoxDecoration(color: AppColors.divider, borderRadius: BorderRadius.circular(6)),
-                      child: Icon(Icons.cancel_outlined, size: iconSize, color: AppColors.textSecondary),
+                      decoration: BoxDecoration(
+                        color: AppColors.divider,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Icon(
+                        Icons.cancel_outlined,
+                        size: iconSize,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   )
                 else
@@ -466,8 +664,15 @@ class _TakeawayState extends State<Takeaway> {
                     onTap: () => _showCancelDialog(context, item),
                     child: Container(
                       padding: EdgeInsets.all(btnPad),
-                      decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(6)),
-                      child: Icon(Icons.cancel_outlined, size: iconSize, color: Colors.red),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Icon(
+                        Icons.cancel_outlined,
+                        size: iconSize,
+                        color: Colors.red,
+                      ),
                     ),
                   ),
               ],
@@ -479,7 +684,10 @@ class _TakeawayState extends State<Takeaway> {
             width: priceWidth,
             child: Text(
               '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.totalPrice)}',
-              style: GoogleFonts.poppins(fontSize: priceFs, fontWeight: FontWeight.w600),
+              style: GoogleFonts.poppins(
+                fontSize: priceFs,
+                fontWeight: FontWeight.w600,
+              ),
               textAlign: TextAlign.right,
             ),
           ),
@@ -492,151 +700,287 @@ class _TakeawayState extends State<Takeaway> {
     int cancelQty = 1;
     final reasonController = TextEditingController();
     String? reasonError;
+    final quickReasons = [
+      'Wrong Selection',
+      'Change of Mind',
+      'Kitchen Delayed',
+      'Out of Stock',
+    ];
     final hInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        ? ((AppResponsive.screenWidth(context) -
+                      AppResponsive.dialogWidth(context)) /
+                  2)
+              .clamp(40.0, double.infinity)
         : 24.0;
     showDialog(
       context: context,
       builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return Dialog(
-              insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
-              backgroundColor: AppColors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Header — danger accent badge + title
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-                    decoration: BoxDecoration(
-                      color: AppColors.danger.withValues(alpha: 0.06),
-                      borderRadius:
-                          const BorderRadius.vertical(top: Radius.circular(16)),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: AppColors.danger.withValues(alpha: 0.12),
-                            shape: BoxShape.circle,
+        return DialogDisposeScope(
+          disposables: [reasonController],
+          child: StatefulBuilder(
+            builder: (context, setState) {
+              return Dialog(
+                insetPadding: EdgeInsets.symmetric(
+                  horizontal: hInset,
+                  vertical: 24,
+                ),
+                backgroundColor: AppColors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withValues(alpha: 0.08),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.delete_sweep_rounded,
+                              color: AppColors.primary,
+                              size: 22,
+                            ),
                           ),
-                          child: Icon(Icons.warning_amber_rounded,
-                              color: AppColors.danger, size: 24),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text('Cancel Item',
-                              style: GoogleFonts.poppins(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.textPrimary)),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Body
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Text('How many "${item.title}" do you want to cancel?',
-                            textAlign: TextAlign.center,
+                          const SizedBox(width: 12),
+                          Text(
+                            'Cancel Item',
                             style: GoogleFonts.poppins(
-                                fontSize: 14, color: AppColors.textSecondary)),
-                        const SizedBox(height: 16),
-                        if (item.quantity > 1)
-                          Center(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: AppColors.surfaceMedium,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(
-                                    onPressed: cancelQty > 1
-                                        ? () => setState(() => cancelQty--)
-                                        : null,
-                                    icon: Icon(Icons.remove_circle_outline,
-                                        color: cancelQty > 1
-                                            ? AppColors.primary
-                                            : AppColors.textSecondary),
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppColors.surfaceLight,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppColors.divider),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    item.title,
+                                    style: GoogleFonts.poppins(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 14,
+                                      color: AppColors.textPrimary,
+                                    ),
                                   ),
-                                  Padding(
+                                ),
+                                if (item.quantity == 1)
+                                  Container(
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 16),
-                                    child: Text('$cancelQty',
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary.withValues(
+                                        alpha: 0.1,
+                                      ),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      'Qty: 1',
+                                      style: GoogleFonts.poppins(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 12,
+                                        color: AppColors.primary,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          if (item.quantity > 1) ...[
+                            Text(
+                              'Select quantity to cancel:',
+                              style: GoogleFonts.poppins(
+                                fontSize: 13,
+                                color: AppColors.textSecondary,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 8),
+                            Center(
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: AppColors.surfaceMedium,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      onPressed: cancelQty > 1
+                                          ? () => setState(() => cancelQty--)
+                                          : null,
+                                      icon: Icon(Icons.remove, size: 20),
+                                    ),
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                      ),
+                                      child: Text(
+                                        '$cancelQty',
                                         style: GoogleFonts.poppins(
-                                            fontSize: 22,
-                                            fontWeight: FontWeight.bold)),
-                                  ),
-                                  IconButton(
-                                    onPressed: cancelQty < item.quantity
-                                        ? () => setState(() => cancelQty++)
-                                        : null,
-                                    icon: Icon(Icons.add_circle_outline,
-                                        color: cancelQty < item.quantity
-                                            ? AppColors.primary
-                                            : AppColors.textSecondary),
-                                  ),
-                                ],
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                    IconButton(
+                                      onPressed: cancelQty < item.quantity
+                                          ? () => setState(() => cancelQty++)
+                                          : null,
+                                      icon: Icon(Icons.add, size: 20),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
-                          )
-                        else
-                          Text('Cancel 1x ${item.title}?',
-                              textAlign: TextAlign.center,
-                              style: GoogleFonts.poppins(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 15,
-                                  color: AppColors.danger)),
-                        const SizedBox(height: 16),
-                        TextField(
-                          controller: reasonController,
-                          minLines: 1,
-                          maxLines: 2,
-                          textCapitalization: TextCapitalization.sentences,
-                          style: GoogleFonts.poppins(fontSize: 14),
-                          decoration: InputDecoration(
-                            labelText: 'Reason for cancellation',
-                            labelStyle: GoogleFonts.poppins(fontSize: 13),
-                            hintText: 'e.g. Customer changed mind',
-                            errorText: reasonError,
-                            border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(10)),
-                          ),
-                          onChanged: (_) {
-                            if (reasonError != null) {
-                              setState(() => reasonError = null);
-                            }
-                          },
-                        ),
-                        const SizedBox(height: 10),
-                        Text('This will print a Cancel KOT for the kitchen.',
+                            const SizedBox(height: 16),
+                          ],
+                          Text(
+                            'Select or enter cancellation reason:',
                             style: GoogleFonts.poppins(
-                                fontSize: 12,
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: quickReasons.map((reason) {
+                              final isSelected =
+                                  reasonController.text == reason;
+                              return InkWell(
+                                onTap: () {
+                                  setState(() {
+                                    reasonController.text = reason;
+                                    reasonError = null;
+                                  });
+                                },
+                                borderRadius: BorderRadius.circular(8),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: isSelected
+                                        ? AppColors.primary.withValues(
+                                            alpha: 0.1,
+                                          )
+                                        : Colors.transparent,
+                                    border: Border.all(
+                                      color: isSelected
+                                          ? AppColors.primary
+                                          : AppColors.divider,
+                                    ),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    reason,
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 11,
+                                      fontWeight: isSelected
+                                          ? FontWeight.w600
+                                          : FontWeight.normal,
+                                      color: isSelected
+                                          ? AppColors.primary
+                                          : AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: reasonController,
+                            minLines: 1,
+                            maxLines: 2,
+                            textCapitalization: TextCapitalization.sentences,
+                            style: GoogleFonts.poppins(fontSize: 14),
+                            decoration: InputDecoration(
+                              hintText: 'Or enter custom reason...',
+                              hintStyle: GoogleFonts.poppins(
+                                fontSize: 13,
+                                color: AppColors.textSecondary.withValues(
+                                  alpha: 0.6,
+                                ),
+                              ),
+                              errorText: reasonError,
+                              filled: true,
+                              fillColor: AppColors.surfaceLight,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 12,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: BorderSide(
+                                  color: AppColors.divider,
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: BorderSide(
+                                  color: AppColors.divider,
+                                ),
+                              ),
+                            ),
+                            onChanged: (_) {
+                              if (reasonError != null) {
+                                setState(() => reasonError = null);
+                              }
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.print_outlined,
+                                size: 14,
                                 color: AppColors.textSecondary,
-                                fontStyle: FontStyle.italic),
-                            textAlign: TextAlign.center),
-                      ],
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'This will print a Cancel KOT for the kitchen.',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 11,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  // Actions — balanced full-width buttons
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                    child: IntrinsicHeight(
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
                       child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Expanded(
                             child: OutlinedButton(
@@ -644,13 +988,20 @@ class _TakeawayState extends State<Takeaway> {
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: AppColors.textSecondary,
                                 side: BorderSide(color: AppColors.divider),
-                                padding: const EdgeInsets.symmetric(vertical: 13),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
                                 shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10)),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
                               ),
-                              child: Text('Keep Item',
-                                  style: GoogleFonts.poppins(
-                                      fontWeight: FontWeight.w600)),
+                              child: Text(
+                                'Keep Item',
+                                style: GoogleFonts.poppins(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
+                              ),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -660,48 +1011,233 @@ class _TakeawayState extends State<Takeaway> {
                                 backgroundColor: AppColors.danger,
                                 foregroundColor: AppColors.white,
                                 elevation: 0,
-                                padding: const EdgeInsets.symmetric(vertical: 13),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
                                 shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10)),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
                               ),
                               onPressed: () {
                                 final reason = reasonController.text.trim();
                                 if (reason.isEmpty) {
-                                  setState(() => reasonError = 'Reason is required');
+                                  setState(
+                                    () => reasonError = 'Reason is required',
+                                  );
                                   return;
                                 }
-                                _cancelReasons[item.id] = reason;
                                 Navigator.pop(ctx);
-                                for (int i = 0; i < cancelQty; i++) {
-                                  widget.onDecreseQty(item);
-                                }
+                                // Commit the cancellation now — no separate Place Order.
+                                _cancelItemImmediately(item, cancelQty, reason);
                               },
-                              child: Text('Confirm Cancel',
-                                  textAlign: TextAlign.center,
-                                  style: GoogleFonts.poppins(
-                                      fontWeight: FontWeight.w600)),
+                              child: Text(
+                                'Confirm Cancel',
+                                style: GoogleFonts.poppins(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
+                              ),
                             ),
                           ),
                         ],
                       ),
                     ),
-                  ),
-                ],
-              ),
-            );
-          },
+                  ],
+                ),
+              );
+            },
+          ),
         );
       },
     );
   }
+
+  /// Commits a single active-item cancellation immediately (no Place Order):
+  /// updates the saved order, restores stock, logs the audit, prints a Cancel
+  /// KOT, notifies the KDS — then asks the parent to drop it from the working
+  /// list AND the diff baseline so a later Place Order can't re-cancel it. Any
+  /// newly-added (unplaced) items stay pending.
+  Future<void> _cancelItemImmediately(
+    CartItem item,
+    int cancelQty,
+    String reason,
+  ) async {
+    final existing = widget.existingModel;
+    if (existing == null) return;
+
+    // Baseline = the order's current saved active items.
+    final List<CartItem> savedItems =
+        widget.originalActiveItems ?? existing.items;
+
+    // Which KOT did this item belong to (for audit + Cancel-KOT reference).
+    int kotFor(String id) {
+      final idx = savedItems.indexWhere((o) => o.id == id);
+      if (idx == -1) return 0;
+      final boundaries = existing.kotBoundaries;
+      final kotNums = existing.getKotNumbers();
+      for (int i = 0; i < boundaries.length; i++) {
+        if (idx < boundaries[i]) return i < kotNums.length ? kotNums[i] : 0;
+      }
+      return 0;
+    }
+
+    final kot = kotFor(item.id);
+
+    // Saved list with this line reduced/removed by cancelQty.
+    final List<CartItem> newSavedItems = [];
+    for (final o in savedItems) {
+      if (o.id == item.id) {
+        final remaining = o.quantity - cancelQty;
+        if (remaining > 0) newSavedItems.add(o.copyWith(quantity: remaining));
+      } else {
+        newSavedItems.add(o.copyWith());
+      }
+    }
+
+    final bool taxInclusive =
+        existing.isTaxInclusive ?? AppSettings.isTaxInclusive;
+    final calc = CartCalculationService(
+      items: newSavedItems,
+      discountType: DiscountType.amount,
+      discountValue: existing.discount ?? 0.0,
+      serviceChargePercentage: widget.isdelivery
+          ? 0.0
+          : (existing.serviceCharge ?? 0.0),
+      deliveryCharge: widget.isdelivery ? (existing.serviceCharge ?? 0.0) : 0.0,
+      isDeliveryOrder: widget.isdelivery,
+      isTaxInclusive: taxInclusive,
+    );
+
+    // If the last active item is being cancelled AND nothing new is pending,
+    // the order is empty → remove it entirely instead of leaving a blank active
+    // order. Otherwise just save the reduced order.
+    final bool hasPendingNew = widget.cartItems.any((w) => !w.isActive);
+    final bool orderEmpty = newSavedItems.isEmpty && !hasPendingNew;
+
+    if (orderEmpty) {
+      await orderStore.deleteOrder(existing.id);
+    } else {
+      await orderStore.updateOrder(
+        existing.copyWith(
+          items: newSavedItems,
+          totalPrice: calc.grandTotal,
+          subTotal: taxInclusive
+              ? calc.subtotal - calc.totalGST
+              : calc.subtotal,
+          gstAmount: calc.totalGST,
+        ),
+      );
+    }
+
+    // Restore stock for the cancelled quantity.
+    final cancelledPortion = item.copyWith(quantity: cancelQty);
+    await InventoryService.restoreStockForOrder([cancelledPortion]);
+
+    // Audit for the Item Cancellation Report.
+    try {
+      final repo = locator<ItemCancellationRepository>();
+      final staff =
+          RestaurantSession.staffName ??
+          (RestaurantSession.isAdmin ? 'Admin' : 'Staff');
+      final sessionId = await DayManagementService.getCurrentSessionId();
+      await repo.add(
+        ItemCancellationModel(
+          id: const Uuid().v4(),
+          itemName: item.title,
+          variantName: item.variantName,
+          quantity: cancelQty,
+          amount: item.price * cancelQty,
+          reason: reason,
+          orderId: existing.id,
+          kotNumber: kot == 0 ? null : kot,
+          staffName: staff,
+          timestamp: DateTime.now(),
+          sessionId: sessionId,
+          orderType: existing.orderType,
+          tableNo: existing.tableNo,
+        ),
+      );
+    } catch (e) {
+      debugPrint('Item-cancellation audit failed: $e');
+    }
+
+    // Print a Cancel KOT for the kitchen.
+    if (mounted && AppSettings.generateKOT) {
+      try {
+        final correctionKot = await orderStore.getNextKotNumber();
+        final correctionOrder = existing.copyWith(
+          items: [
+            cancelledPortion.copyWith(instruction: 'Cancelled from KOT #$kot'),
+          ],
+          kotNumbers: [correctionKot],
+          kotBoundaries: [1],
+          kotStatuses: {correctionKot: 'CANCEL'},
+        );
+        await RestaurantPrintHelper.printKOT(
+          context: context,
+          order: correctionOrder,
+          kotNumber: correctionKot,
+          autoPrint: true,
+          cancelReference: kot == 0 ? null : 'KOT #$kot',
+        );
+      } catch (e) {}
+    }
+
+    // Notify the KDS.
+    try {
+      ws.broadcastEvent({
+        'type': 'ORDER_MODIFIED',
+        'orderId': existing.id,
+        'orderNumber': existing.orderNumber,
+        'kotNumbers': kot == 0 ? [] : [kot],
+        'tableNo': existing.tableNo,
+        'removedItems': [
+          {'id': item.id, 'title': item.title, 'quantity': cancelQty},
+        ],
+        'reducedItems': [],
+      });
+    } catch (e) {}
+
+    // Table: free it when the order is gone, else update its running total.
+    if (existing.tableNo != null && existing.tableNo!.isNotEmpty) {
+      if (orderEmpty) {
+        await tableStore.updateTableStatus(existing.tableNo!, 'Available');
+      } else {
+        await tableStore.updateTableStatus(
+          existing.tableNo!,
+          existing.status,
+          total: calc.grandTotal,
+          orderId: existing.id,
+          orderTime: existing.timeStamp,
+        );
+      }
+    }
+
+    // Order fully cancelled — nothing left to edit; leave the screen.
+    if (orderEmpty) {
+      if (mounted) {
+        returnToStartOrder(context);
+        NotificationService.instance.showSuccess(
+          'Order cancelled — no items left',
+        );
+      }
+      return;
+    }
+
+    // Sync the working list + diff baseline (drops the line, prevents re-cancel).
+    widget.onCommitCancel?.call(item, cancelQty);
+
+    if (mounted) {
+      NotificationService.instance.showSuccess('Item cancelled');
+    }
+  }
+
   Future<void> clearCart() async {
     try {
       await restaurantCartStore.clearCart();
       // await loadCartItems();
       if (mounted) {
-        NotificationService.instance.showInfo(
-          'Cart cleared',
-        );
+        NotificationService.instance.showInfo('Cart cleared');
 
         // ScaffoldMessenger.of(context).showSnackBar(
         //   SnackBar(
@@ -712,10 +1248,7 @@ class _TakeawayState extends State<Takeaway> {
       }
     } catch (e) {
       if (mounted) {
-
-        NotificationService.instance.showError(
-          'Error clearing cart',
-        );
+        NotificationService.instance.showError('Error clearing cart');
 
         // ScaffoldMessenger.of(context).showSnackBar(
         //   SnackBar(
@@ -728,11 +1261,15 @@ class _TakeawayState extends State<Takeaway> {
   }
 
   Future<void> DineinCart() async {
-    Navigator.push(context, MaterialPageRoute(builder: (context) => TableScreen()));
+    if (!PlanEnforce.allows(EntKeys.billingTables)) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => TableScreen()),
+    );
   }
 
   // Handle customer selection from autocomplete
-  void _onCustomerSelected(RestaurantCustomer customer) {
+  void _onCustomerSelected(Customer customer) {
     setState(() {
       selectedCustomer = customer;
       nameController.text = customer.name ?? '';
@@ -742,26 +1279,36 @@ class _TakeawayState extends State<Takeaway> {
   }
 
   // Update customer statistics (visits, loyalty points, last visit, etc.)
-  Future<void> _updateCustomerStats(RestaurantCustomer customer, String orderType, {int pointsToEarn = 0}) async {
+  Future<void> _updateCustomerStats(
+    Customer customer,
+    String orderType, {
+    int pointsToEarn = 0,
+  }) async {
+    if (!PlanEnforce.allows(EntKeys.customers)) return;
     try {
-
-      await restaurantCustomerStore.updateCustomerVisit(
+      await customerStore.updateCustomerVisit(
         customerId: customer.customerId,
         orderType: orderType,
         pointsToAdd: pointsToEarn,
       );
 
       // Verify the update
-      final updatedCustomer = await restaurantCustomerStore.getCustomerById(customer.customerId);
+      final updatedCustomer = await customerStore.getCustomerById(
+        customer.customerId,
+      );
       if (updatedCustomer != null) {
-      } else {
-      }
-    } catch (e) {
-    }
+      } else {}
+    } catch (e) {}
   }
 
   // Check if customer exists or create new customer
-  Future<RestaurantCustomer?> _getOrCreateCustomer(String name, String phone, String orderType) async {
+  Future<Customer?> _getOrCreateCustomer(
+    String name,
+    String phone,
+    String orderType,
+  ) async {
+    // Customers not in plan → never search, create, or link a customer.
+    if (!PlanEnforce.allows(EntKeys.customers)) return null;
     try {
       // If customer is already selected, return it
       if (selectedCustomer != null) {
@@ -775,11 +1322,12 @@ class _TakeawayState extends State<Takeaway> {
 
       // Search for existing customer by phone number (phone is more unique than name)
       if (phone.trim().isNotEmpty) {
-        final searchResults = await restaurantCustomerStore.searchCustomers(phone.trim());
+        final searchResults = await customerStore.searchCustomers(phone.trim());
 
         // Check if we have an exact phone match
         for (var customer in searchResults) {
-          if (customer.phone?.trim().toLowerCase() == phone.trim().toLowerCase()) {
+          if (customer.phone?.trim().toLowerCase() ==
+              phone.trim().toLowerCase()) {
             return customer;
           }
         }
@@ -787,14 +1335,13 @@ class _TakeawayState extends State<Takeaway> {
 
       // If not found and we have at least phone or name, create new customer
       if (phone.trim().isNotEmpty || name.trim().isNotEmpty) {
-
-        final newCustomer = RestaurantCustomer.create(
+        final newCustomer = Customer.create(
           customerId: Uuid().v4(),
           name: name.trim().isEmpty ? null : name.trim(),
           phone: phone.trim().isEmpty ? null : phone.trim(),
         );
 
-        await restaurantCustomerStore.addCustomer(newCustomer);
+        await customerStore.addCustomer(newCustomer);
 
         return newCustomer;
       }
@@ -813,15 +1360,42 @@ class _TakeawayState extends State<Takeaway> {
   TextEditingController remarkController = TextEditingController();
 
   // Customer selection
-  RestaurantCustomer? selectedCustomer;
-  List<RestaurantCustomer> nameSuggestions = [];
-  List<RestaurantCustomer> phoneSuggestions = [];
+  Customer? selectedCustomer;
+  List<Customer> nameSuggestions = [];
+  List<Customer> phoneSuggestions = [];
   bool showNameSuggestions = false;
   bool showPhoneSuggestions = false;
 
   // NEW ORDER
   Future<void> _placeOrder(CartCalculationService calculations) async {
     if (!_stockOkToOrder()) return;
+    // Plan gate — placing an order is a billing entrance, so cap it here (not
+    // only at settle). todaysBillLoad counts active + settled orders so this
+    // can't be dodged by placing many orders and settling them elsewhere.
+    if (!PlanGuard.allowedOr(
+      context,
+      EntKeys.billingInvoiceCreate,
+      featureName: 'Billing',
+    )) {
+      return;
+    }
+    final billsToday = await pastOrderStore.todaysBillLoad();
+    if (!mounted) return;
+    if (!PlanGuard.withinLimitOr(
+      context,
+      EntKeys.billingInvoicePerDayMax,
+      billsToday,
+      unit: 'bills per day',
+    )) {
+      return;
+    }
+    final strictlyPending = await DayManagementService.isEodStrictlyPending();
+    if (strictlyPending) {
+      NotificationService.instance.showError(
+        'Day has ended. Complete End of Day to unlock.',
+      );
+      return;
+    }
     // No active day session yet → start the day right here (opening balance),
     // then continue placing this order. The day begins at the first order.
     final bool sessionOpen = await DayManagementService.isSessionOpen();
@@ -829,7 +1403,9 @@ class _TakeawayState extends State<Takeaway> {
       final started = await promptStartDay(context);
       if (!started) {
         if (mounted) {
-          NotificationService.instance.showError('Start the day to place the order');
+          NotificationService.instance.showError(
+            'Start the day to place the order',
+          );
         }
         return;
       }
@@ -842,13 +1418,17 @@ class _TakeawayState extends State<Takeaway> {
     if (phone.isNotEmpty) {
       final digitsOnly = phone.replaceAll(RegExp(r'\D'), '');
       if (digitsOnly.length != 10) {
-        NotificationService.instance.showError('Mobile number must be exactly 10 digits');
+        NotificationService.instance.showError(
+          'Mobile number must be exactly 10 digits',
+        );
         return;
       }
     }
 
     // Check stock availability before placing order
-    final bool stockAvailable = await InventoryService.checkStockAvailability(plainItems);
+    final bool stockAvailable = await InventoryService.checkStockAvailability(
+      plainItems,
+    );
     if (!stockAvailable) {
       if (mounted) {
         Navigator.pop(context);
@@ -873,8 +1453,7 @@ class _TakeawayState extends State<Takeaway> {
       widget.isDineIn ? 'Dine In' : 'Take Away',
     );
 
-    if (customer != null) {
-    }
+    if (customer != null) {}
 
     final int newKotNumber = await orderStore.getNextKotNumber();
 
@@ -903,9 +1482,9 @@ class _TakeawayState extends State<Takeaway> {
           ? calculations.subtotal - calculations.totalGST
           : calculations.subtotal,
       gstAmount: calculations.totalGST,
-      totalPrice: calculations.grandTotal, // This is the final, correct amount to be paid
+      totalPrice: calculations
+          .grandTotal, // This is the final, correct amount to be paid
       gstRate: 0, // You can enhance your service to provide this if needed
-
       // Initialize KOT tracking fields - single source of truth
       kotNumbers: [newKotNumber],
       itemCountAtLastKot: plainItems.length,
@@ -913,7 +1492,8 @@ class _TakeawayState extends State<Takeaway> {
       kotStatuses: {newKotNumber: 'Processing'}, // Initialize first KOT status
       orderNumber: orderNumber, // Daily order number
       customerId: customer?.customerId, // Link to customer (now properly set)
-      isTaxInclusive: AppSettings.isTaxInclusive, // Store tax mode at order creation
+      isTaxInclusive:
+          AppSettings.isTaxInclusive, // Store tax mode at order creation
       sessionId: currentSessionId, // Link to POS session
     );
 
@@ -921,7 +1501,6 @@ class _TakeawayState extends State<Takeaway> {
 
     // NOTE: Customer stats (visits + points) are updated only at settlement, not here.
     // Adding points on order placement would double-count when the order is later settled.
-
 
     // Auto-print KOT directly to printer (only if Generate KOT setting is enabled)
     if (mounted && AppSettings.generateKOT) {
@@ -935,8 +1514,7 @@ class _TakeawayState extends State<Takeaway> {
       } catch (e) {
         // Don't block order placement if print fails
       }
-    } else if (!AppSettings.generateKOT) {
-    }
+    } else if (!AppSettings.generateKOT) {}
 
     // Deduct stock after successfully adding the order
     await InventoryService.deductStockForOrder(plainItems);
@@ -957,21 +1535,12 @@ class _TakeawayState extends State<Takeaway> {
 
     if (mounted) {
       Navigator.of(context).pop(); // Pop the dialog first
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => Startorder()),
-            (Route<dynamic> route) => false,
-      );
-      NotificationService.instance.showSuccess(
-        'Order Placed Successfully',
-      );
-
+      returnToStartOrder(context);
+      NotificationService.instance.showSuccess('Order Placed Successfully');
 
       // ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Order Placed Successfully')));
     }
   }
-
-
-
 
   @override
   void dispose() {
@@ -988,7 +1557,6 @@ class _TakeawayState extends State<Takeaway> {
     super.dispose();
   }
 
-
   @override
   void initState() {
     super.initState();
@@ -998,14 +1566,14 @@ class _TakeawayState extends State<Takeaway> {
     }
     if (widget.isexisting && widget.existingModel != null) {
       final m = widget.existingModel!;
-      nameController.text   = m.customerName   ?? '';
+      nameController.text = m.customerName ?? '';
       mobileController.text = m.customerNumber ?? '';
-      emailController.text  = m.customerEmail  ?? '';
-      remarkController.text = m.remark         ?? '';
+      emailController.text = m.customerEmail ?? '';
+      remarkController.text = m.remark ?? '';
       // Restore the linked customer so _getOrCreateCustomer skips search/create
       if (m.customerId != null) {
         WidgetsBinding.instance.addPostFrameCallback((_) async {
-          final customer = await restaurantCustomerStore.getCustomerById(m.customerId!);
+          final customer = await customerStore.getCustomerById(m.customerId!);
           if (mounted && customer != null) {
             setState(() => selectedCustomer = customer);
           }
@@ -1013,23 +1581,38 @@ class _TakeawayState extends State<Takeaway> {
       }
     }
   }
+
   Future<void> _updateExistingOrder(CartCalculationService calculations) async {
     if (!_stockOkToOrder()) return;
     if (!widget.isexisting || widget.existingModel == null) return;
     final existingModel = widget.existingModel!;
 
-    final List<CartItem> currentActiveItems = widget.cartItems.where((w) => w.isActive).map((w) => w.item).toList();
-    final List<CartItem> newlyAddedItems    = widget.cartItems.where((w) => !w.isActive).map((w) => w.item).toList();
-    final List<CartItem> allCurrentItems    = [...currentActiveItems, ...newlyAddedItems];
+    final List<CartItem> currentActiveItems = widget.cartItems
+        .where((w) => w.isActive)
+        .map((w) => w.item)
+        .toList();
+    final List<CartItem> newlyAddedItems = widget.cartItems
+        .where((w) => !w.isActive)
+        .map((w) => w.item)
+        .toList();
+    final List<CartItem> allCurrentItems = [
+      ...currentActiveItems,
+      ...newlyAddedItems,
+    ];
 
     if (allCurrentItems.isEmpty) {
-      NotificationService.instance.showError('Cannot place order: cart is empty');
+      NotificationService.instance.showError(
+        'Cannot place order: cart is empty',
+      );
       return;
     }
 
     // Snapshot of original state (passed from cart.dart)
-    final List<CartItem> originalItems = widget.originalActiveItems ?? existingModel.items;
-    final Map<String, int> origQtyMap  = widget.originalQuantities  ?? {for (final i in originalItems) i.id: i.quantity};
+    final List<CartItem> originalItems =
+        widget.originalActiveItems ?? existingModel.items;
+    final Map<String, int> origQtyMap =
+        widget.originalQuantities ??
+        {for (final i in originalItems) i.id: i.quantity};
 
     int getKotNumberForItem(String itemId) {
       final int idx = originalItems.indexWhere((orig) => orig.id == itemId);
@@ -1047,63 +1630,93 @@ class _TakeawayState extends State<Takeaway> {
     // Items removed entirely from the active list
     final List<CartItem> removedItems = originalItems
         .where((orig) => !currentActiveItems.any((curr) => curr.id == orig.id))
-        .map((orig) => orig.copyWith(instruction: 'Cancelled from KOT #${getKotNumberForItem(orig.id)}'))
+        .map(
+          (orig) => orig.copyWith(
+            instruction: 'Cancelled from KOT #${getKotNumberForItem(orig.id)}',
+          ),
+        )
         .toList();
 
     // Items still present but with changed quantity → inventory delta items
-    final List<CartItem> stockToDeduct  = [];
+    final List<CartItem> stockToDeduct = [];
     final List<CartItem> stockToRestore = [];
     for (final curr in currentActiveItems) {
       final origQty = origQtyMap[curr.id];
       if (origQty == null) continue;
       final delta = curr.quantity - origQty;
       if (delta > 0) {
-        stockToDeduct.add(CartItem(
-          id: curr.id, title: curr.title, price: curr.price,
-          productId: curr.productId, quantity: delta,
-          variantName: curr.variantName, weightDisplay: curr.weightDisplay,
-          discount: curr.discount,
-        ));
+        stockToDeduct.add(
+          CartItem(
+            id: curr.id,
+            title: curr.title,
+            price: curr.price,
+            productId: curr.productId,
+            quantity: delta,
+            variantName: curr.variantName,
+            weightDisplay: curr.weightDisplay,
+            discount: curr.discount,
+          ),
+        );
       } else if (delta < 0) {
-        stockToRestore.add(CartItem(
-          id: curr.id, title: curr.title, price: curr.price,
-          productId: curr.productId, quantity: -delta,
-          variantName: curr.variantName, weightDisplay: curr.weightDisplay,
-          discount: curr.discount,
-          instruction: 'Reduced from KOT #${getKotNumberForItem(curr.id)}',
-        ));
+        stockToRestore.add(
+          CartItem(
+            id: curr.id,
+            title: curr.title,
+            price: curr.price,
+            productId: curr.productId,
+            quantity: -delta,
+            variantName: curr.variantName,
+            weightDisplay: curr.weightDisplay,
+            discount: curr.discount,
+            instruction: 'Reduced from KOT #${getKotNumberForItem(curr.id)}',
+          ),
+        );
       }
     }
 
-    final bool hasNewItems  = newlyAddedItems.isNotEmpty;
-    final bool hasCorrection = removedItems.isNotEmpty || stockToRestore.isNotEmpty;
+    final bool hasNewItems = newlyAddedItems.isNotEmpty;
+    final bool hasCorrection =
+        removedItems.isNotEmpty || stockToRestore.isNotEmpty;
 
     // Items to include in correction KOT (removed + reduced)
-    final List<CartItem> correctionItems = [
-      ...removedItems,
-      ...stockToRestore,
-    ];
+    final List<CartItem> correctionItems = [...removedItems, ...stockToRestore];
 
     // Build KOT structure from staged local state
-    List<int> updatedKotNumbers    = List<int>.from(widget.currentKotNumbers ?? existingModel.getKotNumbers());
-    List<int> updatedKotBoundaries = List<int>.from(widget.currentKotBoundaries ?? existingModel.kotBoundaries);
-    Map<int, String> updatedKotStatuses = Map<int, String>.from(existingModel.kotStatuses ?? {});
+    List<int> updatedKotNumbers = List<int>.from(
+      widget.currentKotNumbers ?? existingModel.getKotNumbers(),
+    );
+    List<int> updatedKotBoundaries = List<int>.from(
+      widget.currentKotBoundaries ?? existingModel.kotBoundaries,
+    );
+    Map<int, String> updatedKotStatuses = Map<int, String>.from(
+      existingModel.kotStatuses ?? {},
+    );
 
     // Per-KOT creation times — stamp the new add-on KOT with "now" so the KDS
     // timer reflects when these items were actually added, not the order time.
-    final updatedKotTimestamps =
-        Map<int, DateTime>.from(existingModel.kotTimestamps ?? {});
+    final updatedKotTimestamps = Map<int, DateTime>.from(
+      existingModel.kotTimestamps ?? {},
+    );
 
     int? newAddedKotNumber;
     if (hasNewItems) {
       newAddedKotNumber = await orderStore.getNextKotNumber();
       updatedKotNumbers.add(newAddedKotNumber);
-      updatedKotBoundaries.add(currentActiveItems.length + newlyAddedItems.length);
+      updatedKotBoundaries.add(
+        currentActiveItems.length + newlyAddedItems.length,
+      );
       updatedKotStatuses[newAddedKotNumber] = 'Processing';
       updatedKotTimestamps[newAddedKotNumber] = DateTime.now();
     }
 
     final currentSessionId = await DayManagementService.getCurrentSessionId();
+
+    // Adding/removing items changes the total, so re-derive payment state from
+    // the new balance. Existing payments (totalPaid / paymentListJson /
+    // paymentMethod) are preserved by copyWith — we only recompute the flags,
+    // so a settled order that gets new items correctly reopens as pending.
+    final double alreadyPaid = existingModel.totalPaid ?? 0;
+    final bool nowFullyPaid = (calculations.grandTotal - alreadyPaid) < 0.01;
 
     final updateOrder = existingModel.copyWith(
       items: allCurrentItems,
@@ -1112,8 +1725,12 @@ class _TakeawayState extends State<Takeaway> {
           ? calculations.subtotal - calculations.totalGST
           : calculations.subtotal,
       gstAmount: calculations.totalGST,
-      customerName: nameController.text.isNotEmpty ? nameController.text : existingModel.customerName,
-      customerNumber: mobileController.text.isNotEmpty ? mobileController.text : existingModel.customerNumber,
+      customerName: nameController.text.isNotEmpty
+          ? nameController.text
+          : existingModel.customerName,
+      customerNumber: mobileController.text.isNotEmpty
+          ? mobileController.text
+          : existingModel.customerNumber,
       tableNo: widget.selectedTableNo ?? existingModel.tableNo,
       kotNumbers: updatedKotNumbers,
       itemCountAtLastKot: allCurrentItems.length,
@@ -1121,43 +1738,55 @@ class _TakeawayState extends State<Takeaway> {
       kotStatuses: updatedKotStatuses,
       kotTimestamps: updatedKotTimestamps,
       sessionId: currentSessionId ?? existingModel.sessionId,
+      isPaid: nowFullyPaid,
+      paymentStatus: nowFullyPaid
+          ? 'Paid'
+          : (alreadyPaid > 0 ? 'Partially Paid' : 'Unpaid'),
     );
 
     await orderStore.updateOrder(updateOrder);
 
     // Apply all inventory changes at commit time
-    for (final item in removedItems) await InventoryService.restoreStockForOrder([item]);
-    if (stockToRestore.isNotEmpty) await InventoryService.restoreStockForOrder(stockToRestore);
-    if (stockToDeduct.isNotEmpty)  await InventoryService.deductStockForOrder(stockToDeduct);
-    if (hasNewItems) await InventoryService.deductStockForOrder(newlyAddedItems);
+    for (final item in removedItems)
+      await InventoryService.restoreStockForOrder([item]);
+    if (stockToRestore.isNotEmpty)
+      await InventoryService.restoreStockForOrder(stockToRestore);
+    if (stockToDeduct.isNotEmpty)
+      await InventoryService.deductStockForOrder(stockToDeduct);
+    if (hasNewItems)
+      await InventoryService.deductStockForOrder(newlyAddedItems);
 
     // Audit: log each cancelled/reduced item with its reason for the
     // Item Cancellation Report. Failure here must never block the order update.
     if (hasCorrection) {
       try {
         final repo = locator<ItemCancellationRepository>();
-        final staff = RestaurantSession.staffName ??
+        final staff =
+            RestaurantSession.staffName ??
             (RestaurantSession.isAdmin ? 'Admin' : 'Staff');
         final sessionId = await DayManagementService.getCurrentSessionId();
         final ts = DateTime.now();
         Future<void> rec(CartItem it, int qty) async {
           final kot = getKotNumberForItem(it.id);
-          await repo.add(ItemCancellationModel(
-            id: const Uuid().v4(),
-            itemName: it.title,
-            variantName: it.variantName,
-            quantity: qty,
-            amount: it.price * qty,
-            reason: _cancelReasons[it.id] ?? 'No reason given',
-            orderId: existingModel.id,
-            kotNumber: kot == 0 ? null : kot,
-            staffName: staff,
-            timestamp: ts,
-            sessionId: sessionId,
-            orderType: existingModel.orderType,
-            tableNo: existingModel.tableNo,
-          ));
+          await repo.add(
+            ItemCancellationModel(
+              id: const Uuid().v4(),
+              itemName: it.title,
+              variantName: it.variantName,
+              quantity: qty,
+              amount: it.price * qty,
+              reason: _cancelReasons[it.id] ?? 'No reason given',
+              orderId: existingModel.id,
+              kotNumber: kot == 0 ? null : kot,
+              staffName: staff,
+              timestamp: ts,
+              sessionId: sessionId,
+              orderType: existingModel.orderType,
+              tableNo: existingModel.tableNo,
+            ),
+          );
         }
+
         for (final it in removedItems) await rec(it, it.quantity);
         for (final it in stockToRestore) await rec(it, it.quantity);
       } catch (e) {
@@ -1168,7 +1797,9 @@ class _TakeawayState extends State<Takeaway> {
     // WebSocket: new items KOT
     if (hasNewItems && newAddedKotNumber != null) {
       try {
-        final kotStatusesJson = updatedKotStatuses.map((k, v) => MapEntry(k.toString(), v));
+        final kotStatusesJson = updatedKotStatuses.map(
+          (k, v) => MapEntry(k.toString(), v),
+        );
         ws.broadcastEvent({
           'type': 'NEW_ITEMS_ADDED',
           'orderId': updateOrder.id,
@@ -1202,14 +1833,25 @@ class _TakeawayState extends State<Takeaway> {
           'orderNumber': updateOrder.orderNumber,
           'kotNumbers': modifiedKots,
           'tableNo': updateOrder.tableNo,
-          'removedItems': removedItems.map((i) => {'id': i.id, 'title': i.title, 'quantity': i.quantity}).toList(),
-          'reducedItems': stockToRestore.map((i) => {'id': i.id, 'title': i.title, 'reducedBy': i.quantity}).toList(),
+          'removedItems': removedItems
+              .map(
+                (i) => {'id': i.id, 'title': i.title, 'quantity': i.quantity},
+              )
+              .toList(),
+          'reducedItems': stockToRestore
+              .map(
+                (i) => {'id': i.id, 'title': i.title, 'reducedBy': i.quantity},
+              )
+              .toList(),
         });
       } catch (e) {}
     }
 
     // Print new-items KOT
-    if (hasNewItems && newAddedKotNumber != null && mounted && AppSettings.generateKOT) {
+    if (hasNewItems &&
+        newAddedKotNumber != null &&
+        mounted &&
+        AppSettings.generateKOT) {
       try {
         await RestaurantPrintHelper.printKOT(
           context: context,
@@ -1231,11 +1873,17 @@ class _TakeawayState extends State<Takeaway> {
           kotStatuses: {correctionKotNumber: 'CANCEL'},
         );
 
-        final uniqueKots = correctionItems.map((i) {
-           final match = RegExp(r'#(\d+)').firstMatch(i.instruction ?? '');
-           return match != null ? match.group(1) : null;
-        }).where((e) => e != null).toSet().toList();
-        final cancelRef = uniqueKots.isNotEmpty ? 'KOT #${uniqueKots.join(', ')}' : null;
+        final uniqueKots = correctionItems
+            .map((i) {
+              final match = RegExp(r'#(\d+)').firstMatch(i.instruction ?? '');
+              return match != null ? match.group(1) : null;
+            })
+            .where((e) => e != null)
+            .toSet()
+            .toList();
+        final cancelRef = uniqueKots.isNotEmpty
+            ? 'KOT #${uniqueKots.join(', ')}'
+            : null;
 
         await RestaurantPrintHelper.printKOT(
           context: context,
@@ -1261,26 +1909,30 @@ class _TakeawayState extends State<Takeaway> {
     await clearCart();
 
     if (mounted) {
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => Startorder()),
-        (Route<dynamic> route) => false,
-      );
+      returnToStartOrder(context);
 
       final msgParts = <String>[];
-      if (hasNewItems && newAddedKotNumber != null) msgParts.add('New KOT #$newAddedKotNumber');
+      if (hasNewItems && newAddedKotNumber != null)
+        msgParts.add('New KOT #$newAddedKotNumber');
       if (hasCorrection) msgParts.add('Correction KOT printed');
 
       NotificationService.instance.showSuccess(
-        msgParts.isNotEmpty ? 'Order Updated — ${msgParts.join(' • ')}' : 'Order Updated',
+        msgParts.isNotEmpty
+            ? 'Order Updated — ${msgParts.join(' • ')}'
+            : 'Order Updated',
       );
     }
   }
+
   @override
   Widget build(BuildContext context) {
-    final plainItems  = widget.cartItems.map((w)=> w.item).toList();
+    final plainItems = widget.cartItems.map((w) => w.item).toList();
     // Total unit quantity (sum of every line's qty) — distinct from the AppBar's
     // line-item count, so it's labeled "Qty" to avoid the two numbers contradicting.
-    final int totalQty = widget.cartItems.fold(0, (sum, w) => sum + w.item.quantity);
+    final int totalQty = widget.cartItems.fold(
+      0,
+      (sum, w) => sum + w.item.quantity,
+    );
 
     // ✅ FIX: Use saved values from existing order to show correct total
     final double discountValue;
@@ -1319,132 +1971,252 @@ class _TakeawayState extends State<Takeaway> {
           : AppSettings.isTaxInclusive,
     );
 
-
-
     final height = MediaQuery.of(context).size.height;
     final width = MediaQuery.of(context).size.width;
     return Column(
       children: [
         // Cart items
         Expanded(
-          child: widget.cartItems.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.shopping_cart_outlined, size: 48, color: AppColors.divider),
-                      SizedBox(height: 8),
-                      Text('Your cart is empty', style: GoogleFonts.poppins(fontSize: AppResponsive.getValue<double>(context, mobile: 14, tablet: 16), color: AppColors.textSecondary)),
-                    ],
-                  ),
-                )
-              : Column(
-                  children: [
-                    Padding(
-                      padding: EdgeInsets.fromLTRB(16, 10, 16, 6),
-                      child: Center(
-                        child: widget.isDineIn
-                            ? Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.table_restaurant_rounded,
-                                        size: AppResponsive.getValue<double>(context, mobile: 13, tablet: 14),
-                                        color: AppColors.primary),
-                                    const SizedBox(width: 5),
-                                    Text("Table ${widget.selectedTableNo}",
-                                        style: GoogleFonts.poppins(
-                                            fontSize: AppResponsive.getValue<double>(context, mobile: 12.5, tablet: 14),
-                                            fontWeight: FontWeight.w600,
-                                            color: AppColors.primary)),
-                                  ],
-                                ),
-                              )
-                            : Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    width: 7,
-                                    height: 7,
-                                    decoration: BoxDecoration(
-                                      color: AppColors.primary,
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(widget.isexisting ? 'Existing Order' : 'New Order',
-                                      style: GoogleFonts.poppins(
-                                          fontSize: AppResponsive.getValue<double>(context, mobile: 13, tablet: 15),
-                                          fontWeight: FontWeight.w600,
-                                          color: AppColors.textSecondary)),
-                                ],
+          child: Stack(
+            children: [
+              widget.cartItems.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.shopping_cart_outlined,
+                            size: 48,
+                            color: AppColors.divider,
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            'Your cart is empty',
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.getValue<double>(
+                                context,
+                                mobile: 14,
+                                tablet: 16,
                               ),
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
                       ),
+                    )
+                  : Column(
+                      children: [
+                        Padding(
+                          padding: EdgeInsets.fromLTRB(16, 10, 16, 6),
+                          child: Center(
+                            child: widget.isDineIn
+                                ? Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 3,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.table_restaurant_rounded,
+                                          size: AppResponsive.getValue<double>(
+                                            context,
+                                            mobile: 13,
+                                            tablet: 14,
+                                          ),
+                                          color: AppColors.primary,
+                                        ),
+                                        const SizedBox(width: 5),
+                                        Text(
+                                          "Table ${widget.selectedTableNo}",
+                                          style: GoogleFonts.poppins(
+                                            fontSize:
+                                                AppResponsive.getValue<double>(
+                                                  context,
+                                                  mobile: 12.5,
+                                                  tablet: 14,
+                                                ),
+                                            fontWeight: FontWeight.w600,
+                                            color: AppColors.primary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                : Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Container(
+                                        width: 7,
+                                        height: 7,
+                                        decoration: BoxDecoration(
+                                          color: AppColors.primary,
+                                          shape: BoxShape.circle,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        widget.isexisting
+                                            ? 'Existing Order'
+                                            : 'New Order',
+                                        style: GoogleFonts.poppins(
+                                          fontSize:
+                                              AppResponsive.getValue<double>(
+                                                context,
+                                                mobile: 13,
+                                                tablet: 15,
+                                              ),
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                          ),
+                        ),
+                        Expanded(child: _buildGroupedCartItems()),
+                      ],
                     ),
-                    Expanded(child: _buildGroupedCartItems()),
-                  ],
+              // Floating "Add Items" button — sits just above the summary bar
+              // (inside the list area), so it adapts to the bar's height and can
+              // never overlap the Total / action buttons.
+              // Hidden once the order is fully paid: a paid order is locked —
+              // to add items, start a new order (avoids balance-due/refund edge cases).
+              if (widget.onAddItems != null &&
+                  !(widget.existingModel?.isFullyPaid ?? false))
+                Positioned(
+                  bottom: 12,
+                  right: 16,
+                  child: FloatingActionButton(
+                    heroTag: 'addItemsFab',
+                    onPressed: widget.onAddItems,
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    tooltip: 'Add Items',
+                    child: const Icon(Icons.add),
+                  ),
                 ),
+            ],
+          ),
         ),
 
         // Bottom: total + buttons
         SafeArea(
           top: false,
           child: Container(
-          padding: EdgeInsets.fromLTRB(16, 14, 16, 16),
-          decoration: BoxDecoration(
-            color: AppColors.white,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.08),
-                blurRadius: 12,
-                offset: const Offset(0, -2),
+            padding: EdgeInsets.fromLTRB(16, 14, 16, 16),
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(16),
               ),
-            ],
-          ),
-          child: Column(
-            children: [
-              // Total unit quantity — labeled "Qty" to disambiguate from the AppBar line-item count
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 12,
+                  offset: const Offset(0, -2),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                // Total unit quantity — labeled "Qty" to disambiguate from the AppBar line-item count
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Total Qty',
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.getValue<double>(
+                            context,
+                            mobile: 12,
+                            tablet: 14,
+                            desktop: 15,
+                          ),
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      Text(
+                        '$totalQty',
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.getValue<double>(
+                            context,
+                            mobile: 12,
+                            tablet: 14,
+                            desktop: 15,
+                          ),
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Total Qty', style: GoogleFonts.poppins(fontSize: AppResponsive.getValue<double>(context, mobile: 12, tablet: 14, desktop: 15), color: AppColors.textSecondary)),
-                    Text('$totalQty', style: GoogleFonts.poppins(fontSize: AppResponsive.getValue<double>(context, mobile: 12, tablet: 14, desktop: 15), fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+                    Text(
+                      'Total',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.getValue<double>(
+                          context,
+                          mobile: 15,
+                          tablet: 17,
+                          desktop: 18,
+                        ),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    Text(
+                      '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calculations.grandTotal)}',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.getValue<double>(
+                          context,
+                          mobile: 17,
+                          tablet: 20,
+                          desktop: 22,
+                        ),
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary,
+                      ),
+                    ),
                   ],
                 ),
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Total', style: GoogleFonts.poppins(fontSize: AppResponsive.getValue<double>(context, mobile: 15, tablet: 17, desktop: 18), fontWeight: FontWeight.w500)),
-                  Text(
-                    '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calculations.grandTotal)}',
-                    style: GoogleFonts.poppins(fontSize: AppResponsive.getValue<double>(context, mobile: 17, tablet: 20, desktop: 22), fontWeight: FontWeight.w600, color: AppColors.primary),
-                  ),
-                ],
-              ),
-              SizedBox(height: 12),
-              widget.isexisting ? _existingButtons(height, width, calculations) : _neworderButtons(height, width, calculations),
-            ],
+                SizedBox(height: 12),
+                widget.isexisting
+                    ? _existingButtons(height, width, calculations)
+                    : _neworderButtons(height, width, calculations),
+              ],
+            ),
           ),
-        ),
         ), // SafeArea
       ],
     );
   }
 
-  Widget _existingButtons(double height, double width, CartCalculationService calculations) {
+  Widget _existingButtons(
+    double height,
+    double width,
+    CartCalculationService calculations,
+  ) {
     final plainItems = widget.cartItems.map((w) => w.item).toList();
 
     if (widget.isdelivery) {
-      return SizedBox(width: double.infinity, child: _buildActionButton('Place Order', () => _updateExistingOrder(calculations), icon: Icons.check_circle_outline));
+      return SizedBox(
+        width: double.infinity,
+        child: _buildActionButton(
+          'Place Order',
+          () => _updateExistingOrder(calculations),
+          icon: Icons.check_circle_outline,
+        ),
+      );
     }
 
     return Column(
@@ -1452,19 +2224,38 @@ class _TakeawayState extends State<Takeaway> {
         Row(
           children: [
             Expanded(
+              // Once the bill is paid the order stays active (kitchen still
+              // serves it) — disable Settle so it can't be settled a second time.
               child: _buildActionButton(
-                'Settle (${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calculations.grandTotal)})',
-                () => Navigator.push(context, MaterialPageRoute(builder: (_) => Customerdetails(
-                  tableid: widget.tableid, existingModel: widget.existingModel,
-                  cartitems: plainItems, totalPrice: calculations.grandTotal,
-                ))),
+                (widget.existingModel?.isFullyPaid ?? false)
+                    ? 'Settled'
+                    : ((widget.existingModel?.hasPartialPayment ?? false)
+                          ? 'Settle Balance (${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(widget.existingModel!.amountDue)})'
+                          : 'Settle (${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calculations.grandTotal)})'),
+                () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => Customerdetails(
+                      tableid: widget.tableid,
+                      existingModel: widget.existingModel,
+                      cartitems: plainItems,
+                      totalPrice: calculations.grandTotal,
+                    ),
+                  ),
+                ),
                 icon: Icons.payments_outlined,
+                enabled: !(widget.existingModel?.isFullyPaid ?? false),
               ),
             ),
             SizedBox(width: 8),
             Expanded(
-              child: _buildActionButton('Place Order', () => _updateExistingOrder(calculations),
-                  icon: Icons.check_circle_outline),
+              child: _buildActionButton(
+                'Place Order',
+                () => _updateExistingOrder(calculations),
+                icon: Icons.check_circle_outline,
+                // A fully-paid order is locked — no item changes.
+                enabled: !(widget.existingModel?.isFullyPaid ?? false),
+              ),
             ),
           ],
         ),
@@ -1475,13 +2266,18 @@ class _TakeawayState extends State<Takeaway> {
             'Print Bill',
             () async {
               try {
-                await RestaurantPrintHelper.printBillForActiveOrder(context: context, order: widget.existingModel!, currentItems: plainItems);
+                await RestaurantPrintHelper.printBillForActiveOrder(
+                  context: context,
+                  order: widget.existingModel!,
+                  currentItems: plainItems,
+                );
               } catch (e) {
                 NotificationService.instance.showError('Failed to print bill');
               }
             },
             icon: Icons.print_outlined,
-            enabled: !(widget.cartItems.isEmpty || widget.existingModel == null),
+            enabled:
+                !(widget.cartItems.isEmpty || widget.existingModel == null),
           ),
         ),
       ],
@@ -1489,10 +2285,27 @@ class _TakeawayState extends State<Takeaway> {
   }
 
   /// Solid primary cart action button — same color for every action.
-  Widget _buildActionButton(String label, VoidCallback onTap, {IconData? icon, bool enabled = true}) {
-    final btnFs = AppResponsive.getValue<double>(context, mobile: 13, tablet: 15, desktop: 16);
-    final btnPad = AppResponsive.getValue<double>(context, mobile: 12, tablet: 13, desktop: 15);
-    final bool blocked = _overStock.isNotEmpty || !enabled; // a typed qty exceeds stock, or caller-disabled
+  Widget _buildActionButton(
+    String label,
+    VoidCallback onTap, {
+    IconData? icon,
+    bool enabled = true,
+  }) {
+    final btnFs = AppResponsive.getValue<double>(
+      context,
+      mobile: 13,
+      tablet: 15,
+      desktop: 16,
+    );
+    final btnPad = AppResponsive.getValue<double>(
+      context,
+      mobile: 12,
+      tablet: 13,
+      desktop: 15,
+    );
+    final bool blocked =
+        _overStock.isNotEmpty ||
+        !enabled; // a typed qty exceeds stock, or caller-disabled
     return ElevatedButton(
       onPressed: blocked ? null : onTap,
       style: ElevatedButton.styleFrom(
@@ -1515,7 +2328,10 @@ class _TakeawayState extends State<Takeaway> {
           Flexible(
             child: Text(
               label,
-              style: GoogleFonts.poppins(fontSize: btnFs, fontWeight: FontWeight.w600),
+              style: GoogleFonts.poppins(
+                fontSize: btnFs,
+                fontWeight: FontWeight.w600,
+              ),
               textAlign: TextAlign.center,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -1526,17 +2342,29 @@ class _TakeawayState extends State<Takeaway> {
     );
   }
 
-  Widget _neworderButtons(double height, double width, CartCalculationService calculations) {
+  Widget _neworderButtons(
+    double height,
+    double width,
+    CartCalculationService calculations,
+  ) {
     final plainItems = widget.cartItems.map((w) => w.item).toList();
 
     if (widget.isdelivery) {
       return SizedBox(
         width: double.infinity,
         child: _buildActionButton('Place Order', () {
-          Navigator.push(context, MaterialPageRoute(builder: (_) => Customerdetails(
-            tableid: widget.tableid, cartitems: plainItems,
-            totalPrice: calculations.grandTotal, orderType: 'Delivery', isSettle: true,
-          )));
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => Customerdetails(
+                tableid: widget.tableid,
+                cartitems: plainItems,
+                totalPrice: calculations.grandTotal,
+                orderType: 'Delivery',
+                isSettle: true,
+              ),
+            ),
+          );
         }, icon: Icons.check_circle_outline),
       );
     }
@@ -1547,14 +2375,20 @@ class _TakeawayState extends State<Takeaway> {
           children: [
             Expanded(
               child: _buildActionButton('Place Order', () {
-                nameSuggestions = []; phoneSuggestions = [];
-                showNameSuggestions = false; showPhoneSuggestions = false;
+                nameSuggestions = [];
+                phoneSuggestions = [];
+                showNameSuggestions = false;
+                showPhoneSuggestions = false;
                 _showPlaceOrderDialog(height, calculations);
               }, icon: Icons.check_circle_outline),
             ),
             SizedBox(width: 8),
             Expanded(
-              child: _buildActionButton('Quick Settle', () => _showQuickSettleSheet(calculations), icon: Icons.bolt),
+              child: _buildActionButton(
+                'Quick Settle',
+                () => _showQuickSettleSheet(calculations),
+                icon: Icons.bolt,
+              ),
             ),
           ],
         ),
@@ -1564,10 +2398,18 @@ class _TakeawayState extends State<Takeaway> {
           child: _buildActionButton(
             'Settle & Print Bill',
             () {
-              Navigator.push(context, MaterialPageRoute(builder: (_) => Customerdetails(
-                tableid: widget.tableid, cartitems: plainItems,
-                totalPrice: calculations.grandTotal, orderType: widget.isDineIn ? 'Dine In' : 'Take Away', isSettle: true,
-              )));
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => Customerdetails(
+                    tableid: widget.tableid,
+                    cartitems: plainItems,
+                    totalPrice: calculations.grandTotal,
+                    orderType: widget.isDineIn ? 'Dine In' : 'Take Away',
+                    isSettle: true,
+                  ),
+                ),
+              );
             },
             icon: Icons.print_outlined,
             enabled: !widget.cartItems.isEmpty,
@@ -1578,42 +2420,87 @@ class _TakeawayState extends State<Takeaway> {
   }
 
   /// Place order dialog — extracted from inline builder
-  void _showPlaceOrderDialog(double height, CartCalculationService calculations) {
+  void _showPlaceOrderDialog(
+    double height,
+    CartCalculationService calculations,
+  ) {
+    // Same idiom as _showCancelDialog: size the dialog to dialogWidth by
+    // growing the inset, instead of a fixed inset that lets it stretch to the
+    // full monitor width.
+    final hInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) -
+                      AppResponsive.dialogWidth(context)) /
+                  2)
+              .clamp(40.0, double.infinity)
+        : 24.0;
     showDialog(
       context: context,
       builder: (BuildContext ctx) {
         return StatefulBuilder(
           builder: (ctx, setDialogState) {
-            Widget suggestionList(List<RestaurantCustomer> suggestions, void Function(RestaurantCustomer) onSelect) {
+            Widget suggestionList(
+              List<Customer> suggestions,
+              void Function(Customer) onSelect,
+            ) {
               return Container(
                 constraints: const BoxConstraints(maxHeight: 140),
                 margin: const EdgeInsets.only(top: 4, bottom: 8),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: AppColors.divider)),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.divider),
+                ),
                 child: ListView.separated(
                   shrinkWrap: true,
                   itemCount: suggestions.length,
-                  separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.divider),
+                  separatorBuilder: (_, __) =>
+                      Divider(height: 1, color: AppColors.divider),
                   itemBuilder: (_, index) {
                     final c = suggestions[index];
                     return InkWell(
                       onTap: () => onSelect(c),
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
                         child: Row(
                           children: [
                             CircleAvatar(
                               radius: 14,
-                              backgroundColor: AppColors.primary.withOpacity(0.1),
-                              child: Text(c.name?.isNotEmpty == true ? c.name![0].toUpperCase() : '?',
-                                style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.primary)),
+                              backgroundColor: AppColors.primary.withOpacity(
+                                0.1,
+                              ),
+                              child: Text(
+                                c.name?.isNotEmpty == true
+                                    ? c.name![0].toUpperCase()
+                                    : '?',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.primary,
+                                ),
+                              ),
                             ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(c.name ?? 'Unknown', style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w500)),
-                                  Text('${c.phone ?? ''} • ${c.totalVisites} visits', style: GoogleFonts.poppins(fontSize: 10, color: AppColors.textSecondary)),
+                                  Text(
+                                    c.name ?? 'Unknown',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${c.phone ?? ''} • ${c.totalVisites} visits',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 10,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
@@ -1629,8 +2516,13 @@ class _TakeawayState extends State<Takeaway> {
             return Dialog(
               backgroundColor: AppColors.white,
               clipBehavior: Clip.antiAlias,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              insetPadding: EdgeInsets.symmetric(
+                horizontal: hInset,
+                vertical: 24,
+              ),
               child: Container(
                 width: 460,
                 color: AppColors.white,
@@ -1644,8 +2536,9 @@ class _TakeawayState extends State<Takeaway> {
                       padding: const EdgeInsets.fromLTRB(20, 16, 12, 14),
                       decoration: BoxDecoration(
                         color: AppColors.primary.withValues(alpha: 0.06),
-                        borderRadius:
-                            const BorderRadius.vertical(top: Radius.circular(16)),
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(16),
+                        ),
                       ),
                       child: Row(
                         children: [
@@ -1655,21 +2548,31 @@ class _TakeawayState extends State<Takeaway> {
                               color: AppColors.primary.withValues(alpha: 0.12),
                               shape: BoxShape.circle,
                             ),
-                            child: Icon(Icons.receipt_long_rounded,
-                                color: AppColors.primary, size: 22),
+                            child: Icon(
+                              Icons.receipt_long_rounded,
+                              color: AppColors.primary,
+                              size: 22,
+                            ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
-                            child: Text('Place Order',
-                                style: GoogleFonts.poppins(
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.textPrimary)),
+                            child: Text(
+                              'Place Order',
+                              style: GoogleFonts.poppins(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
                           ),
                           IconButton(
-                              onPressed: () => Navigator.of(ctx).pop(),
-                              icon: Icon(Icons.close,
-                                  size: 20, color: AppColors.textSecondary)),
+                            onPressed: () => Navigator.of(ctx).pop(),
+                            icon: Icon(
+                              Icons.close,
+                              size: 20,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -1681,137 +2584,243 @@ class _TakeawayState extends State<Takeaway> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Section label
-                            Row(
-                              children: [
-                                Icon(Icons.person_outline,
-                                    size: 18, color: AppColors.primary),
-                                const SizedBox(width: 6),
-                                Text('Customer Details',
+                            // Customer capture only when the plan includes Customers.
+                            if (PlanEnforce.allows(EntKeys.customers)) ...[
+                              // Section label
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.person_outline,
+                                    size: 18,
+                                    color: AppColors.primary,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Customer Details',
                                     style: GoogleFonts.poppins(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                        color: AppColors.textPrimary)),
-                                const Spacer(),
-                                Text('Optional',
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  Text(
+                                    'Optional',
                                     style: GoogleFonts.poppins(
-                                        fontSize: 11,
-                                        color: AppColors.textSecondary)),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-
-                            // Selected customer card
-                            if (selectedCustomer != null) ...[
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 10),
-                                decoration: BoxDecoration(
-                                  color: AppColors.success.withValues(alpha: 0.08),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                      color: AppColors.success
-                                          .withValues(alpha: 0.25)),
-                                ),
-                                child: Row(
-                                  children: [
-                                    CircleAvatar(
-                                      radius: 16,
-                                      backgroundColor: AppColors.success
-                                          .withValues(alpha: 0.15),
-                                      child: Text(
-                                        selectedCustomer!.name?.isNotEmpty == true
-                                            ? selectedCustomer!.name![0]
-                                                .toUpperCase()
-                                            : '?',
-                                        style: GoogleFonts.poppins(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w600,
-                                            color: AppColors.success),
-                                      ),
+                                      fontSize: 11,
+                                      color: AppColors.textSecondary,
                                     ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(selectedCustomer!.name ?? 'Unknown',
-                                              style: GoogleFonts.poppins(
-                                                  fontSize: 13,
-                                                  fontWeight: FontWeight.w600)),
-                                          Text(
-                                              '${selectedCustomer!.totalVisites} previous visits',
-                                              style: GoogleFonts.poppins(
-                                                  fontSize: 11,
-                                                  color:
-                                                      AppColors.textSecondary)),
-                                        ],
-                                      ),
-                                    ),
-                                    GestureDetector(
-                                      onTap: () => setDialogState(() {
-                                        selectedCustomer = null; nameController.clear(); emailController.clear(); mobileController.clear();
-                                      }),
-                                      child: Icon(Icons.close,
-                                          size: 18,
-                                          color: AppColors.textSecondary),
-                                    ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
                               const SizedBox(height: 12),
-                            ],
 
-                            AppTextField(
-                              controller: nameController, label: 'Customer Name', hint: 'e.g. John Doe', icon: Icons.person_outline,
-                              onChanged: (value) async {
-                                if (value.isEmpty) { setDialogState(() { showNameSuggestions = false; nameSuggestions = []; }); }
-                                else { final r = await restaurantCustomerStore.searchCustomers(value); setDialogState(() { nameSuggestions = r; showNameSuggestions = r.isNotEmpty; }); }
-                              },
-                            ),
-                            if (showNameSuggestions && nameSuggestions.isNotEmpty)
-                              suggestionList(nameSuggestions, (c) { setDialogState(() {
-                                selectedCustomer = c; nameController.text = c.name ?? ''; emailController.text = ''; mobileController.text = c.phone ?? '';
-                                showNameSuggestions = false; nameSuggestions = [];
-                              }); })
-                            else const SizedBox(height: 12),
-
-                            AppTextField(
-                              controller: mobileController, label: 'Mobile', hint: 'e.g. 9876543210', icon: Icons.phone_outlined,
-                              keyboardType: TextInputType.number, maxLength: 10,
-                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                              onChanged: (value) async {
-                                if (value.isEmpty) { setDialogState(() { showPhoneSuggestions = false; phoneSuggestions = []; }); }
-                                else { final r = await restaurantCustomerStore.searchCustomers(value); setDialogState(() { phoneSuggestions = r; showPhoneSuggestions = r.isNotEmpty; }); }
-                              },
-                            ),
-                            if (showPhoneSuggestions && phoneSuggestions.isNotEmpty)
-                              suggestionList(phoneSuggestions, (c) { setDialogState(() {
-                                selectedCustomer = c; nameController.text = c.name ?? ''; emailController.text = ''; mobileController.text = c.phone ?? '';
-                                showPhoneSuggestions = false; phoneSuggestions = [];
-                              }); })
-                            else const SizedBox(height: 12),
-
-                            Row(
-                              children: [
-                                Expanded(child: AppTextField(controller: emailController, label: 'Email', hint: 'Optional', icon: Icons.mail_outline, keyboardType: TextInputType.emailAddress)),
-                                const SizedBox(width: 12),
-                                Expanded(child: AppTextField(controller: remarkController, label: 'Remark', hint: 'e.g. No onions', icon: Icons.note_alt_outlined)),
+                              // Selected customer card
+                              if (selectedCustomer != null) ...[
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 10,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.success.withValues(
+                                      alpha: 0.08,
+                                    ),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: AppColors.success.withValues(
+                                        alpha: 0.25,
+                                      ),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      CircleAvatar(
+                                        radius: 16,
+                                        backgroundColor: AppColors.success
+                                            .withValues(alpha: 0.15),
+                                        child: Text(
+                                          selectedCustomer!.name?.isNotEmpty ==
+                                                  true
+                                              ? selectedCustomer!.name![0]
+                                                    .toUpperCase()
+                                              : '?',
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            color: AppColors.success,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              selectedCustomer!.name ??
+                                                  'Unknown',
+                                              style: GoogleFonts.poppins(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                            Text(
+                                              '${selectedCustomer!.totalVisites} previous visits',
+                                              style: GoogleFonts.poppins(
+                                                fontSize: 11,
+                                                color: AppColors.textSecondary,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      GestureDetector(
+                                        onTap: () => setDialogState(() {
+                                          selectedCustomer = null;
+                                          nameController.clear();
+                                          emailController.clear();
+                                          mobileController.clear();
+                                        }),
+                                        child: Icon(
+                                          Icons.close,
+                                          size: 18,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
                               ],
-                            ),
+
+                              AppTextField(
+                                controller: nameController,
+                                label: 'Customer Name',
+                                hint: 'e.g. John Doe',
+                                icon: Icons.person_outline,
+                                onChanged: (value) async {
+                                  if (value.isEmpty) {
+                                    setDialogState(() {
+                                      showNameSuggestions = false;
+                                      nameSuggestions = [];
+                                    });
+                                  } else {
+                                    final r = await customerStore
+                                        .searchCustomers(value);
+                                    setDialogState(() {
+                                      nameSuggestions = r;
+                                      showNameSuggestions = r.isNotEmpty;
+                                    });
+                                  }
+                                },
+                              ),
+                              if (showNameSuggestions &&
+                                  nameSuggestions.isNotEmpty)
+                                suggestionList(nameSuggestions, (c) {
+                                  setDialogState(() {
+                                    selectedCustomer = c;
+                                    nameController.text = c.name ?? '';
+                                    emailController.text = '';
+                                    mobileController.text = c.phone ?? '';
+                                    showNameSuggestions = false;
+                                    nameSuggestions = [];
+                                  });
+                                })
+                              else
+                                const SizedBox(height: 12),
+
+                              AppTextField(
+                                controller: mobileController,
+                                label: 'Mobile',
+                                hint: 'e.g. 9876543210',
+                                icon: Icons.phone_outlined,
+                                keyboardType: TextInputType.number,
+                                maxLength: 10,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                ],
+                                onChanged: (value) async {
+                                  if (value.isEmpty) {
+                                    setDialogState(() {
+                                      showPhoneSuggestions = false;
+                                      phoneSuggestions = [];
+                                    });
+                                  } else {
+                                    final r = await customerStore
+                                        .searchCustomers(value);
+                                    setDialogState(() {
+                                      phoneSuggestions = r;
+                                      showPhoneSuggestions = r.isNotEmpty;
+                                    });
+                                  }
+                                },
+                              ),
+                              if (showPhoneSuggestions &&
+                                  phoneSuggestions.isNotEmpty)
+                                suggestionList(phoneSuggestions, (c) {
+                                  setDialogState(() {
+                                    selectedCustomer = c;
+                                    nameController.text = c.name ?? '';
+                                    emailController.text = '';
+                                    mobileController.text = c.phone ?? '';
+                                    showPhoneSuggestions = false;
+                                    phoneSuggestions = [];
+                                  });
+                                })
+                              else
+                                const SizedBox(height: 12),
+
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: AppTextField(
+                                      controller: emailController,
+                                      label: 'Email',
+                                      hint: 'Optional',
+                                      icon: Icons.mail_outline,
+                                      keyboardType: TextInputType.emailAddress,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: AppTextField(
+                                      controller: remarkController,
+                                      label: 'Remark',
+                                      hint: 'e.g. No onions',
+                                      icon: Icons.note_alt_outlined,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ] else ...[
+                              // Customers off — keep the kitchen remark only.
+                              AppTextField(
+                                controller: remarkController,
+                                label: 'Remark',
+                                hint: 'e.g. No onions',
+                                icon: Icons.note_alt_outlined,
+                              ),
+                            ],
                             const SizedBox(height: 20),
 
                             // Total summary card
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 14),
+                                horizontal: 16,
+                                vertical: 14,
+                              ),
                               decoration: BoxDecoration(
-                                color: AppColors.primary.withValues(alpha: 0.06),
+                                color: AppColors.primary.withValues(
+                                  alpha: 0.06,
+                                ),
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
-                                    color: AppColors.primary
-                                        .withValues(alpha: 0.15)),
+                                  color: AppColors.primary.withValues(
+                                    alpha: 0.15,
+                                  ),
+                                ),
                               ),
                               child: Row(
                                 mainAxisAlignment:
@@ -1819,22 +2828,30 @@ class _TakeawayState extends State<Takeaway> {
                                 children: [
                                   Row(
                                     children: [
-                                      Icon(Icons.payments_outlined,
-                                          size: 18, color: AppColors.primary),
+                                      Icon(
+                                        Icons.payments_outlined,
+                                        size: 18,
+                                        color: AppColors.primary,
+                                      ),
                                       const SizedBox(width: 8),
-                                      Text('Total Payable',
-                                          style: GoogleFonts.poppins(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.w500,
-                                              color: AppColors.textPrimary)),
+                                      Text(
+                                        'Total Payable',
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w500,
+                                          color: AppColors.textPrimary,
+                                        ),
+                                      ),
                                     ],
                                   ),
                                   Text(
-                                      '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calculations.grandTotal)}',
-                                      style: GoogleFonts.poppins(
-                                          fontSize: 19,
-                                          fontWeight: FontWeight.w700,
-                                          color: AppColors.primary)),
+                                    '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calculations.grandTotal)}',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 19,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
@@ -1857,18 +2874,24 @@ class _TakeawayState extends State<Takeaway> {
                                   foregroundColor: AppColors.textSecondary,
                                   side: BorderSide(color: AppColors.divider),
                                   shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12)),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
                                 ),
-                                child: Text('Cancel',
-                                    style: GoogleFonts.poppins(
-                                        fontWeight: FontWeight.w600)),
+                                child: Text(
+                                  'Cancel',
+                                  style: GoogleFonts.poppins(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                               ),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
-                                flex: 2,
-                                child: _buildActionButton('Place Order',
-                                    () => _placeOrder(calculations))),
+                              child: _buildActionButton(
+                                'Place Order',
+                                () => _placeOrder(calculations),
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -1884,7 +2907,6 @@ class _TakeawayState extends State<Takeaway> {
   }
 
   Future<void> completeOrder(OrderModel activeModel) async {
-
     // Generate daily bill number for completed order
     final int billNumber = await orderStore.getNextBillNumber();
 
@@ -1897,14 +2919,22 @@ class _TakeawayState extends State<Takeaway> {
       items: activeModel.items,
       orderAt: activeModel.timeStamp,
       orderType: activeModel.orderType,
-      paymentmode: activeModel.paymentMethod ?? 'Cash', // Use the payment method if available
+      paymentmode:
+          activeModel.paymentMethod ??
+          'Cash', // Use the payment method if available
       subTotal: activeModel.subTotal,
       gstRate: activeModel.gstRate,
       gstAmount: activeModel.gstAmount,
       kotNumbers: activeModel.kotNumbers, // Always present in new orders
-      kotBoundaries: activeModel.kotBoundaries, // KOT boundaries for grouping items
+      kotBoundaries:
+          activeModel.kotBoundaries, // KOT boundaries for grouping items
       billNumber: billNumber, // Daily bill number (resets every day)
-      isTaxInclusive: activeModel.isTaxInclusive, // Use stored tax mode from active order
+      isTaxInclusive:
+          activeModel.isTaxInclusive, // Use stored tax mode from active order
+      taxEnabled: TaxFeature.enabled,
+      storeGstNumber: await StoreSettingsService().gstNumberSnapshot(),
+      roundOffStep: AppSettings.roundOffStepForRecord,
+      discountOnItems: AppSettings.discountOnItems,
       shiftId: RestaurantSession.currentShiftId,
     );
 
@@ -1919,13 +2949,28 @@ class _TakeawayState extends State<Takeaway> {
     final methods = _paymentMethodStore.enabledMethods;
     String selected = methods.isNotEmpty ? methods.first.name : 'Cash';
 
+    // Grow the inset so the dialog lands on dialogWidth — a fixed 24px inset
+    // let this stretch to ~1390px on a 1440 monitor.
+    final hInset = !AppResponsive.isMobile(context)
+        ? ((AppResponsive.screenWidth(context) -
+                      AppResponsive.dialogWidth(context)) /
+                  2)
+              .clamp(40.0, double.infinity)
+        : 24.0;
+
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialog) {
           return Dialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+            backgroundColor: AppColors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            insetPadding: EdgeInsets.symmetric(
+              horizontal: hInset,
+              vertical: 40,
+            ),
             child: Container(
               width: 420,
               padding: const EdgeInsets.all(24),
@@ -1938,12 +2983,36 @@ class _TakeawayState extends State<Takeaway> {
                     children: [
                       Container(
                         padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
-                        child: Icon(Icons.flash_on_rounded, size: 18, color: AppColors.primary),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          Icons.flash_on_rounded,
+                          size: 18,
+                          color: AppColors.primary,
+                        ),
                       ),
                       const SizedBox(width: 12),
-                      Expanded(child: Text('Quick Settle', style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700))),
-                      IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close, size: 18, color: AppColors.textSecondary), padding: EdgeInsets.zero, constraints: const BoxConstraints()),
+                      Expanded(
+                        child: Text(
+                          'Quick Settle',
+                          style: GoogleFonts.poppins(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        icon: const Icon(
+                          Icons.close,
+                          size: 18,
+                          color: AppColors.textSecondary,
+                        ),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -1951,19 +3020,34 @@ class _TakeawayState extends State<Takeaway> {
                   // Total amount card
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.primary.withOpacity(0.05),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.primary.withOpacity(0.15)),
+                      border: Border.all(
+                        color: AppColors.primary.withOpacity(0.15),
+                      ),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('Amount to Collect', style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textSecondary)),
+                        Text(
+                          'Amount to Collect',
+                          style: GoogleFonts.poppins(
+                            fontSize: 13,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
                         Text(
                           '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calculations.grandTotal)}',
-                          style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.primary),
+                          style: GoogleFonts.poppins(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primary,
+                          ),
                         ),
                       ],
                     ),
@@ -1971,7 +3055,14 @@ class _TakeawayState extends State<Takeaway> {
                   const SizedBox(height: 20),
 
                   // Payment method label
-                  Text('Select Payment Method', style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+                  Text(
+                    'Select Payment Method',
+                    style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
                   const SizedBox(height: 10),
 
                   // Payment chips
@@ -1984,19 +3075,52 @@ class _TakeawayState extends State<Takeaway> {
                         onTap: () => setDialog(() => selected = m.name),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 150),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
                           decoration: BoxDecoration(
-                            color: isSelected ? AppColors.primary : Colors.white,
+                            color: isSelected
+                                ? AppColors.primary
+                                : Colors.white,
                             borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: isSelected ? AppColors.primary : AppColors.divider, width: 1.5),
-                            boxShadow: isSelected ? [BoxShadow(color: AppColors.primary.withOpacity(0.2), blurRadius: 6, offset: const Offset(0, 2))] : [],
+                            border: Border.all(
+                              color: isSelected
+                                  ? AppColors.primary
+                                  : AppColors.divider,
+                              width: 1.5,
+                            ),
+                            boxShadow: isSelected
+                                ? [
+                                    BoxShadow(
+                                      color: AppColors.primary.withOpacity(0.2),
+                                      blurRadius: 6,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ]
+                                : [],
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(_paymentIcon(m.name), size: 16, color: isSelected ? Colors.white : AppColors.textSecondary),
+                              Icon(
+                                _paymentIcon(m.name),
+                                size: 16,
+                                color: isSelected
+                                    ? Colors.white
+                                    : AppColors.textSecondary,
+                              ),
                               const SizedBox(width: 6),
-                              Text(m.name, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500, color: isSelected ? Colors.white : AppColors.textSecondary)),
+                              Text(
+                                m.name,
+                                style: GoogleFonts.poppins(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  color: isSelected
+                                      ? Colors.white
+                                      : AppColors.textSecondary,
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -2013,11 +3137,19 @@ class _TakeawayState extends State<Takeaway> {
                           onPressed: () => Navigator.pop(ctx),
                           style: OutlinedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 13),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                             side: BorderSide(color: AppColors.divider),
                             foregroundColor: AppColors.textSecondary,
                           ),
-                          child: Text('Cancel', style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500)),
+                          child: Text(
+                            'Cancel',
+                            style: GoogleFonts.poppins(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -2028,14 +3160,25 @@ class _TakeawayState extends State<Takeaway> {
                             Navigator.pop(ctx);
                             _qucikSettleNewOrder(calculations, selected);
                           },
-                          icon: const Icon(Icons.check_circle_outline, size: 16),
-                          label: Text('Settle Now', style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600)),
+                          icon: const Icon(
+                            Icons.check_circle_outline,
+                            size: 16,
+                          ),
+                          label: Text(
+                            'Settle Now',
+                            style: GoogleFonts.poppins(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primary,
                             foregroundColor: Colors.white,
                             elevation: 0,
                             padding: const EdgeInsets.symmetric(vertical: 13),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                           ),
                         ),
                       ),
@@ -2053,22 +3196,62 @@ class _TakeawayState extends State<Takeaway> {
   IconData _paymentIcon(String method) {
     final lower = method.toLowerCase();
     if (lower.contains('cash')) return Icons.payments_outlined;
-    if (lower.contains('card') || lower.contains('credit') || lower.contains('debit')) return Icons.credit_card_outlined;
-    if (lower.contains('upi') || lower.contains('qr')) return Icons.qr_code_outlined;
+    if (lower.contains('card') ||
+        lower.contains('credit') ||
+        lower.contains('debit'))
+      return Icons.credit_card_outlined;
+    if (lower.contains('upi') || lower.contains('qr'))
+      return Icons.qr_code_outlined;
     if (lower.contains('wallet')) return Icons.account_balance_wallet_outlined;
-    if (lower.contains('bank') || lower.contains('transfer') || lower.contains('neft')) return Icons.account_balance_outlined;
+    if (lower.contains('bank') ||
+        lower.contains('transfer') ||
+        lower.contains('neft'))
+      return Icons.account_balance_outlined;
     return Icons.payment_outlined;
   }
 
-// Replace your entire _qucikSettleNewOrder function with this one.
-  Future<void> _qucikSettleNewOrder(CartCalculationService calculations, String paymentMethod) async {
+  // Replace your entire _qucikSettleNewOrder function with this one.
+  Future<void> _qucikSettleNewOrder(
+    CartCalculationService calculations,
+    String paymentMethod,
+  ) async {
+    // Plan gate — Quick Settle creates a bill from nothing, so it must clear the
+    // same gates as Settle & Print (customerdetails `_doSubmitOrder`). Checked
+    // first, so a blocked plan can't even open a day it has no right to bill into.
+    if (!PlanGuard.allowedOr(
+      context,
+      EntKeys.billingInvoiceCreate,
+      featureName: 'Billing',
+    )) {
+      return;
+    }
+    final billsToday = await pastOrderStore.todaysBillLoad();
+    if (!mounted) return;
+    if (!PlanGuard.withinLimitOr(
+      context,
+      EntKeys.billingInvoicePerDayMax,
+      billsToday,
+      unit: 'bills per day',
+    )) {
+      return;
+    }
+
+    final strictlyPending = await DayManagementService.isEodStrictlyPending();
+    if (strictlyPending) {
+      NotificationService.instance.showError(
+        'Day has ended. Complete End of Day to unlock.',
+      );
+      return;
+    }
     // No active day session yet → start the day (opening balance) before the
     // sale is recorded, so it's never excluded from EOD.
     if (!await DayManagementService.isSessionOpen()) {
       final started = await promptStartDay(context);
       if (!started) {
         if (mounted) {
-          NotificationService.instance.showError('Start the day to settle the order');
+          NotificationService.instance.showError(
+            'Start the day to settle the order',
+          );
         }
         return;
       }
@@ -2078,14 +3261,14 @@ class _TakeawayState extends State<Takeaway> {
     final plainItems = widget.cartItems.map((w) => w.item).toList();
 
     // Check stock availability before processing order
-    final bool stockAvailable = await InventoryService.checkStockAvailability(plainItems);
+    final bool stockAvailable = await InventoryService.checkStockAvailability(
+      plainItems,
+    );
     if (!stockAvailable) {
       if (mounted) {
-
         NotificationService.instance.showError(
-            'Cannot process order: Some items are out of stock or have insufficient quantity'
+          'Cannot process order: Some items are out of stock or have insufficient quantity',
         );
-
 
         // ScaffoldMessenger.of(context).showSnackBar(
         //   SnackBar(
@@ -2109,7 +3292,8 @@ class _TakeawayState extends State<Takeaway> {
     final pastOrder = PastOrderModel(
       id: Uuid().v4(), // Generate a unique ID for this transaction
       customerName: 'Quick Settle',
-      totalPrice: calculations.grandTotal, // ✅ Use the final grand total from the service
+      totalPrice: calculations
+          .grandTotal, // ✅ Use the final grand total from the service
       items: plainItems,
       orderAt: DateTime.now(),
       orderType: widget.isDineIn ? 'Dine In' : 'Take Away',
@@ -2126,14 +3310,64 @@ class _TakeawayState extends State<Takeaway> {
       kotNumbers: [quickSettleKotNumber],
       kotBoundaries: [plainItems.length], // Single KOT with all items
       billNumber: billNumber, // Daily bill number (resets every day)
-      isTaxInclusive: AppSettings.isTaxInclusive, // Store tax mode at order creation
-      tableNo: widget.isDineIn ? (widget.selectedTableNo ?? widget.tableid) : null,
+      isTaxInclusive:
+          AppSettings.isTaxInclusive, // Store tax mode at order creation
+      taxEnabled: TaxFeature.enabled,
+      storeGstNumber: await StoreSettingsService().gstNumberSnapshot(),
+      roundOffStep: AppSettings.roundOffStepForRecord,
+      discountOnItems: AppSettings.discountOnItems,
+      tableNo: widget.isDineIn
+          ? (widget.selectedTableNo ?? widget.tableid)
+          : null,
       shiftId: RestaurantSession.currentShiftId,
       sessionId: currentSessionId, // Link to POS session
     );
 
     // 1. Add the completed order to history
     await pastOrderStore.addOrder(pastOrder);
+
+    // 1b. Auto-print the KOT (same as Place Order) — Quick Settle still sends the
+    // order to the kitchen. Non-blocking: a print failure must not fail settle.
+    if (mounted && AppSettings.generateKOT) {
+      try {
+        final kotOrder = OrderModel(
+          id: pastOrder.id,
+          customerName: 'Quick Settle',
+          customerNumber: '',
+          customerEmail: '',
+          items: plainItems,
+          status: 'Processing',
+          timeStamp: pastOrder.orderAt ?? DateTime.now(),
+          orderType: widget.isDineIn ? 'Dine In' : 'Take Away',
+          tableNo:
+              (widget.isDineIn
+                  ? (widget.selectedTableNo ?? widget.tableid)
+                  : null) ??
+              '',
+          subTotal: AppSettings.isTaxInclusive
+              ? calculations.subtotal - calculations.totalGST
+              : calculations.subtotal,
+          gstAmount: calculations.totalGST,
+          totalPrice: calculations.grandTotal,
+          gstRate: 0,
+          kotNumbers: [quickSettleKotNumber],
+          itemCountAtLastKot: plainItems.length,
+          kotBoundaries: [plainItems.length],
+          kotStatuses: {quickSettleKotNumber: 'Processing'},
+          orderNumber: billNumber,
+          isTaxInclusive: AppSettings.isTaxInclusive,
+          sessionId: currentSessionId,
+        );
+        await RestaurantPrintHelper.printKOT(
+          context: context,
+          order: kotOrder,
+          kotNumber: quickSettleKotNumber,
+          autoPrint: true,
+        );
+      } catch (e) {
+        // Don't block settle if KOT print fails.
+      }
+    }
 
     // 2. Deduct stock after successfully adding the order
     await InventoryService.deductStockForOrder(plainItems);
@@ -2149,19 +3383,322 @@ class _TakeawayState extends State<Takeaway> {
     // 4. Clear the user's cart
     await restaurantCartStore.clearCart();
 
-    // 4. Navigate and show success message
+    // 5. Show success notification and print dialog
     if (mounted) {
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => const Startorder()),
-            (Route<dynamic> route) => false,
-      );
-      // ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Quick Settle Successful')));
-
-      NotificationService.instance.showSuccess(
-          'Quick Settle Successful'
+      NotificationService.instance.showSuccess('Quick Settle Successful');
+      await _showOrderSuccessDialogWithBillNumber(
+        pastOrder,
+        calculations,
+        billNumber,
       );
     }
   }
 
+  // Success dialog for settled orders (with bill number)
+  Future<void> _showOrderSuccessDialogWithBillNumber(
+    PastOrderModel pastOrder,
+    CartCalculationService calculations,
+    int billNumber,
+  ) async {
+    if (!mounted) return;
 
+    // Convert pastOrderModel to OrderModel for printing
+    final orderForPrint = OrderModel(
+      id: pastOrder.id,
+      customerName: pastOrder.customerName,
+      customerNumber: '',
+      customerEmail: '',
+      items: pastOrder.items,
+      status: 'Completed',
+      timeStamp: pastOrder.orderAt ?? DateTime.now(),
+      orderType: pastOrder.orderType ?? 'Take Away',
+      tableNo: pastOrder.tableNo,
+      totalPrice: pastOrder.totalPrice,
+      kotNumbers: pastOrder.kotNumbers,
+      itemCountAtLastKot: pastOrder.items.length,
+      kotBoundaries: pastOrder.kotBoundaries,
+      subTotal: pastOrder.subTotal,
+      gstAmount: pastOrder.gstAmount,
+      gstRate: pastOrder.gstRate,
+      discount: pastOrder.Discount,
+      paymentMethod: pastOrder.paymentmode,
+      isPaid: true,
+      paymentStatus: 'Paid',
+      completedAt: DateTime.now(),
+      isTaxInclusive:
+          pastOrder.isTaxInclusive, // Use stored tax mode from past order
+      isSplitPayment: pastOrder.isSplitPayment,
+      paymentListJson: pastOrder.paymentListJson,
+      totalPaid: pastOrder.totalPaid,
+      changeReturn: pastOrder.changeReturn,
+    );
+
+    await _showSuccessDialog(
+      order: orderForPrint,
+      calculations: calculations,
+      billNumber: billNumber,
+      pointsUsed: 0,
+      title: 'Order Settled!',
+      printLabel: 'Print Bill',
+    );
+  }
+
+  void _navigateToHome() {
+    returnToStartOrder(context);
+  }
+
+  /// Shared success dialog for both newly placed and settled orders.
+  /// Green header band + order summary + Done / Print actions.
+  Future<void> _showSuccessDialog({
+    required OrderModel order,
+    required CartCalculationService calculations,
+    required int? billNumber,
+    required int pointsUsed,
+    required String title,
+    required String printLabel,
+  }) async {
+    if (!mounted) return;
+
+    final sym = CurrencyHelper.currentSymbol;
+    final paid = order.totalPaid ?? 0;
+    final change = order.changeReturn ?? 0;
+    final method = (order.isSplitPayment ?? false)
+        ? 'Split'
+        : (order.paymentMethod ?? '').trim();
+    final noun = printLabel.toLowerCase().contains('bill') ? 'bill' : 'receipt';
+    String cap(String s) =>
+        s.isEmpty ? s : '${s[0].toUpperCase()}${s.substring(1)}';
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => PopScope(
+        canPop: false,
+        child: Dialog(
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 28,
+            vertical: 24,
+          ),
+          backgroundColor: AppColors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // ── Green header band ────────────────────────────────
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.fromLTRB(24, 28, 24, 22),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.green.shade400, Colors.green.shade600],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.check_rounded,
+                          color: Colors.white,
+                          size: 38,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Text(
+                        title,
+                        style: GoogleFonts.poppins(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                      if (billNumber != null) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.22),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            'Bill #INV$billNumber',
+                            style: GoogleFonts.poppins(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+
+                // ── Body ─────────────────────────────────────────────
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 22),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Order summary
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceLight,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: AppColors.divider),
+                        ),
+                        child: Column(
+                          children: [
+                            _summaryRow(
+                              'Total',
+                              '$sym${DecimalSettings.formatAmount(order.totalPrice)}',
+                              emphasize: true,
+                            ),
+                            if (paid > 0) ...[
+                              const SizedBox(height: 10),
+                              _summaryRow(
+                                'Paid',
+                                '$sym${DecimalSettings.formatAmount(paid)}',
+                              ),
+                            ],
+                            if (change > 0) ...[
+                              const SizedBox(height: 10),
+                              _summaryRow(
+                                'Change',
+                                '$sym${DecimalSettings.formatAmount(change)}',
+                              ),
+                            ],
+                            if (method.isNotEmpty) ...[
+                              const SizedBox(height: 10),
+                              _summaryRow('Payment', cap(method)),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      Text(
+                        'Would you like to print the $noun?',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.poppins(
+                          fontSize: 13.5,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      // Action buttons
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () {
+                                Navigator.pop(context);
+                                _navigateToHome();
+                              },
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 13,
+                                ),
+                                side: BorderSide(color: AppColors.divider),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                              child: Text(
+                                'Done',
+                                style: GoogleFonts.poppins(
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            flex: 2,
+                            child: ElevatedButton.icon(
+                              onPressed: () async {
+                                await RestaurantPrintHelper.printOrderReceipt(
+                                  context: context,
+                                  order: order,
+                                  calculations: calculations,
+                                  billNumber: billNumber,
+                                  loyaltyPointsDiscount: pointsUsed,
+                                );
+                                // User stays on dialog — press Done to go home
+                              },
+                              icon: const Icon(Icons.print_rounded, size: 20),
+                              label: Text(
+                                printLabel,
+                                style: GoogleFonts.poppins(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 15,
+                                ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 13,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _summaryRow(String label, String value, {bool emphasize = false}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.poppins(
+            fontSize: emphasize ? 14 : 13,
+            fontWeight: emphasize ? FontWeight.w600 : FontWeight.w500,
+            color: emphasize ? AppColors.primary : AppColors.textSecondary,
+          ),
+        ),
+        Text(
+          value,
+          style: GoogleFonts.poppins(
+            fontSize: emphasize ? 15 : 13.5,
+            fontWeight: emphasize ? FontWeight.bold : FontWeight.w600,
+            color: emphasize ? AppColors.primary : AppColors.textPrimary,
+          ),
+        ),
+      ],
+    );
+  }
 }

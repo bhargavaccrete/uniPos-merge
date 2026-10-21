@@ -7,7 +7,7 @@ import '../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../domain/services/restaurant/day_management_service.dart';
 import '../../domain/services/restaurant/inventory_service.dart';
 import '../../domain/services/common/local_notification_service.dart';
-import '../../data/models/restaurant/notification_presenter.dart';
+import '../../data/models/common/notification_presenter.dart';
 import '../../core/routes/routes_name.dart';
 import '../../util/restaurant/restaurant_auth_helper.dart';
 import '../websocket.dart';

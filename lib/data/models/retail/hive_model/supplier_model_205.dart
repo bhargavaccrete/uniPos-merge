@@ -70,6 +70,34 @@ class SupplierModel extends HiveObject {
     );
   }
 
+  SupplierModel copyWith({
+    String? name,
+    String? phone,
+    String? address,
+    String? gstNumber,
+    double? openingBalance,
+    double? currentBalance,
+    String? updatedAt,
+    // `x ?? this.x` can never put a nullable field back to null, so an edit
+    // form has no way to clear an optional value. These say so explicitly,
+    // instead of forcing callers to hand-build the model.
+    bool clearPhone = false,
+    bool clearAddress = false,
+    bool clearGstNumber = false,
+  }) {
+    return SupplierModel(
+      supplierId: supplierId,
+      name: name ?? this.name,
+      phone: clearPhone ? null : (phone ?? this.phone),
+      address: clearAddress ? null : (address ?? this.address),
+      gstNumber: clearGstNumber ? null : (gstNumber ?? this.gstNumber),
+      openingBalance: openingBalance ?? this.openingBalance,
+      currentBalance: currentBalance ?? this.currentBalance,
+      createdAt: createdAt,
+      updatedAt: updatedAt ?? DateTime.now().toIso8601String(),
+    );
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'supplierId': supplierId,

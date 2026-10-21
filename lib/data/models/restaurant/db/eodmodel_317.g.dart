@@ -37,13 +37,22 @@ class EndOfDayReportAdapter extends TypeAdapter<EndOfDayReport> {
       roundOff: fields[17] as double,
       cancelledOrderCount: fields[18] as int,
       cancelledOrderAmount: fields[19] as double,
+      sessionId: fields[20] as String?,
+      cashCollections: fields[21] as double,
+      cardCollections: fields[22] as double,
+      upiCollections: fields[23] as double,
+      totalCost: fields[24] as double,
+      grossProfit: fields[25] as double,
+      customersWithDue: fields[26] as int,
+      totalOutstanding: fields[27] as double,
+      cashWithdrawn: fields[28] == null ? 0.0 : fields[28] as double,
     );
   }
 
   @override
   void write(BinaryWriter writer, EndOfDayReport obj) {
     writer
-      ..writeByte(20)
+      ..writeByte(29)
       ..writeByte(0)
       ..write(obj.date)
       ..writeByte(1)
@@ -83,7 +92,25 @@ class EndOfDayReportAdapter extends TypeAdapter<EndOfDayReport> {
       ..writeByte(18)
       ..write(obj.cancelledOrderCount)
       ..writeByte(19)
-      ..write(obj.cancelledOrderAmount);
+      ..write(obj.cancelledOrderAmount)
+      ..writeByte(20)
+      ..write(obj.sessionId)
+      ..writeByte(21)
+      ..write(obj.cashCollections)
+      ..writeByte(22)
+      ..write(obj.cardCollections)
+      ..writeByte(23)
+      ..write(obj.upiCollections)
+      ..writeByte(24)
+      ..write(obj.totalCost)
+      ..writeByte(25)
+      ..write(obj.grossProfit)
+      ..writeByte(26)
+      ..write(obj.customersWithDue)
+      ..writeByte(27)
+      ..write(obj.totalOutstanding)
+      ..writeByte(28)
+      ..write(obj.cashWithdrawn);
   }
 
   @override

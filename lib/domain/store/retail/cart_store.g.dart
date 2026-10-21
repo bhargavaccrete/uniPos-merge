@@ -9,18 +9,25 @@ part of 'cart_store.dart';
 // ignore_for_file: non_constant_identifier_names, unnecessary_brace_in_string_interps, unnecessary_lambdas, prefer_expression_function_bodies, lines_longer_than_80_chars, avoid_as, avoid_annotating_with_dynamic, no_leading_underscores_for_local_identifiers
 
 mixin _$CartStore on _CartStore, Store {
+  Computed<RetailBill>? _$billComputed;
+
+  @override
+  RetailBill get bill => (_$billComputed ??=
+          Computed<RetailBill>(() => super.bill, name: '_CartStore.bill'))
+      .value;
   Computed<int>? _$itemCountComputed;
 
   @override
   int get itemCount => (_$itemCountComputed ??=
           Computed<int>(() => super.itemCount, name: '_CartStore.itemCount'))
       .value;
-  Computed<int>? _$totalItemsComputed;
+  Computed<double>? _$totalItemsComputed;
 
   @override
-  int get totalItems => (_$totalItemsComputed ??=
-          Computed<int>(() => super.totalItems, name: '_CartStore.totalItems'))
-      .value;
+  double get totalItems =>
+      (_$totalItemsComputed ??= Computed<double>(() => super.totalItems,
+              name: '_CartStore.totalItems'))
+          .value;
   Computed<double>? _$totalPriceComputed;
 
   @override
@@ -117,15 +124,161 @@ mixin _$CartStore on _CartStore, Store {
     });
   }
 
+  late final _$isTaxInclusiveAtom =
+      Atom(name: '_CartStore.isTaxInclusive', context: context);
+
+  @override
+  bool get isTaxInclusive {
+    _$isTaxInclusiveAtom.reportRead();
+    return super.isTaxInclusive;
+  }
+
+  @override
+  set isTaxInclusive(bool value) {
+    _$isTaxInclusiveAtom.reportWrite(value, super.isTaxInclusive, () {
+      super.isTaxInclusive = value;
+    });
+  }
+
+  late final _$discountTypeAtom =
+      Atom(name: '_CartStore.discountType', context: context);
+
+  @override
+  DiscountType get discountType {
+    _$discountTypeAtom.reportRead();
+    return super.discountType;
+  }
+
+  @override
+  set discountType(DiscountType value) {
+    _$discountTypeAtom.reportWrite(value, super.discountType, () {
+      super.discountType = value;
+    });
+  }
+
+  late final _$discountValueAtom =
+      Atom(name: '_CartStore.discountValue', context: context);
+
+  @override
+  double get discountValue {
+    _$discountValueAtom.reportRead();
+    return super.discountValue;
+  }
+
+  @override
+  set discountValue(double value) {
+    _$discountValueAtom.reportWrite(value, super.discountValue, () {
+      super.discountValue = value;
+    });
+  }
+
+  late final _$loyaltyRedemptionAtom =
+      Atom(name: '_CartStore.loyaltyRedemption', context: context);
+
+  @override
+  double get loyaltyRedemption {
+    _$loyaltyRedemptionAtom.reportRead();
+    return super.loyaltyRedemption;
+  }
+
+  @override
+  set loyaltyRedemption(double value) {
+    _$loyaltyRedemptionAtom.reportWrite(value, super.loyaltyRedemption, () {
+      super.loyaltyRedemption = value;
+    });
+  }
+
+  late final _$loadTaxModeAsyncAction =
+      AsyncAction('_CartStore.loadTaxMode', context: context);
+
+  @override
+  Future<void> loadTaxMode() {
+    return _$loadTaxModeAsyncAction.run(() => super.loadTaxMode());
+  }
+
+  late final _$setTaxModeAsyncAction =
+      AsyncAction('_CartStore.setTaxMode', context: context);
+
+  @override
+  Future<void> setTaxMode(bool inclusive) {
+    return _$setTaxModeAsyncAction.run(() => super.setTaxMode(inclusive));
+  }
+
   late final _$addItemAsyncAction =
       AsyncAction('_CartStore.addItem', context: context);
 
   @override
   Future<CartOperationResult> addItem(
       ProductModel product, VarianteModel variant,
-      {CategoryModel? category}) {
-    return _$addItemAsyncAction
-        .run(() => super.addItem(product, variant, category: category));
+      {Category? category,
+      double? priceOverride,
+      double? gstRateOverride,
+      double qty = 1,
+      double? originalPrice,
+      String? overrideReason,
+      String? overrideNote,
+      String? lineDiscountType,
+      double? lineDiscountValue,
+      String? lineDiscountReason,
+      String? lineDiscountNote,
+      bool ignoreStock = false}) {
+    return _$addItemAsyncAction.run(() => super.addItem(product, variant,
+        category: category,
+        priceOverride: priceOverride,
+        gstRateOverride: gstRateOverride,
+        qty: qty,
+        originalPrice: originalPrice,
+        overrideReason: overrideReason,
+        overrideNote: overrideNote,
+        lineDiscountType: lineDiscountType,
+        lineDiscountValue: lineDiscountValue,
+        lineDiscountReason: lineDiscountReason,
+        lineDiscountNote: lineDiscountNote,
+        ignoreStock: ignoreStock));
+  }
+
+  late final _$addQuickItemAsyncAction =
+      AsyncAction('_CartStore.addQuickItem', context: context);
+
+  @override
+  Future<CartOperationResult> addQuickItem(
+      {required String name,
+      required double price,
+      double gstRate = 0,
+      int qty = 1}) {
+    return _$addQuickItemAsyncAction.run(() => super
+        .addQuickItem(name: name, price: price, gstRate: gstRate, qty: qty));
+  }
+
+  late final _$overrideLinePriceAsyncAction =
+      AsyncAction('_CartStore.overrideLinePrice', context: context);
+
+  @override
+  Future<CartOperationResult> overrideLinePrice(
+      {required String variantId,
+      required double newPrice,
+      required String reason,
+      String? note}) {
+    return _$overrideLinePriceAsyncAction.run(() => super.overrideLinePrice(
+        variantId: variantId, newPrice: newPrice, reason: reason, note: note));
+  }
+
+  late final _$setLineDiscountAsyncAction =
+      AsyncAction('_CartStore.setLineDiscount', context: context);
+
+  @override
+  Future<CartOperationResult> setLineDiscount(
+      {required String variantId,
+      required DiscountType type,
+      required double value,
+      required String reason,
+      String? note}) {
+    return _$setLineDiscountAsyncAction.run(() => super.setLineDiscount(
+        variantId: variantId,
+        type: type,
+        value: value,
+        reason: reason,
+        note: note));
   }
 
   late final _$removeItemAsyncAction =
@@ -134,6 +287,15 @@ mixin _$CartStore on _CartStore, Store {
   @override
   Future<void> removeItem(String variantId) {
     return _$removeItemAsyncAction.run(() => super.removeItem(variantId));
+  }
+
+  late final _$setQuantityAsyncAction =
+      AsyncAction('_CartStore.setQuantity', context: context);
+
+  @override
+  Future<CartOperationResult> setQuantity(String variantId, double quantity) {
+    return _$setQuantityAsyncAction
+        .run(() => super.setQuantity(variantId, quantity));
   }
 
   late final _$incrementQuantityAsyncAction =
@@ -192,9 +354,45 @@ mixin _$CartStore on _CartStore, Store {
   @override
   Future<CartOperationResult> addItemToTab(
       ProductModel product, VarianteModel variant,
-      {CategoryModel? category}) {
-    return _$addItemToTabAsyncAction
-        .run(() => super.addItemToTab(product, variant, category: category));
+      {Category? category,
+      double? priceOverride,
+      double? gstRateOverride,
+      double qty = 1,
+      double? originalPrice,
+      String? overrideReason,
+      String? overrideNote,
+      String? lineDiscountType,
+      double? lineDiscountValue,
+      String? lineDiscountReason,
+      String? lineDiscountNote,
+      bool ignoreStock = false}) {
+    return _$addItemToTabAsyncAction.run(() => super.addItemToTab(
+        product, variant,
+        category: category,
+        priceOverride: priceOverride,
+        gstRateOverride: gstRateOverride,
+        qty: qty,
+        originalPrice: originalPrice,
+        overrideReason: overrideReason,
+        overrideNote: overrideNote,
+        lineDiscountType: lineDiscountType,
+        lineDiscountValue: lineDiscountValue,
+        lineDiscountReason: lineDiscountReason,
+        lineDiscountNote: lineDiscountNote,
+        ignoreStock: ignoreStock));
+  }
+
+  late final _$addQuickItemToTabAsyncAction =
+      AsyncAction('_CartStore.addQuickItemToTab', context: context);
+
+  @override
+  Future<CartOperationResult> addQuickItemToTab(
+      {required String name,
+      required double price,
+      double gstRate = 0,
+      int qty = 1}) {
+    return _$addQuickItemToTabAsyncAction.run(() => super.addQuickItemToTab(
+        name: name, price: price, gstRate: gstRate, qty: qty));
   }
 
   late final _$removeItemFromTabAsyncAction =
@@ -222,6 +420,52 @@ mixin _$CartStore on _CartStore, Store {
   Future<void> decrementQuantityInTab(String variantId) {
     return _$decrementQuantityInTabAsyncAction
         .run(() => super.decrementQuantityInTab(variantId));
+  }
+
+  late final _$setQuantityInTabAsyncAction =
+      AsyncAction('_CartStore.setQuantityInTab', context: context);
+
+  @override
+  Future<CartOperationResult> setQuantityInTab(
+      String variantId, double quantity) {
+    return _$setQuantityInTabAsyncAction
+        .run(() => super.setQuantityInTab(variantId, quantity));
+  }
+
+  late final _$setLineDiscountInTabAsyncAction =
+      AsyncAction('_CartStore.setLineDiscountInTab', context: context);
+
+  @override
+  Future<CartOperationResult> setLineDiscountInTab(
+      {required String variantId,
+      required DiscountType type,
+      required double value,
+      required String reason,
+      String? note}) {
+    return _$setLineDiscountInTabAsyncAction.run(() => super
+        .setLineDiscountInTab(
+            variantId: variantId,
+            type: type,
+            value: value,
+            reason: reason,
+            note: note));
+  }
+
+  late final _$overrideLinePriceInTabAsyncAction =
+      AsyncAction('_CartStore.overrideLinePriceInTab', context: context);
+
+  @override
+  Future<CartOperationResult> overrideLinePriceInTab(
+      {required String variantId,
+      required double newPrice,
+      required String reason,
+      String? note}) {
+    return _$overrideLinePriceInTabAsyncAction.run(() => super
+        .overrideLinePriceInTab(
+            variantId: variantId,
+            newPrice: newPrice,
+            reason: reason,
+            note: note));
   }
 
   late final _$clearCartAndSaveAsyncAction =
@@ -253,6 +497,39 @@ mixin _$CartStore on _CartStore, Store {
       ActionController(name: '_CartStore', context: context);
 
   @override
+  void setDiscount({DiscountType? type, double? value}) {
+    final _$actionInfo = _$_CartStoreActionController.startAction(
+        name: '_CartStore.setDiscount');
+    try {
+      return super.setDiscount(type: type, value: value);
+    } finally {
+      _$_CartStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setLoyaltyRedemption(double value) {
+    final _$actionInfo = _$_CartStoreActionController.startAction(
+        name: '_CartStore.setLoyaltyRedemption');
+    try {
+      return super.setLoyaltyRedemption(value);
+    } finally {
+      _$_CartStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void resetBillingInputs() {
+    final _$actionInfo = _$_CartStoreActionController.startAction(
+        name: '_CartStore.resetBillingInputs');
+    try {
+      return super.resetBillingInputs();
+    } finally {
+      _$_CartStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
   dynamic setactiveTab(int index) {
     final _$actionInfo = _$_CartStoreActionController.startAction(
         name: '_CartStore.setactiveTab');
@@ -269,6 +546,11 @@ mixin _$CartStore on _CartStore, Store {
 items: ${items},
 tabs: ${tabs},
 activeTabIndex: ${activeTabIndex},
+isTaxInclusive: ${isTaxInclusive},
+discountType: ${discountType},
+discountValue: ${discountValue},
+loyaltyRedemption: ${loyaltyRedemption},
+bill: ${bill},
 itemCount: ${itemCount},
 totalItems: ${totalItems},
 totalPrice: ${totalPrice},

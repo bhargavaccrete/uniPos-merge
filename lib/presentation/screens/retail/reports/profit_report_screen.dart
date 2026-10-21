@@ -1,8 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:billberrylite/util/common/short_ref.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/util/common/quantity_format.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_notice.dart';
+
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../domain/services/retail/report_service.dart';
+import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
 
 class ProfitReportScreen extends StatefulWidget {
   const ProfitReportScreen({super.key});
@@ -10,22 +19,28 @@ class ProfitReportScreen extends StatefulWidget {
   State<ProfitReportScreen> createState() => _ProfitReportScreenState();
 }
 
-class _ProfitReportScreenState extends State<ProfitReportScreen> with SingleTickerProviderStateMixin {
+class _ProfitReportScreenState extends State<ProfitReportScreen>
+    with SingleTickerProviderStateMixin {
   final ReportService _reportService = ReportService();
   Map<String, dynamic>? _overallReport;
   List<Map<String, dynamic>> _profitPerDay = [];
   List<Map<String, dynamic>> _profitPerItem = [];
   List<Map<String, dynamic>> _profitPerSale = [];
+  List<Map<String, dynamic>> _bundleMargin = [];
   bool _isLoading = false;
   late TabController _tabController;
 
   DateTime? _startDate;
   DateTime? _endDate;
 
+  /// Incremented per load so a slow in-flight request can be discarded when a
+  /// newer one has already been issued.
+  int _loadToken = 0;
+
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     _loadAllReports();
   }
 
@@ -35,31 +50,56 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> with SingleTick
     super.dispose();
   }
 
+  /// Bounds in the form `ReportService` expects: inclusive start, **exclusive**
+  /// end.
+  ///
+  /// `showDateRangePicker` hands back midnight of the final day, and
+  /// `_inWindow` rejects anything not before the end — so passing it straight
+  /// through silently dropped every sale on the last day of the range. Same
+  /// `+1 day` as `ReportPageScaffold._bounds`.
+  (DateTime?, DateTime?) get _bounds {
+    if (_startDate == null || _endDate == null) return (null, null);
+    final start = DateTime(
+      _startDate!.year,
+      _startDate!.month,
+      _startDate!.day,
+    );
+    final end = DateTime(
+      _endDate!.year,
+      _endDate!.month,
+      _endDate!.day,
+    ).add(const Duration(days: 1));
+    return (start, end);
+  }
+
   Future<void> _loadAllReports() async {
+    // Change the range twice quickly and the slower first load could land after
+    // the second and overwrite it with stale numbers. Only the newest token
+    // gets to publish.
+    final token = ++_loadToken;
     setState(() => _isLoading = true);
+    final (start, end) = _bounds;
 
-    final overallData = await _reportService.getProfitReport(
-      startDate: _startDate,
-      endDate: _endDate,
+    // One shared window for the four tabs — calling the four report methods
+    // separately scanned the sales and sale-line boxes four times each.
+    final reportsFuture = _reportService.getProfitReports(
+      startDate: start,
+      endDate: end,
     );
-    final perDayData = await _reportService.getProfitPerDayReport(
-      startDate: _startDate,
-      endDate: _endDate,
-    );
-    final perItemData = await _reportService.getProfitPerItemReport(
-      startDate: _startDate,
-      endDate: _endDate,
-    );
-    final perSaleData = await _reportService.getProfitPerSaleReport(
-      startDate: _startDate,
-      endDate: _endDate,
-    );
+    // Not window-bound — a bundle's margin is a current-catalogue pricing
+    // question, not a sales-history one (see ReportService.getBundleMarginReport).
+    final bundleMarginFuture = _reportService.getBundleMarginReport();
 
+    final reports = await reportsFuture;
+    final bundleMarginData = await bundleMarginFuture;
+
+    if (!mounted || token != _loadToken) return;
     setState(() {
-      _overallReport = overallData;
-      _profitPerDay = perDayData;
-      _profitPerItem = perItemData;
-      _profitPerSale = perSaleData;
+      _overallReport = reports.overall;
+      _profitPerDay = reports.perDay;
+      _profitPerItem = reports.perItem;
+      _profitPerSale = reports.perSale;
+      _bundleMargin = bundleMarginData;
       _isLoading = false;
     });
   }
@@ -94,44 +134,137 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> with SingleTick
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
-      appBar: AppBar(
-        title: const Text('Profit Analysis'),
-        centerTitle: true,
-        backgroundColor: Colors.white,
-        elevation: 0,
+      backgroundColor: AppColors.surfaceLight,
+      appBar: buildPrimaryAppBar(
+        title: 'Profit Analysis',
         actions: [
           IconButton(
             icon: Icon(_startDate != null ? Icons.clear : Icons.date_range),
+            color: Colors.white,
             onPressed: _startDate != null ? _clearDateRange : _selectDateRange,
-            tooltip: _startDate != null ? 'Clear Date Filter' : 'Select Date Range',
+            tooltip: _startDate != null
+                ? 'Clear Date Filter'
+                : 'Select Date Range',
           ),
         ],
+        // Tabs read on the primary fill, matching every other AppBar in the app.
         bottom: TabBar(
           controller: _tabController,
           isScrollable: true,
-          labelColor: const Color(0xFF1A1A1A),
-          unselectedLabelColor: const Color(0xFF6B6B6B),
-          indicatorColor: const Color(0xFF1A1A1A),
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white70,
+          indicatorColor: Colors.white,
           tabs: const [
             Tab(text: 'Overview'),
             Tab(text: 'Daily Trend'),
             Tab(text: 'By Item'),
             Tab(text: 'By Sale'),
+            Tab(text: 'Bundles'),
           ],
         ),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : TabBarView(
-              controller: _tabController,
-              children: [
-                _buildOverviewTab(),
-                _buildDailyTrendTab(),
-                _buildProfitPerItemTab(),
-                _buildProfitPerSaleTab(),
-              ],
+      // Every amount here goes through formatMoney; MoneyScope is the single
+      // subscription that re-renders them when the store's currency or decimal
+      // precision changes.
+      body: MoneyScope(
+        child: AppResponsive.constrainedContent(
+          context: context,
+          alignment: Alignment.topCenter,
+          maxWidth: AppResponsive.maxContentWidth(context),
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildOverviewTab(),
+                    _buildDailyTrendTab(),
+                    _buildProfitPerItemTab(),
+                    _buildProfitPerSaleTab(),
+                    _buildBundleMarginTab(),
+                  ],
+                ),
+        ),
+      ),
+    );
+  }
+
+  /// Lines in [rows] with no cost price on record, and the revenue they carry.
+  ///
+  /// Revenue from an un-costed line is still counted — the sale happened — so
+  /// its profit is really "revenue minus the cost we know about", and the
+  /// margin is overstated by exactly the missing cost. Every tab says so, in
+  /// the same words, off the same two keys.
+  (int, double) _unknownCostOf(List<Map<String, dynamic>> rows) {
+    var lines = 0;
+    var revenue = 0.0;
+    for (final row in rows) {
+      lines += (row['unknownCostLines'] as num?)?.toInt() ?? 0;
+      revenue += (row['unknownCostRevenue'] as num?)?.toDouble() ?? 0.0;
+    }
+    return (lines, revenue);
+  }
+
+  /// The tab-level banner. Returns an empty box when everything is costed, so
+  /// it can sit unconditionally in a `children:` list.
+  Widget _unknownCostBanner(int lines, double revenue) {
+    if (lines <= 0) return const SizedBox.shrink();
+    final plural = lines == 1 ? '' : 's';
+    return Padding(
+      padding: EdgeInsets.only(bottom: AppResponsive.largeSpacing(context)),
+      child: ReportNotice(
+        message:
+            '$lines sale line$plural have no cost price on record. Their '
+            '${formatMoney(revenue)} revenue is included, but the cost is not '
+            '— so profit and margin here are overstated.',
+      ),
+    );
+  }
+
+  /// The row-level marker, for one day / variant / sale.
+  Widget _unknownCostChip(int lines, double revenue) {
+    final plural = lines == 1 ? '' : 's';
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: AppResponsive.smallSpacing(context),
+        vertical: 6,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.amber.shade50,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.warning_amber_rounded,
+            size: AppResponsive.captionFontSize(context) + 4,
+            color: Colors.amber.shade800,
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              'No cost on $lines line$plural (${formatMoney(revenue)} revenue) '
+              '— margin overstated',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.captionFontSize(context),
+                color: Colors.amber.shade900,
+              ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// [_unknownCostChip] for a row, or nothing when the row is fully costed.
+  Widget _rowUnknownCost(Map<String, dynamic> row) {
+    final lines = (row['unknownCostLines'] as num?)?.toInt() ?? 0;
+    if (lines <= 0) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: _unknownCostChip(
+        lines,
+        (row['unknownCostRevenue'] as num?)?.toDouble() ?? 0.0,
+      ),
     );
   }
 
@@ -139,56 +272,99 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> with SingleTick
     if (_overallReport == null) return const Center(child: Text('No data'));
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: AppResponsive.cardPadding(context),
       children: [
         if (_startDate != null && _endDate != null)
           Container(
-            margin: const EdgeInsets.only(bottom: 16),
-            padding: const EdgeInsets.all(12),
+            margin: EdgeInsets.only(
+              bottom: AppResponsive.largeSpacing(context),
+            ),
+            padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
             decoration: BoxDecoration(
               color: Colors.blue.shade50,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(
+                AppResponsive.smallBorderRadius(context),
+              ),
               border: Border.all(color: Colors.blue.shade200),
             ),
             child: Row(
               children: [
                 Icon(Icons.date_range, color: Colors.blue.shade700, size: 20),
-                const SizedBox(width: 8),
+                SizedBox(width: AppResponsive.smallSpacing(context)),
                 Expanded(
                   child: Text(
                     '${DateFormat('MMM dd, yyyy').format(_startDate!)} - ${DateFormat('MMM dd, yyyy').format(_endDate!)}',
-                    style: TextStyle(color: Colors.blue.shade700, fontWeight: FontWeight.w500),
+                    style: GoogleFonts.poppins(
+                      color: Colors.blue.shade700,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
               ],
             ),
           ),
         Container(
-          padding: const EdgeInsets.all(24),
+          padding: AppResponsive.padding(context),
           decoration: BoxDecoration(
-            gradient: const LinearGradient(colors: [Color(0xFF4CAF50), Color(0xFF388E3C)]),
-            borderRadius: BorderRadius.circular(12),
+            gradient: const LinearGradient(
+              colors: [AppColors.success, AppColors.success],
+            ),
+            borderRadius: BorderRadius.circular(
+              AppResponsive.borderRadius(context),
+            ),
           ),
           child: Column(
             children: [
-              const Text('Gross Profit', style: TextStyle(color: Colors.white70, fontSize: 14)),
-              const SizedBox(height: 8),
               Text(
-                '₹${(_overallReport!['grossProfit'] as double).toStringAsFixed(2)}',
-                style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w700),
+                'Gross Profit',
+                style: GoogleFonts.poppins(
+                  color: Colors.white70,
+                  fontSize: AppResponsive.bodyFontSize(context),
+                ),
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: AppResponsive.smallSpacing(context)),
+              Text(
+                formatMoney((_overallReport!['grossProfit'] as double)),
+                style: GoogleFonts.poppins(
+                  color: Colors.white,
+                  fontSize: AppResponsive.headingFontSize(context),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              SizedBox(height: AppResponsive.smallSpacing(context)),
               Text(
                 '${(_overallReport!['profitMargin'] as double).toStringAsFixed(1)}% margin',
-                style: const TextStyle(color: Colors.white70, fontSize: 14),
+                style: GoogleFonts.poppins(
+                  color: Colors.white70,
+                  fontSize: AppResponsive.bodyFontSize(context),
+                ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 16),
-        _buildCard('Total Revenue', '₹${(_overallReport!['totalRevenue'] as double).toStringAsFixed(2)}', Icons.trending_up, Colors.blue),
-        _buildCard('Total Cost', '₹${(_overallReport!['totalCost'] as double).toStringAsFixed(2)}', Icons.shopping_cart, Colors.orange),
-        _buildCard('Items Sold', '${_overallReport!['itemCount']}', Icons.inventory, Colors.purple),
+        SizedBox(height: AppResponsive.largeSpacing(context)),
+        _unknownCostBanner(
+          (_overallReport!['unknownCostLines'] as num?)?.toInt() ?? 0,
+          (_overallReport!['unknownCostRevenue'] as num?)?.toDouble() ?? 0.0,
+        ),
+        _buildCard(
+          'Total Revenue',
+          formatMoney((_overallReport!['totalRevenue'] as double)),
+          Icons.trending_up,
+          Colors.blue,
+        ),
+        _buildCard(
+          'Total Cost',
+          formatMoney((_overallReport!['totalCost'] as double)),
+          Icons.shopping_cart,
+          Colors.orange,
+        ),
+        _buildCard(
+          'Items Sold',
+          '${_overallReport!['itemCount']}',
+          Icons.inventory,
+          Colors.purple,
+        ),
       ],
     );
   }
@@ -198,37 +374,62 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> with SingleTick
       return const Center(child: Text('No daily profit data available'));
     }
 
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
+    final (unknownLines, unknownRevenue) = _unknownCostOf(_profitPerDay);
+
+    return _lazyList(
+      [
+        _unknownCostBanner(unknownLines, unknownRevenue),
         Container(
           height: 250,
-          padding: const EdgeInsets.all(16),
+          padding: AppResponsive.cardPadding(context),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE8E8E8)),
+            borderRadius: BorderRadius.circular(
+              AppResponsive.borderRadius(context),
+            ),
+            border: Border.all(color: AppColors.divider),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Profit Trend',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.subheadingFontSize(context),
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
               Expanded(child: _buildProfitChart()),
             ],
           ),
         ),
-        const SizedBox(height: 16),
-        const Text(
+        SizedBox(height: AppResponsive.largeSpacing(context)),
+        Text(
           'Daily Breakdown',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.subheadingFontSize(context),
+            fontWeight: FontWeight.w600,
+          ),
         ),
-        const SizedBox(height: 8),
-        ..._profitPerDay.map((day) => _buildDailyProfitCard(day)),
+        SizedBox(height: AppResponsive.smallSpacing(context)),
       ],
+      _profitPerDay.length,
+      (i) => _buildDailyProfitCard(_profitPerDay[i]),
+    );
+  }
+
+  /// [header] then [count] cards, built only as they scroll into view.
+  Widget _lazyList(
+    List<Widget> header,
+    int count,
+    Widget Function(int index) cardAt,
+  ) {
+    return ListView.builder(
+      padding: AppResponsive.cardPadding(context),
+      itemCount: header.length + count,
+      itemBuilder: (context, i) =>
+          i < header.length ? header[i] : cardAt(i - header.length),
     );
   }
 
@@ -249,8 +450,11 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> with SingleTick
               reservedSize: 50,
               getTitlesWidget: (value, meta) {
                 return Text(
-                  '₹${(value / 1000).toStringAsFixed(0)}k',
-                  style: const TextStyle(fontSize: 10, color: Color(0xFF6B6B6B)),
+                  '${formatMoney((value / 1000))}k',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.captionFontSize(context),
+                    color: AppColors.textSecondary,
+                  ),
                 );
               },
             ),
@@ -259,34 +463,44 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> with SingleTick
             sideTitles: SideTitles(
               showTitles: true,
               getTitlesWidget: (value, meta) {
-                if (value.toInt() >= 0 && value.toInt() < _profitPerDay.length) {
-                  final date = DateTime.parse(_profitPerDay[value.toInt()]['date']);
+                if (value.toInt() >= 0 &&
+                    value.toInt() < _profitPerDay.length) {
+                  final date = DateTime.parse(
+                    _profitPerDay[value.toInt()]['date'],
+                  );
                   return Padding(
                     padding: const EdgeInsets.only(top: 8),
                     child: Text(
                       DateFormat('MM/dd').format(date),
-                      style: const TextStyle(fontSize: 10, color: Color(0xFF6B6B6B)),
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.captionFontSize(context),
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   );
                 }
-                return const Text('');
+                return Text('');
               },
             ),
           ),
-          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
+          topTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: false),
+          ),
         ),
         borderData: FlBorderData(show: false),
         lineBarsData: [
           LineChartBarData(
             spots: spots,
             isCurved: true,
-            color: const Color(0xFF4CAF50),
+            color: AppColors.success,
             barWidth: 3,
             dotData: const FlDotData(show: false),
             belowBarData: BarAreaData(
               show: true,
-              color: const Color(0xFF4CAF50).withOpacity(0.1),
+              color: AppColors.success.withValues(alpha: 0.1),
             ),
           ),
         ],
@@ -301,12 +515,14 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> with SingleTick
     final margin = day['profitMargin'] as double;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+      margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
+      padding: AppResponsive.cardPadding(context),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE8E8E8)),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
+        border: Border.all(color: AppColors.divider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -316,39 +532,62 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> with SingleTick
             children: [
               Text(
                 DateFormat('EEEE, MMM dd, yyyy').format(date),
-                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.w600,
+                  fontSize: AppResponsive.bodyFontSize(context),
+                ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppResponsive.smallSpacing(context),
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
-                  color: profit >= 0 ? Colors.green.shade50 : Colors.red.shade50,
+                  color: profit >= 0
+                      ? Colors.green.shade50
+                      : Colors.red.shade50,
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
                   '${margin.toStringAsFixed(1)}%',
-                  style: TextStyle(
-                    color: profit >= 0 ? Colors.green.shade700 : Colors.red.shade700,
-                    fontSize: 12,
+                  style: GoogleFonts.poppins(
+                    color: profit >= 0
+                        ? Colors.green.shade700
+                        : Colors.red.shade700,
+                    fontSize: AppResponsive.captionFontSize(context),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
           Row(
             children: [
               Expanded(
-                child: _buildSmallStat('Profit', '₹${profit.toStringAsFixed(2)}', Colors.green),
+                child: _buildSmallStat(
+                  'Profit',
+                  formatMoney(profit),
+                  Colors.green,
+                ),
               ),
               Expanded(
-                child: _buildSmallStat('Revenue', '₹${revenue.toStringAsFixed(2)}', Colors.blue),
+                child: _buildSmallStat(
+                  'Revenue',
+                  formatMoney(revenue),
+                  Colors.blue,
+                ),
               ),
               Expanded(
-                child: _buildSmallStat('Sales', '${day['totalSales']}', Colors.orange),
+                child: _buildSmallStat(
+                  'Sales',
+                  '${day['totalSales']}',
+                  Colors.orange,
+                ),
               ),
             ],
           ),
+          _rowUnknownCost(day),
         ],
       ),
     );
@@ -359,16 +598,24 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> with SingleTick
       return const Center(child: Text('No item profit data available'));
     }
 
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        const Text(
+    final (itemUnknownLines, itemUnknownRevenue) = _unknownCostOf(
+      _profitPerItem,
+    );
+
+    return _lazyList(
+      [
+        _unknownCostBanner(itemUnknownLines, itemUnknownRevenue),
+        Text(
           'Profit by Product Variant',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.subheadingFontSize(context),
+            fontWeight: FontWeight.w600,
+          ),
         ),
-        const SizedBox(height: 8),
-        ..._profitPerItem.map((item) => _buildItemProfitCard(item)),
+        SizedBox(height: AppResponsive.smallSpacing(context)),
       ],
+      _profitPerItem.length,
+      (i) => _buildItemProfitCard(_profitPerItem[i]),
     );
   }
 
@@ -377,12 +624,14 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> with SingleTick
     final margin = item['profitMargin'] as double;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+      margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
+      padding: AppResponsive.cardPadding(context),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE8E8E8)),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
+        border: Border.all(color: AppColors.divider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -396,48 +645,76 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> with SingleTick
                   children: [
                     Text(
                       item['productName'] ?? 'Unknown',
-                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                      style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.w600,
+                        fontSize: AppResponsive.bodyFontSize(context),
+                      ),
                     ),
                     const SizedBox(height: 4),
-                    if (item['size'] != null || item['color'] != null)
+                    if ((item['variantLabel'] as String?)?.isNotEmpty ?? false)
                       Text(
-                        '${item['size'] ?? ''} ${item['color'] ?? ''}'.trim(),
-                        style: const TextStyle(fontSize: 12, color: Color(0xFF6B6B6B)),
+                        item['variantLabel'] as String,
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.captionFontSize(context),
+                          color: AppColors.textSecondary,
+                        ),
                       ),
                   ],
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppResponsive.smallSpacing(context),
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
-                  color: profit >= 0 ? Colors.green.shade50 : Colors.red.shade50,
+                  color: profit >= 0
+                      ? Colors.green.shade50
+                      : Colors.red.shade50,
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
                   '${margin.toStringAsFixed(1)}%',
-                  style: TextStyle(
-                    color: profit >= 0 ? Colors.green.shade700 : Colors.red.shade700,
-                    fontSize: 12,
+                  style: GoogleFonts.poppins(
+                    color: profit >= 0
+                        ? Colors.green.shade700
+                        : Colors.red.shade700,
+                    fontSize: AppResponsive.captionFontSize(context),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
           Row(
             children: [
               Expanded(
-                child: _buildSmallStat('Profit', '₹${profit.toStringAsFixed(2)}', Colors.green),
+                child: _buildSmallStat(
+                  'Profit',
+                  formatMoney(profit),
+                  Colors.green,
+                ),
               ),
               Expanded(
-                child: _buildSmallStat('Revenue', '₹${(item['totalRevenue'] as double).toStringAsFixed(2)}', Colors.blue),
+                child: _buildSmallStat(
+                  'Revenue',
+                  formatMoney((item['totalRevenue'] as double)),
+                  Colors.blue,
+                ),
               ),
               Expanded(
-                child: _buildSmallStat('Qty Sold', '${item['totalQuantitySold']}', Colors.orange),
+                child: _buildSmallStat(
+                  'Qty Sold',
+                  // Quantities are `double` so loose goods can be sold by
+                  // weight; a piece product must still read "3", not "3.0".
+                  formatQty((item['totalQuantitySold'] as num).toDouble()),
+                  Colors.orange,
+                ),
               ),
             ],
           ),
+          _rowUnknownCost(item),
         ],
       ),
     );
@@ -448,16 +725,25 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> with SingleTick
       return const Center(child: Text('No sale profit data available'));
     }
 
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        const Text(
+    // Over the whole period, not just the 50 rows listed below.
+    final (saleUnknownLines, saleUnknownRevenue) = _unknownCostOf(
+      _profitPerSale,
+    );
+
+    return _lazyList(
+      [
+        _unknownCostBanner(saleUnknownLines, saleUnknownRevenue),
+        Text(
           'Profit by Individual Sale',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.subheadingFontSize(context),
+            fontWeight: FontWeight.w600,
+          ),
         ),
-        const SizedBox(height: 8),
-        ..._profitPerSale.take(50).map((sale) => _buildSaleProfitCard(sale)),
+        SizedBox(height: AppResponsive.smallSpacing(context)),
       ],
+      _profitPerSale.length < 50 ? _profitPerSale.length : 50,
+      (i) => _buildSaleProfitCard(_profitPerSale[i]),
     );
   }
 
@@ -467,12 +753,14 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> with SingleTick
     final date = DateTime.parse(sale['date']);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
+      margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
+      padding: AppResponsive.cardPadding(context),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE8E8E8)),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
+        border: Border.all(color: AppColors.divider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -484,44 +772,226 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> with SingleTick
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Sale #${sale['saleId'].toString().substring(0, 8)}...',
-                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                    saleRef(sale['saleId']?.toString(), ellipsis: true),
+                    style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.w600,
+                      fontSize: AppResponsive.bodyFontSize(context),
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     DateFormat('MMM dd, yyyy hh:mm a').format(date),
-                    style: const TextStyle(fontSize: 12, color: Color(0xFF6B6B6B)),
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.captionFontSize(context),
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                 ],
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppResponsive.smallSpacing(context),
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
-                  color: profit >= 0 ? Colors.green.shade50 : Colors.red.shade50,
+                  color: profit >= 0
+                      ? Colors.green.shade50
+                      : Colors.red.shade50,
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
                   '${margin.toStringAsFixed(1)}%',
-                  style: TextStyle(
-                    color: profit >= 0 ? Colors.green.shade700 : Colors.red.shade700,
-                    fontSize: 12,
+                  style: GoogleFonts.poppins(
+                    color: profit >= 0
+                        ? Colors.green.shade700
+                        : Colors.red.shade700,
+                    fontSize: AppResponsive.captionFontSize(context),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
           Row(
             children: [
               Expanded(
-                child: _buildSmallStat('Profit', '₹${profit.toStringAsFixed(2)}', Colors.green),
+                child: _buildSmallStat(
+                  'Profit',
+                  formatMoney(profit),
+                  Colors.green,
+                ),
               ),
               Expanded(
-                child: _buildSmallStat('Revenue', '₹${(sale['totalRevenue'] as double).toStringAsFixed(2)}', Colors.blue),
+                child: _buildSmallStat(
+                  'Revenue',
+                  formatMoney((sale['totalRevenue'] as double)),
+                  Colors.blue,
+                ),
               ),
               Expanded(
-                child: _buildSmallStat('Items', '${sale['totalItems']}', Colors.orange),
+                child: _buildSmallStat(
+                  'Items',
+                  // `signedItemCount` returns a double (it negates a return),
+                  // so this rendered "3.0" without the format call.
+                  formatQty((sale['totalItems'] as num).toDouble()),
+                  Colors.orange,
+                ),
+              ),
+            ],
+          ),
+          _rowUnknownCost(sale),
+        ],
+      ),
+    );
+  }
+
+  /// Bundle/repack margin — not affected by the date filter, since it reads
+  /// the current catalogue rather than a sales window (see
+  /// ReportService.getBundleMarginReport).
+  Widget _buildBundleMarginTab() {
+    if (_bundleMargin.isEmpty) {
+      return const Center(
+        child: Text('No bundle or repack products configured yet'),
+      );
+    }
+
+    return _lazyList(
+      [
+        Text(
+          'Bundle & Repack Margin',
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.subheadingFontSize(context),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Selling price vs. summed component cost — current catalogue, not a sales window.',
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.captionFontSize(context),
+            color: AppColors.textSecondary,
+          ),
+        ),
+        SizedBox(height: AppResponsive.smallSpacing(context)),
+      ],
+      _bundleMargin.length,
+      (i) => _buildBundleMarginCard(_bundleMargin[i]),
+    );
+  }
+
+  Widget _buildBundleMarginCard(Map<String, dynamic> row) {
+    final margin = row['margin'] as double;
+    final marginPercent = row['marginPercent'] as double;
+    final isRepack = row['isRepack'] == true;
+    // A component has no cost price — no margin can be claimed.
+    final costIncomplete = row['costIncomplete'] == true;
+
+    return Container(
+      margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
+      padding: AppResponsive.cardPadding(context),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        row['productName'] as String? ?? 'Unknown',
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.w600,
+                          fontSize: AppResponsive.bodyFontSize(context),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        isRepack ? 'Repack' : 'Bundle',
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.captionFontSize(context),
+                          fontWeight: FontWeight.w700,
+                          color: Colors.blue.shade700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppResponsive.smallSpacing(context),
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: costIncomplete
+                      ? Colors.orange.shade50
+                      : (margin >= 0 ? Colors.green.shade50 : Colors.red.shade50),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  costIncomplete
+                      ? 'Cost missing'
+                      : '${marginPercent.toStringAsFixed(1)}%',
+                  style: GoogleFonts.poppins(
+                    color: costIncomplete
+                        ? Colors.orange.shade700
+                        : (margin >= 0
+                            ? Colors.green.shade700
+                            : Colors.red.shade700),
+                    fontSize: AppResponsive.captionFontSize(context),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
+          Row(
+            children: [
+              Expanded(
+                child: _buildSmallStat(
+                  'Margin',
+                  costIncomplete ? '—' : formatMoney(margin),
+                  costIncomplete
+                      ? Colors.orange
+                      : (margin >= 0 ? Colors.green : Colors.red),
+                ),
+              ),
+              Expanded(
+                child: _buildSmallStat(
+                  // Excludes any tax inside the price — the margin is net.
+                  'Price (ex-tax)',
+                  formatMoney((row['sellingPrice'] as double)),
+                  Colors.blue,
+                ),
+              ),
+              Expanded(
+                child: _buildSmallStat(
+                  'Component Cost',
+                  formatMoney((row['componentCost'] as double)),
+                  Colors.orange,
+                ),
               ),
             ],
           ),
@@ -536,12 +1006,19 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> with SingleTick
       children: [
         Text(
           label,
-          style: const TextStyle(fontSize: 11, color: Color(0xFF6B6B6B)),
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.captionFontSize(context),
+            color: AppColors.textSecondary,
+          ),
         ),
         const SizedBox(height: 4),
         Text(
           value,
-          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: color),
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.smallFontSize(context),
+            fontWeight: FontWeight.w600,
+            color: color,
+          ),
         ),
       ],
     );
@@ -549,23 +1026,37 @@ class _ProfitReportScreenState extends State<ProfitReportScreen> with SingleTick
 
   Widget _buildCard(String label, String value, IconData icon, Color color) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(20),
+      margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
+      padding: AppResponsive.padding(context),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE8E8E8)),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
+        border: Border.all(color: AppColors.divider),
       ),
       child: Row(
         children: [
           Icon(icon, color: color, size: 32),
-          const SizedBox(width: 16),
+          SizedBox(width: AppResponsive.largeSpacing(context)),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, style: const TextStyle(fontSize: 13, color: Color(0xFF6B6B6B))),
+              Text(
+                label,
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.smallFontSize(context),
+                  color: AppColors.textSecondary,
+                ),
+              ),
               const SizedBox(height: 4),
-              Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+              Text(
+                value,
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.subheadingFontSize(context),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ],
           ),
         ],

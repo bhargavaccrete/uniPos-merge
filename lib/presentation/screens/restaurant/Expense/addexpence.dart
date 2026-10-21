@@ -28,6 +28,8 @@ class _AddexpenceState extends State<Addexpence> {
   final TextEditingController _dateController = TextEditingController();
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _reasonController = TextEditingController();
+  final _amountFocus = FocusNode();
+  final _reasonFocus = FocusNode();
   bool _isSaving = false;
   String? _categoryError;
 
@@ -45,15 +47,18 @@ class _AddexpenceState extends State<Addexpence> {
     _dateController.dispose();
     _amountController.dispose();
     _reasonController.dispose();
+    _amountFocus.dispose();
+    _reasonFocus.dispose();
     super.dispose();
   }
 
   Future<void> _pickedDate(BuildContext context) async {
     DateTime? _pickedDate = await showDatePicker(
-        context: context,
-        firstDate: DateTime(2000),
-        initialDate: DateTime.now(),
-        lastDate: DateTime(2100));
+      context: context,
+      firstDate: DateTime(2000),
+      initialDate: DateTime.now(),
+      lastDate: DateTime(2100),
+    );
 
     if (_pickedDate != null) {
       setState(() {
@@ -65,14 +70,24 @@ class _AddexpenceState extends State<Addexpence> {
 
   String? selectedCategoryId;
   String Dropvalue2 = 'Cash';
-  final List<String> items2 = ['Cash','Card/Online','Other'];
+  final List<String> items2 = ['Cash', 'Card/Online', 'Other'];
 
   Future<void> _addExpense() async {
     if (_isSaving) return;
 
+    final strictlyPending = await DayManagementService.isEodStrictlyPending();
+    if (strictlyPending) {
+      NotificationService.instance.showError(
+        'Day has ended. Complete End of Day to unlock.',
+      );
+      return;
+    }
+
     // Validate category separately (not an AppTextField)
     setState(() {
-      _categoryError = selectedCategoryId == null ? 'Please select a category' : null;
+      _categoryError = selectedCategoryId == null
+          ? 'Please select a category'
+          : null;
     });
 
     final formValid = _formKey.currentState!.validate();
@@ -103,7 +118,9 @@ class _AddexpenceState extends State<Addexpence> {
         dateandTime: expenseDateTime,
         amount: amount,
         categoryOfExpense: selectedCategoryId,
-        reason: _reasonController.text.trim().isEmpty ? null : _reasonController.text.trim(),
+        reason: _reasonController.text.trim().isEmpty
+            ? null
+            : _reasonController.text.trim(),
         paymentType: Dropvalue2,
         sessionId: currentSessionId, // Link to POS session
       );
@@ -116,7 +133,9 @@ class _AddexpenceState extends State<Addexpence> {
         NotificationService.instance.showError('Failed to add expense');
       }
     } catch (e) {
-      NotificationService.instance.showError('Failed to add expense. Please try again.');
+      NotificationService.instance.showError(
+        'Failed to add expense. Please try again.',
+      );
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -136,21 +155,19 @@ class _AddexpenceState extends State<Addexpence> {
     _reasonController.clear();
   }
 
-
-
-
-
-
   // ── Category selector (styled dropdown) ──────────────────────────────────
   Widget _categorySection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Category',
-            style: GoogleFonts.poppins(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary)),
+        Text(
+          'Category',
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.bodyFontSize(context),
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
+          ),
+        ),
         SizedBox(height: 10),
         Observer(
           builder: (context) {
@@ -161,9 +178,10 @@ class _AddexpenceState extends State<Addexpence> {
                 color: AppColors.surfaceLight,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                    color: _categoryError != null
-                        ? AppColors.danger
-                        : AppColors.divider),
+                  color: _categoryError != null
+                      ? AppColors.danger
+                      : AppColors.divider,
+                ),
               ),
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
@@ -171,18 +189,30 @@ class _AddexpenceState extends State<Addexpence> {
                   value: selectedCategoryId,
                   borderRadius: BorderRadius.circular(12),
                   dropdownColor: AppColors.white,
-                  icon: Icon(Icons.keyboard_arrow_down_rounded,
-                      color: AppColors.textSecondary),
-                  hint: Text('Select Category',
-                      style: GoogleFonts.poppins(
-                          fontSize: 14, color: AppColors.textSecondary)),
+                  icon: Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    color: AppColors.textSecondary,
+                  ),
+                  hint: Text(
+                    'Select Category',
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.bodyFontSize(context),
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
                   items: categories
-                      .map((category) => DropdownMenuItem<String>(
-                            value: category.id,
-                            child: Text(category.name,
-                                style: GoogleFonts.poppins(
-                                    fontSize: 15, fontWeight: FontWeight.w500)),
-                          ))
+                      .map(
+                        (category) => DropdownMenuItem<String>(
+                          value: category.id,
+                          child: Text(
+                            category.name,
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.bodyFontSize(context),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      )
                       .toList(),
                   onChanged: (String? value) {
                     setState(() {
@@ -198,9 +228,13 @@ class _AddexpenceState extends State<Addexpence> {
         if (_categoryError != null)
           Padding(
             padding: EdgeInsets.only(left: 12, top: 6),
-            child: Text(_categoryError!,
-                style: GoogleFonts.poppins(
-                    fontSize: 12, color: AppColors.danger)),
+            child: Text(
+              _categoryError!,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.smallFontSize(context),
+                color: AppColors.danger,
+              ),
+            ),
           ),
       ],
     );
@@ -211,11 +245,14 @@ class _AddexpenceState extends State<Addexpence> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Payment Type',
-            style: GoogleFonts.poppins(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary)),
+        Text(
+          'Payment Type',
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.bodyFontSize(context),
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
+          ),
+        ),
         SizedBox(height: 10),
         Container(
           padding: EdgeInsets.symmetric(horizontal: 16),
@@ -230,18 +267,25 @@ class _AddexpenceState extends State<Addexpence> {
               value: Dropvalue2,
               borderRadius: BorderRadius.circular(12),
               dropdownColor: AppColors.white,
-              icon: Icon(Icons.keyboard_arrow_down_rounded,
-                  color: AppColors.textSecondary),
+              icon: Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: AppColors.textSecondary,
+              ),
               items: items2
-                  .map((String itemm) => DropdownMenuItem<String>(
-                        value: itemm,
-                        child: Text(itemm,
-                            style: GoogleFonts.poppins(
-                                fontSize: 15, fontWeight: FontWeight.w500)),
-                      ))
+                  .map(
+                    (String itemm) => DropdownMenuItem<String>(
+                      value: itemm,
+                      child: Text(
+                        itemm,
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.bodyFontSize(context),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  )
                   .toList(),
-              onChanged: (String? value) =>
-                  setState(() => Dropvalue2 = value!),
+              onChanged: (String? value) => setState(() => Dropvalue2 = value!),
             ),
           ),
         ),
@@ -256,10 +300,21 @@ class _AddexpenceState extends State<Addexpence> {
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
       body: SingleChildScrollView(
-        padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 16.0, tablet: 24.0, desktop: 32.0)),
+        padding: EdgeInsets.all(
+          AppResponsive.getValue(
+            context,
+            mobile: 16.0,
+            tablet: 24.0,
+            desktop: 32.0,
+          ),
+        ),
         child: Center(
           child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: isTablet ? 680 : double.infinity),
+            // Was a hand-rolled 680; maxFormWidth is the project ladder
+            // (infinity / 600 / 800) so this screen tracks the others.
+            constraints: BoxConstraints(
+              maxWidth: AppResponsive.maxFormWidth(context),
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -268,22 +323,40 @@ class _AddexpenceState extends State<Addexpence> {
                   width: double.infinity,
                   child: OutlinedButton.icon(
                     onPressed: () {
-                      Navigator.pushNamed(context, RouteNames.restaurantExpenseCategory);
+                      Navigator.pushNamed(
+                        context,
+                        RouteNames.restaurantExpenseCategory,
+                      );
                     },
-                    icon: Icon(Icons.category_rounded, size: AppResponsive.getValue(context, mobile: 18.0, tablet: 20.0, desktop: 22.0)),
+                    icon: Icon(
+                      Icons.category_rounded,
+                      size: AppResponsive.getValue(
+                        context,
+                        mobile: 18.0,
+                        tablet: 20.0,
+                        desktop: 22.0,
+                      ),
+                    ),
                     label: Text(
                       'Manage Categories',
                       style: GoogleFonts.poppins(
-                        fontSize: AppResponsive.getValue(context, mobile: 15.0, tablet: 16.0, desktop: 17.0),
+                        fontSize: AppResponsive.buttonFontSize(context),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.primary,
                       side: BorderSide(color: AppColors.primary, width: 2),
-                      padding: EdgeInsets.symmetric(vertical: AppResponsive.getValue(context, mobile: 14.0, tablet: 16.0, desktop: 18.0)),
+                      padding: EdgeInsets.symmetric(
+                        vertical: AppResponsive.getValue(
+                          context,
+                          mobile: 14.0,
+                          tablet: 16.0,
+                          desktop: 18.0,
+                        ),
+                      ),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(10),
                       ),
                     ),
                   ),
@@ -291,10 +364,19 @@ class _AddexpenceState extends State<Addexpence> {
                 SizedBox(height: 20),
                 // Form Container
                 Container(
-                  padding: EdgeInsets.all(AppResponsive.getValue(context, mobile: 20.0, tablet: 28.0, desktop: 36.0)),
+                  padding: EdgeInsets.all(
+                    AppResponsive.getValue(
+                      context,
+                      mobile: 20.0,
+                      tablet: 28.0,
+                      desktop: 36.0,
+                    ),
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.white,
-                    borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+                    borderRadius: BorderRadius.circular(
+                      AppResponsive.borderRadius(context),
+                    ),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withValues(alpha: 0.05),
@@ -321,7 +403,9 @@ class _AddexpenceState extends State<Addexpence> {
                                 readOnly: true,
                                 onTap: () => _pickedDate(context),
                                 validator: (value) {
-                                  if (_dateselect == null) return 'Please select a date';
+                                  if (_dateselect == null) {
+                                    return 'Please select a date';
+                                  }
                                   return null;
                                 },
                               ),
@@ -330,17 +414,33 @@ class _AddexpenceState extends State<Addexpence> {
                             Expanded(
                               child: AppTextField(
                                 controller: _amountController,
-                                label: 'Amount (${CurrencyHelper.currentSymbol})',
+                                focusNode: _amountFocus,
+                                label:
+                                    'Amount (${CurrencyHelper.currentSymbol})',
                                 hint: 'Enter amount',
                                 icon: Icons.attach_money_rounded,
-                                keyboardType: TextInputType.numberWithOptions(decimal: true),
+                                keyboardType: TextInputType.numberWithOptions(
+                                  decimal: true,
+                                ),
                                 inputFormatters: [
-                                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                                  FilteringTextInputFormatter.allow(
+                                    RegExp(r'^\d*\.?\d{0,2}'),
+                                  ),
                                 ],
+                                textInputAction: TextInputAction.next,
+                                // Dismiss the keyboard after Amount so the user can
+                                // pick the Category & Payment dropdowns; Reason is
+                                // typed afterwards and submits the form.
+                                onFieldSubmitted: (_) =>
+                                    FocusScope.of(context).unfocus(),
                                 validator: (value) {
-                                  if (value == null || value.trim().isEmpty) return 'Please enter amount';
+                                  if (value == null || value.trim().isEmpty) {
+                                    return 'Please enter amount';
+                                  }
                                   final amount = double.tryParse(value.trim());
-                                  if (amount == null || amount <= 0) return 'Enter a valid amount greater than 0';
+                                  if (amount == null || amount <= 0) {
+                                    return 'Enter a valid amount greater than 0';
+                                  }
                                   return null;
                                 },
                               ),
@@ -371,9 +471,12 @@ class _AddexpenceState extends State<Addexpence> {
                         // Reason
                         AppTextField(
                           controller: _reasonController,
+                          focusNode: _reasonFocus,
                           label: 'Reason',
                           hint: 'Enter reason (optional)',
                           icon: Icons.notes_rounded,
+                          textInputAction: TextInputAction.done,
+                          onFieldSubmitted: (_) => _addExpense(),
                         ),
 
                         SizedBox(height: 24),
@@ -381,7 +484,12 @@ class _AddexpenceState extends State<Addexpence> {
                         // Add Button
                         SizedBox(
                           width: double.infinity,
-                          height: AppResponsive.getValue(context, mobile: 50.0, tablet: 54.0, desktop: 58.0),
+                          height: AppResponsive.getValue(
+                            context,
+                            mobile: 50.0,
+                            tablet: 54.0,
+                            desktop: 58.0,
+                          ),
                           child: ElevatedButton(
                             onPressed: _isSaving ? null : _addExpense,
                             style: ElevatedButton.styleFrom(
@@ -389,19 +497,27 @@ class _AddexpenceState extends State<Addexpence> {
                               foregroundColor: Colors.white,
                               elevation: 0,
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(10),
                               ),
                             ),
                             child: _isSaving
                                 ? const SizedBox(
                                     width: 22,
                                     height: 22,
-                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
                                   )
                                 : Text(
                                     'Add Expense',
                                     style: GoogleFonts.poppins(
-                                      fontSize: AppResponsive.getValue(context, mobile: 16.0, tablet: 17.0, desktop: 18.0),
+                                      fontSize: AppResponsive.getValue(
+                                        context,
+                                        mobile: 16.0,
+                                        tablet: 17.0,
+                                        desktop: 18.0,
+                                      ),
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),

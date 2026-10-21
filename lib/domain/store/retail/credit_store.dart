@@ -1,9 +1,11 @@
 import 'package:mobx/mobx.dart';
+import 'package:billberrylite/util/common/short_ref.dart';
 import 'package:billberrylite/data/models/retail/hive_model/credit_payment_model_218.dart';
 import 'package:billberrylite/data/repositories/retail/credit_payment_repository.dart';
-import 'package:billberrylite/data/repositories/retail/customer_repository.dart';
+import 'package:billberrylite/data/repositories/common/customer_repository.dart';
 import 'package:billberrylite/data/repositories/retail/sale_repository.dart';
 import 'package:uuid/uuid.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
 
 import '../../../data/models/retail/hive_model/sale_model_203.dart';
 
@@ -210,11 +212,30 @@ abstract class _CreditStore with Store {
     }
 
     // Update customer credit balance
-    final newCreditBalance = customer.creditBalance - (amount - remainingPayment);
+    final collected = amount - remainingPayment;
+    final newCreditBalance = customer.creditBalance - collected;
     await _customerRepository.updateCredit(
       customerId,
-      -(amount - remainingPayment), // Negative to decrease balance
+      -collected, // Negative to decrease balance
     );
+
+    // Cash collected against credit physically lands in the drawer, but it is
+    // not a sale — so it never appeared in the expected-cash figure, and every
+    // day with a cash collection closed with a false overage. Recording it as a
+    // Cash In movement puts it through the drawer's existing totals and gives
+    // it its own line in the log.
+    //
+    // One movement for the whole settlement, not one per invoice: the customer
+    // handed over a single amount, and `collected` is what actually landed
+    // (`amount` may exceed the total due).
+    if (collected > 0 && paymentMode.toLowerCase().trim() == 'cash') {
+      await cashMovementStore.addMovement(
+        type: 'in',
+        amount: collected,
+        reason: 'Credit collection',
+        note: customer.name ?? customerId,
+      );
+    }
 
     // Reload data
     await loadData();
@@ -348,7 +369,7 @@ abstract class _CreditStore with Store {
             id: sale.saleId,
             date: sale.date,
             type: LedgerEntryType.creditSale,
-            description: 'Credit Sale (INV-${sale.saleId.substring(0, 8).toUpperCase()})',
+            description: 'Credit Sale (${sale.displayNumber})',
             amount: sale.totalAmount,
             runningBalance: runningBalance,
             saleId: sale.saleId,
@@ -412,7 +433,7 @@ abstract class _CreditStore with Store {
     final today = DateTime.now();
     final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
     return payments
-        .where((p) => p.date.startsWith(todayStr) && !(p.isWriteOff ?? false))
+        .where((p) => p.date.startsWith(todayStr) && p.isCollection)
         .fold<double>(0.0, (sum, p) => sum + p.amount);
   }
 }

@@ -6,6 +6,7 @@ import 'package:billberrylite/util/color.dart';
 import '../../../../data/models/restaurant/db/stock_movement_model.dart';
 import '../../../../data/repositories/restaurant/stock_movement_repository.dart';
 import '../../../widget/componets/common/primary_app_bar.dart';
+import '../../../../util/common/app_responsive.dart';
 
 /// Per-item stock movement history (manual add/remove log).
 class StockHistoryScreen extends StatefulWidget {
@@ -60,14 +61,19 @@ class _StockHistoryScreenState extends State<StockHistoryScreen> {
             child: Text(
               widget.itemName,
               style: GoogleFonts.poppins(
-                fontSize: 16,
+                fontSize: AppResponsive.subheadingFontSize(context),
                 fontWeight: FontWeight.w600,
                 color: AppColors.textPrimary,
               ),
             ),
           ),
           Expanded(
-            child: _movements.isEmpty ? _buildEmpty() : _buildList(),
+            child: AppResponsive.constrainedContent(
+              context: context,
+              maxWidth: AppResponsive.maxContentWidth(context),
+              alignment: Alignment.topCenter,
+              child: _movements.isEmpty ? _buildEmpty() : _buildList(),
+            ),
           ),
         ],
       ),
@@ -84,7 +90,7 @@ class _StockHistoryScreenState extends State<StockHistoryScreen> {
           Text(
             'No stock movements yet',
             style: GoogleFonts.poppins(
-              fontSize: 15,
+              fontSize: AppResponsive.bodyFontSize(context),
               fontWeight: FontWeight.w500,
               color: AppColors.textSecondary,
             ),
@@ -93,7 +99,9 @@ class _StockHistoryScreenState extends State<StockHistoryScreen> {
           Text(
             'Add or remove stock to start the log',
             style: GoogleFonts.poppins(
-                fontSize: 13, color: AppColors.textSecondary),
+              fontSize: AppResponsive.smallFontSize(context),
+              color: AppColors.textSecondary,
+            ),
           ),
         ],
       ),
@@ -124,7 +132,7 @@ class _StockHistoryScreenState extends State<StockHistoryScreen> {
 
   Widget _buildRow(StockMovementModel m) {
     final isIn = m.isIn;
-    final color = isIn ? AppColors.success : Colors.red;
+    final color = isIn ? AppColors.success : AppColors.danger;
     final variant = _variantOf(m);
     return Container(
       padding: const EdgeInsets.all(12),
@@ -155,7 +163,10 @@ class _StockHistoryScreenState extends State<StockHistoryScreen> {
               children: [
                 if (variant != null) ...[
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
                     margin: const EdgeInsets.only(bottom: 4),
                     decoration: BoxDecoration(
                       color: AppColors.primary.withValues(alpha: 0.1),
@@ -164,7 +175,7 @@ class _StockHistoryScreenState extends State<StockHistoryScreen> {
                     child: Text(
                       variant,
                       style: GoogleFonts.poppins(
-                        fontSize: 11,
+                        fontSize: AppResponsive.captionFontSize(context),
                         fontWeight: FontWeight.w600,
                         color: AppColors.primary,
                       ),
@@ -177,7 +188,7 @@ class _StockHistoryScreenState extends State<StockHistoryScreen> {
                     Text(
                       m.reason,
                       style: GoogleFonts.poppins(
-                        fontSize: 14,
+                        fontSize: AppResponsive.bodyFontSize(context),
                         fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary,
                       ),
@@ -185,7 +196,7 @@ class _StockHistoryScreenState extends State<StockHistoryScreen> {
                     Text(
                       '${isIn ? '+' : '−'}${_qty(m.quantity)} ${widget.unit}',
                       style: GoogleFonts.poppins(
-                        fontSize: 14,
+                        fontSize: AppResponsive.bodyFontSize(context),
                         fontWeight: FontWeight.w700,
                         color: color,
                       ),
@@ -196,16 +207,17 @@ class _StockHistoryScreenState extends State<StockHistoryScreen> {
                 Text(
                   'Balance: ${_qty(m.balanceAfter)} ${widget.unit}',
                   style: GoogleFonts.poppins(
-                      fontSize: 12, color: AppColors.textSecondary),
+                    fontSize: AppResponsive.smallFontSize(context),
+                    color: AppColors.textSecondary,
+                  ),
                 ),
                 if (m.note != null && m.note!.trim().isNotEmpty) ...[
                   const SizedBox(height: 2),
                   Text(
                     m.note!,
                     style: GoogleFonts.poppins(
-                      fontSize: 12,
+                      fontSize: AppResponsive.smallFontSize(context),
                       color: AppColors.textSecondary,
-                      fontStyle: FontStyle.italic,
                     ),
                   ),
                 ],
@@ -213,7 +225,9 @@ class _StockHistoryScreenState extends State<StockHistoryScreen> {
                 Text(
                   '${DateFormat('dd MMM yyyy · hh:mm a').format(m.timestamp)}  •  ${m.staffName}',
                   style: GoogleFonts.poppins(
-                      fontSize: 11, color: AppColors.textSecondary),
+                    fontSize: AppResponsive.captionFontSize(context),
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ],
             ),

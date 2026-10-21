@@ -3,11 +3,12 @@ import 'package:billberrylite/util/restaurant/restaurant_session.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
-import 'package:billberrylite/data/models/restaurant/db/categorymodel_300.dart';
+import 'package:billberrylite/data/models/common/categorymodel_300.dart';
 import 'package:billberrylite/util/restaurant/audit_trail_helper.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 
 class EditCategory extends StatefulWidget {
   final Category category;
@@ -41,24 +42,27 @@ class _EditCategoryState extends State<EditCategory> {
     }
 
     // Duplicate name check (excluding this category itself)
-    final duplicate = categoryStore.categories.any((c) =>
-        c.id != widget.category.id &&
-        c.name.toLowerCase() == trimmedName.toLowerCase());
+    final duplicate = categoryStore.categories.any(
+      (c) =>
+          c.id != widget.category.id &&
+          c.name.toLowerCase() == trimmedName.toLowerCase(),
+    );
     if (duplicate) {
-      NotificationService.instance
-          .showError('A category with this name already exists');
+      NotificationService.instance.showError(
+        'A category with this name already exists',
+      );
       return;
     }
 
     if (_isSaving) return;
     setState(() => _isSaving = true);
     try {
-      final updated = widget.category.copyWith(
-        name: trimmedName,
+      final updated = widget.category.copyWith(name: trimmedName);
+      AuditTrailHelper.trackEdit(
+        updated,
+        editedBy:
+            RestaurantSession.staffName ?? RestaurantSession.effectiveRole,
       );
-      AuditTrailHelper.trackEdit(updated,
-          editedBy:
-              RestaurantSession.staffName ?? RestaurantSession.effectiveRole);
       await categoryStore.updateCategory(updated);
       if (mounted) Navigator.pop(context, true);
     } finally {
@@ -72,14 +76,14 @@ class _EditCategoryState extends State<EditCategory> {
       backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(
         title: 'Edit Category',
-        titleFontSize: 18,
+        titleFontSize: AppResponsive.subheadingFontSize(context),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
         ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: AppResponsive.padding(context),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -92,7 +96,14 @@ class _EditCategoryState extends State<EditCategory> {
               required: true,
             ),
 
-            const SizedBox(height: 32),
+            SizedBox(
+              height: AppResponsive.getValue(
+                context,
+                mobile: 32.0,
+                tablet: 36.0,
+                desktop: 40.0,
+              ),
+            ),
 
             // ── Save Button ─────────────────────────────────────────────
             SizedBox(
@@ -105,23 +116,32 @@ class _EditCategoryState extends State<EditCategory> {
                         width: 18,
                         height: 18,
                         child: CircularProgressIndicator(
-                            strokeWidth: 2, color: Colors.white),
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
                       )
-                    : const Icon(Icons.check_circle_outline,
-                        color: Colors.white),
+                    : const Icon(
+                        Icons.check_circle_outline,
+                        color: Colors.white,
+                      ),
                 label: Text(
                   _isSaving ? 'Saving…' : 'Update Category',
                   style: GoogleFonts.poppins(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white),
+                    fontSize: AppResponsive.buttonFontSize(context),
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
-                  disabledBackgroundColor:
-                      AppColors.primary.withValues(alpha: 0.5),
+                  disabledBackgroundColor: AppColors.primary.withValues(
+                    alpha: 0.5,
+                  ),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                    borderRadius: BorderRadius.circular(
+                      AppResponsive.borderRadius(context),
+                    ),
+                  ),
                   elevation: 0,
                 ),
               ),

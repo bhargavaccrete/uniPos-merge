@@ -1,12 +1,17 @@
-
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/presentation/widget/componets/common/dialog_dispose_scope.dart';
 
 import '../../../../core/di/service_locator.dart';
+import '../../../../core/config/tax_feature.dart';
+import '../../../../util/restaurant/staticswitch.dart';
+import '../../../../domain/services/retail/store_settings_service.dart';
+import '../../../../core/plan/plan_guard.dart';
+import '../../../../core/plan/entitlement_keys.dart';
 import '../../../../util/restaurant/restaurant_session.dart';
 import '../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../data/models/restaurant/db/pastordermodel_313.dart';
@@ -21,7 +26,6 @@ import 'package:billberrylite/domain/services/restaurant/notification_service.da
 import '../../../../domain/services/restaurant/inventory_service.dart';
 import '../../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../../util/common/app_responsive.dart';
-
 
 class Activeorder extends StatefulWidget {
   const Activeorder({super.key});
@@ -65,10 +69,11 @@ class _ActiveorderState extends State<Activeorder> {
         final tableNo = message['tableNo'] as String?;
         final kotNumber = message['kotNumber'];
 
-
         // Show notification to user
         if (mounted && status != null) {
-          NotificationService.instance.showSuccess('KOT #$kotNumber: Status updated to $status');
+          NotificationService.instance.showSuccess(
+            'KOT #$kotNumber: Status updated to $status',
+          );
         }
 
         // UI will automatically refresh via ValueListenableBuilder
@@ -78,22 +83,25 @@ class _ActiveorderState extends State<Activeorder> {
         final newItemCount = message['newItemCount'];
         final tableNo = message['tableNo'];
 
-
         // Reload MobX store — updateOrderWithNewItems writes Hive directly, bypassing MobX
         await orderStore.loadOrders();
 
         // Show notification
         if (mounted) {
-          NotificationService.instance.showSuccess('New KOT #$kotNumber: $newItemCount items added to Table $tableNo');
+          NotificationService.instance.showSuccess(
+            'New KOT #$kotNumber: $newItemCount items added to Table $tableNo',
+          );
         }
       } else if (type == 'CANCEL_KOT') {
         final cancelKotNumber = message['cancelKotNumber'];
         final tableNo = message['tableNo'];
         final cancelledItems = message['cancelledItems'] as List? ?? [];
-        final itemSummary = cancelledItems.map((i) =>
-            '${i['quantity']}× ${i['title']}${i['variantName'] != null ? ' (${i['variantName']})' : ''}')
+        final itemSummary = cancelledItems
+            .map(
+              (i) =>
+                  '${i['quantity']}× ${i['title']}${i['variantName'] != null ? ' (${i['variantName']})' : ''}',
+            )
             .join(', ');
-
 
         // Reload MobX store so UI reflects removed items
         await orderStore.loadOrders();
@@ -107,10 +115,11 @@ class _ActiveorderState extends State<Activeorder> {
         final kotNumber = message['kotNumber'];
         final tableNo = message['tableNo'];
 
-
         // Show notification
         if (mounted) {
-          NotificationService.instance.showSuccess('New Order: KOT #$kotNumber - Table $tableNo');
+          NotificationService.instance.showSuccess(
+            'New Order: KOT #$kotNumber - Table $tableNo',
+          );
         }
       }
     });
@@ -124,217 +133,323 @@ class _ActiveorderState extends State<Activeorder> {
   }
 
   Future<void> _deleteOrder(String orderId) async {
+    // Plan gate — voiding a bill is billing.invoice.void. This path writes the
+    // VOID record directly (not via RefundService), so it needs its own check.
+    if (!PlanGuard.allowedOr(
+      context,
+      EntKeys.billingInvoiceVoid,
+      featureName: 'Void Order',
+    )) {
+      return;
+    }
     final String? voidReason = await _showVoidReasonDialog();
     if (voidReason == null) return;
 
     final order = orderStore.orders.where((o) => o.id == orderId).firstOrNull;
 
-      if (order != null) {
-        // Save to past orders as VOID so it appears in the Void Order Report
-        final voidRecord = PastOrderModel(
-          id: order.id,
-          customerName: order.customerName ?? '',
-          totalPrice: order.totalPrice,
-          items: order.items,
-          orderAt: order.timeStamp ?? DateTime.now(),
-          orderType: order.orderType,
-          paymentmode: 'N/A',
-          subTotal: order.subTotal,
-          gstAmount: order.gstAmount,
-          Discount: order.discount,
-          remark: order.remark,
-          tableNo: order.tableNo,
-          orderStatus: 'VOID',
-          billNumber: order.billNumber,
-          kotNumbers: order.kotNumbers,
-          kotBoundaries: order.kotBoundaries,
-          sessionId: order.sessionId,
-          voidedBy: RestaurantSession.isAdmin
-              ? 'Admin'
-              : '${RestaurantSession.staffName ?? 'Staff'} (${RestaurantSession.effectiveRole})',
-          voidReason: voidReason.isNotEmpty ? voidReason : null,
-        );
-        await pastOrderStore.addOrder(voidRecord);
+    if (order != null) {
+      // A settled dine-in order stays in the active list until served, so it
+      // can still be voided here. If it was already PAID, preserve the real
+      // payment (method + amount + split) and mark it 'VOIDED' — so the Void
+      // report shows it as paid (not "Unpaid") and a refund can be issued.
+      // An unpaid order deleted before payment stays 'VOID' with 'N/A'.
+      final bool wasPaid =
+          order.isPaid == true ||
+          (order.paymentStatus?.toLowerCase() == 'paid');
+      // Save to past orders as VOID/VOIDED so it appears in the Void Order Report
+      final voidRecord = PastOrderModel(
+        id: order.id,
+        customerName: order.customerName ?? '',
+        totalPrice: order.totalPrice,
+        items: order.items,
+        orderAt: order.timeStamp ?? DateTime.now(),
+        orderType: order.orderType,
+        paymentmode: wasPaid ? (order.paymentMethod ?? 'N/A') : 'N/A',
+        paymentListJson: wasPaid ? order.paymentListJson : null,
+        isSplitPayment: wasPaid ? order.isSplitPayment : null,
+        totalPaid: wasPaid ? order.totalPaid : null,
+        subTotal: order.subTotal,
+        gstAmount: order.gstAmount,
+        Discount: order.discount,
+        remark: order.remark,
+        tableNo: order.tableNo,
+        orderStatus: wasPaid ? 'VOIDED' : 'VOID',
+        billNumber: order.billNumber,
+        kotNumbers: order.kotNumbers,
+        kotBoundaries: order.kotBoundaries,
+        sessionId: order.sessionId,
+        voidedBy: RestaurantSession.isAdmin
+            ? 'Admin'
+            : '${RestaurantSession.staffName ?? 'Staff'} (${RestaurantSession.effectiveRole})',
+        voidReason: voidReason.isNotEmpty ? voidReason : null,
+        taxEnabled: TaxFeature.enabled,
+        storeGstNumber: await StoreSettingsService().gstNumberSnapshot(),
+        roundOffStep: AppSettings.roundOffStepForRecord,
+        discountOnItems: AppSettings.discountOnItems,
+      );
+      await pastOrderStore.addOrder(voidRecord);
 
-        // Restore stock only for items in KOTs that have NOT been served yet.
-        // Served KOT items were already consumed by the kitchen — don't restore.
-        {
-          final kotNums = order.kotNumbers;
-          final kotBounds = order.kotBoundaries;
-          final kotStatuses = Map<int, String>.from(order.kotStatuses ?? {});
-          final itemsToRestock = <CartItem, int>{};
+      // Restore stock only for items in KOTs that have NOT been served yet.
+      // Served KOT items were already consumed by the kitchen — don't restore.
+      {
+        final kotNums = order.kotNumbers;
+        final kotBounds = order.kotBoundaries;
+        final kotStatuses = Map<int, String>.from(order.kotStatuses ?? {});
+        final itemsToRestock = <CartItem, int>{};
 
-          int start = 0;
-          for (int i = 0; i < kotNums.length; i++) {
-            final kotNum = kotNums[i];
-            final end = (i < kotBounds.length ? kotBounds[i] : order.items.length)
-                .clamp(start, order.items.length);
-            final kotStatus = kotStatuses[kotNum] ?? order.status;
+        int start = 0;
+        for (int i = 0; i < kotNums.length; i++) {
+          final kotNum = kotNums[i];
+          final end = (i < kotBounds.length ? kotBounds[i] : order.items.length)
+              .clamp(start, order.items.length);
+          final kotStatus = kotStatuses[kotNum] ?? order.status;
 
-            if (kotStatus != 'Served') {
-              for (final item in order.items.sublist(start, end)) {
-                if (item.quantity > 0) {
-                  itemsToRestock[item] = (itemsToRestock[item] ?? 0) + item.quantity;
-                }
+          if (kotStatus != 'Served') {
+            for (final item in order.items.sublist(start, end)) {
+              if (item.quantity > 0) {
+                itemsToRestock[item] =
+                    (itemsToRestock[item] ?? 0) + item.quantity;
               }
             }
-            start = end;
           }
+          start = end;
+        }
 
-          if (itemsToRestock.isNotEmpty) {
-            await InventoryService.restoreStockForRefund(itemsToRestock);
-          }
+        if (itemsToRestock.isNotEmpty) {
+          await InventoryService.restoreStockForRefund(itemsToRestock);
         }
       }
+    }
 
-      await orderStore.deleteOrder(orderId);
+    await orderStore.deleteOrder(orderId);
 
-      // Reset the table to Available so it no longer shows as occupied
-      if (order?.tableNo != null && order!.tableNo!.isNotEmpty) {
-        await tableStore.updateTableStatus(order.tableNo!, 'Available');
-      }
+    // Reset the table to Available so it no longer shows as occupied
+    if (order?.tableNo != null && order!.tableNo!.isNotEmpty) {
+      await tableStore.updateTableStatus(order.tableNo!, 'Available');
+    }
   }
-
-
 
   Future<String?> _showVoidReasonDialog() async {
     final reasonCtrl = TextEditingController();
-    const quickReasons = ['Wrong order', 'Customer cancelled', 'Item unavailable', 'Test order'];
+    const quickReasons = [
+      'Wrong order',
+      'Customer cancelled',
+      'Item unavailable',
+      'Test order',
+    ];
 
     final result = await showDialog<String?>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialog) {
-          return Dialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 40),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: AppColors.danger.withOpacity(0.08),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(Icons.block, size: 18, color: AppColors.danger),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text('Void Order',
-                            style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w700)),
-                      ),
-                      IconButton(
-                        onPressed: () => Navigator.pop(ctx, null),
-                        icon: Icon(Icons.close, size: 18, color: AppColors.textSecondary),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: quickReasons.map((r) {
-                      final selected = reasonCtrl.text == r;
-                      return GestureDetector(
-                        onTap: () => setDialog(() {
-                          reasonCtrl.text = r;
-                          reasonCtrl.selection = TextSelection.collapsed(offset: r.length);
-                        }),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      builder: (ctx) => DialogDisposeScope(
+        disposables: [reasonCtrl],
+        child: StatefulBuilder(
+          builder: (ctx, setDialog) {
+            return Dialog(
+              backgroundColor: AppColors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(
+                  AppResponsive.borderRadius(context),
+                ),
+              ),
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 28,
+                vertical: 40,
+              ),
+              child: Padding(
+                padding: EdgeInsets.all(
+                  AppResponsive.extraLargeSpacing(context),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: EdgeInsets.all(
+                            AppResponsive.smallSpacing(context),
+                          ),
                           decoration: BoxDecoration(
-                            color: selected ? AppColors.primary.withOpacity(0.1) : AppColors.surfaceMedium,
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(
-                              color: selected ? AppColors.primary : AppColors.divider,
+                            color: AppColors.danger.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(
+                              AppResponsive.smallBorderRadius(context),
                             ),
                           ),
-                          child: Text(r,
-                              style: GoogleFonts.poppins(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                                color: selected ? AppColors.primary : AppColors.textSecondary,
-                              )),
+                          child: Icon(
+                            Icons.block,
+                            size: AppResponsive.smallIconSize(context),
+                            color: AppColors.danger,
+                          ),
                         ),
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: reasonCtrl,
-                    onChanged: (_) => setDialog(() {}),
-                    decoration: InputDecoration(
-                      hintText: 'Or type a reason (optional)',
-                      hintStyle: GoogleFonts.poppins(fontSize: 13, color: AppColors.textSecondary),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: AppColors.divider),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: AppColors.divider),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: AppColors.primary),
-                      ),
-                    ),
-                    style: GoogleFonts.poppins(fontSize: 13),
-                    maxLines: 2,
-                  ),
-                  const SizedBox(height: 20),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
+                        SizedBox(width: AppResponsive.mediumSpacing(context)),
+                        Expanded(
+                          child: Text(
+                            'Void Order',
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.subheadingFontSize(
+                                context,
+                              ),
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        IconButton(
                           onPressed: () => Navigator.pop(ctx, null),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 13),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            side: BorderSide(color: AppColors.divider),
+                          icon: Icon(
+                            Icons.close,
+                            size: AppResponsive.smallIconSize(context),
+                            color: AppColors.textSecondary,
                           ),
-                          child: Text('Cancel',
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: AppResponsive.largeSpacing(context)),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: quickReasons.map((r) {
+                        final selected = reasonCtrl.text == r;
+                        return GestureDetector(
+                          onTap: () => setDialog(() {
+                            reasonCtrl.text = r;
+                            reasonCtrl.selection = TextSelection.collapsed(
+                              offset: r.length,
+                            );
+                          }),
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: AppResponsive.smallSpacing(context),
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: selected
+                                  ? AppColors.primary.withOpacity(0.1)
+                                  : AppColors.surfaceMedium,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: selected
+                                    ? AppColors.primary
+                                    : AppColors.divider,
+                              ),
+                            ),
+                            child: Text(
+                              r,
                               style: GoogleFonts.poppins(
-                                  fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        flex: 2,
-                        child: ElevatedButton(
-                          onPressed: () => Navigator.pop(ctx, reasonCtrl.text.trim()),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.danger,
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            padding: const EdgeInsets.symmetric(vertical: 13),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                fontSize: AppResponsive.smallFontSize(context),
+                                fontWeight: FontWeight.w500,
+                                color: selected
+                                    ? AppColors.primary
+                                    : AppColors.textSecondary,
+                              ),
+                            ),
                           ),
-                          child: Text('Void Order',
-                              style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600)),
+                        );
+                      }).toList(),
+                    ),
+                    SizedBox(height: AppResponsive.mediumSpacing(context)),
+                    TextField(
+                      controller: reasonCtrl,
+                      autofocus: true,
+                      onChanged: (_) => setDialog(() {}),
+                      decoration: InputDecoration(
+                        hintText: 'Or type a reason (optional)',
+                        hintStyle: GoogleFonts.poppins(
+                          fontSize: AppResponsive.smallFontSize(context),
+                          color: AppColors.textSecondary,
+                        ),
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: AppResponsive.mediumSpacing(context),
+                          vertical: AppResponsive.smallSpacing(context),
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(
+                            AppResponsive.smallBorderRadius(context),
+                          ),
+                          borderSide: BorderSide(color: AppColors.divider),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(
+                            AppResponsive.smallBorderRadius(context),
+                          ),
+                          borderSide: BorderSide(color: AppColors.divider),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(
+                            AppResponsive.smallBorderRadius(context),
+                          ),
+                          borderSide: BorderSide(color: AppColors.primary),
                         ),
                       ),
-                    ],
-                  ),
-                ],
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.bodyFontSize(context),
+                      ),
+                      maxLines: 2,
+                    ),
+                    SizedBox(height: AppResponsive.largeSpacing(context)),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.pop(ctx, null),
+                            style: OutlinedButton.styleFrom(
+                              padding: EdgeInsets.symmetric(
+                                vertical: AppResponsive.mediumSpacing(context),
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              side: BorderSide(color: AppColors.divider),
+                            ),
+                            child: Text(
+                              'Cancel',
+                              style: GoogleFonts.poppins(
+                                fontSize: AppResponsive.bodyFontSize(context),
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: AppResponsive.mediumSpacing(context)),
+                        Expanded(
+                          flex: 2,
+                          child: ElevatedButton(
+                            onPressed: () =>
+                                Navigator.pop(ctx, reasonCtrl.text.trim()),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.danger,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              padding: EdgeInsets.symmetric(
+                                vertical: AppResponsive.mediumSpacing(context),
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            child: Text(
+                              'Void Order',
+                              style: GoogleFonts.poppins(
+                                fontSize: AppResponsive.bodyFontSize(context),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
 
-    reasonCtrl.dispose();
     return result;
   }
 
@@ -355,7 +470,7 @@ class _ActiveorderState extends State<Activeorder> {
 
   // In _ActiveorderState class
 
-// Status flow order for stepper
+  // Status flow order for stepper
   static const _statusFlow = ['Processing', 'Cooking', 'Ready', 'Served'];
 
   static const _statusColors = {
@@ -374,7 +489,7 @@ class _ActiveorderState extends State<Activeorder> {
 
   int _statusIndex(String status) => _statusFlow.indexOf(status).clamp(0, 3);
 
-// This function shows the main dialog with KOT-level status updates
+  // This function shows the main dialog with KOT-level status updates
   void _showStatusUpdateDialog(OrderModel order, bool istakeaway) {
     // Local mutable copy of KOT statuses — updated optimistically inside the dialog
     final kotStatuses = Map<int, String>.from(order.kotStatuses ?? {});
@@ -390,11 +505,15 @@ class _ActiveorderState extends State<Activeorder> {
             // ── helpers ────────────────────────────────────────────────
             Future<void> updateOne(int kotNum, String newStatus) async {
               setDialogState(() => kotStatuses[kotNum] = newStatus);
-              final allServed = order.kotNumbers.every((k) => kotStatuses[k] == 'Served');
+              final allServed = order.kotNumbers.every(
+                (k) => kotStatuses[k] == 'Served',
+              );
               if (newStatus == 'Served' && allServed) {
                 final latestOrder = orderStore.orders.firstWhere(
-                  (o) => o.id == order.id, orElse: () => order);
-                if (latestOrder.paymentStatus == 'Paid') {
+                  (o) => o.id == order.id,
+                  orElse: () => order,
+                );
+                if (latestOrder.isFullyPaid) {
                   Navigator.pop(dialogContext);
                   await _moveOrderToPast(latestOrder);
                   return;
@@ -407,13 +526,13 @@ class _ActiveorderState extends State<Activeorder> {
               for (final k in order.kotNumbers) {
                 setDialogState(() => kotStatuses[k] = newStatus);
               }
-              await Future.wait(
-                order.kotNumbers.map((k) => _updateKotStatus(order, k, newStatus)),
-              );
+              await _updateAllKotStatuses(order, order.kotNumbers, newStatus);
               if (newStatus == 'Served') {
                 final latestOrder = orderStore.orders.firstWhere(
-                  (o) => o.id == order.id, orElse: () => order);
-                if (latestOrder.paymentStatus == 'Paid') {
+                  (o) => o.id == order.id,
+                  orElse: () => order,
+                );
+                if (latestOrder.isFullyPaid) {
                   if (dialogContext.mounted) Navigator.pop(dialogContext);
                   await _moveOrderToPast(latestOrder);
                 }
@@ -421,13 +540,21 @@ class _ActiveorderState extends State<Activeorder> {
             }
 
             // ── derived state ──────────────────────────────────────────
-            final allServed = order.kotNumbers.every((k) => kotStatuses[k] == 'Served');
-            final overallStatus = _calculateOverallStatus(kotStatuses, order.kotNumbers);
+            final allServed = order.kotNumbers.every(
+              (k) => kotStatuses[k] == 'Served',
+            );
+            final overallStatus = _calculateOverallStatus(
+              kotStatuses,
+              order.kotNumbers,
+            );
             final hasMultipleKots = order.kotNumbers.length > 1;
 
             // ── UI ─────────────────────────────────────────────────────
             return Dialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              backgroundColor: AppColors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 440),
                 child: Column(
@@ -435,36 +562,50 @@ class _ActiveorderState extends State<Activeorder> {
                   children: [
                     // ── Header ────────────────────────────────────────
                     Container(
-                      padding: const EdgeInsets.fromLTRB(20, 20, 12, 16),
+                      padding: EdgeInsets.fromLTRB(
+                        AppResponsive.largeSpacing(context),
+                        AppResponsive.largeSpacing(context),
+                        AppResponsive.mediumSpacing(context),
+                        AppResponsive.largeSpacing(context),
+                      ),
                       decoration: BoxDecoration(
                         color: AppColors.primary.withValues(alpha: 0.05),
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(20),
+                        ),
                       ),
                       child: Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(10),
+                            padding: EdgeInsets.all(
+                              AppResponsive.smallSpacing(context),
+                            ),
                             decoration: BoxDecoration(
                               color: AppColors.primary.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(
+                                AppResponsive.borderRadius(context),
+                              ),
                             ),
                             child: Icon(
                               Icons.receipt_long_rounded,
                               color: AppColors.primary,
-                              size: 22,
+                              size: AppResponsive.iconSize(context),
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          SizedBox(width: AppResponsive.mediumSpacing(context)),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  (order.tableNo != null && order.tableNo!.isNotEmpty)
+                                  (order.tableNo != null &&
+                                          order.tableNo!.isNotEmpty)
                                       ? 'Table ${order.tableNo}'
                                       : order.orderType,
                                   style: GoogleFonts.poppins(
-                                    fontSize: 17,
+                                    fontSize: AppResponsive.subheadingFontSize(
+                                      context,
+                                    ),
                                     fontWeight: FontWeight.w700,
                                     color: Colors.black87,
                                   ),
@@ -475,7 +616,9 @@ class _ActiveorderState extends State<Activeorder> {
                                       width: 8,
                                       height: 8,
                                       decoration: BoxDecoration(
-                                        color: _statusColors[overallStatus] ?? AppColors.textSecondary,
+                                        color:
+                                            _statusColors[overallStatus] ??
+                                            AppColors.textSecondary,
                                         shape: BoxShape.circle,
                                       ),
                                     ),
@@ -483,15 +626,21 @@ class _ActiveorderState extends State<Activeorder> {
                                     Text(
                                       overallStatus,
                                       style: GoogleFonts.poppins(
-                                        fontSize: 13,
+                                        fontSize: AppResponsive.smallFontSize(
+                                          context,
+                                        ),
                                         fontWeight: FontWeight.w500,
-                                        color: _statusColors[overallStatus] ?? AppColors.textSecondary,
+                                        color:
+                                            _statusColors[overallStatus] ??
+                                            AppColors.textSecondary,
                                       ),
                                     ),
                                     Text(
                                       '  •  ${order.kotNumbers.length} KOT${order.kotNumbers.length > 1 ? 's' : ''}',
                                       style: GoogleFonts.poppins(
-                                        fontSize: 12,
+                                        fontSize: AppResponsive.smallFontSize(
+                                          context,
+                                        ),
                                         color: AppColors.textSecondary,
                                       ),
                                     ),
@@ -502,7 +651,11 @@ class _ActiveorderState extends State<Activeorder> {
                           ),
                           IconButton(
                             onPressed: () => Navigator.pop(dialogContext),
-                            icon: Icon(Icons.close_rounded, color: AppColors.textSecondary, size: 22),
+                            icon: Icon(
+                              Icons.close_rounded,
+                              color: AppColors.textSecondary,
+                              size: AppResponsive.iconSize(context),
+                            ),
                           ),
                         ],
                       ),
@@ -511,7 +664,12 @@ class _ActiveorderState extends State<Activeorder> {
                     // ── Content ───────────────────────────────────────
                     Flexible(
                       child: SingleChildScrollView(
-                        padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+                        padding: EdgeInsets.fromLTRB(
+                          AppResponsive.largeSpacing(context),
+                          AppResponsive.largeSpacing(context),
+                          AppResponsive.largeSpacing(context),
+                          AppResponsive.largeSpacing(context),
+                        ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
@@ -520,32 +678,54 @@ class _ActiveorderState extends State<Activeorder> {
                             if (allServed)
                               Container(
                                 width: double.infinity,
-                                padding: const EdgeInsets.all(16),
-                                margin: const EdgeInsets.only(bottom: 16),
+                                padding: AppResponsive.padding(context),
+                                margin: EdgeInsets.only(
+                                  bottom: AppResponsive.largeSpacing(context),
+                                ),
                                 decoration: BoxDecoration(
                                   color: AppColors.success.withOpacity(0.08),
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(color: AppColors.success.withOpacity(0.3)),
+                                  borderRadius: BorderRadius.circular(
+                                    AppResponsive.borderRadius(context),
+                                  ),
+                                  border: Border.all(
+                                    color: AppColors.success.withOpacity(0.3),
+                                  ),
                                 ),
                                 child: Row(
                                   children: [
                                     Container(
-                                      padding: const EdgeInsets.all(8),
+                                      padding: EdgeInsets.all(
+                                        AppResponsive.smallSpacing(context),
+                                      ),
                                       decoration: BoxDecoration(
-                                        color: AppColors.success.withOpacity(0.15),
+                                        color: AppColors.success.withOpacity(
+                                          0.15,
+                                        ),
                                         shape: BoxShape.circle,
                                       ),
-                                      child: Icon(Icons.check_rounded, color: AppColors.success, size: 20),
+                                      child: Icon(
+                                        Icons.check_rounded,
+                                        color: AppColors.success,
+                                        size: AppResponsive.iconSize(context),
+                                      ),
                                     ),
-                                    const SizedBox(width: 12),
+                                    SizedBox(
+                                      width: AppResponsive.mediumSpacing(
+                                        context,
+                                      ),
+                                    ),
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Text(
                                             'All KOTs Served',
                                             style: GoogleFonts.poppins(
-                                              fontSize: 14,
+                                              fontSize:
+                                                  AppResponsive.bodyFontSize(
+                                                    context,
+                                                  ),
                                               fontWeight: FontWeight.w600,
                                               color: AppColors.success,
                                             ),
@@ -553,7 +733,10 @@ class _ActiveorderState extends State<Activeorder> {
                                           Text(
                                             'Order is ready for settlement',
                                             style: GoogleFonts.poppins(
-                                              fontSize: 12,
+                                              fontSize:
+                                                  AppResponsive.smallFontSize(
+                                                    context,
+                                                  ),
                                               color: AppColors.success,
                                             ),
                                           ),
@@ -569,47 +752,93 @@ class _ActiveorderState extends State<Activeorder> {
                               Text(
                                 'Quick Actions',
                                 style: GoogleFonts.poppins(
-                                  fontSize: 13,
+                                  fontSize: AppResponsive.bodyFontSize(context),
                                   fontWeight: FontWeight.w600,
                                   color: AppColors.textSecondary,
                                 ),
                               ),
-                              const SizedBox(height: 8),
+                              SizedBox(
+                                height: AppResponsive.smallSpacing(context),
+                              ),
                               Row(
                                 children: [
-                                  _buildBulkChip('All Cooking', AppColors.warning, Icons.local_fire_department_rounded, () => updateAll('Cooking')),
-                                  const SizedBox(width: 8),
-                                  _buildBulkChip('All Ready', AppColors.info, Icons.room_service_rounded, () => updateAll('Ready')),
-                                  const SizedBox(width: 8),
-                                  _buildBulkChip('All Served', AppColors.success, Icons.check_circle_rounded, () => updateAll('Served')),
+                                  _buildBulkChip(
+                                    'All Cooking',
+                                    AppColors.warning,
+                                    Icons.local_fire_department_rounded,
+                                    () => updateAll('Cooking'),
+                                  ),
+                                  SizedBox(
+                                    width: AppResponsive.smallSpacing(context),
+                                  ),
+                                  _buildBulkChip(
+                                    'All Ready',
+                                    AppColors.info,
+                                    Icons.room_service_rounded,
+                                    () => updateAll('Ready'),
+                                  ),
+                                  SizedBox(
+                                    width: AppResponsive.smallSpacing(context),
+                                  ),
+                                  _buildBulkChip(
+                                    'All Served',
+                                    AppColors.success,
+                                    Icons.check_circle_rounded,
+                                    () => updateAll('Served'),
+                                  ),
                                 ],
                               ),
-                              const SizedBox(height: 20),
+                              SizedBox(
+                                height: AppResponsive.largeSpacing(context),
+                              ),
                             ],
 
                             // ── KOT cards ─────────────────────────────
                             ...order.kotNumbers.map((kotNum) {
-                              final currentStatus = kotStatuses[kotNum] ?? order.status;
+                              final currentStatus =
+                                  kotStatuses[kotNum] ?? order.status;
                               final currentIdx = _statusIndex(currentStatus);
                               final kotIndex = order.kotNumbers.indexOf(kotNum);
-                              final startIndex = kotIndex == 0 ? 0 : order.kotBoundaries[kotIndex - 1];
-                              final endIndex = order.kotBoundaries[kotIndex];
+                              // Defensive: KOT boundaries can drift past the item
+                              // count (e.g. items removed) — clamp so sublist()
+                              // never throws a RangeError while rendering.
+                              final int itemLen = order.items.length;
+                              final int endIndex =
+                                  (kotIndex < order.kotBoundaries.length
+                                          ? order.kotBoundaries[kotIndex]
+                                          : itemLen)
+                                      .clamp(0, itemLen);
+                              final int startIndex =
+                                  (kotIndex == 0
+                                          ? 0
+                                          : order.kotBoundaries[kotIndex - 1])
+                                      .clamp(0, endIndex);
                               final itemCount = endIndex - startIndex;
                               final isServed = currentStatus == 'Served';
-                              final statusColor = _statusColors[currentStatus] ?? AppColors.textSecondary;
+                              final statusColor =
+                                  _statusColors[currentStatus] ??
+                                  AppColors.textSecondary;
 
                               return Container(
-                                margin: const EdgeInsets.only(bottom: 12),
+                                margin: EdgeInsets.only(
+                                  bottom: AppResponsive.mediumSpacing(context),
+                                ),
                                 decoration: BoxDecoration(
                                   color: Colors.white,
-                                  borderRadius: BorderRadius.circular(14),
+                                  borderRadius: BorderRadius.circular(
+                                    AppResponsive.borderRadius(context),
+                                  ),
                                   border: Border.all(
-                                    color: isServed ? AppColors.success.withOpacity(0.4) : AppColors.divider,
+                                    color: isServed
+                                        ? AppColors.success.withOpacity(0.4)
+                                        : AppColors.divider,
                                     width: 1.5,
                                   ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.03),
+                                      color: Colors.black.withValues(
+                                        alpha: 0.03,
+                                      ),
                                       blurRadius: 8,
                                       offset: const Offset(0, 2),
                                     ),
@@ -619,38 +848,65 @@ class _ActiveorderState extends State<Activeorder> {
                                   children: [
                                     // KOT header
                                     Padding(
-                                      padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+                                      padding: EdgeInsets.fromLTRB(
+                                        AppResponsive.mediumSpacing(context),
+                                        AppResponsive.mediumSpacing(context),
+                                        AppResponsive.mediumSpacing(context),
+                                        AppResponsive.smallSpacing(context),
+                                      ),
                                       child: Row(
                                         children: [
                                           Container(
-                                            padding: const EdgeInsets.all(8),
+                                            padding: EdgeInsets.all(
+                                              AppResponsive.smallSpacing(
+                                                context,
+                                              ),
+                                            ),
                                             decoration: BoxDecoration(
-                                              color: statusColor.withValues(alpha: 0.1),
-                                              borderRadius: BorderRadius.circular(10),
+                                              color: statusColor.withValues(
+                                                alpha: 0.1,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
                                             ),
                                             child: Icon(
-                                              _statusIcons[currentStatus] ?? Icons.receipt,
+                                              _statusIcons[currentStatus] ??
+                                                  Icons.receipt,
                                               color: statusColor,
-                                              size: 18,
+                                              size: AppResponsive.smallIconSize(
+                                                context,
+                                              ),
                                             ),
                                           ),
-                                          const SizedBox(width: 10),
+                                          SizedBox(
+                                            width: AppResponsive.smallSpacing(
+                                              context,
+                                            ),
+                                          ),
                                           Expanded(
                                             child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
                                               children: [
                                                 Text(
                                                   'KOT #$kotNum',
                                                   style: GoogleFonts.poppins(
-                                                    fontSize: 14,
+                                                    fontSize:
+                                                        AppResponsive.bodyFontSize(
+                                                          context,
+                                                        ),
                                                     fontWeight: FontWeight.w600,
                                                   ),
                                                 ),
                                                 Text(
                                                   '$itemCount item${itemCount > 1 ? 's' : ''}',
                                                   style: GoogleFonts.poppins(
-                                                    fontSize: 12,
-                                                    color: AppColors.textSecondary,
+                                                    fontSize:
+                                                        AppResponsive.smallFontSize(
+                                                          context,
+                                                        ),
+                                                    color:
+                                                        AppColors.textSecondary,
                                                   ),
                                                 ),
                                               ],
@@ -658,23 +914,43 @@ class _ActiveorderState extends State<Activeorder> {
                                           ),
                                           // Status badge
                                           Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal:
+                                                  AppResponsive.smallSpacing(
+                                                    context,
+                                                  ),
+                                              vertical: 4,
+                                            ),
                                             decoration: BoxDecoration(
-                                              color: statusColor.withValues(alpha: 0.1),
-                                              borderRadius: BorderRadius.circular(20),
-                                              border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+                                              color: statusColor.withValues(
+                                                alpha: 0.1,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(20),
+                                              border: Border.all(
+                                                color: statusColor.withValues(
+                                                  alpha: 0.3,
+                                                ),
+                                              ),
                                             ),
                                             child: Row(
                                               mainAxisSize: MainAxisSize.min,
                                               children: [
                                                 if (isServed) ...[
-                                                  Icon(Icons.check_rounded, size: 13, color: statusColor),
+                                                  Icon(
+                                                    Icons.check_rounded,
+                                                    size: 13,
+                                                    color: statusColor,
+                                                  ),
                                                   const SizedBox(width: 4),
                                                 ],
                                                 Text(
                                                   currentStatus,
                                                   style: GoogleFonts.poppins(
-                                                    fontSize: 11,
+                                                    fontSize:
+                                                        AppResponsive.captionFontSize(
+                                                          context,
+                                                        ),
                                                     fontWeight: FontWeight.w600,
                                                     color: statusColor,
                                                   ),
@@ -689,15 +965,24 @@ class _ActiveorderState extends State<Activeorder> {
                                     // Progress dots + next action (only if not served)
                                     if (!isServed)
                                       Padding(
-                                        padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+                                        padding: EdgeInsets.fromLTRB(
+                                          AppResponsive.mediumSpacing(context),
+                                          0,
+                                          AppResponsive.mediumSpacing(context),
+                                          AppResponsive.mediumSpacing(context),
+                                        ),
                                         child: Row(
                                           children: [
                                             // Compact dot progress indicator
-                                            ...List.generate(_statusFlow.length, (i) {
-                                              final dotColor = _statusColors[_statusFlow[i]]!;
+                                            ...List.generate(_statusFlow.length, (
+                                              i,
+                                            ) {
+                                              final dotColor =
+                                                  _statusColors[_statusFlow[i]]!;
                                               final isPast = i < currentIdx;
                                               final isCurrent = i == currentIdx;
-                                              final isLast = i == _statusFlow.length - 1;
+                                              final isLast =
+                                                  i == _statusFlow.length - 1;
 
                                               return Row(
                                                 mainAxisSize: MainAxisSize.min,
@@ -706,14 +991,21 @@ class _ActiveorderState extends State<Activeorder> {
                                                     width: isCurrent ? 22 : 14,
                                                     height: 14,
                                                     decoration: BoxDecoration(
-                                                      color: (isPast || isCurrent)
+                                                      color:
+                                                          (isPast || isCurrent)
                                                           ? dotColor
                                                           : AppColors.divider,
-                                                      borderRadius: BorderRadius.circular(7),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            7,
+                                                          ),
                                                     ),
                                                     child: (isPast || isCurrent)
                                                         ? Icon(
-                                                            isPast ? Icons.check_rounded : _statusIcons[_statusFlow[i]]!,
+                                                            isPast
+                                                                ? Icons
+                                                                      .check_rounded
+                                                                : _statusIcons[_statusFlow[i]]!,
                                                             size: 10,
                                                             color: Colors.white,
                                                           )
@@ -724,7 +1016,9 @@ class _ActiveorderState extends State<Activeorder> {
                                                       width: 8,
                                                       height: 2,
                                                       color: isPast
-                                                          ? dotColor.withValues(alpha: 0.5)
+                                                          ? dotColor.withValues(
+                                                              alpha: 0.5,
+                                                            )
                                                           : AppColors.divider,
                                                     ),
                                                 ],
@@ -734,29 +1028,54 @@ class _ActiveorderState extends State<Activeorder> {
                                             const Spacer(),
 
                                             // Next step button
-                                            if (currentIdx < _statusFlow.length - 1)
+                                            if (currentIdx <
+                                                _statusFlow.length - 1)
                                               () {
-                                                final nextStatus = _statusFlow[currentIdx + 1];
-                                                final nextColor = _statusColors[nextStatus]!;
+                                                final nextStatus =
+                                                    _statusFlow[currentIdx + 1];
+                                                final nextColor =
+                                                    _statusColors[nextStatus]!;
                                                 return SizedBox(
                                                   height: 32,
                                                   child: ElevatedButton.icon(
-                                                    onPressed: () => updateOne(kotNum, nextStatus),
-                                                    icon: Icon(_statusIcons[nextStatus]!, size: 14),
+                                                    onPressed: () => updateOne(
+                                                      kotNum,
+                                                      nextStatus,
+                                                    ),
+                                                    icon: Icon(
+                                                      _statusIcons[nextStatus]!,
+                                                      size: 14,
+                                                    ),
                                                     label: Text(
                                                       nextStatus,
                                                       style: GoogleFonts.poppins(
-                                                        fontSize: 12,
-                                                        fontWeight: FontWeight.w600,
+                                                        fontSize:
+                                                            AppResponsive.smallFontSize(
+                                                              context,
+                                                            ),
+                                                        fontWeight:
+                                                            FontWeight.w600,
                                                       ),
                                                     ),
                                                     style: ElevatedButton.styleFrom(
-                                                      backgroundColor: nextColor,
-                                                      foregroundColor: Colors.white,
+                                                      backgroundColor:
+                                                          nextColor,
+                                                      foregroundColor:
+                                                          Colors.white,
                                                       elevation: 0,
-                                                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                                                      padding: EdgeInsets.symmetric(
+                                                        horizontal:
+                                                            AppResponsive.mediumSpacing(
+                                                              context,
+                                                            ),
+                                                      ),
                                                       shape: RoundedRectangleBorder(
-                                                        borderRadius: BorderRadius.circular(8),
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              AppResponsive.smallBorderRadius(
+                                                                context,
+                                                              ),
+                                                            ),
                                                       ),
                                                     ),
                                                   ),
@@ -768,47 +1087,114 @@ class _ActiveorderState extends State<Activeorder> {
 
                                     // Item list for this KOT — cancel buttons shown only for non-served KOTs
                                     Padding(
-                                      padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+                                      padding: EdgeInsets.fromLTRB(
+                                        AppResponsive.mediumSpacing(context),
+                                        0,
+                                        AppResponsive.mediumSpacing(context),
+                                        AppResponsive.smallSpacing(context),
+                                      ),
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
-                                          Divider(height: 16, color: AppColors.divider),
-                                          ...order.items.sublist(startIndex, endIndex).asMap().entries.map((e) {
+                                          Divider(
+                                            height: 16,
+                                            color: AppColors.divider,
+                                          ),
+                                          ...order.items.sublist(startIndex, endIndex).asMap().entries.map((
+                                            e,
+                                          ) {
                                             final item = e.value;
                                             return Padding(
-                                              padding: const EdgeInsets.symmetric(vertical: 3),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    vertical: 3,
+                                                  ),
                                               child: Row(
                                                 children: [
                                                   Container(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          horizontal: 6,
+                                                          vertical: 2,
+                                                        ),
                                                     decoration: BoxDecoration(
-                                                      color: AppColors.primary.withValues(alpha: 0.08),
-                                                      borderRadius: BorderRadius.circular(6),
+                                                      color: AppColors.primary
+                                                          .withValues(
+                                                            alpha: 0.08,
+                                                          ),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            6,
+                                                          ),
                                                     ),
-                                                    child: Text('${item.quantity}×',
-                                                      style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primary)),
+                                                    child: Text(
+                                                      '${item.quantity}×',
+                                                      style: GoogleFonts.poppins(
+                                                        fontSize:
+                                                            AppResponsive.captionFontSize(
+                                                              context,
+                                                            ),
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                        color:
+                                                            AppColors.primary,
+                                                      ),
+                                                    ),
                                                   ),
-                                                  const SizedBox(width: 8),
+                                                  SizedBox(
+                                                    width:
+                                                        AppResponsive.smallSpacing(
+                                                          context,
+                                                        ),
+                                                  ),
                                                   Expanded(
                                                     child: Text(
                                                       '${item.title}${item.variantName != null ? ' (${item.variantName})' : ''}',
-                                                      style: GoogleFonts.poppins(fontSize: 12),
+                                                      style: GoogleFonts.poppins(
+                                                        fontSize:
+                                                            AppResponsive.smallFontSize(
+                                                              context,
+                                                            ),
+                                                      ),
                                                       maxLines: 1,
-                                                      overflow: TextOverflow.ellipsis,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
                                                     ),
                                                   ),
                                                   if (!isServed)
                                                     InkWell(
-                                                      onTap: () => _cancelKotItem(
-                                                        order: order,
-                                                        kotIndex: kotIndex,
-                                                        itemIndexInOrder: startIndex + e.key,
-                                                        dialogContext: dialogContext,
-                                                      ),
-                                                      borderRadius: BorderRadius.circular(12),
+                                                      onTap: () =>
+                                                          _cancelKotItem(
+                                                            order: order,
+                                                            kotIndex: kotIndex,
+                                                            itemIndexInOrder:
+                                                                startIndex +
+                                                                e.key,
+                                                            dialogContext:
+                                                                dialogContext,
+                                                          ),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            AppResponsive.borderRadius(
+                                                              context,
+                                                            ),
+                                                          ),
                                                       child: Padding(
-                                                        padding: const EdgeInsets.all(4),
-                                                        child: Icon(Icons.cancel_outlined, size: 18, color: AppColors.danger.withOpacity(0.6)),
+                                                        padding:
+                                                            const EdgeInsets.all(
+                                                              4,
+                                                            ),
+                                                        child: Icon(
+                                                          Icons.cancel_outlined,
+                                                          size:
+                                                              AppResponsive.smallIconSize(
+                                                                context,
+                                                              ),
+                                                          color: AppColors
+                                                              .danger
+                                                              .withOpacity(0.6),
+                                                        ),
                                                       ),
                                                     ),
                                                 ],
@@ -829,15 +1215,24 @@ class _ActiveorderState extends State<Activeorder> {
 
                     // ── Close button ──────────────────────────────────
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                      padding: EdgeInsets.fromLTRB(
+                        AppResponsive.largeSpacing(context),
+                        0,
+                        AppResponsive.largeSpacing(context),
+                        AppResponsive.largeSpacing(context),
+                      ),
                       child: SizedBox(
                         width: double.infinity,
                         child: OutlinedButton(
                           onPressed: () => Navigator.pop(dialogContext),
                           style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            padding: EdgeInsets.symmetric(
+                              vertical: AppResponsive.mediumSpacing(context),
+                            ),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(
+                                AppResponsive.borderRadius(context),
+                              ),
                             ),
                             side: BorderSide(color: AppColors.divider),
                           ),
@@ -862,13 +1257,20 @@ class _ActiveorderState extends State<Activeorder> {
   }
 
   // Quick action chip for bulk updates
-  Widget _buildBulkChip(String label, Color color, IconData icon, VoidCallback onTap) {
+  Widget _buildBulkChip(
+    String label,
+    Color color,
+    IconData icon,
+    VoidCallback onTap,
+  ) {
     return Expanded(
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(10),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10),
+          padding: EdgeInsets.symmetric(
+            vertical: AppResponsive.smallSpacing(context),
+          ),
           decoration: BoxDecoration(
             color: color.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(10),
@@ -877,7 +1279,11 @@ class _ActiveorderState extends State<Activeorder> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 18, color: color),
+              Icon(
+                icon,
+                size: AppResponsive.smallIconSize(context),
+                color: color,
+              ),
               const SizedBox(height: 4),
               Text(
                 label,
@@ -895,16 +1301,108 @@ class _ActiveorderState extends State<Activeorder> {
     );
   }
 
-// ACTION 1: Updates KOT status and syncs with KDS
-  Future<void> _updateKotStatus(OrderModel order, int kotNumber, String newStatus) async {
+  Future<void> _updateAllKotStatuses(
+    OrderModel orderParam,
+    List<int> kotNumbers,
+    String newStatus,
+  ) async {
     try {
+      // Fetch the latest version from the store to prevent stale writes
+      final order = orderStore.orders.firstWhere(
+        (o) => o.id == orderParam.id,
+        orElse: () => orderParam,
+      );
+
+      // Update KOT status map for all KOTs in one go
+      Map<int, String> updatedKotStatuses = Map<int, String>.from(
+        order.kotStatuses ?? {},
+      );
+      for (var kotNumber in kotNumbers) {
+        updatedKotStatuses[kotNumber] = newStatus;
+      }
+
+      // Calculate overall order status
+      String overallStatus = _calculateOverallStatus(
+        updatedKotStatuses,
+        order.kotNumbers,
+      );
+
+      // Update the order in database in a single atomic write
+      final updatedOrder = order.copyWith(
+        kotStatuses: updatedKotStatuses,
+        status: overallStatus,
+      );
+      await orderStore.updateOrder(updatedOrder);
+
+      // Update table status to match order status
+      if (order.tableNo != null && order.tableNo!.isNotEmpty) {
+        await tableStore.updateTableStatus(
+          order.tableNo!,
+          overallStatus,
+          total: order.totalPrice,
+          orderId: order.id,
+          orderTime: order.timeStamp,
+        );
+      }
+
+      // Broadcast to KDS via WebSocket for each KOT to preserve compatibility
+      try {
+        final kotStatusesJson = updatedKotStatuses.map(
+          (key, value) => MapEntry(key.toString(), value),
+        );
+        for (var kotNumber in kotNumbers) {
+          ws.broadcastEvent({
+            'type': 'KOT_STATUS_UPDATE',
+            'orderId': order.id,
+            'kotNumber': kotNumber,
+            'kotStatus': newStatus,
+            'overallStatus': overallStatus,
+            'tableNo': order.tableNo,
+            'allKotNumbers': order.kotNumbers,
+            'kotStatuses': kotStatusesJson,
+          });
+        }
+      } catch (e) {
+        // Silently catch WS broadcast errors
+      }
+
+      // Show success message
+      if (mounted) {
+        NotificationService.instance.showSuccess(
+          'All KOTs updated to $newStatus',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        NotificationService.instance.showError('Failed to update status: $e');
+      }
+    }
+  }
+
+  // ACTION 1: Updates KOT status and syncs with KDS
+  Future<void> _updateKotStatus(
+    OrderModel orderParam,
+    int kotNumber,
+    String newStatus,
+  ) async {
+    try {
+      // Fetch the latest version from the store to prevent stale writes
+      final order = orderStore.orders.firstWhere(
+        (o) => o.id == orderParam.id,
+        orElse: () => orderParam,
+      );
 
       // Update KOT status map
-      Map<int, String> updatedKotStatuses = Map<int, String>.from(order.kotStatuses ?? {});
+      Map<int, String> updatedKotStatuses = Map<int, String>.from(
+        order.kotStatuses ?? {},
+      );
       updatedKotStatuses[kotNumber] = newStatus;
 
       // Calculate overall order status
-      String overallStatus = _calculateOverallStatus(updatedKotStatuses, order.kotNumbers);
+      String overallStatus = _calculateOverallStatus(
+        updatedKotStatuses,
+        order.kotNumbers,
+      );
 
       // Update the order in database
       final updatedOrder = order.copyWith(
@@ -924,11 +1422,12 @@ class _ActiveorderState extends State<Activeorder> {
         );
       }
 
-
       // Broadcast to KDS via WebSocket
       try {
         // Convert integer keys to strings for JSON encoding
-        final kotStatusesJson = updatedKotStatuses.map((key, value) => MapEntry(key.toString(), value));
+        final kotStatusesJson = updatedKotStatuses.map(
+          (key, value) => MapEntry(key.toString(), value),
+        );
 
         ws.broadcastEvent({
           'type': 'KOT_STATUS_UPDATE',
@@ -940,12 +1439,13 @@ class _ActiveorderState extends State<Activeorder> {
           'allKotNumbers': order.kotNumbers,
           'kotStatuses': kotStatusesJson,
         });
-      } catch (e) {
-      }
+      } catch (e) {}
 
       // Show success message
       if (mounted) {
-        NotificationService.instance.showSuccess('KOT #$kotNumber updated to $newStatus');
+        NotificationService.instance.showSuccess(
+          'KOT #$kotNumber updated to $newStatus',
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -955,11 +1455,16 @@ class _ActiveorderState extends State<Activeorder> {
   }
 
   // Helper function to calculate overall order status from KOT statuses
-  String _calculateOverallStatus(Map<int, String> kotStatuses, List<int> kotNumbers) {
+  String _calculateOverallStatus(
+    Map<int, String> kotStatuses,
+    List<int> kotNumbers,
+  ) {
     if (kotStatuses.isEmpty) return 'Processing';
 
     // Get all statuses
-    final statuses = kotNumbers.map((kot) => kotStatuses[kot] ?? 'Processing').toList();
+    final statuses = kotNumbers
+        .map((kot) => kotStatuses[kot] ?? 'Processing')
+        .toList();
 
     // If all KOTs are Served, order is Served
     if (statuses.every((s) => s == 'Served')) return 'Served';
@@ -982,7 +1487,7 @@ class _ActiveorderState extends State<Activeorder> {
     await orderStore.updateOrder(updatedOrder);
   }
 
-// ACTION 2: Moves the order to the past orders box
+  // ACTION 2: Moves the order to the past orders box
   Future<void> _moveOrderToPast(OrderModel order) async {
     // Always use the latest version of the order from the store
     // (payment details may have been updated after the dialog was opened)
@@ -993,7 +1498,8 @@ class _ActiveorderState extends State<Activeorder> {
 
     // Reuse the stored bill number if payment was recorded earlier (Dine In paid-but-not-served flow),
     // otherwise generate a fresh one now.
-    final int billNumber = latestOrder.billNumber ?? await orderStore.getNextBillNumber();
+    final int billNumber =
+        latestOrder.billNumber ?? await orderStore.getNextBillNumber();
 
     final pastOrder = PastOrderModel(
       id: latestOrder.id,
@@ -1018,6 +1524,10 @@ class _ActiveorderState extends State<Activeorder> {
       sessionId: latestOrder.sessionId,
       serviceCharge: latestOrder.serviceCharge,
       isTaxInclusive: latestOrder.isTaxInclusive,
+      taxEnabled: TaxFeature.enabled,
+      storeGstNumber: await StoreSettingsService().gstNumberSnapshot(),
+      roundOffStep: AppSettings.roundOffStepForRecord,
+      discountOnItems: AppSettings.discountOnItems,
     );
 
     await pastOrderStore.addOrder(pastOrder);
@@ -1025,10 +1535,7 @@ class _ActiveorderState extends State<Activeorder> {
     if (latestOrder.tableNo != null && latestOrder.tableNo!.isNotEmpty) {
       await tableStore.updateTableStatus(latestOrder.tableNo!, 'Available');
     }
-
   }
-
-
 
   Future<void> _cancelKotItem({
     required OrderModel order,
@@ -1050,7 +1557,8 @@ class _ActiveorderState extends State<Activeorder> {
     if (!confirmed) return;
 
     // 1. Remove item from the list
-    final updatedItems = List<CartItem>.from(order.items)..removeAt(itemIndexInOrder);
+    final updatedItems = List<CartItem>.from(order.items)
+      ..removeAt(itemIndexInOrder);
 
     // 2. Adjust boundaries: every boundary at index >= kotIndex decreases by 1
     final updatedBoundaries = List<int>.from(order.kotBoundaries);
@@ -1100,7 +1608,9 @@ class _ActiveorderState extends State<Activeorder> {
     if (dialogContext.mounted) Navigator.pop(dialogContext);
 
     // 9. Notify user
-    NotificationService.instance.showInfo('${item.quantity}× ${item.title} removed from KOT');
+    NotificationService.instance.showInfo(
+      '${item.quantity}× ${item.title} removed from KOT',
+    );
   }
 
   // Show dialog to select KOT for reprinting
@@ -1123,14 +1633,23 @@ class _ActiveorderState extends State<Activeorder> {
 
     // If multiple KOTs, show selection dialog
     final reprintHInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        ? ((AppResponsive.screenWidth(context) -
+                      AppResponsive.dialogWidth(context)) /
+                  2)
+              .clamp(40.0, double.infinity)
         : 24.0;
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          insetPadding: EdgeInsets.symmetric(horizontal: reprintHInset, vertical: 24),
-          title: Text('Select KOT to Reprint', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+          insetPadding: EdgeInsets.symmetric(
+            horizontal: reprintHInset,
+            vertical: AppResponsive.extraLargeSpacing(context),
+          ),
+          title: Text(
+            'Select KOT to Reprint',
+            style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+          ),
           content: Container(
             width: double.maxFinite,
             child: ListView.builder(
@@ -1138,15 +1657,33 @@ class _ActiveorderState extends State<Activeorder> {
               itemCount: order.kotNumbers.length,
               itemBuilder: (context, index) {
                 final kotNum = order.kotNumbers[index];
-                // Calculate item count for this KOT
-                final startIndex = index == 0 ? 0 : order.kotBoundaries[index - 1];
-                final endIndex = order.kotBoundaries[index];
+                // Calculate item count for this KOT (clamp against item count so
+                // a drifted boundary can't crash sublist/rendering).
+                final int itemLen = order.items.length;
+                final int endIndex =
+                    (index < order.kotBoundaries.length
+                            ? order.kotBoundaries[index]
+                            : itemLen)
+                        .clamp(0, itemLen);
+                final int startIndex =
+                    (index == 0 ? 0 : order.kotBoundaries[index - 1]).clamp(
+                      0,
+                      endIndex,
+                    );
                 final itemCount = endIndex - startIndex;
 
                 return ListTile(
                   leading: Icon(Icons.receipt_long, color: AppColors.info),
-                  title: Text('KOT #$kotNum', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
-                  subtitle: Text('$itemCount items', style: GoogleFonts.poppins(fontSize: 12)),
+                  title: Text(
+                    'KOT #$kotNum',
+                    style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    '$itemCount items',
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.smallFontSize(context),
+                    ),
+                  ),
                   trailing: Icon(Icons.print, color: AppColors.textSecondary),
                   onTap: () {
                     Navigator.pop(context);
@@ -1183,7 +1720,10 @@ class _ActiveorderState extends State<Activeorder> {
         children: [
           // Order Type Filter + Search Row
           Container(
-            padding: EdgeInsets.symmetric(horizontal: hPad, vertical: 10),
+            padding: EdgeInsets.symmetric(
+              horizontal: hPad,
+              vertical: AppResponsive.smallSpacing(context),
+            ),
             color: AppColors.white,
             child: Row(
               children: [
@@ -1195,40 +1735,51 @@ class _ActiveorderState extends State<Activeorder> {
                     icon: Icons.search_rounded,
                     suffixIcon: _searchQuery.isNotEmpty
                         ? IconButton(
-                            icon: const Icon(Icons.clear, color: AppColors.textSecondary, size: 18),
+                            icon: Icon(
+                              Icons.clear,
+                              color: AppColors.textSecondary,
+                              size: AppResponsive.smallIconSize(context),
+                            ),
                             onPressed: () {
                               _searchController.clear();
                               setState(() => _searchQuery = '');
                             },
                           )
                         : null,
-                    onChanged: (v) => setState(() => _searchQuery = v.trim().toLowerCase()),
+                    onChanged: (v) =>
+                        setState(() => _searchQuery = v.trim().toLowerCase()),
                   ),
                 ),
-                SizedBox(width: 10),
+                SizedBox(width: AppResponsive.smallSpacing(context)),
                 // Compact dropdown
                 Container(
-                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: AppResponsive.smallSpacing(context),
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.white,
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(
+                      AppResponsive.smallBorderRadius(context),
+                    ),
                     border: Border.all(color: AppColors.divider, width: 1.5),
                   ),
                   child: DropdownButton<String>(
                     value: dropDownValue,
                     isDense: true,
                     underline: SizedBox(),
-                    icon: Icon(Icons.keyboard_arrow_down, size: 20, color: AppColors.textPrimary),
+                    icon: Icon(
+                      Icons.keyboard_arrow_down,
+                      size: AppResponsive.iconSize(context),
+                      color: AppColors.textPrimary,
+                    ),
                     style: GoogleFonts.poppins(
-                      fontSize: 13,
+                      fontSize: AppResponsive.bodyFontSize(context),
                       fontWeight: FontWeight.w500,
                       color: AppColors.textPrimary,
                     ),
                     items: dropdownItems.map((String item) {
-                      return DropdownMenuItem(
-                        value: item,
-                        child: Text(item),
-                      );
+                      return DropdownMenuItem(value: item, child: Text(item));
                     }).toList(),
                     onChanged: (String? newValue) {
                       setState(() {
@@ -1251,9 +1802,12 @@ class _ActiveorderState extends State<Activeorder> {
 
                 // Show all orders except 'Served' orders that are already paid
                 final activeOrders = orderStore.orders
-                    .where((order) =>
-                        order.status != 'Served' ||
-                        (order.status == 'Served' && order.paymentStatus != 'Paid'))
+                    .where(
+                      (order) =>
+                          order.status != 'Served' ||
+                          (order.status == 'Served' &&
+                              order.paymentStatus != 'Paid'),
+                    )
                     .toList();
 
                 activeOrders.sort((a, b) => b.timeStamp.compareTo(a.timeStamp));
@@ -1265,15 +1819,20 @@ class _ActiveorderState extends State<Activeorder> {
                       children: [
                         Icon(
                           Icons.receipt_long_outlined,
-                          size: 64,
+                          size: AppResponsive.getValue(
+                            context,
+                            mobile: 64.0,
+                            tablet: 76.0,
+                            desktop: 88.0,
+                          ),
                           color: AppColors.divider,
                         ),
-                        SizedBox(height: 16),
+                        SizedBox(height: AppResponsive.largeSpacing(context)),
                         Text(
                           'No active orders',
                           style: GoogleFonts.poppins(
                             fontWeight: FontWeight.w500,
-                            fontSize: 16,
+                            fontSize: AppResponsive.subheadingFontSize(context),
                             color: AppColors.textSecondary,
                           ),
                         ),
@@ -1285,15 +1844,21 @@ class _ActiveorderState extends State<Activeorder> {
                 var filterOrderList = dropDownValue == 'All'
                     ? activeOrders
                     : activeOrders
-                        .where((order) => order.orderType == dropDownValue)
-                        .toList();
+                          .where((order) => order.orderType == dropDownValue)
+                          .toList();
 
                 // Apply search query: match customer name, table, or KOT number
                 if (_searchQuery.isNotEmpty) {
                   filterOrderList = filterOrderList.where((order) {
-                    final nameMatch = order.customerName.toLowerCase().contains(_searchQuery);
-                    final tableMatch = (order.tableNo ?? '').toLowerCase().contains(_searchQuery);
-                    final kotMatch = order.kotNumbers.any((k) => k.toString().contains(_searchQuery));
+                    final nameMatch = order.customerName.toLowerCase().contains(
+                      _searchQuery,
+                    );
+                    final tableMatch = (order.tableNo ?? '')
+                        .toLowerCase()
+                        .contains(_searchQuery);
+                    final kotMatch = order.kotNumbers.any(
+                      (k) => k.toString().contains(_searchQuery),
+                    );
                     return nameMatch || tableMatch || kotMatch;
                   }).toList();
                 }
@@ -1305,15 +1870,20 @@ class _ActiveorderState extends State<Activeorder> {
                       children: [
                         Icon(
                           Icons.receipt_long_outlined,
-                          size: 64,
+                          size: AppResponsive.getValue(
+                            context,
+                            mobile: 64.0,
+                            tablet: 76.0,
+                            desktop: 88.0,
+                          ),
                           color: AppColors.divider,
                         ),
-                        SizedBox(height: 16),
+                        SizedBox(height: AppResponsive.largeSpacing(context)),
                         Text(
                           'No orders of type "$dropDownValue"',
                           style: GoogleFonts.poppins(
                             fontWeight: FontWeight.w500,
-                            fontSize: 16,
+                            fontSize: AppResponsive.subheadingFontSize(context),
                             color: AppColors.textSecondary,
                           ),
                         ),
@@ -1326,49 +1896,85 @@ class _ActiveorderState extends State<Activeorder> {
                 if (isTablet) {
                   return LayoutBuilder(
                     builder: (ctx, constraints) {
-                      final cols = AppResponsive.gridColumns(context, mobile: 1, tablet: 1, desktop: 2);
-                      final spacing = 12.0;
-                      final cardWidth = (constraints.maxWidth - 32 - spacing * (cols - 1)) / cols;
+                      final cols = AppResponsive.gridColumns(
+                        context,
+                        mobile: 1,
+                        tablet: 1,
+                        desktop: 2,
+                      );
+                      final spacing = AppResponsive.gridSpacing(context);
+                      // Derive the inset from the SAME EdgeInsets the scroll
+                      // view uses. This was a hardcoded `- 32` that matched the
+                      // old `EdgeInsets.all(16)`; once the padding became
+                      // responsive (16/20/24) the two drifted, each card came
+                      // out too wide for the row, and the 2-column desktop
+                      // layout silently collapsed to one card per row.
+                      final pad = AppResponsive.padding(context);
+                      final cardWidth =
+                          (constraints.maxWidth -
+                              pad.horizontal -
+                              spacing * (cols - 1)) /
+                          cols;
                       return SingleChildScrollView(
-                        padding: const EdgeInsets.all(16),
+                        padding: pad,
                         child: Wrap(
                           spacing: spacing,
                           runSpacing: spacing,
-                          children: filterOrderList.map((order) => SizedBox(
-                            width: cardWidth,
-                            child: OrderCard(
-                              color: _getColorForStatus(order.status),
-                              order: order,
-                              onDelete: _deleteOrder,
-                              onPrintKot: () => _showKotPrintSelectionDialog(order),
-                              onPrintBill: () => RestaurantPrintHelper.printBillForActiveOrder(
-                                context: context,
-                                order: order,
-                                currentItems: order.items,
-                              ),
-                              ontapcooking: () async {
-                                if (order.status == 'Processing' ||
-                                    order.status == 'Cooking' ||
-                                    order.status == 'Ready' ||
-                                    order.status == 'Served') {
-                                  _showStatusUpdateDialog(order, order.orderType == 'Take Away');
-                                }
-                              },
-                              ontap: () async {
-                                if (order.isPaid != true) {
-                                  await Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => CartScreen(
-                                        existingOrder: order,
-                                        selectedTableNo: order.tableNo,
-                                      ),
-                                    ),
-                                  );
-                                }
-                              },
-                            ),
-                          )).toList(),
+                          children: filterOrderList
+                              .map(
+                                (order) => SizedBox(
+                                  width: cardWidth,
+                                  child: OrderCard(
+                                    color: _getColorForStatus(order.status),
+                                    order: order,
+                                    onDelete: _deleteOrder,
+                                    onPrintKot: () =>
+                                        _showKotPrintSelectionDialog(order),
+                                    onPrintBill: () =>
+                                        RestaurantPrintHelper.printBillForActiveOrder(
+                                          context: context,
+                                          order: order,
+                                          currentItems: order.items,
+                                        ),
+                                    ontapcooking: () async {
+                                      if (order.status == 'Processing' ||
+                                          order.status == 'Cooking' ||
+                                          order.status == 'Ready' ||
+                                          order.status == 'Served') {
+                                        _showStatusUpdateDialog(
+                                          order,
+                                          order.orderType == 'Take Away',
+                                        );
+                                      }
+                                    },
+                                    ontap: () async {
+                                      if (!order.isFullyPaid) {
+                                        await Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) => CartScreen(
+                                              existingOrder: order,
+                                              selectedTableNo: order.tableNo,
+                                            ),
+                                          ),
+                                        );
+                                      } else if (orderHasMoreToShow(order)) {
+                                        // Paid orders can't be edited, so the
+                                        // cart is the wrong destination — but
+                                        // tapping used to do nothing at all.
+                                        // Show the order read-only instead,
+                                        // and only when the card isn't already
+                                        // showing the whole thing.
+                                        await showOrderItemsDialog(
+                                          context,
+                                          order,
+                                        );
+                                      }
+                                    },
+                                  ),
+                                ),
+                              )
+                              .toList(),
                         ),
                       );
                     },
@@ -1377,7 +1983,7 @@ class _ActiveorderState extends State<Activeorder> {
 
                 // Mobile: original single-column list (unchanged)
                 return ListView.builder(
-                  padding: EdgeInsets.all(16),
+                  padding: AppResponsive.padding(context),
                   itemCount: filterOrderList.length,
                   itemBuilder: (context, index) {
                     final order = filterOrderList[index];
@@ -1386,23 +1992,25 @@ class _ActiveorderState extends State<Activeorder> {
                       order: order,
                       onDelete: _deleteOrder,
                       onPrintKot: () => _showKotPrintSelectionDialog(order),
-                      onPrintBill: () => RestaurantPrintHelper.printBillForActiveOrder(
-                        context: context,
-                        order: order,
-                        currentItems: order.items,
-                      ),
+                      onPrintBill: () =>
+                          RestaurantPrintHelper.printBillForActiveOrder(
+                            context: context,
+                            order: order,
+                            currentItems: order.items,
+                          ),
                       ontapcooking: () async {
                         if (order.status == 'Processing' ||
                             order.status == 'Cooking' ||
                             order.status == 'Ready' ||
                             order.status == 'Served') {
                           _showStatusUpdateDialog(
-                              order, order.orderType == 'Take Away' ? true : false);
+                            order,
+                            order.orderType == 'Take Away' ? true : false,
+                          );
                         }
                       },
                       ontap: () async {
                         if (order.isPaid != true) {
-
                           await Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -1412,7 +2020,11 @@ class _ActiveorderState extends State<Activeorder> {
                               ),
                             ),
                           );
-                        } else {
+                        } else if (orderHasMoreToShow(order)) {
+                          // Was an empty `else {}` — a paid order's tap did
+                          // nothing. Show it read-only instead, but only when
+                          // the card isn't already showing everything.
+                          await showOrderItemsDialog(context, order);
                         }
                       },
                     );
@@ -1426,7 +2038,6 @@ class _ActiveorderState extends State<Activeorder> {
     );
   }
 }
-
 
 // Future Builder
 /*  FutureBuilder<List<OrderModel>>(
@@ -1444,7 +2055,7 @@ class _ActiveorderState extends State<Activeorder> {
                         'No Active Orders',
                         style: GoogleFonts.poppins(
                           fontWeight: FontWeight.w500,
-                          fontSize: 28,
+                          fontSize: AppResponsive.getValue(context, mobile: 28.0, tablet: 32.0, desktop: 36.0),
                           color: AppColors.textPrimary,
                         ),
                       ),

@@ -1,4 +1,5 @@
 
+import 'package:billberrylite/core/config/tax_label_rule.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/di/service_locator.dart';
@@ -8,17 +9,28 @@ import 'package:billberrylite/domain/services/restaurant/day_management_service.
 import '../../../core/constants/hive_box_names.dart';
 import '../../../data/models/restaurant/db/cash_movement_model.dart';
 import 'package:hive/hive.dart';
+import 'package:billberrylite/util/restaurant/order_status_filter.dart';
+import 'package:billberrylite/util/restaurant/payment_mode_summary.dart';
+import 'package:billberrylite/util/retail/payment_mode_summary.dart';
+import 'package:billberrylite/util/retail/retail_cash_expectation.dart';
+import 'package:billberrylite/domain/services/retail/eod_report_service.dart';
+import 'package:billberrylite/domain/services/retail/report_service.dart';
+import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
+
+/// Below this, a cash difference is float noise rather than a real shortage or
+/// overage — half a paisa, under anything a drawer can be counted to.
+///
+/// Shared so the EOD History card judges a stored difference by exactly the
+/// rule that decided its status.
+const double kCashReconciliationTolerance = 0.005;
 
 class EODService {
   static const _uuid = Uuid();
 
   /// Returns true if the order should be completely excluded from all EOD totals.
   /// VOID/VOIDED = never paid, CANCELLED = abandoned, FULLY_REFUNDED = all money returned.
-  static bool _isExcluded(String status) {
-    return status.contains('VOID') ||
-        status == 'CANCELLED' ||
-        status == 'FULLY_REFUNDED';
-  }
+  static bool _isExcluded(String status) =>
+      OrderStatusFilter.isExcludedFromRevenue(status);
 
   static Future<EndOfDayReport> generateEODReport({
     required DateTime date,
@@ -68,21 +80,44 @@ class EODService {
     // Use activeDayOrders for count-based statistics (excludes fully refunded orders)
     final orderSummaries = _calculateOrderTypeSummaries(activeDayOrders);
     final categorySales = _calculateCategorySales(activeDayOrders);
-    final paymentSummaries = _calculatePaymentSummaries(activeDayOrders);
+    final paymentSummaries = PaymentModeSummary.summarize(activeDayOrders);
     final taxSummaries = _calculateTaxSummaries(activeDayOrders);
 
-    final totalSales = allDayOrders.fold<double>(0.0, (sum, order) {
+    // 1. Identify all orders refunded within this session's time range [startTime, endTime]
+    final sessionRefundedOrders = pastOrders.where((order) {
+      if (order.refundedAt == null) return false;
+      final status = order.orderStatus?.toUpperCase() ?? '';
+      if (status == 'CANCELLED') return false;
+      return (order.refundedAt!.isAfter(startTime) || order.refundedAt!.isAtSameMomentAs(startTime)) &&
+             (order.refundedAt!.isBefore(endTime) || order.refundedAt!.isAtSameMomentAs(endTime));
+    }).toList();
+
+    // 2. Identify external refunded orders (refunded in this session but created before this session)
+    final externalRefundedOrders = sessionRefundedOrders.where((order) {
+      if (targetSessionId != null) {
+        return order.sessionId != targetSessionId;
+      }
+      return order.orderAt == null || (order.orderAt!.isBefore(startTime));
+    }).toList();
+
+    // 3. Compute EOD totalRefunds as sum of refundAmount for all orders refunded in this session's period
+    final totalRefunds = sessionRefundedOrders.fold<double>(0.0, (sum, order) => sum + (order.refundAmount ?? 0.0));
+
+    final totalSalesBase = allDayOrders.fold<double>(0.0, (sum, order) {
       final status = order.orderStatus?.toUpperCase() ?? '';
       if (_isExcluded(status)) return sum;
       return sum + (order.totalPrice - (order.refundAmount ?? 0.0));
     });
+    // Deduct external refunds from today's net sales
+    final totalSales = totalSalesBase - externalRefundedOrders.fold<double>(0.0, (sum, order) => sum + (order.refundAmount ?? 0.0));
+
     final totalDiscount = allDayOrders.fold<double>(0.0, (sum, order) {
       final status = order.orderStatus?.toUpperCase() ?? '';
       if (_isExcluded(status)) return sum;
       return sum + (order.Discount ?? 0.0);
     });
 
-    final totalTax = allDayOrders.fold<double>(0.0, (sum, order) {
+    final totalTaxBase = allDayOrders.fold<double>(0.0, (sum, order) {
       final status = order.orderStatus?.toUpperCase() ?? '';
       if (_isExcluded(status)) return sum;
       final refundRatio = order.totalPrice > 0
@@ -90,13 +125,46 @@ class EODService {
           : 1.0;
       return sum + (order.gstAmount ?? 0.0) * refundRatio;
     });
-
-    // Refunds: include partially/fully refunded amounts (real cash returned to customers)
-    final totalRefunds = allDayOrders.fold<double>(0.0, (sum, order) {
-      final status = order.orderStatus?.toUpperCase() ?? '';
-      if (status.contains('VOID') || status == 'CANCELLED') return sum;
-      return sum + (order.refundAmount ?? 0.0);
+    // Deduct external refund tax portions from today's net tax liability
+    final double externalRefundedTax = externalRefundedOrders.fold<double>(0.0, (sum, order) {
+      final refund = order.refundAmount ?? 0.0;
+      if (refund > 0 && order.totalPrice > 0) {
+        return sum + (refund * ((order.gstAmount ?? 0.0) / order.totalPrice));
+      }
+      return sum;
     });
+    final totalTax = totalTaxBase - externalRefundedTax;
+
+    // Subtract external refunds from paymentSummaries
+    for (final order in externalRefundedOrders) {
+      final refund = order.refundAmount ?? 0.0;
+      if (refund <= 0) continue;
+
+      if (order.isSplitPayment == true && order.paymentListJson != null && order.paymentListJson!.isNotEmpty) {
+        final ratio = order.totalPrice > 0 ? refund / order.totalPrice : 0.0;
+        for (final p in order.paymentList) {
+          final method = (p['method'] as String? ?? '').toLowerCase().trim();
+          final amt = ((p['amount'] as num?)?.toDouble() ?? 0.0) * ratio;
+          _subtractFromSummary(paymentSummaries, method, amt);
+        }
+      } else {
+        final method = (order.paymentmode ?? '').toLowerCase().trim();
+        _subtractFromSummary(paymentSummaries, method, refund);
+      }
+    }
+
+    // Recompute percentages for paymentSummaries
+    final newGrandTotal = paymentSummaries.fold<double>(0.0, (sum, p) => sum + p.totalAmount);
+    for (int i = 0; i < paymentSummaries.length; i++) {
+      final p = paymentSummaries[i];
+      paymentSummaries[i] = PaymentSummary(
+        paymentType: p.paymentType,
+        totalAmount: p.totalAmount,
+        transactionCount: p.transactionCount,
+        percentage: newGrandTotal > 0 ? (p.totalAmount / newGrandTotal) * 100 : 0.0,
+      );
+    }
+
     final totalOrderCount = activeDayOrders.length; // Count only active orders
 
     // Calculate expenses for the day using expense store
@@ -218,6 +286,7 @@ class EODService {
       roundOff: double.parse(roundOffSum.toStringAsFixed(2)),
       cancelledOrderCount: cancelledOrderCount,
       cancelledOrderAmount: cancelledOrderAmount,
+      sessionId: targetSessionId,
     );
   }
 
@@ -288,81 +357,6 @@ class EODService {
     }).toList()..sort((a, b) => b.totalAmount.compareTo(a.totalAmount));
   }
 
-  static List<PaymentSummary> _calculatePaymentSummaries(List<PastOrderModel> orders) {
-    final Map<String, double> paymentTotals = {};
-    final Map<String, int> paymentCounts = {};
-
-    double grandTotal = 0.0;
-
-    for (final order in orders) {
-      final status = order.orderStatus?.toUpperCase() ?? '';
-      if (_isExcluded(status)) continue;
-
-      final netAmount = order.totalPrice - (order.refundAmount ?? 0.0);
-
-      // Always decode paymentListJson if present — it's the source of truth.
-      // Avoid relying on isSplitPayment flag which can be null for legacy orders.
-      if (order.paymentListJson != null && order.paymentListJson!.isNotEmpty) {
-        final refundRatio =
-            order.totalPrice > 0 ? netAmount / order.totalPrice : 1.0;
-        for (final entry in order.paymentList) {
-          // Normalise so 'Cash'/'cash'/'CASH' collapse into one bucket.
-          final method = _normalizePaymentMethod(entry['method'] as String?);
-          final amt =
-              ((entry['amount'] as num?)?.toDouble() ?? 0.0) * refundRatio;
-          paymentTotals[method] = (paymentTotals[method] ?? 0.0) + amt;
-          paymentCounts[method] = (paymentCounts[method] ?? 0) + 1;
-          grandTotal += amt;
-        }
-      } else {
-        final paymentType = _normalizePaymentMethod(order.paymentmode);
-        paymentTotals[paymentType] =
-            (paymentTotals[paymentType] ?? 0.0) + netAmount;
-        paymentCounts[paymentType] = (paymentCounts[paymentType] ?? 0) + 1;
-        grandTotal += netAmount;
-      }
-    }
-
-    return paymentTotals.entries.map((entry) {
-      final paymentType = entry.key;
-      final totalAmount = entry.value;
-      final transactionCount = paymentCounts[paymentType] ?? 0;
-      final percentage = grandTotal > 0 ? (totalAmount / grandTotal) * 100 : 0.0;
-
-      return PaymentSummary(
-        paymentType: paymentType,
-        totalAmount: totalAmount,
-        transactionCount: transactionCount,
-        percentage: percentage,
-      );
-    }).toList()..sort((a, b) => b.totalAmount.compareTo(a.totalAmount));
-  }
-
-  /// Canonical display label for a payment method so case/spacing variants
-  /// (e.g. 'Cash', 'cash', 'CASH ') collapse into one bucket in summaries.
-  static String _normalizePaymentMethod(String? raw) {
-    final m = (raw ?? '').trim().toLowerCase();
-    if (m.isEmpty) return 'Unknown';
-    switch (m) {
-      case 'cash':
-        return 'Cash';
-      case 'upi':
-        return 'UPI';
-      case 'card':
-        return 'Card';
-      case 'wallet':
-        return 'Wallet';
-      case 'credit':
-        return 'Credit';
-      case 'split':
-      case 'split payment':
-        return 'Split Payment';
-      default:
-        // Title-case unknown/custom methods for a tidy label.
-        return m[0].toUpperCase() + m.substring(1);
-    }
-  }
-
   static List<TaxSummary> _calculateTaxSummaries(List<PastOrderModel> orders) {
     final Map<String, TaxInfo> taxData = {};
 
@@ -406,8 +400,16 @@ class EODService {
   }
 
   static Future<void> saveEODReport(EndOfDayReport report) async {
-    // Replace any existing report for the same date (handles safe retry on failure)
-    final existing = await eodStore.getEODByDate(report.date);
+    // De-duplicate by SESSION, not date: a retry of the same close reuses the
+    // same session, so replace only that session's report. Genuinely different
+    // sessions on the same date are each kept.
+    //
+    // Both verticals stamp a sessionId now. The date fallback survives only for
+    // records written before retail did — without a session there is no way to
+    // tell a retry from a second close, and replacing is the safer of the two.
+    final existing = report.sessionId != null
+        ? await eodStore.getEODBySession(report.sessionId!)
+        : await eodStore.getEODByDate(report.date);
     if (existing != null) {
       await eodStore.deleteEODReport(existing.reportId);
     }
@@ -436,7 +438,23 @@ class EODService {
     required double openingBalance,
     required double actualCash,
     String? remarks,
+    /// Safe drop — cash taken out of the drawer at close. Stored on the record
+    /// so the settlement slip can be reprinted with the real figure.
+    double cashWithdrawn = 0,
+    /// The session being closed. Defaults to the open one, exactly as
+    /// [generateEODReport] resolves it; passed explicitly only by tests.
+    String? sessionId,
   }) async {
+    // Retail DOES have sessions — it shares DayManagementService, and the EOD
+    // screen already gates itself on `getCurrentSession()`. This was simply
+    // never stamped, so every retail report carried a null sessionId and
+    // `saveEODReport` fell back to de-duplicating by DATE: closing a second
+    // session on the same calendar day DELETED the first day's report.
+    //
+    // Resolved before the session is closed — `_completeEndOfDay` generates and
+    // saves the report before calling `markDayEnded`, which clears the pointer.
+    final targetSessionId =
+        sessionId ?? await DayManagementService.getCurrentSessionId();
     // Get the day start timestamp - CRITICAL for filtering sales after "Start Day" was clicked
     final dayStartTimestamp = await DayManagementService.getDayStartTimestamp();
 
@@ -447,28 +465,51 @@ class EODService {
     // Use current time as end — handles midnight crossing (EOD run after midnight for yesterday's session)
     final endTime = DateTime.now();
 
+    // TRADING DAY: the report is dated when the session OPENED, not when the
+    // close was run — the same rule restaurant applies (endday.dart sets
+    // `selectedDate = currentSession.startTime`). A shop that opens 11 PM and
+    // closes at 2 AM belongs entirely to the day it opened, and its after-
+    // midnight sales are already inside [startTime]..[endTime]. Dating the
+    // record `DateTime.now()` filed those closes under the NEXT day, so the
+    // report's own date disagreed with the sales window it was built from.
+    //
+    // Falls back to the caller's [date] when there is no session.
+    final reportDate = dayStartTimestamp ?? date;
+
 
     // Get all sales for the day using SaleStore
     final allSales = await saleStore.getSalesByDateRange(startTime, endTime);
 
 
-    // Debug: Print each sale's timestamp to verify filtering
-    if (allSales.isNotEmpty) {
-      for (var sale in allSales) {
-      }
-    }
-
     // Filter out returns for count-based stats, but include them in financial calculations
     final activeSales = allSales.where((sale) => sale.isReturn != true).toList();
 
-    // Calculate payment summaries (Cash, Card, UPI, Credit, Split)
-    final paymentSummaries = _calculateRetailPaymentSummaries(activeSales);
+    // Calculate payment summaries (Cash, Card, UPI, Credit, Split).
+    //
+    // Forward sales PLUS exchange returns. An exchange return carries signed
+    // money legs describing what actually went back to the customer, so
+    // including it makes the buckets show the real difference rather than the
+    // whole value of the goods swapped. Its exchange-credit leg is suppressed
+    // by the summariser. Plain returns stay excluded, keeping the long-standing
+    // gross-of-refunds convention and the separate `cashRefunds` term that
+    // already accounts for them.
+    final exchangeReturns = allSales
+        .where((s) => s.isReturn == true && s.exchangeGroupId != null)
+        .toList();
+    final paymentSummaries = _calculateRetailPaymentSummaries(
+      [...activeSales, ...exchangeReturns],
+    );
 
-    // Calculate totals
-    final totalSales = allSales.fold<double>(0.0, (sum, sale) {
-      // Returns have negative amounts
-      return sum + (sale.isReturn == true ? -sale.totalAmount : sale.totalAmount);
-    });
+    // Calculate totals.
+    //
+    // A return header is ALREADY stored negated (`return_service.dart`), so it
+    // nets by simply being summed. Negating it here made `-(-1000)` positive
+    // and ADDED every refund to the day's sales — a double swing on the figure
+    // the shop closes its day against. The invariant is documented in
+    // `util/retail/sale_revenue_filter.dart`, which `ReportService` follows;
+    // this is the line that used to disagree with it.
+    final totalSales =
+        allSales.fold<double>(0.0, (sum, sale) => sum + sale.totalAmount);
 
     final totalDiscount = allSales.fold<double>(0.0, (sum, sale) => sum + sale.discountAmount);
     final totalTax = allSales.fold<double>(0.0, (sum, sale) => sum + (sale.totalGstAmount ?? sale.taxAmount));
@@ -476,10 +517,15 @@ class EODService {
     // Calculate tax summaries (CGST/SGST breakdown)
     final taxSummaries = _calculateRetailTaxSummaries(allSales);
 
-    // Calculate total returns
+    // Calculate total returns.
+    //
+    // POSITIVE, matching the field's contract on the restaurant side (`:96`)
+    // and what every consumer expects — `eod_report_detail_screen` renders the
+    // Refunds row behind `if (report.totalRefunds > 0)`, so the raw negative
+    // sum meant the row never appeared at all.
     final totalRefunds = allSales
         .where((sale) => sale.isReturn == true)
-        .fold<double>(0.0, (sum, sale) => sum + sale.totalAmount);
+        .fold<double>(0.0, (sum, sale) => sum + sale.totalAmount.abs());
 
     final totalSaleCount = activeSales.length;
 
@@ -516,12 +562,35 @@ class EODService {
       totalCashOut = todayMoves.where((m) => m.type == 'out').fold(0.0, (s, m) => s + m.amount);
     }
 
-    // Full formula: Opening + Cash Sales + Cash In − Cash Out − Cash Expenses
-    final closingBalance = openingBalance + expectedCash + totalCashIn - totalCashOut - cashExpenses;
+    // Cash handed back on returns leaves the drawer, so it must come off the
+    // expectation. This term was missing here while the EOD screen subtracted
+    // it — so the variance the cashier signed off on never matched the variance
+    // stored in the archived close.
+    //
+    // Retail only: restaurant nets refunds per-order via `refundAmount`, which
+    // is already inside its totals, so adding a term there would double-count.
+    final cashRefunds = EODReportService.cashRefundsIn(allSales);
+
+    // One definition, shared with the EOD screen — see RetailCashExpectation.
+    final closingBalance = RetailCashExpectation.expected(
+      openingBalance: openingBalance,
+      cashSales: expectedCash,
+      cashIn: totalCashIn,
+      cashOut: totalCashOut,
+      cashExpenses: cashExpenses,
+      cashRefunds: cashRefunds,
+    );
     final cashDifference = actualCash - closingBalance;
 
     String reconciliationStatus;
-    if (cashDifference == 0) {
+    // Tolerance, not `== 0`. `closingBalance` accumulates opening + cash sales
+    // + cash in - cash out - expenses - refunds, so a perfectly counted drawer
+    // routinely lands a residual like 1e-13 away from it. The exact comparison
+    // branded such a day 'Shortage', and the status is STORED — so it stayed
+    // wrong forever. Half a paisa is below anything a drawer can be counted to.
+    //
+    // Only the STATUS decision changes; `difference` keeps the real number.
+    if (cashDifference.abs() < kCashReconciliationTolerance) {
       reconciliationStatus = 'Balanced';
     } else if (cashDifference > 0) {
       reconciliationStatus = 'Overage';
@@ -530,18 +599,45 @@ class EODService {
     }
 
     final cashReconciliation = CashReconciliation(
-      systemExpectedCash: expectedCash,
+      // `closingBalance`, not `expectedCash`. The latter is CASH SALES ONLY,
+      // while `difference` is measured against the full expectation — so every
+      // screen and export showing both made `actual − expected` disagree with
+      // `difference` whenever there was a float, an expense, a refund or a
+      // manual movement. The EOD screen already reads `closingBalance`.
+      systemExpectedCash: closingBalance,
       actualCash: actualCash,
       difference: cashDifference,
       reconciliationStatus: reconciliationStatus,
       remarks: remarks,
     );
 
+    // ==================== CREDIT COLLECTIONS ====================
+    // Repayments against credit sold on earlier days. Not revenue — adding them
+    // to `totalSales` would book the same goods twice — but the cash leg is
+    // real money that has to be in the drawer.
+    final collections = await creditPaymentRepository.getCollectionByModeInRange(
+        startTime, endTime);
+
+    // ==================== PROFIT ====================
+    // Through ReportService rather than recomputed here, so the day close and
+    // the Profit report can never disagree. It nets returns, reads the cost
+    // frozen on each sale line, and takes GST out of revenue — the engine this
+    // replaces did none of those and force-unwrapped `costPrice!`.
+    final profit = await ReportService()
+        .getProfitReport(startDate: startTime, endDate: endTime);
+    final totalCost = (profit['totalCost'] as num).toDouble();
+    final grossProfit = (profit['grossProfit'] as num).toDouble();
+
+    // ==================== CUSTOMER OUTSTANDING ====================
+    // A position at close, not a movement during the day.
+    final customersWithCredit = await customerStore.getCustomersWithCredit();
+    final totalOutstanding = await saleStore.getTotalDueAmount();
+
     final reportId = _uuid.v4();
 
     return EndOfDayReport(
       reportId: reportId,
-      date: date,
+      date: reportDate,
       openingBalance: openingBalance,
       orderSummaries: [], // Empty for retail - not applicable
       totalDiscount: totalDiscount,
@@ -557,50 +653,28 @@ class EODService {
       totalExpenses: totalExpenses,
       cashExpenses: cashExpenses,
       mode: 'retail', // Mark as retail EOD
+      cashCollections: collections['cash'] ?? 0.0,
+      cardCollections: collections['card'] ?? 0.0,
+      upiCollections: collections['upi'] ?? 0.0,
+      totalCost: totalCost,
+      grossProfit: grossProfit,
+      customersWithDue: customersWithCredit.length,
+      totalOutstanding: totalOutstanding,
+      cashWithdrawn: cashWithdrawn,
+      sessionId: targetSessionId,
     );
   }
 
-  static List<PaymentSummary> _calculateRetailPaymentSummaries(List sales) {
-    final Map<String, double> paymentTotals = {};
-    final Map<String, int> paymentCounts = {};
-    double grandTotal = 0.0;
-
-    for (final sale in sales) {
-      String paymentType = sale.paymentType ?? 'Unknown';
-
-      // Handle split payments - expand into individual payment methods
-      if (sale.isSplitPayment == true && sale.paymentListJson != null && sale.paymentListJson!.isNotEmpty) {
-        for (final payment in sale.paymentList) {
-          final method = payment['method'] as String;
-          final amount = payment['amount'] as double;
-
-          paymentTotals[method] = (paymentTotals[method] ?? 0.0) + amount;
-          paymentCounts[method] = (paymentCounts[method] ?? 0) + 1;
-          grandTotal += amount;
-        }
-      } else {
-        // Single payment
-        final amount = sale.totalAmount as double;
-        paymentTotals[paymentType] = (paymentTotals[paymentType] ?? 0.0) + amount;
-        paymentCounts[paymentType] = (paymentCounts[paymentType] ?? 0) + 1;
-        grandTotal += amount;
-      }
-    }
-
-    return paymentTotals.entries.map((entry) {
-      final paymentType = entry.key;
-      final totalAmount = entry.value;
-      final transactionCount = paymentCounts[paymentType] ?? 0;
-      final percentage = grandTotal > 0 ? (totalAmount / grandTotal) * 100 : 0.0;
-
-      return PaymentSummary(
-        paymentType: paymentType,
-        totalAmount: totalAmount,
-        transactionCount: transactionCount,
-        percentage: percentage,
-      );
-    }).toList()..sort((a, b) => b.totalAmount.compareTo(a.totalAmount));
-  }
+  /// Delegates to the shared retail summariser so EOD and any payment-mode
+  /// report can never disagree — the same reason restaurant's EOD goes through
+  /// `PaymentModeSummary.summarize`.
+  ///
+  /// The list handed in is still `activeSales` (returns excluded), which keeps
+  /// expected-cash gross of refunds; refunds are accounted for separately by
+  /// the drawer's own cash-refund figure.
+  static List<PaymentSummary> _calculateRetailPaymentSummaries(
+          List<SaleModel> sales) =>
+      RetailPaymentModeSummary.summarize(sales);
 
   static List<TaxSummary> _calculateRetailTaxSummaries(List sales) {
     double totalCgst = 0.0;
@@ -608,8 +682,11 @@ class EODService {
     double totalTaxableAmount = 0.0;
 
     for (final sale in sales) {
-      if (sale.isReturn == true) continue; // Skip returns
-
+      // Returns are NETTED, not skipped. Their CGST/SGST/taxable are stored
+      // already negated, so summing them straight nets the credit note out.
+      // Skipping them left CGST + SGST unable to reconcile with `totalTax`
+      // above, which does net returns — the two disagreed on any day with a
+      // refund.
       if (sale.totalCgstAmount != null && sale.totalSgstAmount != null) {
         totalCgst += sale.totalCgstAmount!;
         totalSgst += sale.totalSgstAmount!;
@@ -618,6 +695,25 @@ class EODService {
     }
 
     List<TaxSummary> summaries = [];
+
+    // CGST/SGST is an INDIAN intra-state concept. Storing those names for a UK
+    // or US shop put Indian tax rows into its permanent close records — and
+    // unlike a screen label, a stored name cannot be re-rendered later.
+    // `TaxLabelRule` is the same rule the GST report and Checkout already use.
+    if (!TaxLabelRule.splitsIntoComponents) {
+      final totalTax = totalCgst + totalSgst;
+      if (totalTax > 0) {
+        summaries.add(TaxSummary(
+          // "VAT" / "Sales Tax" / "Tax" — whatever this country calls it.
+          taxName: TaxLabelRule.name,
+          taxRate: 0.0, // Rate varies by product, so we'll show 0 for overall
+          taxAmount: totalTax,
+          // The WHOLE base, not a half: there is nothing to halve it between.
+          taxableAmount: totalTaxableAmount,
+        ));
+      }
+      return summaries;
+    }
 
     // Add CGST summary if present
     if (totalCgst > 0) {
@@ -640,6 +736,27 @@ class EODService {
     }
 
     return summaries;
+  }
+
+  static void _subtractFromSummary(List<PaymentSummary> list, String method, double amount) {
+    final normMethod = PaymentModeSummary.normalizeMethod(method);
+    final idx = list.indexWhere((s) => s.paymentType.toLowerCase().trim() == normMethod.toLowerCase().trim());
+    if (idx != -1) {
+      final old = list[idx];
+      list[idx] = PaymentSummary(
+        paymentType: old.paymentType,
+        totalAmount: old.totalAmount - amount,
+        transactionCount: old.transactionCount,
+        percentage: 0.0,
+      );
+    } else {
+      list.add(PaymentSummary(
+        paymentType: normMethod,
+        totalAmount: -amount,
+        transactionCount: 1,
+        percentage: 0.0,
+      ));
+    }
   }
 }
 

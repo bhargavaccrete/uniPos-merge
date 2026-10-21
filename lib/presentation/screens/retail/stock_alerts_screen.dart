@@ -1,9 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/util/common/quantity_format.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_empty_state.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_status_pill.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_summary_card.dart';
+import 'package:billberrylite/presentation/widget/componets/common/report_summary_row.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:billberrylite/domain/store/retail/stock_alert_store.dart';
+import 'package:billberrylite/domain/services/retail/stock_alert_service.dart';
 
 import '../../../core/di/service_locator.dart';
-
 
 class StockAlertsScreen extends StatefulWidget {
   const StockAlertsScreen({super.key});
@@ -22,34 +32,111 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
     _alertStore.refresh();
   }
 
+  /// Threshold picker, on the shared [AppDialogShell] rather than a
+  /// `PopupMenuButton`. The menu gave no indication of which value was active
+  /// and looked nothing like the app's other dialogs.
+  Future<void> _pickThreshold() async {
+    const options = StockAlertService.thresholdOptions;
+    final current = _alertStore.threshold;
+
+    final picked = await showDialog<int>(
+      context: context,
+      builder: (dialogContext) => AppDialogShell(
+        title: 'Alert Threshold',
+        // Worth saying: a variant with its own minStock ignores this number,
+        // so changing it appears to do nothing for those rows.
+        subtitle:
+            'Flags variants at or below this stock level, unless the '
+            'variant sets its own minimum.',
+        icon: Icons.tune_rounded,
+        accent: AppColors.primary,
+        body: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: options.map((value) {
+            final selected = value == current;
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: AppResponsive.smallSpacing(context),
+              ),
+              child: Material(
+                color: selected
+                    ? AppColors.primary.withValues(alpha: 0.08)
+                    : AppColors.surfaceLight,
+                borderRadius: BorderRadius.circular(10),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(10),
+                  onTap: () => Navigator.pop(dialogContext, value),
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: AppResponsive.mediumSpacing(context),
+                      vertical: AppResponsive.mediumSpacing(context),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          selected
+                              ? Icons.radio_button_checked
+                              : Icons.radio_button_unchecked,
+                          size: AppResponsive.smallIconSize(dialogContext),
+                          color: selected
+                              ? AppColors.primary
+                              : AppColors.textSecondary,
+                        ),
+                        SizedBox(width: AppResponsive.mediumSpacing(context)),
+                        Text(
+                          '$value units or fewer',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.bodyFontSize(dialogContext),
+                            fontWeight: selected
+                                ? FontWeight.w600
+                                : FontWeight.w400,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+        actions: [appDialogCancelButton(dialogContext)],
+      ),
+    );
+
+    if (picked == null || picked == current) return;
+    await _alertStore.setThreshold(picked);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
-      appBar: AppBar(
-        title: const Text('Stock Alerts'),
-        centerTitle: true,
-        backgroundColor: Colors.white,
-        elevation: 0,
+      backgroundColor: AppColors.surfaceLight,
+      appBar: buildPrimaryAppBar(
+        title: 'Stock Alerts',
         actions: [
           Observer(
-            builder: (_) => PopupMenuButton<int>(
-              onSelected: (value) {
-                _alertStore.setThreshold(value);
-              },
-              itemBuilder: (context) => [
-                const PopupMenuItem(value: 5, child: Text('Threshold: 5')),
-                const PopupMenuItem(value: 10, child: Text('Threshold: 10')),
-                const PopupMenuItem(value: 15, child: Text('Threshold: 15')),
-                const PopupMenuItem(value: 20, child: Text('Threshold: 20')),
-              ],
+            builder: (_) => InkWell(
+              onTap: _pickThreshold,
               child: Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.tune, size: 20),
+                    Icon(
+                      Icons.tune,
+                      size: AppResponsive.smallIconSize(context),
+                      color: Colors.white,
+                    ),
                     const SizedBox(width: 4),
-                    Text('≤${_alertStore.threshold}', style: const TextStyle(fontSize: 14)),
+                    Text(
+                      '≤${_alertStore.threshold}',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.bodyFontSize(context),
+                        color: Colors.white,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -57,93 +144,84 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
           ),
         ],
       ),
-      body: Observer(
-        builder: (_) {
-          if (_alertStore.isLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      body: AppResponsive.constrainedContent(
+        context: context,
+        alignment: Alignment.topCenter,
+        maxWidth: AppResponsive.maxContentWidth(context),
+        child: Observer(
+          builder: (_) {
+            if (_alertStore.isLoading) {
+              return const Center(
+                child: CircularProgressIndicator(color: AppColors.primary),
+              );
+            }
 
-          if (_alertStore.lowStockItems.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.check_circle, size: 80, color: Colors.green.withOpacity(0.5)),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'All products are well stocked!',
-                    style: TextStyle(fontSize: 16, color: Color(0xFF6B6B6B)),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'No items below threshold of ${_alertStore.threshold}',
-                    style: const TextStyle(fontSize: 12, color: Color(0xFF9E9E9E)),
-                  ),
-                ],
-              ),
-            );
-          }
+            if (_alertStore.lowStockItems.isEmpty) {
+              // AppEmptyState, not ReportEmptyState — this is a dashboard
+              // destination, not a report.
+              return AppEmptyState(
+                icon: Icons.check_circle,
+                title: 'All products are well stocked!',
+                message: 'No items below threshold of ${_alertStore.threshold}',
+              );
+            }
 
-          return Column(
-            children: [
-              // Summary Cards
-              _buildSummarySection(),
-              // Alert List
-              Expanded(
-                child: RefreshIndicator(
-                  onRefresh: () => _alertStore.refresh(),
-                  child: ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _alertStore.lowStockItems.length,
-                    itemBuilder: (context, index) {
-                      final item = _alertStore.lowStockItems[index];
-                      return _buildAlertCard(item);
-                    },
+            return Column(
+              children: [
+                // Summary Cards
+                _buildSummarySection(context),
+                // Alert List
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: () => _alertStore.refresh(),
+                    child: ListView.builder(
+                      padding: AppResponsive.padding(context),
+                      itemCount: _alertStore.lowStockItems.length,
+                      itemBuilder: (context, index) {
+                        final item = _alertStore.lowStockItems[index];
+                        return _buildAlertCard(context, item);
+                      },
+                    ),
                   ),
                 ),
-              ),
-            ],
-          );
-        },
+              ],
+            );
+          },
+        ),
       ),
     );
   }
 
-  Widget _buildSummarySection() {
+  Widget _buildSummarySection(BuildContext context) {
     return Observer(
       builder: (_) => Container(
-        padding: const EdgeInsets.all(16),
+        padding: AppResponsive.padding(context),
         decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(bottom: BorderSide(color: Color(0xFFE8E8E8))),
+          color: AppColors.white,
+          border: Border(bottom: BorderSide(color: AppColors.divider)),
         ),
-        child: Row(
-          children: [
-            Expanded(
-              child: _buildSummaryCard(
-                'Total Alerts',
-                _alertStore.totalAlerts.toString(),
-                const Color(0xFF1A1A1A),
-                Icons.notifications_active,
-              ),
+        // ReportSummaryRow instead of a hand-rolled Row of Expandeds: its cards
+        // carry the FittedBox that keeps a 3-across band readable on a 360dp
+        // phone, which the local version had no answer for.
+        child: ReportSummaryRow(
+          cards: [
+            ReportSummaryCard(
+              title: 'Total Alerts',
+              value: _alertStore.totalAlerts.toString(),
+              icon: Icons.notifications_active,
+              color: AppColors.primary,
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildSummaryCard(
-                'Critical',
-                _alertStore.criticalCount.toString(),
-                Colors.red,
-                Icons.error,
-              ),
+            ReportSummaryCard(
+              title: 'Critical',
+              value: _alertStore.criticalCount.toString(),
+              icon: Icons.error,
+              color: AppColors.danger,
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildSummaryCard(
-                'Out of Stock',
-                _alertStore.outOfStockCount.toString(),
-                Colors.red.shade900,
-                Icons.remove_shopping_cart,
-              ),
+            ReportSummaryCard(
+              title: 'Out of Stock',
+              value: _alertStore.outOfStockCount.toString(),
+              icon: Icons.remove_shopping_cart,
+              color: Colors.red.shade900,
             ),
           ],
         ),
@@ -151,42 +229,15 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
     );
   }
 
-  Widget _buildSummaryCard(String label, String value, Color color, IconData icon) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 20),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10,
-              color: color.withOpacity(0.8),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAlertCard(Map<String, dynamic> item) {
-    final stock = item['currentStock'] as int;
-    final isOutOfStock = stock == 0;
-    final isCritical = stock <= 3;
+  Widget _buildAlertCard(BuildContext context, Map<String, dynamic> item) {
+    // `num` — decimal variants hold a fractional stock.
+    final stock = (item['currentStock'] as num?)?.toDouble() ?? 0;
+    final isOutOfStock = stock <= 0;
+    // The store's rule — a third of THIS row's reorder point — not a flat
+    // `stock <= 3`. The flat version disagreed with the Critical tile above,
+    // so a variant reordering at 20 with 5 left counted as critical but was
+    // painted as merely low.
+    final isCritical = _alertStore.isCritical(item);
 
     Color alertColor;
     IconData alertIcon;
@@ -197,11 +248,11 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
       alertIcon = Icons.remove_shopping_cart;
       alertLabel = 'OUT OF STOCK';
     } else if (isCritical) {
-      alertColor = Colors.red;
+      alertColor = AppColors.danger;
       alertIcon = Icons.warning_amber;
       alertLabel = 'CRITICAL';
     } else {
-      alertColor = const Color(0xFFFF9800);
+      alertColor = AppColors.warning;
       alertIcon = Icons.info_outline;
       alertLabel = 'LOW STOCK';
     }
@@ -209,33 +260,44 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
     final variantInfo = _buildVariantDescription(item);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: alertColor, width: isOutOfStock || isCritical ? 2 : 1),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
+        border: Border.all(
+          color: alertColor,
+          width: isOutOfStock || isCritical ? 2 : 1,
+        ),
         boxShadow: [
           BoxShadow(
-            color: alertColor.withOpacity(0.1),
+            color: alertColor.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: AppResponsive.cardPadding(context),
         child: Row(
           children: [
             // Alert Icon
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
               decoration: BoxDecoration(
-                color: alertColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(10),
+                color: alertColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(
+                  AppResponsive.smallBorderRadius(context),
+                ),
               ),
-              child: Icon(alertIcon, color: alertColor, size: 28),
+              child: Icon(
+                alertIcon,
+                color: alertColor,
+                size: AppResponsive.largeIconSize(context),
+              ),
             ),
-            const SizedBox(width: 16),
+            SizedBox(width: AppResponsive.largeSpacing(context)),
             // Product Info
             Expanded(
               child: Column(
@@ -243,8 +305,8 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
                 children: [
                   Text(
                     item['productName'] ?? 'Unknown Product',
-                    style: const TextStyle(
-                      fontSize: 14,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.bodyFontSize(context),
                       fontWeight: FontWeight.w600,
                     ),
                     maxLines: 1,
@@ -254,27 +316,19 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
                     const SizedBox(height: 4),
                     Text(
                       variantInfo,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF6B6B6B),
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.captionFontSize(context),
+                        color: AppColors.textSecondary,
                       ),
                     ),
                   ],
                   const SizedBox(height: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: alertColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      alertLabel,
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: alertColor,
-                      ),
-                    ),
+                  // Same pill the damaged-goods and purchase-return reports
+                  // use, so a severity badge looks the same wherever it appears.
+                  AppStatusPill(
+                    label: alertLabel,
+                    color: alertColor,
+                    dense: true,
                   ),
                 ],
               ),
@@ -284,15 +338,20 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: AppResponsive.largeSpacing(context),
+                    vertical: AppResponsive.smallSpacing(context),
+                  ),
                   decoration: BoxDecoration(
-                    color: alertColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
+                    color: alertColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(
+                      AppResponsive.smallBorderRadius(context),
+                    ),
                   ),
                   child: Text(
-                    '$stock',
-                    style: TextStyle(
-                      fontSize: 20,
+                    formatQty(stock),
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.headingFontSize(context),
                       fontWeight: FontWeight.bold,
                       color: alertColor,
                     ),
@@ -301,9 +360,9 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
                 const SizedBox(height: 4),
                 Text(
                   'in stock',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: alertColor.withOpacity(0.7),
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.captionFontSize(context),
+                    color: alertColor.withValues(alpha: 0.7),
                   ),
                 ),
               ],
@@ -317,14 +376,17 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
   String _buildVariantDescription(Map<String, dynamic> item) {
     final parts = <String>[];
 
-    if (item['size'] != null && item['size'].toString().isNotEmpty) {
-      parts.add('Size: ${item['size']}');
-    }
-    if (item['color'] != null && item['color'].toString().isNotEmpty) {
-      parts.add('Color: ${item['color']}');
-    }
-    if (item['weight'] != null && item['weight'].toString().isNotEmpty) {
-      parts.add('Weight: ${item['weight']}');
+    // Every configured attribute, not just the three legacy columns.
+    final label =
+        (item['variantLabel'] as String?) ??
+        attributeStore.describeAttributes(
+          null,
+          size: item['size']?.toString(),
+          color: item['color']?.toString(),
+          weight: item['weight']?.toString(),
+        );
+    if (label.isNotEmpty) {
+      parts.add(label);
     }
     if (item['barcode'] != null && item['barcode'].toString().isNotEmpty) {
       parts.add('Barcode: ${item['barcode']}');

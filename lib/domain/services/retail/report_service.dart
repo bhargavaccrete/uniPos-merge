@@ -2,54 +2,330 @@
 
 
 
+import 'package:billberrylite/core/config/tax_label_rule.dart';
+import 'package:billberrylite/util/common/tax_split.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
-import 'package:billberrylite/data/models/retail/hive_model/purchase_model_207.dart';
+import 'package:billberrylite/core/config/tax_feature.dart';
+import 'package:billberrylite/data/models/retail/hive_model/credit_payment_model_218.dart';
+import 'package:billberrylite/data/models/retail/hive_model/grn_model_213.dart';
+import 'package:billberrylite/data/models/retail/hive_model/purchase_return_model_174.dart';
+import 'package:billberrylite/data/models/retail/hive_model/supplier_claim_model_176.dart';
+import 'package:billberrylite/data/models/retail/hive_model/purchase_order_model_211.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
+import 'package:billberrylite/data/models/retail/hive_model/variante_model_201.dart';
+import 'package:billberrylite/data/models/retail/hive_model/grn_item_model_214.dart';
+import 'package:billberrylite/data/repositories/retail/credit_payment_repository.dart';
+import 'package:billberrylite/data/repositories/retail/grn_item_repository.dart';
+import 'package:billberrylite/domain/services/retail/exchange_service.dart';
+import 'package:billberrylite/domain/services/retail/gst_service.dart';
+import 'package:billberrylite/domain/services/retail/line_discount_reason.dart';
+import 'package:billberrylite/domain/services/retail/price_override_reason.dart';
+import 'package:billberrylite/domain/services/retail/quick_item_service.dart';
+import 'package:billberrylite/domain/services/retail/sale_return_reason.dart';
+import 'package:billberrylite/domain/store/retail/product_store.dart' show kInactiveVariantStatus;
+import 'package:billberrylite/domain/services/retail/inventory_service.dart';
+import 'package:billberrylite/domain/services/retail/sales_totals.dart';
+import 'package:billberrylite/domain/services/retail/stock_adjustment_service.dart';
+import 'package:billberrylite/util/restaurant/report_history_window.dart';
+import 'package:billberrylite/util/retail/sale_revenue_filter.dart';
+import 'package:billberrylite/data/repositories/restaurant/cash_movement_repository.dart';
+import 'package:billberrylite/util/retail/cash_drawer_ledger.dart';
+import 'package:billberrylite/util/retail/sale_created_at_prefilter.dart';
 
 import '../../../data/models/retail/hive_model/sale_item_model_204.dart';
 
-/// Service for generating various business reports
+/// One window of sales, already classified.
+///
+/// Every sales report needs the same three things — which sales fall in the
+/// window, which of those are returns, and a saleId→sign map for netting their
+/// line items. Deriving that once, in one place, is what stops the rules
+/// drifting apart between reports.
+class _SaleWindow {
+  final List<SaleModel> forward;
+  final List<SaleModel> returns;
+
+  /// `+1` for a forward sale, `-1` for a return. Line-level aggregation only —
+  /// see [RetailSaleFilter.revenueSign].
+  final Map<String, int> signBySaleId;
+
+  /// Rows dropped because their date could not be parsed.
+  final int skippedRows;
+
+  const _SaleWindow({
+    required this.forward,
+    required this.returns,
+    required this.signBySaleId,
+    required this.skippedRows,
+  });
+
+  /// Forward sales and returns together, headers already signed.
+  Iterable<SaleModel> get all => [...forward, ...returns];
+}
+
+/// Service for generating various business reports.
+///
+/// **Accrual basis.** `SaleModel.status` is deliberately never consulted: a
+/// `due` credit sale counts as revenue the moment it is rung up, not when it is
+/// collected. There is no cash-basis alternative here — cash actually received
+/// is the cash drawer's and EOD's job.
+///
+/// **Header reports and line reports differ by round-off, and always will.**
+/// Daily/Monthly sum the stored `sale.totalAmount`; Product/Variant/Category
+/// sum `item.total`. `RetailBillLine.total` is `taxableAmount + gstAmount`
+/// (`retail_billing_service.dart:45`) and excludes `roundOff`, which *is* inside
+/// the stored grand total. Bill-level discount and loyalty redemption are
+/// distributed across lines and do reconcile; round-off is not distributed,
+/// because doing so would put a fabricated fraction of a rupee on individual
+/// lines and make a reprint disagree with the original receipt. So expect a
+/// drift of up to the round-off per sale between the two families of report.
+/// That gap is the round-off, not a bug — do not "fix" it by redistributing.
+///
+/// **Gross and net are named, never implied.** On the totals reports every key
+/// declares its own basis: bare keys (`totalRevenue`, `totalTax`,
+/// `totalDiscount`) cover forward sales only, `net*` keys include returns. They
+/// used to be mixed — revenue folded over forward sales while tax and discount
+/// folded over both — and were then rendered as consecutive rows that could not
+/// be reconciled. See [RetailSalesTotals], which owns that arithmetic for both
+/// the daily and the monthly report.
 class ReportService {
+  /// Inclusive start, **exclusive** end — the single date rule for every report
+  /// in this service.
+  ///
+  /// The original comparisons were `isAfter(start) && isBefore(end)`, strict on
+  /// both sides. Because a date picker hands back midnight, that dropped the
+  /// whole last day of a range and any record sitting exactly on a boundary.
+  /// Callers must therefore pass an end that is the first instant *after* the
+  /// window (start of next day / next month), which is what the report kit's
+  /// `reportPeriodEndBound` already returns.
+  /// How far back this plan may look, captured once per instance so every row
+  /// in a single report is judged against the same instant.
+  ///
+  /// Always `ReportHistoryWindow.cutoff`, never `PlanEnforce.windowCutoff` —
+  /// the latter has no `days <= 0 ⇒ unlimited` guard, so a `0` would pin the
+  /// cutoff to now and blank every report while the filter buttons stayed
+  /// unlocked.
+  final DateTime? _historyCutoff = ReportHistoryWindow.cutoff;
+
+  bool _inWindow(DateTime at, DateTime? start, DateTime? end) {
+    // Enforced here rather than at each of the 16 report methods, so no report
+    // can be added later that quietly reaches past the plan's limit. Null means
+    // unlimited, which is what retail resolves to today (licensing is bypassed
+    // for retail), making this a no-op until that flips.
+    if (_historyCutoff != null && at.isBefore(_historyCutoff)) return false;
+    if (start != null && at.isBefore(start)) return false;
+    if (end != null && !at.isBefore(end)) return false;
+    return true;
+  }
+
+  /// Money lands on paise; quantities keep a digit more than they are ever
+  /// displayed with.
+  ///
+  /// Applied at EMIT time, never per line: rounding each line first would move
+  /// a group's total by up to half a paisa per row. Line figures are already
+  /// 2dp from the billing engine, so this only strips float noise — the reason
+  /// a quantity could surface as `0.30000000000000004`.
+  static double _r2(double v) => double.parse(v.toStringAsFixed(2));
+
+  /// The CGST/SGST components of an authoritative [totalGst], reconciled so the
+  /// two ALWAYS add back to it exactly at two decimals.
+  ///
+  /// Every write path stores the halves as two INDEPENDENTLY rounded copies of
+  /// `gst / 2` (`SaleItemModel:260`, `GstService:60`,
+  /// `RetailBillingService:209`). On an odd paisa those two roundings do not
+  /// close: ₹18.05 stores 9.03 and 9.03, which display as ₹18.06 beside a Total
+  /// GST of ₹18.05. Summed over a month of lines the gap reaches rupees, and it
+  /// is visible on the one report that gets filed.
+  ///
+  /// Total GST is the authoritative figure — it is what the customer was
+  /// charged and what `sale.taxAmount` and the receipt carry. The components
+  /// are a presentation split of it, so they are DERIVED here rather than
+  /// summed: the first is the ordinary half, the second is whatever is left.
+  /// The adjustment is at most ₹0.01 and lands on SGST, deterministically.
+  ///
+  /// Sign is preserved — a credit note's negative GST yields two negative
+  /// components that still sum to it.
+  /// This report's rule is now the app-wide one — see [TaxSplit].
+  static ({double cgst, double sgst}) _splitGst(double totalGst) =>
+      TaxSplit.halves(totalGst);
+  static double _r3(double v) => double.parse(v.toStringAsFixed(3));
+
+  /// Deterministic order for a line-level report row: revenue desc, then
+  /// quantity desc, then the group's own id ascending.
+  ///
+  /// Revenue alone is not enough. `List.sort` is NOT stable in Dart, so two rows
+  /// on the same revenue fell in whatever order `getAllSaleItems()` happened to
+  /// return their lines — which meant Top Selling's rank could change between
+  /// two loads of one period, and could even change which product made the cut.
+  /// Quantity, then the id, break the tie on values that do not move.
+  ///
+  /// [idKey] is the report's own grouping key: `productId`, `variantId` or
+  /// `categoryId`. Ordering only — no figure is altered.
+  static int _byRevenueDesc(
+    Map<String, dynamic> a,
+    Map<String, dynamic> b,
+    String idKey,
+  ) {
+    final byRevenue =
+        (b['totalRevenue'] as num).compareTo(a['totalRevenue'] as num);
+    if (byRevenue != 0) return byRevenue;
+    final byQuantity =
+        (b['totalQuantity'] as num).compareTo(a['totalQuantity'] as num);
+    if (byQuantity != 0) return byQuantity;
+    return (a[idKey] as String).compareTo(b[idKey] as String);
+  }
+
+  /// Never `DateTime.parse` a stored date in a filter.
+  ///
+  /// A single malformed string threw straight out of the enclosing `.where`
+  /// closure and took the whole report down with it. Restore accepts
+  /// `saleMap['date']` unvalidated, so a bad value is reachable. Unparseable
+  /// rows are skipped and counted into `skippedRows` instead — silently
+  /// dropping a sale is bad, but silently dropping every sale is worse.
+  DateTime? _parseDate(String? iso) => DateTime.tryParse(iso ?? '');
+
+  /// The one timestamp every retail report filters and groups on.
+  ///
+  /// `SaleModel` carries both `date` and `createdAt`, written identically by
+  /// every factory — but nothing enforces that, and restore used to default
+  /// them independently, so a restored sale could carry two different days.
+  /// Reports used `date` while `SaleRepository`, EOD, the cash drawer and the
+  /// dashboard all used `createdAt`, which meant the same sale could be counted
+  /// by one and not the other. `createdAt` wins because the rest of the app
+  /// already agreed on it.
+  DateTime? _reportedAt(SaleModel sale) => _parseDate(sale.createdAt);
+
+  /// Classify every sale in a window once: forward sales, returns, and the
+  /// per-sale sign its line items carry.
+  ///
+  /// Both bounds null means "all time" — and note the classification runs
+  /// regardless. It used to sit inside `if (start != null || end != null)`,
+  /// so an unfiltered report skipped it entirely and counted return lines,
+  /// which are stored positive, as extra sales.
+  Future<_SaleWindow> _salesInWindow(DateTime? start, DateTime? end) async {
+    // One pass over the sales box, one parse per sale. `_inWindow` applies the
+    // same `[start, end)` rule the bounded `getSalesByDateRange` read did, plus
+    // the plan's history cutoff.
+    //
+    // That bounded read silently dropped unparseable dates before this loop saw
+    // them, so they only count toward `skippedRows` when a bound is missing.
+    final bounded = start != null && end != null;
+    // Skips the parse for sales provably outside a bound. Such a string always
+    // parses, so skipping it never moves `skippedRows`.
+    final prefilter = SaleCreatedAtPrefilter.forWindow(start, end);
+
+    final forward = <SaleModel>[];
+    final returns = <SaleModel>[];
+    final signBySaleId = <String, int>{};
+    var skipped = 0;
+
+    for (final sale in saleStore.salesInStorageOrder()) {
+      if (prefilter.isDefinitelyOutside(sale.createdAt)) continue;
+      final at = _reportedAt(sale);
+      if (at == null) {
+        if (!bounded) skipped++;
+        continue;
+      }
+      if (!_inWindow(at, start, end)) continue;
+      if (RetailSaleFilter.isExcludedFromRevenue(sale)) continue;
+
+      signBySaleId[sale.saleId] = RetailSaleFilter.revenueSign(sale);
+      if (RetailSaleFilter.isReturn(sale)) {
+        returns.add(sale);
+      } else {
+        forward.add(sale);
+      }
+    }
+
+    return _SaleWindow(
+      forward: forward,
+      returns: returns,
+      signBySaleId: signBySaleId,
+      skippedRows: skipped,
+    );
+  }
+
+  /// Every sale line in a window, paired with the sign its sale contributes.
+  ///
+  /// Lines belonging to a return come back with `sign: -1` rather than being
+  /// dropped, so an item sold 10 and returned 8 reports 2 — which is what makes
+  /// the item-level reports reconcile with `netRevenue` on Daily/Monthly.
+  Future<List<({SaleItemModel item, int sign})>> _signedLinesInWindow(
+      DateTime? start, DateTime? end) async {
+    final window = await _salesInWindow(start, end);
+
+    // Box order, uncopied — accumulation order downstream depends on it.
+    final signed = <({SaleItemModel item, int sign})>[];
+    for (final item in saleItemRepository.saleItemsInStorageOrder()) {
+      final sign = window.signBySaleId[item.saleId];
+      if (sign == null) continue; // outside the window, or an excluded sale
+      signed.add((item: item, sign: sign));
+    }
+    return signed;
+  }
+
+  /// Revenue for a line with the collected tax taken out.
+  ///
+  /// `item.total` is tax-INCLUSIVE. Profit compares it against an ex-tax cost
+  /// price, so leaving the GST in booked the tax you owe the government as
+  /// margin — a ₹100 item at 18% costing ₹60 reported ₹58 profit instead of
+  /// ₹40, and the overstatement grew with the tax rate.
+  double _netRevenueOf(SaleItemModel item) =>
+      item.total - (item.gstAmount ?? item.taxAmount ?? 0.0);
+
+  /// variantId → current cost price, read once per report.
+  ///
+  /// Only a fallback for lines written before cost was snapshotted onto the
+  /// sale (see `SaleItemModel.costPrice`); it replaces a `getVariantById` call
+  /// per line, which on a miss degraded to a full box scan each time.
+  Future<Map<String, double?>> _liveCostByVariantId() async {
+    final all = await productStore.getAllVariants();
+    return {for (final v in all) v.varianteId: v.costPrice};
+  }
+
+  /// Unit cost for a line: frozen-at-sale first, live variant second, and
+  /// `null` when it is genuinely unknown.
+  ///
+  /// Never collapse the unknown case to `0` — that silently turns a line with
+  /// no cost data into 100% margin and drags the whole store's margin up.
+  double? _unitCostOf(SaleItemModel item, Map<String, double?> liveCost) =>
+      item.costPrice ?? liveCost[item.varianteId];
+
+  /// saleId → its lines, for the sales in [window] only, indexed in a single
+  /// pass. Each list keeps box order.
+  ///
+  /// `saleItemRepository.getItemsBySaleId` has no index and scans the whole
+  /// box, so calling it per sale meant a 1,000-sale month cost 1,000 full
+  /// scans — and the profit screen did that twice over. Callers only look up
+  /// ids from `window.all`, so lines of other sales are never grouped.
+  Future<Map<String, List<SaleItemModel>>> _itemsBySaleId(
+      _SaleWindow window) async {
+    final bySaleId = <String, List<SaleItemModel>>{};
+    for (final item in saleItemRepository.saleItemsInStorageOrder()) {
+      if (!window.signBySaleId.containsKey(item.saleId)) continue;
+      (bySaleId[item.saleId] ??= <SaleItemModel>[]).add(item);
+    }
+    return bySaleId;
+  }
+
   // ==================== Daily Sales Report ====================
 
   /// Get daily sales report for a specific date
   Future<Map<String, dynamic>> getDailySalesReport(DateTime date) async {
+    // Exclusive end = start of the next day. The old 23:59:59 bound with a
+    // strict isAfter/isBefore dropped both a sale at exactly midnight and
+    // anything in the final second of the day.
     final startOfDay = DateTime(date.year, date.month, date.day);
-    final endOfDay = DateTime(date.year, date.month, date.day, 23, 59, 59);
+    final endOfDay = startOfDay.add(const Duration(days: 1));
 
-    final allSales = await saleStore.getAllSales();
-    final dailySales = allSales.where((sale) {
-      final saleDate = DateTime.parse(sale.date);
-      return saleDate.isAfter(startOfDay) && saleDate.isBefore(endOfDay) && !(sale.isReturn ?? false);
-    }).toList();
-
-    final totalSales = dailySales.length;
-    final totalRevenue = dailySales.fold<double>(0.0, (sum, sale) => sum + sale.totalAmount);
-    final totalItems = dailySales.fold<int>(0, (sum, sale) => sum + sale.totalItems);
-    final totalDiscount = dailySales.fold<double>(0.0, (sum, sale) => sum + sale.discountAmount);
-    final totalTax = dailySales.fold<double>(0.0, (sum, sale) => sum + sale.taxAmount);
-
-    // Get returns for the day
-    final dailyReturns = allSales.where((sale) {
-      final saleDate = DateTime.parse(sale.date);
-      return saleDate.isAfter(startOfDay) && saleDate.isBefore(endOfDay) && (sale.isReturn ?? false);
-    }).toList();
-
-    final totalReturns = dailyReturns.length;
-    final totalReturnAmount = dailyReturns.fold<double>(0.0, (sum, sale) => sum + sale.totalAmount.abs());
+    final window = await _salesInWindow(startOfDay, endOfDay);
 
     return {
       'date': date,
-      'totalSales': totalSales,
-      'totalRevenue': totalRevenue,
-      'totalItems': totalItems,
-      'totalDiscount': totalDiscount,
-      'totalTax': totalTax,
-      'totalReturns': totalReturns,
-      'totalReturnAmount': totalReturnAmount,
-      'netRevenue': totalRevenue - totalReturnAmount,
-      'averageSaleValue': totalSales > 0 ? totalRevenue / totalSales : 0.0,
-      'sales': dailySales,
+      ...RetailSalesTotals.compute(
+        forward: window.forward,
+        returns: window.returns,
+        skippedRows: window.skippedRows,
+      ),
     };
   }
 
@@ -57,34 +333,23 @@ class ReportService {
 
   /// Get monthly sales report
   Future<Map<String, dynamic>> getMonthlySalesReport(int year, int month) async {
+    // Exclusive end = first instant of the following month. `DateTime(y, m+1, 1)`
+    // rolls the year over correctly for December.
     final startOfMonth = DateTime(year, month, 1);
-    final endOfMonth = DateTime(year, month + 1, 0, 23, 59, 59);
+    final endOfMonth = DateTime(year, month + 1, 1);
 
-    final allSales = await saleStore.getAllSales();
-    final monthlySales = allSales.where((sale) {
-      final saleDate = DateTime.parse(sale.date);
-      return saleDate.isAfter(startOfMonth) && saleDate.isBefore(endOfMonth) && !(sale.isReturn ?? false);
-    }).toList();
+    final window = await _salesInWindow(startOfMonth, endOfMonth);
 
-    final totalSales = monthlySales.length;
-    final totalRevenue = monthlySales.fold<double>(0.0, (sum, sale) => sum + sale.totalAmount);
-    final totalItems = monthlySales.fold<int>(0, (sum, sale) => sum + sale.totalItems);
-    final totalDiscount = monthlySales.fold<double>(0.0, (sum, sale) => sum + sale.discountAmount);
-    final totalTax = monthlySales.fold<double>(0.0, (sum, sale) => sum + sale.taxAmount);
-
-    // Get returns for the month
-    final monthlyReturns = allSales.where((sale) {
-      final saleDate = DateTime.parse(sale.date);
-      return saleDate.isAfter(startOfMonth) && saleDate.isBefore(endOfMonth) && (sale.isReturn ?? false);
-    }).toList();
-
-    final totalReturns = monthlyReturns.length;
-    final totalReturnAmount = monthlyReturns.fold<double>(0.0, (sum, sale) => sum + sale.totalAmount.abs());
-
-    // Group by day for trend analysis
+    // Day-by-day trend, net of returns: a refund pulls its own day down rather
+    // than vanishing. Return headers are already negative, so adding them is
+    // the netting.
+    //
+    // Nothing renders this yet — it is kept as the ready-made series for a
+    // monthly trend chart, which is the only reason it is still computed.
     final dailyBreakdown = <int, double>{};
-    for (var sale in monthlySales) {
-      final saleDate = DateTime.parse(sale.date);
+    for (var sale in window.all) {
+      final saleDate = _reportedAt(sale);
+      if (saleDate == null) continue;
       final day = saleDate.day;
       dailyBreakdown[day] = (dailyBreakdown[day] ?? 0.0) + sale.totalAmount;
     }
@@ -92,123 +357,174 @@ class ReportService {
     return {
       'year': year,
       'month': month,
-      'totalSales': totalSales,
-      'totalRevenue': totalRevenue,
-      'totalItems': totalItems,
-      'totalDiscount': totalDiscount,
-      'totalTax': totalTax,
-      'totalReturns': totalReturns,
-      'totalReturnAmount': totalReturnAmount,
-      'netRevenue': totalRevenue - totalReturnAmount,
-      'averageSaleValue': totalSales > 0 ? totalRevenue / totalSales : 0.0,
+      // Same builder as the daily report, so the two can never drift apart
+      // again — they were copies of one another, bugs included.
+      ...RetailSalesTotals.compute(
+        forward: window.forward,
+        returns: window.returns,
+        skippedRows: window.skippedRows,
+      ),
       'dailyBreakdown': dailyBreakdown,
-      'sales': monthlySales,
     };
   }
 
   // ==================== Product-wise Sales Report ====================
 
+  /// The line-level contract shared by the product, variant and category
+  /// reports. All three run it; only the grouping key and the row's descriptive
+  /// fields differ.
+  ///
+  /// - **line**      — every `SaleItemModel` whose sale falls in the window
+  /// - **sign**      — `RetailSaleFilter.revenueSign`; return LINES are stored
+  ///                   positive, so the sign is what nets them
+  /// - **quantity**  — `Σ qty × sign`, a double: retail sells by weight
+  /// - **revenue**   — `Σ total × sign`. `total` is `taxable + gst`, so it is
+  ///                   tax-INCLUSIVE and discount-applied, and it EXCLUDES
+  ///                   round-off, which lives only on the sale header. That is
+  ///                   the whole of the gap against Daily/Monthly revenue, and
+  ///                   it must not be allocated down to lines.
+  /// - **discount**  — `Σ discountAmount × sign`; already the line's own share
+  ///                   plus its portion of the bill discount, allocated by the
+  ///                   billing engine. Nothing to re-derive.
+  /// - **tax**       — `Σ taxAmount × sign`; `fromCalculated` writes
+  ///                   `taxAmount = gstAmount` on forward AND return lines, so
+  ///                   refunds net correctly.
+  ///
+  /// Deliberately three functions rather than one for now: the sharing question
+  /// is open until these reports are corrected and covered.
+
+  // ── Ad-hoc lines in a grouped report ──────────────────────────────────────
+
+  /// The one bucket every quick item folds into on a grouped report.
+  ///
+  /// `QuickItemService` mints a UNIQUE productId AND variantId per line, on
+  /// purpose — a shared id would label every ad-hoc sale ever made with
+  /// whichever name happened to sell first. The cost is that a report grouping
+  /// on those ids gets one row per SALE LINE: fifty sales of "Gift Wrap" became
+  /// fifty single-sale rows, and Top Selling ranked them as fifty separate
+  /// products, crowding out the real ones.
+  ///
+  /// So the grouped reports fold them onto this key instead. Revenue still
+  /// reconciles with `netRevenue` on Daily/Monthly because the lines are
+  /// collapsed, never dropped. The per-name breakdown lives in
+  /// [getQuickItemsReport], which is the report that can carry it — these three
+  /// are keyed on catalogue ids a quick item does not have.
+  static const String quickItemGroupId = 'QUICK-ITEMS';
+  static const String quickItemGroupName = 'Quick Items';
+
+  /// Grouping key for a line: its catalogue product, or the shared ad-hoc
+  /// bucket. Reads `varianteId` because that is the id carrying the prefix.
+  static String _productGroupId(SaleItemModel item) =>
+      QuickItemService.isQuickItem(item.varianteId)
+          ? quickItemGroupId
+          : item.productId;
+
   /// Get sales report grouped by products
   Future<List<Map<String, dynamic>>> getProductWiseSalesReport({DateTime? startDate, DateTime? endDate}) async {
-    final allItems = await saleItemRepository.getAllSaleItems();
-
-    // Filter by date if provided
-    List<SaleItemModel> filteredItems = allItems;
-    if (startDate != null || endDate != null) {
-      final allSales = await saleStore.getAllSales();
-      final validSaleIds = <String>{};
-
-      for (var sale in allSales) {
-        final saleDate = DateTime.parse(sale.date);
-        if ((startDate == null || saleDate.isAfter(startDate)) &&
-            (endDate == null || saleDate.isBefore(endDate)) &&
-            !(sale.isReturn ?? false)) {
-          validSaleIds.add(sale.saleId);
-        }
-      }
-
-      filteredItems = allItems.where((item) => validSaleIds.contains(item.saleId)).toList();
-    }
+    final lines = await _signedLinesInWindow(startDate, endDate);
 
     // Group by productId
     final Map<String, Map<String, dynamic>> productStats = {};
 
-    for (var item in filteredItems) {
-      if (!productStats.containsKey(item.productId)) {
-        productStats[item.productId] = {
-          'productId': item.productId,
-          'productName': item.productName,
-          'totalQuantity': 0,
+    for (final (:item, :sign) in lines) {
+      // Ad-hoc lines share one bucket — see [quickItemGroupId].
+      final key = _productGroupId(item);
+      final isQuick = key == quickItemGroupId;
+
+      if (!productStats.containsKey(key)) {
+        productStats[key] = {
+          'productId': key,
+          // Defaulted here, not at each call site: `SaleItemModel.productName`
+          // is nullable and screens cast this straight to `String`.
+          'productName':
+              isQuick ? quickItemGroupName : (item.productName ?? 'Unknown'),
+          'isQuickItem': isQuick,
+          'totalQuantity': 0.0,
           'totalRevenue': 0.0,
           'totalDiscount': 0.0,
           'totalTax': 0.0,
         };
       }
 
-      productStats[item.productId]!['totalQuantity'] += item.qty;
-      productStats[item.productId]!['totalRevenue'] += item.total;
-      productStats[item.productId]!['totalDiscount'] += (item.discountAmount ?? 0.0);
-      productStats[item.productId]!['totalTax'] += (item.taxAmount ?? 0.0);
+      productStats[key]!['totalQuantity'] += item.qty * sign;
+      productStats[key]!['totalRevenue'] += item.total * sign;
+      productStats[key]!['totalDiscount'] += (item.discountAmount ?? 0.0) * sign;
+      productStats[key]!['totalTax'] += (item.taxAmount ?? 0.0) * sign;
     }
 
-    // Convert to list and sort by revenue
-    final statsList = productStats.values.toList()
-      ..sort((a, b) => (b['totalRevenue'] as double).compareTo(a['totalRevenue'] as double));
+    // Rounded here, then sorted, so the order matches the figures shown.
+    final statsList = productStats.values.map(_rounded).toList()
+      ..sort((a, b) => _byRevenueDesc(a, b, 'productId'));
 
     return statsList;
   }
+
+  /// Emit-time rounding for a line-level row. Leaves every other key alone.
+  /// A breakdown row with its `cgst`/`sgst` replaced by the reconciled split of
+  /// its own `totalGst`. Each By Rate and By Category card prints its two
+  /// components above its own total, so each row has to close on its own.
+  static Map<String, dynamic> _reconciledSplit(Map<String, dynamic> row) {
+    final parts = _splitGst(row['totalGst'] as double);
+    return {...row, 'cgst': parts.cgst, 'sgst': parts.sgst};
+  }
+
+  static Map<String, dynamic> _rounded(Map<String, dynamic> row) => {
+        ...row,
+        'totalQuantity': _r3(row['totalQuantity'] as double),
+        'totalRevenue': _r2(row['totalRevenue'] as double),
+        'totalDiscount': _r2(row['totalDiscount'] as double),
+        'totalTax': _r2(row['totalTax'] as double),
+      };
 
   // ==================== Variant-wise Sales Report ====================
 
   /// Get sales report grouped by variants
   Future<List<Map<String, dynamic>>> getVariantWiseSalesReport({DateTime? startDate, DateTime? endDate}) async {
-    final allItems = await saleItemRepository.getAllSaleItems();
-
-    // Filter by date if provided
-    List<SaleItemModel> filteredItems = allItems;
-    if (startDate != null || endDate != null) {
-      final allSales = await saleStore.getAllSales();
-      final validSaleIds = <String>{};
-
-      for (var sale in allSales) {
-        final saleDate = DateTime.parse(sale.date);
-        if ((startDate == null || saleDate.isAfter(startDate)) &&
-            (endDate == null || saleDate.isBefore(endDate)) &&
-            !(sale.isReturn ?? false)) {
-          validSaleIds.add(sale.saleId);
-        }
-      }
-
-      filteredItems = allItems.where((item) => validSaleIds.contains(item.saleId)).toList();
-    }
+    final lines = await _signedLinesInWindow(startDate, endDate);
 
     // Group by variantId
     final Map<String, Map<String, dynamic>> variantStats = {};
 
-    for (var item in filteredItems) {
-      if (!variantStats.containsKey(item.varianteId)) {
-        variantStats[item.varianteId] = {
-          'variantId': item.varianteId,
-          'productId': item.productId,
-          'productName': item.productName,
-          'size': item.size,
-          'color': item.color,
-          'totalQuantity': 0,
+    for (final (:item, :sign) in lines) {
+      // Same fold as the product-wise report: a quick item mints a unique
+      // variantId per line too, so grouping on it raw gives one row per sale.
+      final isQuick = QuickItemService.isQuickItem(item.varianteId);
+      final key = isQuick ? quickItemGroupId : item.varianteId;
+
+      if (!variantStats.containsKey(key)) {
+        variantStats[key] = {
+          'variantId': key,
+          'productId': _productGroupId(item),
+          // Defaulted here, not at each call site: `SaleItemModel.productName`
+          // is nullable and screens cast this straight to `String`.
+          'productName':
+              isQuick ? quickItemGroupName : (item.productName ?? 'Unknown'),
+          'isQuickItem': isQuick,
+          'size': isQuick ? null : item.size,
+          'color': isQuick ? null : item.color,
+          // Descriptor resolved from the sale's own record, so reports match
+          // the receipt even if the variant was edited afterwards. A quick item
+          // has no attributes to describe.
+          'variantLabel': isQuick
+              ? ''
+              : attributeStore.describeAttributes(item.attributes,
+                  size: item.size, color: item.color),
+          'totalQuantity': 0.0,
           'totalRevenue': 0.0,
           'totalDiscount': 0.0,
           'totalTax': 0.0,
         };
       }
 
-      variantStats[item.varianteId]!['totalQuantity'] += item.qty;
-      variantStats[item.varianteId]!['totalRevenue'] += item.total;
-      variantStats[item.varianteId]!['totalDiscount'] += (item.discountAmount ?? 0.0);
-      variantStats[item.varianteId]!['totalTax'] += (item.taxAmount ?? 0.0);
+      variantStats[key]!['totalQuantity'] += item.qty * sign;
+      variantStats[key]!['totalRevenue'] += item.total * sign;
+      variantStats[key]!['totalDiscount'] += (item.discountAmount ?? 0.0) * sign;
+      variantStats[key]!['totalTax'] += (item.taxAmount ?? 0.0) * sign;
     }
 
-    // Convert to list and sort by revenue
-    final statsList = variantStats.values.toList()
-      ..sort((a, b) => (b['totalRevenue'] as double).compareTo(a['totalRevenue'] as double));
+    // Rounded here, then sorted, so the order matches the figures shown.
+    final statsList = variantStats.values.map(_rounded).toList()
+      ..sort((a, b) => _byRevenueDesc(a, b, 'variantId'));
 
     return statsList;
   }
@@ -217,137 +533,641 @@ class ReportService {
 
   /// Get sales report grouped by categories
   Future<List<Map<String, dynamic>>> getCategoryWiseSalesReport({DateTime? startDate, DateTime? endDate}) async {
-    final allItems = await saleItemRepository.getAllSaleItems();
-    final allProducts = productStore.products;
+    final lines = await _signedLinesInWindow(startDate, endDate);
 
-    // Filter by date if provided
-    List<SaleItemModel> filteredItems = allItems;
-    if (startDate != null || endDate != null) {
-      final allSales = await saleStore.getAllSales();
-      final validSaleIds = <String>{};
+    // Indexed once — the per-line `products.where(...).firstOrNull` this
+    // replaces was a full product scan for every sale line.
+    //
+    // `ProductModel.category` holds the category **id**, not its name (see
+    // `add_product_screen.dart`, which saves `_selectedCategoryModel?.id`).
+    // Reporting it directly is why this report showed raw ids.
+    final categoryIdByProductId = {
+      for (final p in productStore.products) p.productId: p.category,
+    };
+    final categoryNameById = categoryStore.categoryNameById;
 
-      for (var sale in allSales) {
-        final saleDate = DateTime.parse(sale.date);
-        if ((startDate == null || saleDate.isAfter(startDate)) &&
-            (endDate == null || saleDate.isBefore(endDate)) &&
-            !(sale.isReturn ?? false)) {
-          validSaleIds.add(sale.saleId);
-        }
-      }
-
-      filteredItems = allItems.where((item) => validSaleIds.contains(item.saleId)).toList();
-    }
-
-    // Group by category
+    // Group by category id — names are not guaranteed unique, and grouping on
+    // a display string would silently merge two categories that share one.
     final Map<String, Map<String, dynamic>> categoryStats = {};
 
-    for (var item in filteredItems) {
-      // Find product to get category
-      final product = allProducts.where((p) => p.productId == item.productId).firstOrNull;
+    for (final (:item, :sign) in lines) {
+      // Ad-hoc lines get their OWN bucket rather than falling into
+      // 'Uncategorized'. They are not products missing a category — they were
+      // never in the catalogue — and mixing the two hides both.
+      final isQuick = QuickItemService.isQuickItem(item.varianteId);
+      final categoryId = categoryIdByProductId[item.productId] ?? '';
+      final name = categoryNameById[categoryId];
 
-      final category = product?.category ?? 'Uncategorized';
+      // Blank, unknown and deleted-category ids all collapse into a single
+      // bucket, so a deleted category can't produce several rows that are all
+      // labelled 'Uncategorized'.
+      final key = isQuick
+          ? quickItemGroupId
+          : (name == null ? '' : categoryId);
+      final label =
+          isQuick ? quickItemGroupName : (name ?? 'Uncategorized');
 
-      if (!categoryStats.containsKey(category)) {
-        categoryStats[category] = {
-          'category': category,
-          'totalQuantity': 0,
-          'totalRevenue': 0.0,
-          'totalDiscount': 0.0,
-          'totalTax': 0.0,
-          'productCount': <String>{},
-        };
-      }
+      final stat = categoryStats.putIfAbsent(
+          key,
+          () => {
+                'categoryId': key,
+                'category': label,
+                'totalQuantity': 0.0,
+                'totalRevenue': 0.0,
+                'totalDiscount': 0.0,
+                'totalTax': 0.0,
+                'productCount': <String>{},
+              });
 
-      categoryStats[category]!['totalQuantity'] += item.qty;
-      categoryStats[category]!['totalRevenue'] += item.total;
-      categoryStats[category]!['totalDiscount'] += (item.discountAmount ?? 0.0);
-      categoryStats[category]!['totalTax'] += (item.taxAmount ?? 0.0);
-      (categoryStats[category]!['productCount'] as Set<String>).add(item.productId);
+      stat['totalQuantity'] += item.qty * sign;
+      stat['totalRevenue'] += item.total * sign;
+      stat['totalDiscount'] += (item.discountAmount ?? 0.0) * sign;
+      stat['totalTax'] += (item.taxAmount ?? 0.0) * sign;
+      // Grouped id, not the raw one: every quick line has a unique productId,
+      // so counting those raw made 50 ad-hoc sales read as 50 products.
+      (stat['productCount'] as Set<String>).add(_productGroupId(item));
     }
 
     // Convert to list and calculate product count
     final statsList = categoryStats.values.map((stat) {
-      return {
+      return _rounded({
+        'categoryId': stat['categoryId'],
         'category': stat['category'],
         'totalQuantity': stat['totalQuantity'],
         'totalRevenue': stat['totalRevenue'],
         'totalDiscount': stat['totalDiscount'],
         'totalTax': stat['totalTax'],
         'productCount': (stat['productCount'] as Set<String>).length,
-      };
+      });
     }).toList()
-      ..sort((a, b) => (b['totalRevenue'] as double).compareTo(a['totalRevenue'] as double));
+      ..sort((a, b) => _byRevenueDesc(a, b, 'categoryId'));
 
     return statsList;
   }
 
-  // ==================== Supplier-wise Purchase Report ====================
+  // ==================== Quick Items Report ====================
 
-  /// Get purchase report grouped by suppliers (includes Purchase Orders)
-  Future<List<Map<String, dynamic>>> getSupplierWisePurchaseReport({DateTime? startDate, DateTime? endDate}) async {
-    final allPurchaseOrders = purchaseOrderStore.purchaseOrders.toList();
-    final allSuppliers = supplierStore.suppliers;
+  /// Ad-hoc lines typed at the POS, grouped by the NAME the cashier entered.
+  ///
+  /// This is the only report keyed on the typed name rather than a catalogue
+  /// id, and it has to be: `QuickItemService` mints a fresh productId and
+  /// variantId for every line, so id-grouping gives one row per sale. Folding
+  /// on the name is what turns fifty "Gift Wrap" lines back into one row of
+  /// fifty — and a name that keeps recurring is a product missing from the
+  /// catalogue, which is the useful thing to learn here.
+  ///
+  /// Why this needs watching at all: a quick item is the one price-setting
+  /// action at the till with **no permission gate** (`posscreen.dart` —
+  /// deliberate, since nothing is being moved off a settled figure), it
+  /// **deducts no stock** (`RetailInventoryService` skips the line), and it
+  /// carries **no cost price**, so its margin is unknown rather than total. The
+  /// Profit report already flags the last of those through `unknownCostLines`;
+  /// nothing surfaced the first two.
+  ///
+  /// Names are folded case-insensitively on their trimmed form, so "gift wrap"
+  /// and "Gift Wrap" are one row. The display keeps the first spelling seen.
+  ///
+  /// Returns are netted, not dropped — same rule as every other line-level
+  /// report, so a quick item sold and then refunded reads as zero rather than
+  /// as revenue.
+  Future<List<Map<String, dynamic>>> getQuickItemsReport({
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    // Joined through the sale rather than `_signedLinesInWindow`, because
+    // `SaleItemModel` carries no date of its own and this report reports when a
+    // name was last sold.
+    final window = await _salesInWindow(startDate, endDate);
+    final itemsBySaleId = await _itemsBySaleId(window);
 
-    // Filter by date if provided
-    List<dynamic> filteredPOs = allPurchaseOrders;
-    if (startDate != null || endDate != null) {
-      filteredPOs = allPurchaseOrders.where((po) {
-        final poDate = DateTime.parse(po.createdAt);
-        return (startDate == null || poDate.isAfter(startDate)) &&
-            (endDate == null || poDate.isBefore(endDate));
-      }).toList();
+    final stats = <String, Map<String, dynamic>>{};
+    // Denominator for each row's share. Every line in the window, quick or
+    // not — the question is what fraction of takings never touched the
+    // catalogue.
+    var windowRevenue = 0.0;
+
+    for (final sale in window.all) {
+      final sign = RetailSaleFilter.revenueSign(sale);
+      final soldAt = _reportedAt(sale);
+
+      for (final item in itemsBySaleId[sale.saleId] ?? const <SaleItemModel>[]) {
+        windowRevenue += item.total * sign;
+
+        if (!QuickItemService.isQuickItem(item.varianteId)) continue;
+
+        final display = (item.productName ?? 'Unnamed').trim();
+        final key = display.toLowerCase();
+
+        final stat = stats.putIfAbsent(
+          key,
+          () => <String, dynamic>{
+            'itemName': display.isEmpty ? 'Unnamed' : display,
+            'lineCount': 0,
+            'totalQuantity': 0.0,
+            'totalRevenue': 0.0,
+            'totalDiscount': 0.0,
+            'totalTax': 0.0,
+            'gstRates': <double>{},
+            'firstSold': soldAt,
+            'lastSold': soldAt,
+          },
+        );
+
+        // Forward lines only: a refund is not another time it was sold.
+        if (sign > 0) stat['lineCount'] += 1;
+        stat['totalQuantity'] += item.qty * sign;
+        stat['totalRevenue'] += item.total * sign;
+        stat['totalDiscount'] += (item.discountAmount ?? 0.0) * sign;
+        stat['totalTax'] += (item.taxAmount ?? 0.0) * sign;
+
+        final rate = item.gstRate;
+        if (rate != null) (stat['gstRates'] as Set<double>).add(rate);
+
+        if (soldAt != null) {
+          final first = stat['firstSold'] as DateTime?;
+          final last = stat['lastSold'] as DateTime?;
+          if (first == null || soldAt.isBefore(first)) stat['firstSold'] = soldAt;
+          if (last == null || soldAt.isAfter(last)) stat['lastSold'] = soldAt;
+        }
+      }
     }
 
-    // Group by supplierId
-    final Map<String, Map<String, dynamic>> supplierStats = {};
+    final rows = stats.values.map((stat) {
+      final qty = stat['totalQuantity'] as double;
+      final revenue = stat['totalRevenue'] as double;
+      final rates = (stat['gstRates'] as Set<double>).toList()..sort();
 
-    for (var po in filteredPOs) {
-      final supplier = allSuppliers.where((s) => s.supplierId == po.supplierId).firstOrNull;
+      return <String, dynamic>{
+        'itemName': stat['itemName'],
+        'lineCount': stat['lineCount'],
+        'totalQuantity': _r3(qty),
+        'totalRevenue': _r2(revenue),
+        'totalDiscount': _r2(stat['totalDiscount'] as double),
+        'totalTax': _r2(stat['totalTax'] as double),
+        // Charged per unit on balance. Zero quantity means it was sold and
+        // fully returned — an average price would be a division by zero, and
+        // there is no meaningful figure to show.
+        'avgPrice': qty == 0 ? 0.0 : _r2(revenue / qty),
+        'gstRates': rates,
+        // Per-row, so the screen's total share is just the sum of the column
+        // rather than a figure smuggled onto every row.
+        'shareOfRevenuePct':
+            windowRevenue == 0 ? 0.0 : _r2(revenue / windowRevenue * 100),
+        'firstSold': (stat['firstSold'] as DateTime?)?.toIso8601String(),
+        'lastSold': (stat['lastSold'] as DateTime?)?.toIso8601String(),
+      };
+    }).toList()
+      ..sort((a, b) {
+        final byRevenue =
+            (b['totalRevenue'] as double).compareTo(a['totalRevenue'] as double);
+        if (byRevenue != 0) return byRevenue;
+        return (a['itemName'] as String).compareTo(b['itemName'] as String);
+      });
 
-      final supplierName = supplier?.name ?? po.supplierName ?? 'Unknown Supplier';
-      final supplierId = po.supplierId;
+    return rows;
+  }
 
-      if (!supplierStats.containsKey(supplierId)) {
-        supplierStats[supplierId] = {
-          'supplierId': supplierId,
-          'supplierName': supplierName,
-          'totalPurchases': 0,
-          'totalAmount': 0.0,
-          'totalItems': 0,
-        };
+  // ==================== Sales Refund Report ====================
+
+  /// customerId -> display name, read once per report.
+  ///
+  /// Goes through the REPOSITORY, not `customerStore.customers`: CustomerStore
+  /// is the one store here that does not hydrate in its constructor, so a
+  /// report opened straight from the hub would find that list empty.
+  Future<Map<String, String>> _customerNameById() async {
+    final all = await customerRepository.getAllCustomers();
+    return {
+      for (final c in all)
+        if ((c.name ?? '').trim().isNotEmpty) c.customerId: c.name!.trim(),
+    };
+  }
+
+  /// shiftId -> staff name, read once per report.
+  ///
+  /// `SaleModel` carries no staffId — `shiftId` is the only staff link there
+  /// is, and it is null on every row written before shifts existed. Callers
+  /// must render a placeholder rather than dropping those rows.
+  Future<Map<String, String>> _staffNameByShiftId() async {
+    final all = await shiftRepository.getAllShifts();
+    return {for (final s in all) s.id: s.staffName};
+  }
+
+  /// Every refund document raised in the window, one row per credit note.
+  ///
+  /// **Headers, not lines — so the sign rule does NOT apply here.** A return's
+  /// header amounts are stored already negated (`return_service.dart`), which
+  /// is what lets Daily/Monthly net them by a plain fold. This report is *about*
+  /// returns, so it reports magnitudes: applying [RetailSaleFilter.revenueSign]
+  /// on top would double-negate every figure.
+  ///
+  /// **Returned value and money paid out are different numbers**, and the gap
+  /// is the point of the report:
+  /// - `appliedToDue` — value that cancelled an unpaid invoice instead of being
+  ///   handed over. `ReturnService` settles against `dueAmount` first.
+  /// - `paidOut` — what actually left the till. On an EXCHANGE most of the
+  ///   value crosses to the replacement sale as goods, so it is read from the
+  ///   payment legs with the `exchange_credit` accounting leg removed rather
+  ///   than derived from the header.
+  ///
+  /// Exchange legs are INCLUDED and flagged, never dropped: an exchange's
+  /// return half is a real return document, and excluding it would make this
+  /// report disagree with `netRevenue`, the profit reports and EOD, all of
+  /// which net every `isReturn` row.
+  Future<List<Map<String, dynamic>>> getSalesRefundReport({
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    final window = await _salesInWindow(startDate, endDate);
+    // Bail before the extra box reads: a period with no refunds is the common
+    // case, and it should cost one bounded read rather than four full scans.
+    if (window.returns.isEmpty) return const [];
+
+    // Originals resolved by key, here — the same moment the old full-box copy
+    // was taken. Writers key every sale by its own saleId, so a key lookup
+    // finds exactly the sale an id match over all sales would.
+    final originalById = <String, SaleModel>{};
+    for (final sale in window.returns) {
+      final id = sale.originalSaleId;
+      if (id == null || originalById.containsKey(id)) continue;
+      final original = saleStore.saleInStorage(id);
+      if (original != null) originalById[id] = original;
+    }
+
+    // referenceId -> value written off a due by that return.
+    final adjustments = <String, double>{};
+    for (final p in await CreditPaymentRepository().getAllPayments()) {
+      if (!p.isReturnAdjustment) continue;
+      final ref = p.referenceId;
+      if (ref == null) continue;
+      adjustments[ref] = (adjustments[ref] ?? 0) + p.amount;
+    }
+
+    final customerNames = await _customerNameById();
+    final staffNames = await _staffNameByShiftId();
+
+    final rows = <Map<String, dynamic>>[];
+
+    for (final sale in window.returns) {
+      final refundValue = sale.totalAmount.abs();
+      final appliedToDue = adjustments[sale.saleId] ?? 0.0;
+      final isExchange = sale.exchangeGroupId != null;
+
+      // On an exchange the legs were rewritten by `ExchangeService._stamp`
+      // AFTER the return was written, so the header no longer describes what
+      // changed hands. Read the money legs instead.
+      final double paidOut;
+      if (isExchange) {
+        var money = 0.0;
+        for (final leg in sale.paymentList) {
+          if (ExchangeService.isExchangeCredit(leg['method'] as String?)) {
+            continue;
+          }
+          money += ((leg['amount'] as num?) ?? 0).toDouble().abs();
+        }
+        paidOut = money;
+      } else {
+        final remainder = refundValue - appliedToDue;
+        paidOut = remainder > 0 ? remainder : 0.0;
       }
 
-      supplierStats[supplierId]!['totalPurchases'] += 1;
-      supplierStats[supplierId]!['totalAmount'] += (po.estimatedTotal ?? 0.0);
-      supplierStats[supplierId]!['totalItems'] += po.totalItems;
+      final original = originalById[sale.originalSaleId];
+      final returnedAt = _reportedAt(sale);
+      final soldAt = original == null ? null : _reportedAt(original);
+
+      rows.add({
+        'returnSaleId': sale.saleId,
+        'date': sale.createdAt,
+        'originalSaleId': sale.originalSaleId,
+        'originalSaleDate': original?.createdAt,
+        'daysToReturn': (returnedAt == null || soldAt == null)
+            ? null
+            : returnedAt.difference(soldAt).inDays,
+        'customerId': sale.customerId,
+        'customerName': customerNames[sale.customerId] ?? 'Walk-in',
+        // The one return header field stored POSITIVE.
+        'totalItems': sale.totalItems,
+        'refundValue': _r2(refundValue),
+        'subtotal': _r2(sale.subtotal.abs()),
+        'discountAmount': _r2(sale.discountAmount.abs()),
+        'taxAmount': _r2(sale.taxAmount.abs()),
+        // A return header's paymentType IS the refund method.
+        'refundMethod': sale.paymentType,
+        'appliedToDue': _r2(appliedToDue),
+        'paidOut': _r2(paidOut),
+        'returnReason': sale.returnReason,
+        'returnReasonLabel': sale.returnReason != null
+            ? SaleReturnReason.labelFor(sale.returnReason!)
+            : (isExchange ? 'Exchange' : 'Not recorded'),
+        'returnNote': sale.returnNote,
+        'isExchange': isExchange,
+        'exchangeGroupId': sale.exchangeGroupId,
+        'shiftId': sale.shiftId,
+        'staffName': staffNames[sale.shiftId] ?? '—',
+      });
     }
 
-    // Convert to list and sort by total amount
-    final statsList = supplierStats.values.toList()
-      ..sort((a, b) => (b['totalAmount'] as double).compareTo(a['totalAmount'] as double));
+    // Newest first, with the id as the tie-break: `List.sort` is not stable in
+    // Dart and two refunds can share an instant.
+    rows.sort((a, b) {
+      final byDate = (b['date'] as String).compareTo(a['date'] as String);
+      if (byDate != 0) return byDate;
+      return (a['returnSaleId'] as String)
+          .compareTo(b['returnSaleId'] as String);
+    });
 
-    return statsList;
+    return rows;
+  }
+
+  // ==================== Discounts Given Report ====================
+
+  /// Every sale where money was given away, with the three mechanisms that do
+  /// it kept apart.
+  ///
+  /// Only one of the three lands in `SaleModel.discountAmount`, which is why a
+  /// report that sums that field alone understates what the shop actually gave:
+  /// - **Discount** — bill + line, in `discountAmount`. `lineDiscountAmount` is
+  ///   a SUBSET of the line's `discountAmount`, never a sibling, so the split
+  ///   is derived per line through [SaleItemModel.billDiscountShare] rather
+  ///   than by subtracting the header's `lineDiscountTotal` — which is null on
+  ///   every sale written before line discounts existed.
+  /// - **Price override** — invisible in `discountAmount`. `line.price` is
+  ///   already the overridden figure, so an override silently lowers `subtotal`
+  ///   and has to be recovered as `(originalPrice - price) x qty`.
+  /// - **Loyalty redemption** — invisible too, stored only as a point count and
+  ///   applied after the discount is final, where it also cuts GST.
+  ///
+  /// The three are genuinely disjoint (see `CartCalculationService`), so their
+  /// sum is a real figure rather than an approximation.
+  ///
+  /// **Lines, not headers — so the sign rule DOES apply.** A return emits its
+  /// own negative row that nets the original, matching how the profit reports
+  /// list returns. Loyalty is the one exception: a return header never carries
+  /// `loyaltyPointsUsed`, and redeemed points are not given back on a refund,
+  /// so no reversal is synthesised.
+  Future<List<Map<String, dynamic>>> getDiscountReport({
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    final window = await _salesInWindow(startDate, endDate);
+    final itemsBySaleId = await _itemsBySaleId(window);
+    final customerNames = await _customerNameById();
+    final staffNames = await _staffNameByShiftId();
+
+    final rows = <Map<String, dynamic>>[];
+
+    for (final sale in window.all) {
+      final sign = RetailSaleFilter.revenueSign(sale);
+      final lines = itemsBySaleId[sale.saleId] ?? const <SaleItemModel>[];
+
+      var listValue = 0.0;
+      var overrideDelta = 0.0;
+      var lineDiscount = 0.0;
+      var billDiscount = 0.0;
+      final overrideReasons = <String>{};
+      final lineDiscountReasons = <String>{};
+
+      for (final line in lines) {
+        // What the goods would have fetched at the catalogue price they were
+        // rung up against — before any of the three mechanisms.
+        listValue += (line.originalPrice ?? line.price) * line.qty * sign;
+
+        if (line.isPriceOverridden) {
+          overrideDelta += line.overrideDeltaPerUnit * line.qty * sign;
+          final reason = line.overrideReason;
+          if (reason != null && reason.isNotEmpty) {
+            overrideReasons.add(PriceOverrideReason.labelFor(reason));
+          }
+        }
+
+        lineDiscount += (line.lineDiscountAmount ?? 0.0) * sign;
+        billDiscount += line.billDiscountShare * sign;
+
+        final lineReason = line.lineDiscountReason;
+        if (lineReason != null && lineReason.isNotEmpty) {
+          lineDiscountReasons.add(LineDiscountReason.labelFor(lineReason));
+        }
+      }
+
+      // Header field, unsigned by design — see the doc comment.
+      final loyaltyPoints = sale.loyaltyPointsUsed ?? 0;
+      final loyaltyValue = loyaltyPoints.toDouble();
+
+      final discountTotal = billDiscount + lineDiscount;
+      final totalGivenAway = discountTotal + overrideDelta + loyaltyValue;
+
+      // Half a paisa, so a rounding tail never becomes a row.
+      if (totalGivenAway.abs() <= 0.005) continue;
+
+      rows.add({
+        'saleId': sale.saleId,
+        'date': sale.createdAt,
+        'customerId': sale.customerId,
+        'customerName': customerNames[sale.customerId] ?? 'Walk-in',
+        'paymentType': sale.paymentType,
+        'isReturn': RetailSaleFilter.isReturn(sale),
+        'exchangeGroupId': sale.exchangeGroupId,
+        'totalItems': RetailSaleFilter.signedItemCount(sale),
+        'listValue': _r2(listValue),
+        'billDiscount': _r2(billDiscount),
+        'lineDiscount': _r2(lineDiscount),
+        'discountTotal': _r2(discountTotal),
+        'overrideDelta': _r2(overrideDelta),
+        'loyaltyPointsUsed': loyaltyPoints,
+        'loyaltyValue': _r2(loyaltyValue),
+        'totalGivenAway': _r2(totalGivenAway),
+        // Header, already signed on a return — no .abs().
+        'netTotal': _r2(sale.totalAmount),
+        'giveawayPct':
+            listValue == 0 ? 0.0 : _r2(totalGivenAway / listValue * 100),
+        'discountType': sale.discountType,
+        'discountValue': sale.discountValue,
+        'discountReason': sale.discountReason,
+        'overrideReasons': overrideReasons.join(', '),
+        'lineDiscountReasons': lineDiscountReasons.join(', '),
+        'staffName': staffNames[sale.shiftId] ?? '—',
+      });
+    }
+
+    rows.sort((a, b) {
+      final byValue = (b['totalGivenAway'] as double)
+          .compareTo(a['totalGivenAway'] as double);
+      if (byValue != 0) return byValue;
+      return (a['saleId'] as String).compareTo(b['saleId'] as String);
+    });
+
+    return rows;
+  }
+
+  // ==================== Supplier-wise Purchase Report ====================
+
+  /// Purchases grouped by supplier, measured on what was actually RECEIVED.
+  ///
+  /// Reads confirmed GRNs, not purchase orders. The previous version summed
+  /// `po.estimatedTotal` across every PO regardless of status, so drafts and
+  /// cancelled orders inflated it and the figure was an estimate rather than
+  /// spend. `GRNModel.totalAmount` is the supplier's invoice value for that
+  /// receipt. Credits from returns and settled claims are supplier-ledger
+  /// events and are deliberately NOT netted off here — see the damaged columns.
+  Future<List<Map<String, dynamic>>> getSupplierWisePurchaseReport(
+      {DateTime? startDate, DateTime? endDate}) async {
+    final receipts = _confirmedGRNs(startDate: startDate, endDate: endDate);
+    final suppliers = supplierStore.suppliers;
+    final recovery = _damagedRecoveryInWindow(startDate, endDate);
+
+    final stats = <String, Map<String, dynamic>>{};
+
+    for (final grn in receipts) {
+      final supplier = suppliers
+          .where((s) => s.supplierId == grn.supplierId)
+          .firstOrNull;
+
+      // Historical identity: the receipt's OWN snapshot wins, so renaming a
+      // supplier today cannot rename last year's purchases. `supplierName` is
+      // denormalized onto the GRN for exactly this reason. Falls back to the
+      // live record (a GRN restored without the field), then to a placeholder.
+      //
+      // Blank counts as absent: `??` alone passes an empty or whitespace-only
+      // name straight through and renders an empty cell.
+      final snapshot = (grn.supplierName ?? '').trim();
+      final current = (supplier?.name ?? '').trim();
+      final resolvedName = snapshot.isNotEmpty
+          ? snapshot
+          : (current.isNotEmpty ? current : 'Unknown Supplier');
+
+      final entry = stats.putIfAbsent(
+        // Grouping stays on the ID: two suppliers sharing a name must never
+        // merge, and one supplier's receipts must never split on a rename.
+        grn.supplierId,
+        () => {
+          'supplierId': grn.supplierId,
+          'supplierName': resolvedName,
+          'receiptCount': 0,
+          'totalItems': 0.0,
+          'totalAmount': 0.0,
+          'damagedAmount': 0.0,
+          'damagedExpected': 0.0,
+          'damagedRecovered': 0.0,
+          'damagedAbsorbed': 0.0,
+        },
+      );
+
+      entry['receiptCount'] = (entry['receiptCount'] as int) + 1;
+      entry['totalItems'] =
+          (entry['totalItems'] as num).toDouble() + grn.totalReceivedQty;
+      entry['totalAmount'] =
+          (entry['totalAmount'] as double) + (grn.totalAmount ?? 0);
+    }
+
+    // Recovery is merged by SUPPLIER on its own event date, not by receipt. A
+    // supplier can therefore appear in this window purely because a return was
+    // raised or a credit landed, with no goods received — which is the point:
+    // a January receipt credited in March belongs to March.
+    for (final e in recovery.entries) {
+      final row = stats.putIfAbsent(
+        e.key,
+        () => {
+          'supplierId': e.key,
+          'supplierName': e.value.supplierName ?? 'Unknown Supplier',
+          'receiptCount': 0,
+          'totalItems': 0.0,
+          'totalAmount': 0.0,
+          'damagedAmount': 0.0,
+          'damagedExpected': 0.0,
+          'damagedRecovered': 0.0,
+          'damagedAbsorbed': 0.0,
+        },
+      );
+      row['damagedExpected'] =
+          (row['damagedExpected'] as double) + e.value.expected;
+      row['damagedRecovered'] =
+          (row['damagedRecovered'] as double) + e.value.recovered;
+      row['damagedAbsorbed'] =
+          (row['damagedAbsorbed'] as double) + e.value.absorbed;
+      row['damagedAmount'] = (row['damagedAmount'] as double) + e.value.total;
+    }
+
+    // Amount alone is not a total order: `List.sort` is not stable in Dart, so
+    // two suppliers on the same spend fell in whatever order the GRN box
+    // happened to yield, and the screen and its export could disagree between
+    // loads. Units, then the supplier id, break the tie on values that do not
+    // move.
+    return stats.values.toList()
+      ..sort((a, b) {
+        final byAmount =
+            (b['totalAmount'] as num).compareTo(a['totalAmount'] as num);
+        if (byAmount != 0) return byAmount;
+        final byUnits =
+            (b['totalItems'] as num).compareTo(a['totalItems'] as num);
+        if (byUnits != 0) return byUnits;
+        return (a['supplierId'] as String).compareTo(b['supplierId'] as String);
+      });
   }
 
   // ==================== Low Stock Report ====================
 
   /// Get low stock report
   Future<List<Map<String, dynamic>>> getLowStockReport({int threshold = 10}) async {
+    // The catalogue hydrates asynchronously from ProductStore's constructor,
+    // and `products` below is the OBSERVABLE while the variants are read from
+    // the repository. Without this await a cold open could see every variant
+    // and zero products, produce no rows, and render the success state — "All
+    // products are well stocked" — over a catalogue that had simply not loaded.
+    // Same guard, same reason, as `RetailNotificationSyncService`.
+    await productStore.ensureLoaded();
+
     final allProducts = productStore.products;
     final lowStockItems = <Map<String, dynamic>>[];
 
+    // One read of the variant box, grouped once. `getVariantsForProduct` is
+    // itself a full box scan, so calling it per product was products × variants.
+    final variantsByProduct = <String, List<VarianteModel>>{};
+    for (final v in await productStore.getAllVariants()) {
+      (variantsByProduct[v.productId] ??= <VarianteModel>[]).add(v);
+    }
+
     for (var product in allProducts) {
-      final variants = await productStore.getVariantsForProduct(product.productId);
+      final variants =
+          variantsByProduct[product.productId] ?? const <VarianteModel>[];
       for (var variant in variants) {
-        if (variant.stockQty <= threshold) {
+        // A DEACTIVATED variant is not actionable: it has been withdrawn, so it
+        // will sit at zero forever and can never be reordered. It used to be
+        // flagged here and — because `StockAlertService` reads these same rows —
+        // raised as a low-stock NOTIFICATION for the life of the store, with no
+        // way to clear it short of deleting the variant.
+        //
+        // Excluding rather than filtering to `isSellable`, deliberately:
+        // `isSellable` is `status == 'active'`, and `VarianteModel` documents
+        // `out_of_stock` as a third value. Keeping only 'active' would drop the
+        // out-of-stock rows, which are the most urgent ones this report exists
+        // to show. Only an explicit 'inactive' is withdrawn.
+        if (variant.status == kInactiveVariantStatus) continue;
+
+        // A variant's own minStock wins over the global threshold, matching
+        // productStore.reorderPointFor — otherwise the Stock Alerts card and
+        // the inventory colouring would disagree about the same variant.
+        // Always a `double`. `minStock` is a double and `threshold` an int, so
+        // this used to emit a double for a variant-level reorder point and an
+        // int for the global fallback — two runtime types in one column, which
+        // rendered as "5.0" beside "10" and would throw on any `as int`.
+        final reorderPoint = variant.minStock ?? threshold.toDouble();
+        // Bundle-type variants have no stock of their own — `variant.stockQty`
+        // is meaningless for them. "How many can actually be sold" (bounded by
+        // component stock) is what the reorder threshold should compare
+        // against instead. See docs/retail_inventory_system_plan.md §3.3.
+        final isBundle = product.isBundle;
+        final effectiveStock = isBundle
+            ? RetailInventoryService.calculateAvailableToSell(product, variant)
+            : variant.stockQty;
+        if (effectiveStock <= reorderPoint) {
           lowStockItems.add({
             'productId': product.productId,
             'productName': product.productName,
             'variantId': variant.varianteId,
-            'size': variant.size,
-            'color': variant.color,
-            'weight': variant.weight,
-            'currentStock': variant.stockQty,
+            'variantLabel':
+                attributeStore.describeAttributes(attributeStore.attributesOf(variant)),
+            'currentStock': effectiveStock,
+            'isBundle': isBundle,
+            'reorderPoint': reorderPoint,
             'costPrice': variant.costPrice,
             'mrp': variant.mrp,
             'barcode': variant.barcode,
@@ -356,10 +1176,304 @@ class ReportService {
       }
     }
 
-    // Sort by stock quantity (lowest first)
-    lowStockItems.sort((a, b) => (a['currentStock'] as int).compareTo(b['currentStock'] as int));
+    // Lowest stock first, then the variant id. Stock alone is not a total
+    // order and `List.sort` is not stable, so a catalogue with many
+    // zero-stock variants reordered between loads — and between the screen and
+    // its own export, which reads this same list.
+    lowStockItems.sort((a, b) {
+      final byStock =
+          (a['currentStock'] as num).compareTo(b['currentStock'] as num);
+      if (byStock != 0) return byStock;
+      return (a['variantId'] as String).compareTo(b['variantId'] as String);
+    });
 
     return lowStockItems;
+  }
+
+  // ==================== Cash Drawer History Report ====================
+
+  /// Every cash movement through the drawer in a period, newest first.
+  ///
+  /// The live Cash Drawer screen shows the same ledger for today only — once a
+  /// day is closed there was no way to look back at it. Both compose it from
+  /// the same rules ([CashDrawerLedger]) so they cannot disagree.
+  ///
+  /// Covers the four things that move till cash: cash sales (the cash leg of a
+  /// split bill only), cash refunds, cash expenses, and manual Cash In / Out —
+  /// which is also where credit collected in cash arrives.
+  Future<List<Map<String, dynamic>>> getCashDrawerReport(
+      {DateTime? startDate, DateTime? endDate}) async {
+    final rows = <Map<String, dynamic>>[];
+
+    // ---- Sales and refunds -------------------------------------------------
+    final window = await _salesInWindow(startDate, endDate);
+    for (final sale in window.all) {
+      final at = _reportedAt(sale);
+      if (at == null) continue;
+
+      final refund = CashDrawerLedger.cashRefundOf(sale);
+      if (refund > 0) {
+        rows.add({
+          // Source-prefixed unique key, for the tie-break below. `reference`
+          // cannot serve: it holds a staff NAME on a manual movement.
+          'id': 'sale:${sale.saleId}',
+          'at': at,
+          'type': 'Refund',
+          'description': 'Cash Refund',
+          'amount': -refund,
+          'reference': sale.saleId,
+        });
+        continue;
+      }
+
+      final cash = CashDrawerLedger.cashComponentOf(sale);
+      if (cash <= 0) continue;
+      rows.add({
+        'id': 'sale:${sale.saleId}',
+        'at': at,
+        'type': 'Sale',
+        'description':
+            sale.isSplitPayment == true ? 'Sale (cash portion)' : 'Cash Sale',
+        'amount': cash,
+        'reference': sale.saleId,
+      });
+    }
+
+    // ---- Manual Cash In / Out ----------------------------------------------
+    for (final m in await CashMovementRepository().getAllMovements()) {
+      if (!CashDrawerLedger.isLedgerMovement(m)) continue;
+      if (!_inWindow(m.timestamp, startDate, endDate)) continue;
+      final isIn = m.type == 'in';
+      rows.add({
+        'id': 'movement:${m.id}',
+        'at': m.timestamp,
+        'type': isIn ? 'Cash In' : 'Cash Out',
+        'description': m.note == null || m.note!.isEmpty
+            ? m.reason
+            : '${m.reason} — ${m.note}',
+        'amount': isIn ? m.amount : -m.amount,
+        'reference': m.staffName,
+      });
+    }
+
+    // ---- Cash expenses ------------------------------------------------------
+    await expenseStore.loadExpenses();
+    for (final e in expenseStore.expenses) {
+      if ((e.paymentType ?? '').toLowerCase().trim() != 'cash') continue;
+      if (!_inWindow(e.dateandTime, startDate, endDate)) continue;
+      rows.add({
+        'id': 'expense:${e.id}',
+        'at': e.dateandTime,
+        'type': 'Expense',
+        'description':
+            e.reason == null || e.reason!.isEmpty ? 'Expense' : e.reason!,
+        'amount': -e.amount,
+        'reference': '',
+      });
+    }
+
+    // Newest first, then the row's own id. A timestamp is not a total order —
+    // two cash sales in the same second, or a sale and a movement sharing one,
+    // reordered between loads because `List.sort` is not stable. The screen and
+    // the export read this same list, so both are pinned by one decision.
+    rows.sort((a, b) {
+      final byTime = (b['at'] as DateTime).compareTo(a['at'] as DateTime);
+      if (byTime != 0) return byTime;
+      return (a['id'] as String).compareTo(b['id'] as String);
+    });
+    return rows;
+  }
+
+  // ==================== Credit Reports ====================
+
+  /// Credit sales for a period — the Credit Sales tab.
+  ///
+  /// Exists so the credit tabs go through the SAME window rule as every other
+  /// retail report: [_withinRange] applies the caller's bounds AND the plan's
+  /// `reports.history_limit_days` cutoff. Reading `SaleRepository` directly, as
+  /// the screen used to, skipped the cutoff entirely — a plan limited to 30
+  /// days of history still showed every credit sale ever made.
+  ///
+  /// Filtered on `createdAt`, the basis every other report uses. The repository
+  /// still owns the ORDER (newest first, sale id as the tie-break).
+  Future<List<SaleModel>> getCreditSalesReport({
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    final all = await saleStore.getCreditSales();
+    return all
+        .where((sale) => _withinRange(sale.createdAt, startDate, endDate))
+        .toList();
+  }
+
+  /// Credit collections for a period — the Collections tab.
+  ///
+  /// Same window rule as [getCreditSalesReport]. Payments carry a single date,
+  /// so that is what is judged. Write-off and return-adjustment rows are kept
+  /// here — the tab LISTS them — and excluded from the money totals by
+  /// `CreditPaymentRepository.bucketCollections`, which is the one place that
+  /// decides what counts as collected.
+  Future<List<CreditPaymentModel>> getCreditCollectionsReport({
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    final all = await CreditPaymentRepository().getAllPayments();
+    return all
+        .where((payment) => _withinRange(payment.date, startDate, endDate))
+        .toList();
+  }
+
+  // ==================== GST Summary Report ====================
+
+  /// Output GST for a period, broken down by rate, by product and by rate-band.
+  ///
+  /// Lifted out of `gst_report_screen.dart`, which computed it inside the
+  /// widget and got three things wrong that mattered for a filing-grade report:
+  /// it applied no return filter at all (so a credit note ADDED to the GST you
+  /// appear to owe), it bounded the range with a `±1 day` fudge on `sale.date`
+  /// instead of the window rule every other report uses, and it fetched line
+  /// items with a full box scan per sale.
+  ///
+  /// Returns are netted — a credit note reduces output tax, which is the whole
+  /// point of issuing one.
+  Future<Map<String, dynamic>> getGstSummaryReport(
+      {DateTime? startDate, DateTime? endDate}) async {
+    final window = await _salesInWindow(startDate, endDate);
+    final lines = <({SaleItemModel item, int sign})>[];
+    for (final item in saleItemRepository.saleItemsInStorageOrder()) {
+      final sign = window.signBySaleId[item.saleId];
+      if (sign == null) continue;
+      lines.add((item: item, sign: sign));
+    }
+
+    final byRate = <double, Map<String, dynamic>>{};
+    final byProduct = <String, Map<String, dynamic>>{};
+    // Keyed on the RATE, not on a formatted label. Keying on `rate.toInt()`
+    // merged 12% and 12.5% into one "12%" band whose badge then showed
+    // whichever rate arrived first, while `byRate` kept them apart — the same
+    // screen gave two different answers.
+    final byCategory = <double, Map<String, dynamic>>{};
+
+    // No cgst/sgst accumulators: the components are derived from the totals
+    // below, not summed from the per-line halves. See `_splitGst`.
+    double totalTaxable = 0, totalGst = 0;
+    // B-4: signed UNITS, so a credit note subtracts. `lineCount` below counts
+    // rows and cannot do that.
+    double totalQuantity = 0;
+
+    for (final (:item, :sign) in lines) {
+      final rate = item.gstRate ?? 0;
+      final taxable = (item.taxableAmount ?? 0) * sign;
+      final gst = (item.gstAmount ?? 0) * sign;
+
+      totalTaxable += taxable;
+      totalGst += gst;
+      totalQuantity += item.qty * sign;
+
+      final rateRow = byRate.putIfAbsent(
+          rate,
+          () => {
+                'rate': rate,
+                'itemCount': 0,
+                'taxableAmount': 0.0,
+                // Placeholders. Filled by `_reconciledSplit` at emit time from
+                // this row's own `totalGst`, never accumulated.
+                'cgst': 0.0,
+                'sgst': 0.0,
+                'totalGst': 0.0,
+              });
+      rateRow['itemCount'] += sign;
+      rateRow['taxableAmount'] += taxable;
+      rateRow['totalGst'] += gst;
+
+      final productRow = byProduct.putIfAbsent(
+          item.productId,
+          () => {
+                'productId': item.productId,
+                'productName': item.productName ?? 'Unknown',
+                // A `double`: retail sells by weight, and seeding an `int`
+                // made the field's runtime type depend on whether any line had
+                // been added yet.
+                'quantity': 0.0,
+                'taxableAmount': 0.0,
+                'totalGst': 0.0,
+              });
+      productRow['quantity'] += item.qty * sign;
+      productRow['taxableAmount'] += taxable;
+      productRow['totalGst'] += gst;
+
+      // Rate band standing in for a category, as the screen already did.
+      final categoryRow = byCategory.putIfAbsent(
+          rate,
+          () => {
+                // Country-aware NAME only — the grouping, the rate and every
+                // amount below are identical everywhere. The rate is formatted,
+                // not floored, so 12.5% reads "12.5%" and stays its own band.
+                'categoryName':
+                    '${TaxLabelRule.name} ${GstService.formatGstRate(rate)} Items',
+                'gstRate': rate,
+                'itemCount': 0,
+                'taxableAmount': 0.0,
+                // Placeholders — see the byRate seed above.
+                'cgst': 0.0,
+                'sgst': 0.0,
+                'totalGst': 0.0,
+              });
+      categoryRow['itemCount'] += sign;
+      categoryRow['taxableAmount'] += taxable;
+      categoryRow['totalGst'] += gst;
+    }
+
+    return {
+      'saleCount': window.forward.length,
+      'returnCount': window.returns.length,
+      'lineCount': lines.length,
+      'totalTaxableAmount': totalTaxable,
+      'totalGstAmount': totalGst,
+      // Derived from the total, so the three figures the Summary card prints
+      // under one divider actually add up.
+      'totalCgstAmount': _splitGst(totalGst).cgst,
+      'totalSgstAmount': _splitGst(totalGst).sgst,
+      'totalQuantity': totalQuantity,
+      // Ascending, decided HERE. Returned in map-insertion order, the Summary
+      // tab listed rates in whatever order their first line happened to appear
+      // in the box while the By Rate tab sorted them — two orders for one list,
+      // and the Summary one shifted as new sales arrived.
+      'byRate': (byRate.values.map(_reconciledSplit).toList()
+        ..sort((a, b) => (a['rate'] as double).compareTo(b['rate'] as double))),
+      // ORDER IS DECIDED HERE, for all three breakdowns, so the screen just
+      // renders what it is handed and no two surfaces can disagree.
+      'byProduct': (byProduct.values.map((row) {
+        final taxable = row['taxableAmount'] as double;
+        final gst = row['totalGst'] as double;
+        return {
+          ...row,
+          // Effective rate, not a mean of the rates seen. Averaging the rates
+          // ignores line size, and stays stable once returns can make a
+          // line count negative.
+          'avgGstRate': taxable != 0 ? (gst / taxable) * 100 : 0.0,
+        };
+      }).toList()
+        // Most tax first, then the product id. Tax alone is not a total order
+        // and `List.sort` is not stable, so tied products reordered between
+        // loads.
+        ..sort((a, b) {
+          final byTax =
+              (b['totalGst'] as double).compareTo(a['totalGst'] as double);
+          if (byTax != 0) return byTax;
+          return (a['productId'] as String).compareTo(b['productId'] as String);
+        })),
+      // Same rule as byProduct; the rate is the tie-break because a band's
+      // name is derived from it.
+      'byCategory': (byCategory.values.map(_reconciledSplit).toList()
+        ..sort((a, b) {
+          final byTax =
+              (b['totalGst'] as double).compareTo(a['totalGst'] as double);
+          if (byTax != 0) return byTax;
+          return (a['gstRate'] as double).compareTo(b['gstRate'] as double);
+        })),
+      'skippedRows': window.skippedRows,
+    };
   }
 
   // ==================== Top Selling Products Report ====================
@@ -367,170 +1481,343 @@ class ReportService {
   /// Get top selling products
   Future<List<Map<String, dynamic>>> getTopSellingProductsReport({int limit = 20, DateTime? startDate, DateTime? endDate}) async {
     final productWiseReport = await getProductWiseSalesReport(startDate: startDate, endDate: endDate);
-    return productWiseReport.take(limit).toList();
+    // Eligibility: a product that was returned as much as it sold, or more, has
+    // not sold on balance and is not a top seller.
+    //
+    // Filtered BEFORE `take`: reversing these lets an excluded row consume one
+    // of the N slots, so a "top 20" would come back holding fewer than 20
+    // eligible products. Rows are already rounded here, so a residual fraction
+    // of a paisa correctly reads as zero.
+    //
+    // Top Selling only. Product-wise still reports every product, these
+    // included.
+    return productWiseReport
+        .where((row) => (row['totalRevenue'] as num) > 0)
+        .take(limit)
+        .toList();
   }
 
   // ==================== Profit Report ====================
 
   /// Get profit report (Revenue - Cost)
-  Future<Map<String, dynamic>> getProfitReport({DateTime? startDate, DateTime? endDate}) async {
-    final allItems = await saleItemRepository.getAllSaleItems();
+  Future<Map<String, dynamic>> getProfitReport({DateTime? startDate, DateTime? endDate}) async =>
+      _profitOverall(
+        await _signedLinesInWindow(startDate, endDate),
+        await _liveCostByVariantId(),
+      );
 
-    // Filter by date if provided
-    List<SaleItemModel> filteredItems = allItems;
-    if (startDate != null || endDate != null) {
-      final allSales = await saleStore.getAllSales();
-      final validSaleIds = <String>{};
+  /// All four profit tabs over one window, prepared once: one sales pass, one
+  /// sale-line pass and one cost map, where calling the four report methods
+  /// separately builds each of those four times.
+  ///
+  /// Each tab keeps its own iteration order. Overall and By-Item fold the flat
+  /// line list in box order; By-Sale and By-Day walk `window.all` and each
+  /// sale's lines in box order — exactly what the separate methods read.
+  Future<
+      ({
+        Map<String, dynamic> overall,
+        List<Map<String, dynamic>> perDay,
+        List<Map<String, dynamic>> perItem,
+        List<Map<String, dynamic>> perSale,
+      })> getProfitReports({DateTime? startDate, DateTime? endDate}) async {
+    final window = await _salesInWindow(startDate, endDate);
 
-      for (var sale in allSales) {
-        final saleDate = DateTime.parse(sale.date);
-        if ((startDate == null || saleDate.isAfter(startDate)) &&
-            (endDate == null || saleDate.isBefore(endDate)) &&
-            !(sale.isReturn ?? false)) {
-          validSaleIds.add(sale.saleId);
-        }
-      }
-
-      filteredItems = allItems.where((item) => validSaleIds.contains(item.saleId)).toList();
+    // The same line pass as `_signedLinesInWindow` and `_itemsBySaleId`,
+    // filling both shapes at once.
+    final lines = <({SaleItemModel item, int sign})>[];
+    final itemsBySaleId = <String, List<SaleItemModel>>{};
+    for (final item in saleItemRepository.saleItemsInStorageOrder()) {
+      final sign = window.signBySaleId[item.saleId];
+      if (sign == null) continue;
+      lines.add((item: item, sign: sign));
+      (itemsBySaleId[item.saleId] ??= <SaleItemModel>[]).add(item);
     }
 
+    final liveCost = await _liveCostByVariantId();
+
+    return (
+      overall: _profitOverall(lines, liveCost),
+      perDay: _profitPerDay(window, itemsBySaleId, liveCost),
+      perItem: _profitPerItem(lines, liveCost),
+      perSale: _profitPerSale(window, itemsBySaleId, liveCost),
+    );
+  }
+
+  Map<String, dynamic> _profitOverall(
+    List<({SaleItemModel item, int sign})> lines,
+    Map<String, double?> liveCost,
+  ) {
     double totalRevenue = 0.0;
     double totalCost = 0.0;
+    var unknownCostLines = 0;
+    double unknownCostRevenue = 0.0;
 
-    for (var item in filteredItems) {
-      totalRevenue += item.total;
+    for (final (:item, :sign) in lines) {
+      final revenue = _netRevenueOf(item) * sign;
+      totalRevenue += revenue;
 
-      // Get variant to find cost price
-      final variant = await productStore.getVariantById(item.varianteId);
-      if (variant != null && variant.costPrice != null) {
-        totalCost += (variant.costPrice! * item.qty);
+      final unitCost = _unitCostOf(item, liveCost);
+      if (unitCost == null) {
+        // Counted as revenue but NOT as free profit. The caller surfaces this
+        // so "100% margin" can't mean "we never entered a cost price".
+        unknownCostLines++;
+        unknownCostRevenue += revenue;
+        continue;
       }
+      totalCost += unitCost * item.qty * sign;
     }
 
     final profit = totalRevenue - totalCost;
-    final profitMargin = totalRevenue > 0 ? (profit / totalRevenue) * 100 : 0.0;
+    final profitMargin = totalRevenue != 0 ? (profit / totalRevenue) * 100 : 0.0;
 
     return {
       'totalRevenue': totalRevenue,
       'totalCost': totalCost,
       'grossProfit': profit,
       'profitMargin': profitMargin,
-      'itemCount': filteredItems.length,
+      // Sale-item LINES in the window, not units sold.
+      'itemCount': lines.length,
+      'unknownCostLines': unknownCostLines,
+      'unknownCostRevenue': unknownCostRevenue,
     };
   }
 
   // ==================== Profit Per Item Report ====================
 
   /// Get profit breakdown per item/variant
-  Future<List<Map<String, dynamic>>> getProfitPerItemReport({DateTime? startDate, DateTime? endDate}) async {
-    final allItems = await saleItemRepository.getAllSaleItems();
+  Future<List<Map<String, dynamic>>> getProfitPerItemReport({DateTime? startDate, DateTime? endDate}) async =>
+      _profitPerItem(
+        await _signedLinesInWindow(startDate, endDate),
+        await _liveCostByVariantId(),
+      );
 
-    // Filter by date if provided
-    List<SaleItemModel> filteredItems = allItems;
-    if (startDate != null || endDate != null) {
-      final allSales = await saleStore.getAllSales();
-      final validSaleIds = <String>{};
-
-      for (var sale in allSales) {
-        final saleDate = DateTime.parse(sale.date);
-        if ((startDate == null || saleDate.isAfter(startDate)) &&
-            (endDate == null || saleDate.isBefore(endDate)) &&
-            !(sale.isReturn ?? false)) {
-          validSaleIds.add(sale.saleId);
-        }
-      }
-
-      filteredItems = allItems.where((item) => validSaleIds.contains(item.saleId)).toList();
-    }
-
+  List<Map<String, dynamic>> _profitPerItem(
+    List<({SaleItemModel item, int sign})> lines,
+    Map<String, double?> liveCost,
+  ) {
     // Group by variant and calculate profit
     final Map<String, Map<String, dynamic>> itemProfits = {};
 
-    for (var item in filteredItems) {
-      final variant = await productStore.getVariantById(item.varianteId);
+    for (final (:item, :sign) in lines) {
+      final unitCost = _unitCostOf(item, liveCost);
 
       if (!itemProfits.containsKey(item.varianteId)) {
         itemProfits[item.varianteId] = {
           'variantId': item.varianteId,
           'productId': item.productId,
-          'productName': item.productName,
+          // Defaulted here, not at each call site: `SaleItemModel.productName`
+          // is nullable and screens cast this straight to `String`.
+          'productName': item.productName ?? 'Unknown',
           'size': item.size,
           'color': item.color,
+          // Descriptor resolved from the sale's own record, so reports match
+          // the receipt even if the variant was edited afterwards.
+          'variantLabel': attributeStore.describeAttributes(item.attributes,
+              size: item.size, color: item.color),
           'barcode': item.barcode,
-          'totalQuantitySold': 0,
+          'totalQuantitySold': 0.0,
           'totalRevenue': 0.0,
           'totalCost': 0.0,
           'totalProfit': 0.0,
           'profitMargin': 0.0,
           'avgSellingPrice': 0.0,
-          'costPrice': variant?.costPrice ?? 0.0,
+          // Null, not 0.0 — "no cost on record" and "costs nothing" are
+          // different facts and the screen needs to be able to tell them apart.
+          'costPrice': unitCost,
+          'unknownCostLines': 0,
+          'unknownCostRevenue': 0.0,
         };
       }
 
-      final revenue = item.total;
-      final cost = (variant?.costPrice ?? 0.0) * item.qty;
-      final profit = revenue - cost;
+      final revenue = _netRevenueOf(item) * sign;
+      final stat = itemProfits[item.varianteId]!;
 
-      itemProfits[item.varianteId]!['totalQuantitySold'] += item.qty;
-      itemProfits[item.varianteId]!['totalRevenue'] += revenue;
-      itemProfits[item.varianteId]!['totalCost'] += cost;
-      itemProfits[item.varianteId]!['totalProfit'] += profit;
+      stat['totalQuantitySold'] += item.qty * sign;
+      stat['totalRevenue'] += revenue;
+
+      // Cost only when it is known; profit is derived at the end from the two
+      // totals. Accumulating profit HERE, inside the else, meant revenue
+      // counted every line while profit counted only the costed ones — so a
+      // variant with a mix failed its own `profit == revenue - cost`, and its
+      // margin was understated by the whole un-costed amount.
+      if (unitCost == null) {
+        stat['unknownCostLines'] += 1;
+        stat['unknownCostRevenue'] += revenue;
+      } else {
+        stat['totalCost'] += unitCost * item.qty * sign;
+      }
     }
 
     // Calculate profit margin and average selling price
     final statsList = itemProfits.values.map((stat) {
       final revenue = stat['totalRevenue'] as double;
-      final profit = stat['totalProfit'] as double;
-      final qty = stat['totalQuantitySold'] as int;
+      final qty = (stat['totalQuantitySold'] as num).toDouble();
+      // Derived from the two totals, never accumulated alongside them.
+      final profit = revenue - (stat['totalCost'] as double);
 
       return {
         ...stat,
-        'profitMargin': revenue > 0 ? (profit / revenue) * 100 : 0.0,
-        'avgSellingPrice': qty > 0 ? revenue / qty : 0.0,
+        // Derived, so the row always satisfies profit == revenue - cost.
+        'totalProfit': profit,
+        // `!= 0`, not `> 0`: a variant returned more than it sold has negative
+        // revenue, and `> 0` rendered that loss as a flat 0% break-even.
+        'profitMargin': revenue != 0 ? (profit / revenue) * 100 : 0.0,
+        'avgSellingPrice': qty != 0 ? revenue / qty : 0.0,
       };
     }).toList()
-      ..sort((a, b) => (b['totalProfit'] as double).compareTo(a['totalProfit'] as double));
+      // Highest profit first, then the variant id — profit alone is not a
+      // total order and `List.sort` is not stable.
+      ..sort((a, b) {
+        final byProfit =
+            (b['totalProfit'] as double).compareTo(a['totalProfit'] as double);
+        if (byProfit != 0) return byProfit;
+        return (a['variantId'] as String).compareTo(b['variantId'] as String);
+      });
 
     return statsList;
+  }
+
+  // ==================== Bundle Margin Report ====================
+
+  /// Margin for each bundle/repack product: its effective selling price
+  /// against the summed cost of its components. Unlike the other profit
+  /// reports this is NOT tied to a sales window — a bundle's margin is a
+  /// pricing question about the current catalogue, not a sales-history one
+  /// (mirrors how [getLowStockReport] is also window-less). See
+  /// docs/retail_inventory_system_plan.md §3.3.
+  Future<List<Map<String, dynamic>>> getBundleMarginReport() async {
+    // Null when a component has no cost. Counting it as ₹0 overstated the
+    // margin — the same "unknown is not zero" rule the profit report follows.
+    final costByVariantId = <String, double?>{
+      for (final v in productStore.variants) v.varianteId: v.costPrice,
+    };
+
+    // Margin is measured on the price EXCLUDING tax, like the Profit report's
+    // net revenue: under tax-inclusive pricing the GST inside the price is
+    // collected for the government, not earned. Comparing the gross price
+    // with cost overstated every bundle's margin by its tax.
+    final taxInclusive =
+        TaxFeature.enabled && await gstService.isTaxInclusiveMode();
+    final defaultRate = await gstService.getDefaultGstRate();
+
+    final rows = <Map<String, dynamic>>[];
+    for (final product in productStore.products) {
+      if (!product.needsBundleComponents) continue;
+      final variants = productStore.variantsFor(product.productId);
+      // Every variant has its own recipe; only the first used to be reported.
+      for (final variant in variants) {
+        final bundle =
+            bundleRepository.getBundleForVariant(variant.varianteId);
+        if (bundle == null || !bundle.hasComponents) continue;
+
+        final costIncomplete = bundle.components.any((c) =>
+            c.quantity > 0 && (costByVariantId[c.componentVariantId] ?? 0) <= 0);
+        final componentCost =
+            bundle.estimatedCost((id) => costByVariantId[id] ?? 0.0);
+        final grossPrice = variant.sellingPrice ?? variant.mrp ?? 0.0;
+        // Same rate order as the cart: variant → product → default.
+        final rate = variant.taxRate ?? product.gstRate ?? defaultRate;
+        final sellingPrice = taxInclusive && rate > 0
+            ? grossPrice / (1 + rate / 100)
+            : grossPrice;
+        final margin = sellingPrice - componentCost;
+        final marginPercent =
+            sellingPrice != 0 ? (margin / sellingPrice) * 100 : 0.0;
+
+        rows.add({
+          'productId': product.productId,
+          'productName': variants.length > 1 && variant.hasAttributes
+              ? '${product.productName} (${variant.variantDescription})'
+              : product.productName,
+          'variantId': variant.varianteId,
+          'isRepack': product.isRepack,
+          'sellingPrice': sellingPrice,
+          'componentCost': componentCost,
+          'margin': margin,
+          'marginPercent': marginPercent,
+          'componentCount': bundle.components.length,
+          // The margin figures above are not trustworthy when true — the
+          // screen shows "cost missing" instead of a number.
+          'costIncomplete': costIncomplete,
+        });
+      }
+    }
+
+    // Weakest real margin first; rows with a missing cost last.
+    rows.sort((a, b) {
+      final ai = a['costIncomplete'] == true, bi = b['costIncomplete'] == true;
+      if (ai != bi) return ai ? 1 : -1;
+      return (a['marginPercent'] as double)
+          .compareTo(b['marginPercent'] as double);
+    });
+    return rows;
   }
 
   // ==================== Profit Per Sale Report ====================
 
   /// Get profit breakdown per individual sale transaction
   Future<List<Map<String, dynamic>>> getProfitPerSaleReport({DateTime? startDate, DateTime? endDate}) async {
-    final allSales = await saleStore.getAllSales();
+    final window = await _salesInWindow(startDate, endDate);
+    return _profitPerSale(
+      window,
+      await _itemsBySaleId(window),
+      await _liveCostByVariantId(),
+    );
+  }
 
-    // Filter by date and exclude returns
-    List<SaleModel> filteredSales = allSales.where((sale) {
-      final saleDate = DateTime.parse(sale.date);
-      return ((startDate == null || saleDate.isAfter(startDate)) &&
-          (endDate == null || saleDate.isBefore(endDate)) &&
-          !(sale.isReturn ?? false));
-    }).toList();
-
+  List<Map<String, dynamic>> _profitPerSale(
+    _SaleWindow window,
+    Map<String, List<SaleItemModel>> itemsBySaleId,
+    Map<String, double?> liveCost,
+  ) {
     final saleProfits = <Map<String, dynamic>>[];
 
-    for (var sale in filteredSales) {
-      final saleItems = await saleItemRepository.getItemsBySaleId(sale.saleId);
+    // Returns are listed too, as negative rows. Excluding them here while the
+    // overall profit report netted them made two tabs of the same screen
+    // disagree about the same period.
+    for (final sale in window.all) {
+      final sign = RetailSaleFilter.revenueSign(sale);
+      final saleItems = itemsBySaleId[sale.saleId] ?? const <SaleItemModel>[];
 
+      // LINE basis, matching every other profit tab. This used to read
+      // `sale.totalAmount - sale.taxAmount`, which is `taxable + roundOff` —
+      // so this tab and the Daily one carried the sale's round-off into profit
+      // while Overview and By-Item did not, and the same period showed a
+      // different profit depending on which tab you were looking at.
+      //
+      // Round-off is an adjustment to the customer's payable, attributable to
+      // no line and no product's margin, so it stays out of profit. Cost is a
+      // pure line figure; revenue has to be on the same footing.
+      double totalRevenue = 0.0;
       double totalCost = 0.0;
-      double totalRevenue = sale.totalAmount;
+      var unknownCostLines = 0;
+      double unknownCostRevenue = 0.0;
+      for (final item in saleItems) {
+        // Lines are stored positive even on a return — hence the sign.
+        final revenue = _netRevenueOf(item) * sign;
+        totalRevenue += revenue;
 
-      for (var item in saleItems) {
-        final variant = await productStore.getVariantById(item.varianteId);
-        if (variant != null && variant.costPrice != null) {
-          totalCost += (variant.costPrice! * item.qty);
+        final unitCost = _unitCostOf(item, liveCost);
+        if (unitCost == null) {
+          // Revenue is kept; only the cost is unknown. Surfaced below so a
+          // margin built on it can't be mistaken for fully-costed profit.
+          unknownCostLines++;
+          unknownCostRevenue += revenue;
+          continue;
         }
+        totalCost += unitCost * item.qty * sign;
       }
 
       final profit = totalRevenue - totalCost;
-      final profitMargin = totalRevenue > 0 ? (profit / totalRevenue) * 100 : 0.0;
+      final profitMargin = totalRevenue != 0 ? (profit / totalRevenue) * 100 : 0.0;
 
       saleProfits.add({
         'saleId': sale.saleId,
-        'date': sale.date,
+        // Same field the row was filtered on, so the listed date can't
+        // disagree with the period the report claims to cover.
+        'date': sale.createdAt,
         'customerId': sale.customerId,
-        'totalItems': sale.totalItems,
+        'totalItems': RetailSaleFilter.signedItemCount(sale),
         'totalRevenue': totalRevenue,
         'totalCost': totalCost,
         'profit': profit,
@@ -538,11 +1825,20 @@ class ReportService {
         'paymentType': sale.paymentType,
         'discountAmount': sale.discountAmount,
         'taxAmount': sale.taxAmount,
+        'isReturn': RetailSaleFilter.isReturn(sale),
+        'unknownCostLines': unknownCostLines,
+        'unknownCostRevenue': unknownCostRevenue,
       });
     }
 
-    // Sort by profit (highest first)
-    saleProfits.sort((a, b) => (b['profit'] as double).compareTo(a['profit'] as double));
+    // Highest profit first, then the sale id. Profit alone is not a total
+    // order and `List.sort` is not stable, so tied rows could reorder between
+    // loads.
+    saleProfits.sort((a, b) {
+      final byProfit = (b['profit'] as double).compareTo(a['profit'] as double);
+      if (byProfit != 0) return byProfit;
+      return (a['saleId'] as String).compareTo(b['saleId'] as String);
+    });
 
     return saleProfits;
   }
@@ -551,21 +1847,27 @@ class ReportService {
 
   /// Get daily profit breakdown over a date range
   Future<List<Map<String, dynamic>>> getProfitPerDayReport({DateTime? startDate, DateTime? endDate}) async {
-    final allSales = await saleStore.getAllSales();
+    final window = await _salesInWindow(startDate, endDate);
+    return _profitPerDay(
+      window,
+      await _itemsBySaleId(window),
+      await _liveCostByVariantId(),
+    );
+  }
 
-    // Filter by date and exclude returns
-    List<SaleModel> filteredSales = allSales.where((sale) {
-      final saleDate = DateTime.parse(sale.date);
-      return ((startDate == null || saleDate.isAfter(startDate)) &&
-          (endDate == null || saleDate.isBefore(endDate)) &&
-          !(sale.isReturn ?? false));
-    }).toList();
-
+  List<Map<String, dynamic>> _profitPerDay(
+    _SaleWindow window,
+    Map<String, List<SaleItemModel>> itemsBySaleId,
+    Map<String, double?> liveCost,
+  ) {
     // Group by day
     final Map<String, Map<String, dynamic>> dailyProfits = {};
 
-    for (var sale in filteredSales) {
-      final saleDate = DateTime.parse(sale.date);
+    // Returns included, so a refund pulls its own day down instead of vanishing.
+    for (final sale in window.all) {
+      final sign = RetailSaleFilter.revenueSign(sale);
+      final saleDate = _reportedAt(sale);
+      if (saleDate == null) continue;
       final dayKey = DateTime(saleDate.year, saleDate.month, saleDate.day).toIso8601String();
 
       if (!dailyProfits.containsKey(dayKey)) {
@@ -576,25 +1878,44 @@ class ReportService {
           'totalCost': 0.0,
           'totalProfit': 0.0,
           'profitMargin': 0.0,
-          'totalItems': 0,
+          'totalItems': 0.0,
+          // A day of un-costed sales used to read as 100% margin with nothing
+          // said about it — the exact failure `_unitCostOf` exists to prevent.
+          'unknownCostLines': 0,
+          'unknownCostRevenue': 0.0,
         };
       }
 
-      final saleItems = await saleItemRepository.getItemsBySaleId(sale.saleId);
+      final saleItems = itemsBySaleId[sale.saleId] ?? const <SaleItemModel>[];
 
+      // LINE basis, matching every other profit tab — see the note in
+      // `getProfitPerSaleReport`. The header figure this replaces carried the
+      // sale's round-off into the day's profit.
+      double saleRevenue = 0.0;
       double saleCost = 0.0;
-      for (var item in saleItems) {
-        final variant = await productStore.getVariantById(item.varianteId);
-        if (variant != null && variant.costPrice != null) {
-          saleCost += (variant.costPrice! * item.qty);
+      var unknownLines = 0;
+      double unknownRevenue = 0.0;
+      for (final item in saleItems) {
+        final revenue = _netRevenueOf(item) * sign;
+        saleRevenue += revenue;
+
+        final unitCost = _unitCostOf(item, liveCost);
+        if (unitCost == null) {
+          unknownLines++;
+          unknownRevenue += revenue;
+          continue;
         }
+        saleCost += unitCost * item.qty * sign;
       }
 
-      dailyProfits[dayKey]!['totalSales'] += 1;
-      dailyProfits[dayKey]!['totalRevenue'] += sale.totalAmount;
-      dailyProfits[dayKey]!['totalCost'] += saleCost;
-      dailyProfits[dayKey]!['totalProfit'] += (sale.totalAmount - saleCost);
-      dailyProfits[dayKey]!['totalItems'] += sale.totalItems;
+      final day = dailyProfits[dayKey]!;
+      day['totalSales'] += sign;
+      day['totalRevenue'] += saleRevenue;
+      day['totalCost'] += saleCost;
+      day['totalProfit'] += saleRevenue - saleCost;
+      day['totalItems'] += RetailSaleFilter.signedItemCount(sale);
+      day['unknownCostLines'] += unknownLines;
+      day['unknownCostRevenue'] += unknownRevenue;
     }
 
     // Calculate profit margin for each day
@@ -604,11 +1925,593 @@ class ReportService {
 
       return {
         ...stat,
-        'profitMargin': revenue > 0 ? (profit / revenue) * 100 : 0.0,
+        'profitMargin': revenue != 0 ? (profit / revenue) * 100 : 0.0,
       };
     }).toList()
       ..sort((a, b) => (a['date'] as String).compareTo(b['date'] as String));
 
     return statsList;
   }
+
+  // ==================== PURCHASING REPORTS (shared helpers) ====================
+
+  /// [_inWindow] for records that store their timestamp as an ISO string.
+  /// An unparseable value is treated as outside any explicit window.
+  /// The date rule for every PURCHASE report — POs, GRNs and returns.
+  ///
+  /// Parse FIRST, always. This used to open with
+  /// `if (start == null && end == null) return true;`, which skipped
+  /// [_inWindow] entirely — so an all-time query ignored the plan's history
+  /// cutoff, and admitted rows whose date could not be read while a bounded
+  /// query rejected the very same rows. [_inWindow] already null-guards both
+  /// bounds, so it is the whole rule in both cases.
+  ///
+  /// The sales side had the same defect and it is documented there
+  /// (`_salesInWindow`, "it used to sit inside `if (start != null || end !=
+  /// null)`"). This is the purchase counterpart.
+  bool _withinRange(String? iso, DateTime? start, DateTime? end) {
+    final at = DateTime.tryParse(iso ?? '');
+    if (at == null) return false;
+    return _inWindow(at, start, end);
+  }
+
+  /// Confirmed receipts only — a draft GRN has moved no stock and owes no
+  /// money, so it must never reach a report.
+  List<GRNModel> _confirmedGRNs({DateTime? startDate, DateTime? endDate}) {
+    return purchaseOrderStore.grns
+        .where((g) =>
+            g.statusEnum == GRNStatus.confirmed &&
+            _withinRange(g.receivedDate, startDate, endDate))
+        .toList()
+      // Newest first, then the GRN id. `receivedDate` alone is not a total
+      // order and `List.sort` is not stable in Dart, so two receipts confirmed
+      // in the same instant could swap between loads.
+      //
+      // Only the GRN Report inherits this order: Supplier-wise re-aggregates
+      // and sorts on its own, Purchase Summary only folds, and Damaged Items
+      // builds a map from it and sorts its own rows.
+      ..sort((a, b) {
+        final byDate = b.receivedDate.compareTo(a.receivedDate);
+        if (byDate != 0) return byDate;
+        return a.grnId.compareTo(b.grnId);
+      });
+  }
+
+  /// Damaged value per GRN. GRN headers only carry accepted value, so the
+  /// damaged side has to come from the line items.
+  /// Damaged value per GRN, split by whether it can still come back.
+  ///
+  /// Derived from the damaged-goods DOCUMENTS, not from the GRN line's
+  /// `damagedHandling`. Handling is chosen once at receipt, but the outcome is
+  /// decided later — a claim can be rejected weeks on. Reading the documents
+  /// makes the report self-correct as statuses change; reading the line would
+  /// freeze a rejected claim as recoverable forever.
+  ///
+  /// A rejected claim that has already been written off is counted through its
+  /// loss records instead, so the same value never lands in `absorbed` twice.
+  /// A received line with no usable cost price.
+  ///
+  /// **Zero is the live case, not null.** `ReceivingItemData.costPrice` is a
+  /// non-nullable double seeded `estimatedPrice ?? variant.costPrice ?? 0`
+  /// (`material_receiving_screen.dart:88`) and the price field parses
+  /// `tryParse(text) ?? 0` (`:150`), so a blank price becomes 0 — which then
+  /// values the line, the receipt, the supplier accrual and any return raised
+  /// from it at nothing. Null only reaches here from legacy or restored rows.
+  ///
+  /// Both mean the same thing — the cost was never captured — so both are
+  /// flagged. Nothing is reconstructed: substituting the variant's current cost
+  /// would price a receipt at a figure no invoice supports, and the supplier
+  /// ledger has already accrued the zero.
+  ///
+  /// Lines that received nothing are ignored; an unpriced line only matters
+  /// once goods have actually arrived against it.
+  static bool _lineUnpriced(GRNItemModel i) =>
+      i.receivedQty > 0 && (i.costPrice == null || i.costPrice! <= 0);
+
+  /// GRN ids with at least one unpriced received line.
+  ///
+  /// Derived once from the item list so every report that surfaces this reads
+  /// the same answer — a receipt cannot be flagged on one screen and clean on
+  /// another.
+  static Set<String> _grnIdsWithUnpricedLines(List<GRNItemModel> items) => {
+        for (final i in items)
+          if (_lineUnpriced(i)) i.grnId,
+      };
+
+  /// A confirmed receipt whose invoice value was never recorded.
+  ///
+  /// **Null is not zero.** `GRNModel.totalAmount` and the supplier's `purchase`
+  /// ledger movement are written from ONE value in ONE block
+  /// (`material_receiving_screen.dart:547` and `:753`), so a GRN with no amount
+  /// also has no payable — the two absences are the same event. Every report
+  /// reads it as `?? 0`, which is honest against the ledger but silently
+  /// understates spend, so the condition is surfaced rather than patched.
+  ///
+  /// Deliberately NOT reconstructed. `Σ item.totalAmount` uses `acceptedQty`
+  /// (`grn_item_model_214.dart:135`) while the header bills `receivedQty`, so
+  /// it drops the damaged value; and recomputing from `costPrice` would invent
+  /// a payable the supplier balance has never seen.
+  ///
+  /// A stored `0.0` is a legitimate value — a free or sample receipt — and is
+  /// never flagged.
+  static bool _grnAmountMissing(GRNModel g) => g.totalAmount == null;
+
+  /// Damage recovery for a window, grouped by SUPPLIER, with every document
+  /// judged on ITS OWN event date.
+  ///
+  /// This replaces a per-GRN lookup that attributed every return, claim and
+  /// write-off to the date its GRN was RECEIVED, and applied no date filter at
+  /// all. Two things were wrong with that: recovery appeared in a period before
+  /// it had happened, and a closed period changed retroactively every time a
+  /// later credit note arrived.
+  ///
+  /// The app already dates these events correctly in the supplier ledger —
+  /// `recordCreditNote` posts with `creditNoteDate` and `updateClaimStatus`
+  /// posts with `resolvedAt` (`damaged_goods_store.dart:313, :45`). This makes
+  /// the reports agree with the ledger.
+  ///
+  /// **Expected is not Recovered.** A raised return or claim is value the
+  /// supplier owes; only a credit note or a settled claim is value actually
+  /// received — and a credit note may be for LESS than the return's face value,
+  /// so `creditNoteAmount` is what counts as recovered, never `totalAmount`.
+  ///
+  /// Iterates the DOCUMENTS, not the window's GRNs: February's recovery belongs
+  /// to a January receipt that is not in February's window at all.
+  ///
+  /// Cancelled returns are excluded from all three buckets. The goods never went
+  /// back, nothing was credited, and there is no reliable cancellation date to
+  /// post against — `updatedAt` moves on any edit, so using it would invent an
+  /// accounting event.
+  Map<String, _DamagedRecovery> _damagedRecoveryInWindow(
+      DateTime? start, DateTime? end) {
+    final bySupplier = <String, _DamagedRecovery>{};
+    _DamagedRecovery entry(String supplierId, String? name) {
+      final e = bySupplier.putIfAbsent(supplierId, () => _DamagedRecovery());
+      final trimmed = (name ?? '').trim();
+      if (e.supplierName == null && trimmed.isNotEmpty) {
+        e.supplierName = trimmed;
+      }
+      return e;
+    }
+
+    for (final r in damagedGoodsStore.purchaseReturns) {
+      switch (r.statusEnum) {
+        case PurchaseReturnStatus.cancelled:
+          // Counted through the `return_cancelled` loss rows written at
+          // cancellation (dated by it) in the loss loop below — never here too.
+          break;
+        case PurchaseReturnStatus.pending:
+          if (_withinRange(r.returnDate, start, end)) {
+            entry(r.supplierId, r.supplierName).expected += r.totalAmount;
+          }
+        case PurchaseReturnStatus.creditReceived:
+          // The note's face value, which may be less than the return total.
+          // A legacy row with no credit date cannot be placed in a period.
+          if (_withinRange(r.creditNoteDate, start, end)) {
+            entry(r.supplierId, r.supplierName).recovered +=
+                r.creditNoteAmount ?? 0;
+          }
+      }
+    }
+
+    for (final c in damagedGoodsStore.supplierClaims) {
+      switch (c.statusEnum) {
+        case SupplierClaimStatus.pending:
+        case SupplierClaimStatus.approved:
+          // Approved means the supplier agreed, not that they paid.
+          if (_withinRange(c.claimDate, start, end)) {
+            entry(c.supplierId, c.supplierName).expected += c.totalAmount;
+          }
+        case SupplierClaimStatus.settled:
+          if (_withinRange(c.resolvedAt, start, end)) {
+            entry(c.supplierId, c.supplierName).recovered += c.totalAmount;
+          }
+        case SupplierClaimStatus.rejected:
+          // A written-off rejection is counted through its loss row instead, so
+          // the same value never lands in `absorbed` twice.
+          if (!c.isLossRecorded && _withinRange(c.resolvedAt, start, end)) {
+            entry(c.supplierId, c.supplierName).absorbed += c.totalAmount;
+          }
+      }
+    }
+
+    for (final l in damagedGoodsStore.inventoryLosses) {
+      // Only losses raised from a receipt are purchase damage; a stock
+      // adjustment loss has no GRN and belongs to inventory, not purchasing.
+      if (l.grnId == null) continue;
+      final supplierId = l.supplierId;
+      if (supplierId == null) continue;
+      if (!_withinRange(l.recordedAt, start, end)) continue;
+      entry(supplierId, l.supplierName).absorbed += l.lossValue;
+    }
+
+    return bySupplier;
+  }
+
+  /// Units received against a PO across its confirmed GRNs.
+  double _receivedQtyForPO(String poId) {
+    return purchaseOrderStore.grns
+        .where((g) => g.poId == poId && g.statusEnum == GRNStatus.confirmed)
+        .fold<double>(0.0, (sum, g) => sum + g.totalReceivedQty);
+  }
+
+  /// Value billed against a PO across its confirmed GRNs — the supplier's
+  /// invoice value, damaged units included.
+  double _receivedValueForPO(String poId) {
+    return purchaseOrderStore.grns
+        .where((g) => g.poId == poId && g.statusEnum == GRNStatus.confirmed)
+        .fold<double>(0, (sum, g) => sum + (g.totalAmount ?? 0));
+  }
+
+  // ==================== Purchase Summary Report ====================
+
+  /// Headline purchasing numbers for a period: what was ordered, what actually
+  /// arrived, and what it cost.
+  Future<Map<String, dynamic>> getPurchaseSummaryReport(
+      {DateTime? startDate, DateTime? endDate}) async {
+    final orders = purchaseOrderStore.purchaseOrders
+        .where((po) => _withinRange(po.createdAt, startDate, endDate))
+        .toList();
+
+    final receipts = _confirmedGRNs(startDate: startDate, endDate: endDate);
+    final recovery = _damagedRecoveryInWindow(startDate, endDate);
+    // One item read so this figure is line-accurate. A receipt with SOME
+    // unpriced lines still has a non-zero header total, so a header-only check
+    // would miss it — and would then disagree with the GRN Report, which is
+    // line-aware.
+    final unpricedGRNs =
+        _grnIdsWithUnpricedLines(await GRNItemRepository().getAllGRNItems());
+
+    // Every status, including draft and cancelled — this breakdown is meant to
+    // account for all of them.
+    final countByStatus = <String, int>{};
+    for (final status in POStatus.values) {
+      countByStatus[status.name] =
+          orders.where((po) => po.statusEnum == status).length;
+    }
+
+    // ...but the ordered aggregates must not. A draft was never placed and a
+    // cancelled order was un-placed, so counting either as money ordered made
+    // the ordered-vs-received gap look like a supplier failure.
+    final placedOrders = orders
+        .where((po) =>
+            po.statusEnum != POStatus.draft &&
+            po.statusEnum != POStatus.cancelled)
+        .toList();
+
+    // Recovery is judged on each document's OWN event date, so these cover
+    // recovery that HAPPENED in this period — not recovery attached to this
+    // period's receipts. A January receipt credited in March contributes to
+    // March, and January never changes afterwards.
+    final damagedExpected =
+        recovery.values.fold<double>(0, (sum, r) => sum + r.expected);
+    final damagedRecovered =
+        recovery.values.fold<double>(0, (sum, r) => sum + r.recovered);
+    final damagedAbsorbed =
+        recovery.values.fold<double>(0, (sum, r) => sum + r.absorbed);
+
+    // Value still expected on orders that are placed but not fully received.
+    final outstandingValue = orders
+        .where((po) =>
+            po.statusEnum == POStatus.sent ||
+            po.statusEnum == POStatus.partiallyCompleted)
+        .fold<double>(
+            0,
+            (sum, po) =>
+                sum +
+                (po.estimatedTotal - _receivedValueForPO(po.poId))
+                    .clamp(0, double.infinity))
+        .toDouble();
+
+    return {
+      'orderCount': placedOrders.length,
+      'countByStatus': countByStatus,
+      'receiptCount': receipts.length,
+      'orderedQty': placedOrders.fold<double>(0.0, (sum, po) => sum + po.totalItems),
+      'receivedQty':
+          receipts.fold<double>(0.0, (sum, g) => sum + g.totalReceivedQty),
+      'orderedValue':
+          placedOrders.fold<double>(0, (sum, po) => sum + po.estimatedTotal),
+      'receivedValue':
+          receipts.fold<double>(0, (sum, g) => sum + (g.totalAmount ?? 0)),
+      'damagedValue': damagedExpected + damagedRecovered + damagedAbsorbed,
+      // Expected is owed, not received — never present them as one number.
+      'damagedExpected': damagedExpected,
+      'damagedRecovered': damagedRecovered,
+      'damagedAbsorbed': damagedAbsorbed,
+      'outstandingValue': outstandingValue,
+      'supplierCount': receipts.map((g) => g.supplierId).toSet().length,
+      // Same window and same confirmed-only rule as every figure above it —
+      // it counts the very list they were folded from.
+      'grnsMissingAmount': receipts.where(_grnAmountMissing).length,
+      // Receipts in this window carrying at least one line with no cost price.
+      // Their value — and any recovery raised from them — is understated.
+      'grnsWithUnpricedLines':
+          receipts.where((g) => unpricedGRNs.contains(g.grnId)).length,
+    };
+  }
+
+  // ==================== Purchase Order Status Report ====================
+
+  /// Purchase orders in one status, with their receiving progress.
+  ///
+  /// Backs the Pending / Partially Received / Completed reports — same shape,
+  /// different [status].
+  Future<List<Map<String, dynamic>>> getPurchaseOrderStatusReport(
+    POStatus status, {
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    final orders = purchaseOrderStore.purchaseOrders
+        .where((po) =>
+            po.statusEnum == status &&
+            _withinRange(po.createdAt, startDate, endDate))
+        .toList()
+      // Newest first, then the PO id. `createdAt` alone is not a total order,
+      // and `List.sort` is not stable in Dart, so two orders stamped the same
+      // instant fell in whatever order the box yielded and could swap between
+      // loads — on screen and in the export.
+      ..sort((a, b) {
+        final byDate = b.createdAt.compareTo(a.createdAt);
+        if (byDate != 0) return byDate;
+        return a.poId.compareTo(b.poId);
+      });
+
+    return orders.map((po) {
+      final received = _receivedQtyForPO(po.poId);
+      // The PO's own snapshot is the source of truth for the name — a renamed
+      // supplier must not relabel historical orders. Blank counts as absent:
+      // `??` alone passes a whitespace-only name through and renders an empty
+      // cell.
+      final snapshot = (po.supplierName ?? '').trim();
+      return {
+        'poId': po.poId,
+        'poNumber': po.poNumber,
+        'supplierName': snapshot.isNotEmpty ? snapshot : 'Unknown Supplier',
+        'createdAt': po.createdAt,
+        'expectedDeliveryDate': po.expectedDeliveryDate,
+        'orderedQty': po.totalItems,
+        'receivedQty': received,
+        // `.toDouble()` is load-bearing: `num.clamp` returns whichever operand
+        // it picked, so on an over-receipt this handed back the int literal `0`
+        // while every other row was a double. The column carried two runtime
+        // types and the screen's `as int` threw on the double ones.
+        'remainingQty':
+            (po.totalItems - received).clamp(0, po.totalItems).toDouble(),
+        'estimatedTotal': po.estimatedTotal,
+        'receivedValue': _receivedValueForPO(po.poId),
+        'status': po.status,
+      };
+    }).toList();
+  }
+
+  // ==================== GRN Report ====================
+
+  /// Every confirmed goods receipt in the period.
+  Future<List<Map<String, dynamic>>> getGRNReport(
+      {DateTime? startDate, DateTime? endDate}) async {
+    final receipts = _confirmedGRNs(startDate: startDate, endDate: endDate);
+    final items = await GRNItemRepository().getAllGRNItems();
+
+    final unpricedGRNs = _grnIdsWithUnpricedLines(items);
+
+    final acceptedByGRN = <String, double>{};
+    final damagedByGRN = <String, double>{};
+    for (final item in items) {
+      acceptedByGRN[item.grnId] =
+          (acceptedByGRN[item.grnId] ?? 0) + item.acceptedQty;
+      damagedByGRN[item.grnId] =
+          (damagedByGRN[item.grnId] ?? 0) + (item.damagedQty ?? 0);
+    }
+
+    return receipts
+        .map((grn) => {
+              'grnId': grn.grnId,
+              'grnNumber': grn.grnNumber,
+              'poNumber': grn.poNumber,
+              'supplierName': grn.supplierName ?? 'Unknown Supplier',
+              'receivedDate': grn.receivedDate,
+              'invoiceNumber': grn.invoiceNumber,
+              'orderedQty': grn.totalOrderedQty,
+              'receivedQty': grn.totalReceivedQty,
+              // `?? 0` handed back the int literal for a GRN with no items
+              // while every other row was a double, so the column carried two
+              // runtime types and the screen's `as int` threw on the doubles.
+              'acceptedQty': acceptedByGRN[grn.grnId] ?? 0.0,
+              'damagedQty': damagedByGRN[grn.grnId] ?? 0.0,
+              'totalAmount': grn.totalAmount ?? 0.0,
+              // At least one received line has no cost price, so this receipt's
+              // Value is understated by whatever those units were worth.
+              'hasUnpricedLine': unpricedGRNs.contains(grn.grnId),
+              // The `?? 0` above is lossy: it makes "never recorded" and
+              // "genuinely free" look identical. This keeps them apart so the
+              // row report can name the receipt rather than just count it.
+              'amountMissing': _grnAmountMissing(grn),
+            })
+        .toList();
+  }
+
+  // ==================== Damaged Items Report ====================
+
+  /// Every damaged line across confirmed receipts, with what was decided.
+  ///
+  /// Supplier and date live on the GRN header, so the lines are joined back to
+  /// their receipt.
+  Future<List<Map<String, dynamic>>> getDamagedItemsReport(
+      {DateTime? startDate, DateTime? endDate}) async {
+    final receipts = {
+      for (final g in _confirmedGRNs(startDate: startDate, endDate: endDate))
+        g.grnId: g
+    };
+    final items = await GRNItemRepository().getAllGRNItems();
+
+    final rows = <Map<String, dynamic>>[];
+    for (final item in items) {
+      if ((item.damagedQty ?? 0) <= 0) continue;
+      final grn = receipts[item.grnId];
+      if (grn == null) continue; // outside the period, or an unconfirmed GRN
+
+      rows.add({
+        'grnItemId': item.grnItemId,
+        'grnNumber': grn.grnNumber,
+        'poNumber': grn.poNumber,
+        // The GRN's own snapshot names the supplier — a rename must not
+        // relabel historical receipts. Blank counts as absent: `??` alone
+        // passes a whitespace-only name through and renders an empty cell.
+        'supplierName': (grn.supplierName ?? '').trim().isEmpty
+            ? 'Unknown Supplier'
+            : grn.supplierName!.trim(),
+        'receivedDate': grn.receivedDate,
+        'productName': item.productName ?? 'Unknown Product',
+        'variantInfo': item.variantInfo,
+        // Always a double. Rows are filtered to `damagedQty > 0`, so this is
+        // never the `?? 0` int literal in practice — but the fallback matches
+        // the type anyway, so the column can never carry two runtime types.
+        'damagedQty': (item.damagedQty ?? 0).toDouble(),
+        'costPrice': item.costPrice,
+        // No usable cost, so `damagedAmount` below is 0 and any return or claim
+        // raised from this line was created at zero value too.
+        'costMissing': _lineUnpriced(item),
+        'damagedAmount': item.damagedAmount ?? 0.0,
+        'handling': item.damagedHandlingEnum?.name,
+        'handlingDisplay': item.damagedHandlingDisplay,
+      });
+    }
+
+    // Newest first, then the line id. Several damaged lines from ONE receipt
+    // share an identical `receivedDate`, so ties are the norm here rather than
+    // the exception — and `List.sort` is not stable in Dart.
+    //
+    // This is the report's OWN sort: `_confirmedGRNs` is consumed as a map
+    // above, so its ordering never reaches these rows.
+    rows.sort((a, b) {
+      final byDate =
+          (b['receivedDate'] as String).compareTo(a['receivedDate'] as String);
+      if (byDate != 0) return byDate;
+      return (a['grnItemId'] as String).compareTo(b['grnItemId'] as String);
+    });
+    return rows;
+  }
+
+  // ==================== Purchase Return Report ====================
+
+  /// Goods sent back to suppliers, and where each credit note stands.
+  Future<List<Map<String, dynamic>>> getPurchaseReturnReport(
+      {DateTime? startDate, DateTime? endDate}) async {
+    final returns = damagedGoodsStore.purchaseReturns
+        .where((r) => _withinRange(r.returnDate, startDate, endDate))
+        .toList()
+      // Newest first, then the return id. `returnDate` alone is not a total
+      // order — one receipt can raise several returns in the same instant — and
+      // `List.sort` is not stable in Dart, so tied rows could swap between
+      // loads, on screen and in the export.
+      ..sort((a, b) {
+        final byDate = b.returnDate.compareTo(a.returnDate);
+        if (byDate != 0) return byDate;
+        return a.returnId.compareTo(b.returnId);
+      });
+
+    return returns
+        .map((r) => {
+              'returnId': r.returnId,
+              'returnNumber': r.returnNumber,
+              'grnNumber': r.grnNumber,
+              'poNumber': r.poNumber,
+              // The return document's own snapshot names the supplier — a
+              // rename must not relabel history. Blank counts as absent: `??`
+              // alone passes a whitespace-only name through as an empty cell.
+              'supplierName': (r.supplierName ?? '').trim().isEmpty
+                  ? 'Unknown Supplier'
+                  : r.supplierName!.trim(),
+              'returnDate': r.returnDate,
+              // Explicitly a double, matching every other quantity the reports
+              // emit — goods go back by weight as readily as by the piece.
+              'totalQty': r.totalQty.toDouble(),
+              'totalAmount': r.totalAmount,
+              'status': r.status,
+              'statusDisplay': r.statusDisplay,
+              'creditNoteNumber': r.creditNoteNumber,
+              'creditNoteAmount': r.creditNoteAmount,
+            })
+        .toList();
+  }
+
+  // ==================== Stock Adjustment Report ====================
+
+  /// Every manual stock adjustment in the window, newest first.
+  ///
+  /// This is the audit trail for the one stock movement that has no document
+  /// behind it. Reads the movement log rather than deriving anything: the log
+  /// stores `balanceAfter`, so the before-level is recovered by backing the
+  /// signed change out of it — that stays correct even when later movements
+  /// have since changed the variant's stock.
+  ///
+  /// Loss value is intentionally NOT computed here. Whether an adjustment cost
+  /// money is decided by its reason at the time it was made, and that decision
+  /// is already recorded as an `InventoryLossModel` — see the Damaged Items
+  /// report. Recomputing it from today's cost price would disagree with it.
+  Future<List<Map<String, dynamic>>> getStockAdjustmentReport({
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
+    final movements = StockAdjustmentService.allAdjustments()
+        .where((m) => _inWindow(m.timestamp, startDate, endDate))
+        .toList();
+
+    return movements
+        .map((m) => {
+              'timestamp': m.timestamp.toIso8601String(),
+              'itemName': m.itemName,
+              'productId': m.itemId,
+              'variantId': m.variantId,
+              'type': m.type,
+              'isIn': m.isIn,
+              // Doubles, deliberately. `StockMovementModel.quantity` and
+              // `balanceAfter` are `double` and the adjustment dialog lets a
+              // loose-goods variant type a fractional amount
+              // (`stock_adjustment_dialog.dart:159`), so `.toInt()` here turned
+              // a 2.5 kg correction into 2 — silently, with no error to notice.
+              //
+              // It also broke the row's own arithmetic: `balanceBefore` is
+              // derived from the two doubles, so truncating all three
+              // separately let Before + Change disagree with After.
+              'quantity': m.quantity,
+              'signedQuantity': m.signedQuantity,
+              'balanceAfter': m.balanceAfter,
+              'balanceBefore': m.balanceAfter - m.signedQuantity,
+              // Carried from the movement so a weighed correction can read
+              // "2.5 kg" rather than a bare number that looks like pieces.
+              'unit': m.unit,
+              'reason': m.reason,
+              'note': m.note ?? '',
+              'staffName': m.staffName,
+            })
+        .toList();
+  }
+}
+
+/// Damaged value for one GRN, split by whether the business can still get it
+/// back from the supplier.
+///
+/// Mutable on purpose — it is accumulated in a single pass over three document
+/// lists and never escapes [ReportService].
+/// Damage recovery for one supplier in one window, split by what actually
+/// happened rather than by what might.
+class _DamagedRecovery {
+  /// Snapshot name from whichever document was seen first, so a supplier that
+  /// appears only through a recovery event can still be labelled.
+  String? supplierName;
+
+  /// Raised and owed: an open return, or a claim not yet settled or refused.
+  /// **Not money received.**
+  double expected = 0;
+
+  /// Actually credited or settled — a credit note's face value, or a settled
+  /// claim's total.
+  double recovered = 0;
+
+  /// Write-offs and refused claims: cost the business keeps.
+  double absorbed = 0;
+
+  double get total => expected + recovered + absorbed;
 }

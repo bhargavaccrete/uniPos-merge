@@ -1,0 +1,1144 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show FilteringTextInputFormatter;
+import 'package:flutter_slidable/flutter_slidable.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/presentation/widget/componets/common/dialog_dispose_scope.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/core/plan/plan_guard.dart';
+import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_empty_state.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:uuid/uuid.dart';
+import '../../../../data/models/common/staffModel_310.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../../../util/restaurant/restaurant_auth_helper.dart';
+import '../../../../util/common/app_responsive.dart';
+import '../../../../util/common/staff_roles.dart';
+import '../../../../core/plan/mode_keys.dart';
+
+class ManageStaffScreen extends StatefulWidget {
+  const ManageStaffScreen({super.key});
+
+  @override
+  State<ManageStaffScreen> createState() => _ManageStaffScreenState();
+}
+
+class _ManageStaffScreenState extends State<ManageStaffScreen> {
+  TextEditingController userNameController = TextEditingController();
+  TextEditingController firstNameController = TextEditingController();
+
+  bool _usernameManuallyEdited = false;
+
+  @override
+  void initState() {
+    super.initState();
+    staffStore.loadStaff();
+    firstNameController.addListener(_syncUsernameFromFirstName);
+  }
+
+  void _syncUsernameFromFirstName() {
+    if (_usernameManuallyEdited) return;
+    final generated = firstNameController.text.trim().toLowerCase().replaceAll(
+      RegExp(r'\s+'),
+      '_',
+    );
+    if (userNameController.text != generated) {
+      userNameController.value = userNameController.value.copyWith(
+        text: generated,
+        selection: TextSelection.collapsed(offset: generated.length),
+      );
+    }
+  }
+
+  TextEditingController lastNameController = TextEditingController();
+  TextEditingController mobileController = TextEditingController();
+  TextEditingController mailController = TextEditingController();
+  TextEditingController pinNoController = TextEditingController();
+  TextEditingController searchController = TextEditingController();
+
+  // Focus chain for the Add Staff dialog: first → last → mobile → email → pin.
+  final _addFirstNameFocus = FocusNode();
+  final _addLastNameFocus = FocusNode();
+  final _addMobileFocus = FocusNode();
+  final _addMailFocus = FocusNode();
+  final _addPinFocus = FocusNode();
+
+  String selectedrole = StaffRoles.unselected;
+  String searchQuery = '';
+
+  @override
+  void dispose() {
+    userNameController.dispose();
+    firstNameController.dispose();
+    lastNameController.dispose();
+    mobileController.dispose();
+    mailController.dispose();
+    pinNoController.dispose();
+    searchController.dispose();
+    _addFirstNameFocus.dispose();
+    _addLastNameFocus.dispose();
+    _addMobileFocus.dispose();
+    _addMailFocus.dispose();
+    _addPinFocus.dispose();
+    super.dispose();
+  }
+
+  // ── Role chips ───────────────────────────────────────────────────────────
+  // Vocabulary comes from StaffRoles so this screen, the onboarding step and
+  // the permission matrix can never drift apart. Retail gets Manager/Cashier;
+  // restaurant additionally gets Waiter.
+  List<String> get _roleLabels => StaffRoles.forCurrentMode;
+
+  Widget _buildRoleSelector(String current, void Function(String) onSelect) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _label('Role *'),
+        Row(
+          children: _roleLabels.map((role) {
+            final isSelected = current == role;
+            final color = StaffRoles.colorFor(role);
+            return Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  right: role != _roleLabels.last ? 8 : 0,
+                ),
+                child: GestureDetector(
+                  onTap: () => onSelect(role),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? color.withValues(alpha: 0.1)
+                          : AppColors.surfaceLight,
+                      border: Border.all(
+                        color: isSelected ? color : AppColors.divider,
+                        width: isSelected ? 1.5 : 1,
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          StaffRoles.iconFor(role),
+                          size: 20,
+                          color: isSelected ? color : AppColors.textSecondary,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          role,
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.captionFontSize(context),
+                            fontWeight: isSelected
+                                ? FontWeight.w600
+                                : FontWeight.w400,
+                            color: isSelected ? color : AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _addStaff() async {
+    if (!PlanGuard.allowedOr(context, ModeKeys.users, featureName: 'Staff'))
+      return;
+    if (!PlanGuard.withinLimitOr(
+      context,
+      ModeKeys.usersMax,
+      staffStore.staff.length,
+      unit: 'users',
+    ))
+      return;
+    final newstaff = StaffModel(
+      id: Uuid().v4().toString(),
+      userName: userNameController.text.trim(),
+      firstName: firstNameController.text.trim(),
+      lastName: lastNameController.text.trim(),
+      isCashier: selectedrole,
+      mobileNo: mobileController.text.trim(),
+      emailId: mailController.text.trim(),
+      pinNo: RestaurantAuthHelper.hashPassword(pinNoController.text.trim()),
+      isActive: true,
+      createdAt: DateTime.now(),
+    );
+    await staffStore.addStaff(newstaff);
+    _clear();
+  }
+
+  /// PIN-only login means PINs must be globally unique — across all staff AND
+  /// the admin. Returns true if [pin] is already taken. [excludeStaffId] skips
+  /// the staff being edited.
+  Future<bool> _isPinTaken(String pin, {String? excludeStaffId}) async {
+    final staffClash = staffStore.staff.any(
+      (s) =>
+          s.id != excludeStaffId &&
+          RestaurantAuthHelper.verifyPassword(pin, s.pinNo),
+    );
+    if (staffClash) return true;
+    // Check the admin PIN too. If nothing is stored yet, the admin is still on
+    // the login default ('123456') — so compare against that, otherwise a staff
+    // could take the default admin PIN and shadow the admin at login.
+    final prefs = await SharedPreferences.getInstance();
+    final adminPass = prefs.getString(RestaurantAuthHelper.adminPinKey);
+    final adminCollision = adminPass != null
+        ? RestaurantAuthHelper.verifyPassword(pin, adminPass)
+        : pin == '123456';
+    if (adminCollision) return true;
+    return false;
+  }
+
+  void _searchStaff(String query) {
+    setState(() {
+      searchQuery = query;
+    });
+  }
+
+  List<StaffModel> _getFilteredStaff() {
+    final allStaff = staffStore.staff.toList();
+    if (searchQuery.isEmpty) {
+      return allStaff;
+    }
+    final searchLower = searchQuery.toLowerCase();
+    return allStaff.where((staff) {
+      return staff.userName.toLowerCase().contains(searchLower) ||
+          staff.firstName.toLowerCase().contains(searchLower) ||
+          staff.lastName.toLowerCase().contains(searchLower) ||
+          staff.emailId.toLowerCase().contains(searchLower) ||
+          staff.mobileNo.contains(searchLower);
+    }).toList();
+  }
+
+  void _clear() {
+    _usernameManuallyEdited = false;
+    userNameController.clear();
+    firstNameController.clear();
+    lastNameController.clear();
+    mobileController.clear();
+    mailController.clear();
+    pinNoController.clear();
+    selectedrole = StaffRoles.unselected;
+  }
+
+  Future<void> _updateStaff(StaffModel staff) async {
+    await staffStore.updateStaff(staff);
+  }
+
+  void _deleteStaff(String id) async {
+    await staffStore.deleteStaff(id);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.surfaceLight,
+      appBar: buildPrimaryAppBar(title: 'Staff Management'),
+      body: AppResponsive.constrainedContent(
+        context: context,
+        maxWidth: AppResponsive.maxContentWidth(context),
+        alignment: Alignment.topCenter,
+        child: Column(
+          children: [
+            // Search & Add Button Section
+            Container(
+              color: Colors.white,
+              padding: AppResponsive.padding(context),
+              child: Column(
+                children: [
+                  // Search Bar
+                  AppTextField(
+                    controller: searchController,
+                    hint: 'Search staff…',
+                    icon: Icons.search_rounded,
+                    onChanged: _searchStaff,
+                  ),
+                  SizedBox(height: AppResponsive.mediumSpacing(context)),
+                  // Add Staff Button
+                  SizedBox(
+                    width: double.infinity,
+                    height: AppResponsive.buttonHeight(context),
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        selectedrole = StaffRoles.unselected;
+                        _clear();
+                        _showAddStaffDialog(context);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      icon: Icon(
+                        Icons.person_add_rounded,
+                        size: AppResponsive.iconSize(context),
+                      ),
+                      label: Text(
+                        'Add New Staff',
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.buttonFontSize(context),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Staff List
+            Expanded(
+              child: Observer(
+                builder: (_) {
+                  final filteredStaff = _getFilteredStaff();
+
+                  if (staffStore.isLoading) {
+                    return Center(child: CircularProgressIndicator());
+                  }
+
+                  if (filteredStaff.isEmpty) {
+                    return AppEmptyState(
+                      icon: Icons.people_outline,
+                      title: searchQuery.isEmpty
+                          ? 'No staff members yet'
+                          : 'No staff found',
+                      message: searchQuery.isEmpty
+                          ? 'Add your first staff member'
+                          : null,
+                    );
+                  }
+
+                  return ListView.builder(
+                    padding: AppResponsive.padding(context),
+                    itemCount: filteredStaff.length,
+                    itemBuilder: (context, index) {
+                      final staff = filteredStaff[index];
+                      return _buildStaffCard(context, staff);
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStaffCard(BuildContext context, StaffModel staff) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
+      child: Slidable(
+        key: ValueKey(staff.id),
+        endActionPane: ActionPane(
+          motion: ScrollMotion(),
+          children: [
+            SlidableAction(
+              onPressed: (context) async {
+                final updatedStaff = staff.copyWith(
+                  isActive: !(staff.isActive ?? true),
+                );
+                await _updateStaff(updatedStaff);
+                if (context.mounted) {
+                  NotificationService.instance.showInfo(
+                    (updatedStaff.isActive ?? true)
+                        ? 'Staff Enabled'
+                        : 'Staff Disabled',
+                  );
+                }
+              },
+              backgroundColor: (staff.isActive ?? true)
+                  ? Colors.orange
+                  : Colors.green,
+              foregroundColor: Colors.white,
+              icon: (staff.isActive ?? true) ? Icons.block : Icons.check_circle,
+              label: (staff.isActive ?? true) ? 'Disable' : 'Enable',
+              borderRadius: BorderRadius.horizontal(left: Radius.circular(12)),
+            ),
+            SlidableAction(
+              onPressed: (context) {
+                _showDeleteConfirmation(context, staff.id);
+              },
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              icon: Icons.delete_rounded,
+              label: 'Delete',
+              borderRadius: BorderRadius.horizontal(right: Radius.circular(12)),
+            ),
+          ],
+        ),
+        child: Container(
+          decoration: BoxDecoration(
+            color: (staff.isActive ?? true) == false
+                ? AppColors.surfaceMedium
+                : AppColors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.divider.withValues(alpha: 0.5)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 8,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
+          child: Row(
+            children: [
+              // Avatar
+              CircleAvatar(
+                radius: AppResponsive.getValue(
+                  context,
+                  mobile: 20.0,
+                  tablet: 22.0,
+                  desktop: 24.0,
+                ),
+                backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                child: Text(
+                  staff.firstName.isNotEmpty
+                      ? staff.firstName[0].toUpperCase()
+                      : '?',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.subheadingFontSize(context),
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+              SizedBox(width: AppResponsive.mediumSpacing(context)),
+              // Staff Info
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      staff.userName,
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.bodyFontSize(context),
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      "${staff.firstName} ${staff.lastName}",
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.smallFontSize(context),
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            staff.isCashier,
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.captionFontSize(context),
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        if ((staff.isActive ?? true) == false) ...[
+                          SizedBox(width: 8),
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.red,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              'DISABLED',
+                              style: GoogleFonts.poppins(
+                                fontSize: AppResponsive.getValue(
+                                  context,
+                                  mobile: 10.0,
+                                  tablet: 11.0,
+                                  desktop: 12.0,
+                                ),
+                                color: Colors.white,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              // Action Buttons
+              Row(
+                children: [
+                  IconButton(
+                    onPressed: () => _showStaffDetails(context, staff),
+                    icon: Icon(Icons.visibility_rounded),
+                    color: AppColors.info,
+                    style: IconButton.styleFrom(
+                      backgroundColor: AppColors.info.withValues(alpha: 0.1),
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                  IconButton(
+                    onPressed: () => _showEditStaffDialog(context, staff),
+                    icon: Icon(Icons.edit_rounded),
+                    color: AppColors.primary,
+                    style: IconButton.styleFrom(
+                      backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showAddStaffDialog(BuildContext context) {
+    bool pinVisible = false;
+    // Local form key per dialog open (see edit dialog note).
+    final formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) {
+          // Shared by the PIN field's done key and the Add Staff button so
+          // pressing enter commits the form exactly like tapping the button.
+          Future<void> submitAdd() async {
+            if (!formKey.currentState!.validate()) return;
+            if (selectedrole == StaffRoles.unselected) {
+              NotificationService.instance.showInfo('Please select a role');
+              return;
+            }
+            final username = userNameController.text.trim().toLowerCase();
+            if (staffStore.staff.any(
+              (s) => s.userName.toLowerCase() == username,
+            )) {
+              NotificationService.instance.showError(
+                'Username already exists.',
+              );
+              return;
+            }
+            if (await _isPinTaken(pinNoController.text.trim())) {
+              NotificationService.instance.showError(
+                'This PIN is already in use. Choose a different one.',
+              );
+              return;
+            }
+            _addStaff();
+            if (ctx.mounted) Navigator.pop(ctx);
+            NotificationService.instance.showSuccess(
+              'Staff added successfully',
+            );
+          }
+
+          return AppDialogShell(
+            title: 'Add New Staff',
+            accent: AppColors.primary,
+            icon: Icons.person_add_rounded,
+            body: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ── First + Last Name ────────────────────────────
+                  Row(
+                    children: [
+                      Expanded(
+                        child: AppTextField(
+                          controller: firstNameController,
+                          focusNode: _addFirstNameFocus,
+                          label: 'First Name',
+                          hint: 'John',
+                          icon: Icons.person_outline,
+                          required: true,
+                          textInputAction: TextInputAction.next,
+                          onFieldSubmitted: (_) =>
+                              _addLastNameFocus.requestFocus(),
+                          validator: (v) => (v == null || v.trim().isEmpty)
+                              ? 'Required'
+                              : null,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: AppTextField(
+                          controller: lastNameController,
+                          focusNode: _addLastNameFocus,
+                          label: 'Last Name',
+                          hint: 'Doe',
+                          icon: Icons.person_outline,
+                          textInputAction: TextInputAction.next,
+                          // Skip the Role buttons (not text fields) → jump to Mobile.
+                          onFieldSubmitted: (_) =>
+                              _addMobileFocus.requestFocus(),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Username field hidden — auto-generated from first name.
+
+                  // ── Role ─────────────────────────────────────────
+                  _buildRoleSelector(
+                    selectedrole,
+                    (role) => setS(() => selectedrole = role),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // ── Mobile + Email ───────────────────────────────
+                  Row(
+                    children: [
+                      Expanded(
+                        child: AppTextField(
+                          controller: mobileController,
+                          focusNode: _addMobileFocus,
+                          label: 'Mobile (optional)',
+                          hint: '9876543210',
+                          icon: Icons.phone_outlined,
+                          keyboardType: TextInputType.phone,
+                          maxLength: 10,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
+                          textInputAction: TextInputAction.next,
+                          onFieldSubmitted: (_) => _addMailFocus.requestFocus(),
+                          validator: (v) {
+                            if (v != null &&
+                                v.trim().isNotEmpty &&
+                                v.trim().length != 10) {
+                              return 'Must be 10 digits';
+                            }
+                            return null;
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: AppTextField(
+                          controller: mailController,
+                          focusNode: _addMailFocus,
+                          label: 'Email',
+                          hint: 'john@email.com',
+                          icon: Icons.mail_outline,
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
+                          onFieldSubmitted: (_) => _addPinFocus.requestFocus(),
+                          validator: (v) {
+                            if (v != null && v.trim().isNotEmpty) {
+                              if (!RegExp(
+                                r'^[\w.+-]+@[\w-]+\.[a-zA-Z]{2,}$',
+                              ).hasMatch(v.trim()))
+                                return 'Invalid email';
+                            }
+                            return null;
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  // ── PIN ──────────────────────────────────────────
+                  AppTextField(
+                    controller: pinNoController,
+                    focusNode: _addPinFocus,
+                    label: 'PIN (4–6 digits)',
+                    hint: '••••••',
+                    icon: Icons.lock_outline_rounded,
+                    required: true,
+                    keyboardType: TextInputType.number,
+                    maxLength: 6,
+                    obscureText: !pinVisible,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    textInputAction: TextInputAction.done,
+                    onFieldSubmitted: (_) => submitAdd(),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        pinVisible
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                        size: 18,
+                        color: Colors.grey.shade500,
+                      ),
+                      onPressed: () => setS(() => pinVisible = !pinVisible),
+                    ),
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty)
+                        return 'PIN is required';
+                      if (!RegExp(r'^\d{4,6}$').hasMatch(v.trim()))
+                        return 'PIN must be 4–6 digits';
+                      return null;
+                    },
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              appDialogCancelButton(ctx),
+              const SizedBox(width: 12),
+              appDialogPrimaryButton(label: 'Add Staff', onPressed: submitAdd),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  void _showEditStaffDialog(BuildContext context, StaffModel staff) {
+    TextEditingController editUserNameController = TextEditingController(
+      text: staff.userName,
+    );
+    TextEditingController editFirstNameController = TextEditingController(
+      text: staff.firstName,
+    );
+    TextEditingController editLastNameController = TextEditingController(
+      text: staff.lastName,
+    );
+    TextEditingController editMobileController = TextEditingController(
+      text: staff.mobileNo,
+    );
+    TextEditingController editEmailController = TextEditingController(
+      text: staff.emailId,
+    );
+    // FIX: Never pre-fill with the stored hash — re-hash only if user types a new PIN.
+    TextEditingController editPinController = TextEditingController();
+    String editSelectedRole = staff.isCashier;
+    bool isActive = staff.isActive ?? true;
+    bool editPinVisible = false;
+    // Local form key per dialog open — a shared member GlobalKey inside a
+    // showDialog builder triggers a _dependents assertion on back-dismiss.
+    final editFormKey = GlobalKey<FormState>();
+
+    // Focus chain for the Edit dialog: first → last → mobile → email → pin.
+    // FocusNode is a ChangeNotifier, so the dispose scope cleans these up too.
+    final editFirstNameFocus = FocusNode();
+    final editLastNameFocus = FocusNode();
+    final editMobileFocus = FocusNode();
+    final editEmailFocus = FocusNode();
+    final editPinFocus = FocusNode();
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return DialogDisposeScope(
+          disposables: [
+            editUserNameController,
+            editFirstNameController,
+            editLastNameController,
+            editMobileController,
+            editEmailController,
+            editPinController,
+            editFirstNameFocus,
+            editLastNameFocus,
+            editMobileFocus,
+            editEmailFocus,
+            editPinFocus,
+          ],
+          child: StatefulBuilder(
+            builder: (context, setState) {
+              // Shared by the PIN field's done key and the Update Staff button.
+              Future<void> submitUpdate() async {
+                if (!editFormKey.currentState!.validate()) return;
+                final newUsername = editUserNameController.text
+                    .trim()
+                    .toLowerCase();
+                final isDuplicate = staffStore.staff.any(
+                  (s) =>
+                      s.id != staff.id &&
+                      s.userName.toLowerCase() == newUsername,
+                );
+                if (isDuplicate) {
+                  NotificationService.instance.showError(
+                    'Username already exists.',
+                  );
+                  return;
+                }
+                final newPin = editPinController.text.trim();
+                if (newPin.isNotEmpty &&
+                    await _isPinTaken(newPin, excludeStaffId: staff.id)) {
+                  NotificationService.instance.showError(
+                    'This PIN is already in use. Choose a different one.',
+                  );
+                  return;
+                }
+                final updatedStaff = staff.copyWith(
+                  userName: editUserNameController.text.trim(),
+                  firstName: editFirstNameController.text.trim(),
+                  lastName: editLastNameController.text.trim(),
+                  isCashier: editSelectedRole,
+                  mobileNo: editMobileController.text.trim(),
+                  emailId: editEmailController.text.trim(),
+                  // Only re-hash if the user typed a new PIN; keep existing otherwise.
+                  pinNo: newPin.isNotEmpty
+                      ? RestaurantAuthHelper.hashPassword(newPin)
+                      : staff.pinNo,
+                  isActive: isActive,
+                );
+                await _updateStaff(updatedStaff);
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  NotificationService.instance.showSuccess(
+                    'Staff updated successfully',
+                  );
+                }
+              }
+
+              return AppDialogShell(
+                title: 'Edit Staff',
+                subtitle: 'Update staff member details',
+                accent: AppColors.primary,
+                icon: Icons.edit_rounded,
+                body: Form(
+                  key: editFormKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // ── First / Last Name ────────────────────────────────
+                      Row(
+                        children: [
+                          Expanded(
+                            child: AppTextField(
+                              controller: editFirstNameController,
+                              focusNode: editFirstNameFocus,
+                              label: 'First Name',
+                              hint: 'John',
+                              icon: Icons.person_outline,
+                              required: true,
+                              textInputAction: TextInputAction.next,
+                              onFieldSubmitted: (_) =>
+                                  editLastNameFocus.requestFocus(),
+                              validator: (v) => (v == null || v.trim().isEmpty)
+                                  ? 'Required'
+                                  : null,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: AppTextField(
+                              controller: editLastNameController,
+                              focusNode: editLastNameFocus,
+                              label: 'Last Name',
+                              hint: 'Doe',
+                              icon: Icons.person_outline,
+                              textInputAction: TextInputAction.next,
+                              // Skip the Role buttons (not text fields) → jump to Mobile.
+                              onFieldSubmitted: (_) =>
+                                  editMobileFocus.requestFocus(),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Username field hidden — kept as-is, not editable.
+
+                      // ── Role ─────────────────────────────────────────────
+                      _buildRoleSelector(
+                        [
+                              'Manager',
+                              'Cashier',
+                              'Waiter',
+                            ].contains(editSelectedRole)
+                            ? editSelectedRole
+                            : 'Cashier',
+                        (role) => setState(() => editSelectedRole = role),
+                      ),
+                      const SizedBox(height: 14),
+
+                      // ── Mobile / Email ───────────────────────────────────
+                      Row(
+                        children: [
+                          Expanded(
+                            child: AppTextField(
+                              controller: editMobileController,
+                              focusNode: editMobileFocus,
+                              label: 'Mobile (optional)',
+                              hint: '9876543210',
+                              icon: Icons.phone_outlined,
+                              keyboardType: TextInputType.phone,
+                              maxLength: 10,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                              ],
+                              textInputAction: TextInputAction.next,
+                              onFieldSubmitted: (_) =>
+                                  editEmailFocus.requestFocus(),
+                              validator: (v) {
+                                if (v != null &&
+                                    v.trim().isNotEmpty &&
+                                    v.trim().length != 10) {
+                                  return 'Must be 10 digits';
+                                }
+                                return null;
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: AppTextField(
+                              controller: editEmailController,
+                              focusNode: editEmailFocus,
+                              label: 'Email',
+                              hint: 'john@email.com',
+                              icon: Icons.mail_outline,
+                              keyboardType: TextInputType.emailAddress,
+                              textInputAction: TextInputAction.next,
+                              onFieldSubmitted: (_) =>
+                                  editPinFocus.requestFocus(),
+                              validator: (v) {
+                                if (v != null && v.trim().isNotEmpty) {
+                                  if (!RegExp(
+                                    r'^[\w.+-]+@[\w-]+\.[a-zA-Z]{2,}$',
+                                  ).hasMatch(v.trim()))
+                                    return 'Invalid email';
+                                }
+                                return null;
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+
+                      // ── New PIN ──────────────────────────────────────────
+                      AppTextField(
+                        controller: editPinController,
+                        focusNode: editPinFocus,
+                        label: 'New PIN (leave blank to keep current)',
+                        hint: '4–6 digits',
+                        icon: Icons.lock_outline_rounded,
+                        obscureText: !editPinVisible,
+                        keyboardType: TextInputType.number,
+                        maxLength: 6,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
+                        textInputAction: TextInputAction.done,
+                        onFieldSubmitted: (_) => submitUpdate(),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            editPinVisible
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                            size: 20,
+                            color: Colors.grey.shade500,
+                          ),
+                          onPressed: () =>
+                              setState(() => editPinVisible = !editPinVisible),
+                        ),
+                        validator: (v) {
+                          if (v != null && v.trim().isNotEmpty) {
+                            if (!RegExp(r'^\d{4,6}$').hasMatch(v.trim()))
+                              return 'PIN must be 4–6 digits';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 14),
+
+                      // ── Account Status toggle ────────────────────────────
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceLight,
+                          border: Border.all(color: Colors.grey.shade300),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Account Status',
+                              style: GoogleFonts.poppins(
+                                fontSize: AppResponsive.bodyFontSize(context),
+                                fontWeight: FontWeight.w500,
+                                color: Colors.grey.shade700,
+                              ),
+                            ),
+                            Row(
+                              children: [
+                                Text(
+                                  isActive ? 'Active' : 'Disabled',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: AppResponsive.bodyFontSize(
+                                      context,
+                                    ),
+                                    fontWeight: FontWeight.w600,
+                                    color: isActive
+                                        ? Colors.green.shade700
+                                        : Colors.red.shade400,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Switch(
+                                  value: isActive,
+                                  activeColor: AppColors.primary,
+                                  materialTapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                  onChanged: (v) =>
+                                      setState(() => isActive = v),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  appDialogCancelButton(context),
+                  const SizedBox(width: 12),
+                  appDialogPrimaryButton(
+                    label: 'Update Staff',
+                    onPressed: submitUpdate,
+                  ),
+                ],
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  void _showStaffDetails(BuildContext context, StaffModel staff) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AppDialogShell(
+          title: 'Staff Details',
+          accent: AppColors.primary,
+          icon: Icons.person,
+          body: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildDetailRow('Name', "${staff.firstName} ${staff.lastName}"),
+              _buildDetailRow('Username', staff.userName),
+              _buildDetailRow('Role', staff.isCashier),
+              _buildDetailRow('Mobile', staff.mobileNo),
+              _buildDetailRow('Email', staff.emailId),
+              _buildDetailRow(
+                'Status',
+                (staff.isActive ?? true) ? 'Active' : 'Disabled',
+              ),
+            ],
+          ),
+          actions: [
+            appDialogPrimaryButton(
+              label: 'Close',
+              onPressed: () => Navigator.pop(context),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: AppResponsive.getValue(
+              context,
+              mobile: 80.0,
+              tablet: 110.0,
+              desktop: 130.0,
+            ),
+            child: Text(
+              '$label:',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+                color: Colors.grey.shade600,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Shared field helpers ─────────────────────────────────────────────────
+
+  Widget _label(String text) => Padding(
+    padding: const EdgeInsets.only(bottom: 6),
+    child: Text(
+      text,
+      style: GoogleFonts.poppins(
+        fontSize: AppResponsive.smallFontSize(context),
+        fontWeight: FontWeight.w600,
+        color: Colors.grey.shade600,
+      ),
+    ),
+  );
+
+  Future<void> _showDeleteConfirmation(
+    BuildContext context,
+    String staffId,
+  ) async {
+    final ok = await showAppConfirmDialog(
+      context: context,
+      title: 'Delete Staff?',
+      message:
+          'Are you sure you want to delete this staff member? This action cannot be undone.',
+      confirmLabel: 'Delete',
+      accent: Colors.red,
+      icon: Icons.delete_rounded,
+    );
+    if (ok) {
+      _deleteStaff(staffId);
+      NotificationService.instance.showSuccess('Staff deleted successfully');
+    }
+  }
+}

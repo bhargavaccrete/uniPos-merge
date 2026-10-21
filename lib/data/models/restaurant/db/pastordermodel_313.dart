@@ -121,10 +121,22 @@ class PastOrderModel extends HiveObject{
   final String? refundedBy; // Staff name/role who processed the refund
 
   @HiveField(33)
-  final String? customerId; // Links to RestaurantCustomer for loyalty point restoration
+  final String? customerId; // Links to Customer for loyalty point restoration
 
   @HiveField(34)
   final double? serviceCharge; // Computed service/delivery charge amount at settlement time
+
+  @HiveField(36)
+  final bool? taxEnabled; // Tax on/off when settled; null on older records → TaxFeature.forRecord
+
+  @HiveField(37)
+  final String? storeGstNumber; // Store GSTIN when settled; '' = none, null = older record → live
+
+  @HiveField(38)
+  final double? roundOffStep; // Round-off step when settled (0 = off); null = older record → live
+
+  @HiveField(39)
+  final bool? discountOnItems; // Discount-on-items setting when settled; null = older record → live
 
   PastOrderModel({
     required this.id,
@@ -165,10 +177,21 @@ class PastOrderModel extends HiveObject{
     this.refundedBy,
     this.customerId,
     this.serviceCharge,
+    this.taxEnabled,
+    this.storeGstNumber,
+    this.roundOffStep,
+    this.discountOnItems,
   }) : assert(kotNumbers.isNotEmpty, 'Order must have at least one KOT number'),
         assert(kotBoundaries.isNotEmpty, 'Order must have at least one KOT boundary'),
         assert(kotNumbers.length == kotBoundaries.length, 'KOT numbers and boundaries must match');
 
+  // Payment completion derived from totalPaid vs totalPrice (mirrors OrderModel).
+  // Finalized past orders are settled, so an untracked totalPaid counts as paid.
+  double get amountDue {
+    if ((totalPaid ?? 0) == 0) return 0;
+    return (totalPrice - (totalPaid ?? 0)).clamp(0, double.infinity);
+  }
+  bool get isFullyPaid => amountDue < 0.01;
 
   PastOrderModel copyWith({
     String? id,
@@ -207,6 +230,10 @@ class PastOrderModel extends HiveObject{
     String? refundedBy,
     String? customerId,
     double? serviceCharge,
+    bool? taxEnabled,
+    String? storeGstNumber,
+    double? roundOffStep,
+    bool? discountOnItems,
   }) {
     return PastOrderModel(
       id: id ?? this.id,
@@ -245,6 +272,10 @@ class PastOrderModel extends HiveObject{
       refundedBy: refundedBy ?? this.refundedBy,
       customerId: customerId ?? this.customerId,
       serviceCharge: serviceCharge ?? this.serviceCharge,
+      taxEnabled: taxEnabled ?? this.taxEnabled,
+      storeGstNumber: storeGstNumber ?? this.storeGstNumber,
+      roundOffStep: roundOffStep ?? this.roundOffStep,
+      discountOnItems: discountOnItems ?? this.discountOnItems,
     );
   }
 
@@ -259,10 +290,28 @@ class PastOrderModel extends HiveObject{
 
     int startIndex = 0;
     for (int i = 0; i < kotNumbers.length; i++) {
-      int endIndex = kotBoundaries[i];
-      int kotNum = kotNumbers[i];
+      if (i >= kotBoundaries.length) {
+        int kotNum = kotNumbers[i];
+        if (startIndex < items.length) {
+          itemsByKot[kotNum] = items.sublist(startIndex);
+        } else {
+          itemsByKot[kotNum] = [];
+        }
+        break;
+      }
 
-      // Get items for this KOT
+      int endIndex = kotBoundaries[i];
+      if (endIndex > items.length) {
+        endIndex = items.length;
+      }
+      if (startIndex > items.length) {
+        startIndex = items.length;
+      }
+      if (startIndex > endIndex) {
+        startIndex = endIndex;
+      }
+
+      int kotNum = kotNumbers[i];
       List<CartItem> kotItems = items.sublist(startIndex, endIndex);
       itemsByKot[kotNum] = kotItems;
 
@@ -309,7 +358,12 @@ class PastOrderModel extends HiveObject{
       'voidedBy': voidedBy,
       'voidReason': voidReason,
       'refundedBy': refundedBy,
+      'customerId': customerId,
       'serviceCharge': serviceCharge,
+      'taxEnabled': taxEnabled,
+      'storeGstNumber': storeGstNumber,
+      'roundOffStep': roundOffStep,
+      'discountOnItems': discountOnItems,
     };
   }
 
@@ -350,7 +404,12 @@ class PastOrderModel extends HiveObject{
       voidedBy: map['voidedBy'] as String?,
       voidReason: map['voidReason'] as String?,
       refundedBy: map['refundedBy'] as String?,
+      customerId: map['customerId'] as String?,
       serviceCharge: map['serviceCharge'] != null ? (map['serviceCharge'] as num).toDouble() : null,
+      taxEnabled: map['taxEnabled'] as bool?,
+      storeGstNumber: map['storeGstNumber'] as String?,
+      roundOffStep: (map['roundOffStep'] as num?)?.toDouble(),
+      discountOnItems: map['discountOnItems'] as bool?,
     );
   }
 

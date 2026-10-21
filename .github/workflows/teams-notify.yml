@@ -1,0 +1,54 @@
+name: Notify Teams on Commit
+
+on:
+  push:
+    branches:
+      - '**'
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Teams notification
+        run: |
+          curl -H "Content-Type: application/json" -d @- "${{ secrets.TEAMS_WEBHOOK_URL }}" <<EOF
+          {
+            "type": "message",
+            "attachments": [
+              {
+                "contentType": "application/vnd.microsoft.card.adaptive",
+                "content": {
+                  "\$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+                  "type": "AdaptiveCard",
+                  "version": "1.4",
+                  "body": [
+                    {
+                      "type": "TextBlock",
+                      "text": "🔔 New commit on **${{ github.ref_name }}**",
+                      "weight": "Bolder",
+                      "size": "Medium"
+                    },
+                    {
+                      "type": "TextBlock",
+                      "text": "By **${{ github.actor }}**: ${{ github.event.head_commit.message }}",
+                      "wrap": true
+                    },
+                    {
+                      "type": "TextBlock",
+                      "text": "Repo: ${{ github.repository }}",
+                      "wrap": true,
+                      "isSubtle": true
+                    }
+                  ],
+                  "actions": [
+                    {
+                      "type": "Action.OpenUrl",
+                      "title": "View Commit",
+                      "url": "${{ github.event.head_commit.url }}"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+          EOF

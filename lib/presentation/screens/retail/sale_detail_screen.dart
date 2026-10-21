@@ -1,31 +1,65 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:billberrylite/util/common/short_ref.dart';
+import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/util/color.dart';
 import 'package:intl/intl.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_item_model_204.dart';
-import 'package:billberrylite/data/models/retail/hive_model/customer_model_208.dart';
+import 'package:billberrylite/data/models/common/customer_model_125.dart';
+import 'package:billberrylite/domain/services/retail/receipt_pdf_service.dart'
+    show
+        receiptLineDiscount,
+        receiptLineDiscountTotal,
+        receiptBillDiscountRemainder;
 import 'package:billberrylite/presentation/screens/retail/sale_return_screen.dart';
+import 'package:billberrylite/domain/services/retail/return_service.dart';
+import 'package:billberrylite/domain/services/retail/exchange_service.dart';
+import 'package:billberrylite/util/retail/payment_mode_summary.dart';
+import 'package:billberrylite/presentation/screens/retail/exchange_screen.dart';
 import 'package:billberrylite/domain/services/retail/print_service.dart';
 import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/util/restaurant/staticswitch.dart';
+
 class SaleDetailScreen extends StatefulWidget {
   final String saleId;
 
-  const SaleDetailScreen({
-    super.key,
-    required this.saleId,
-  });
+  const SaleDetailScreen({super.key, required this.saleId});
 
   @override
   State<SaleDetailScreen> createState() => _SaleDetailScreenState();
 }
 
 class _SaleDetailScreenState extends State<SaleDetailScreen> {
+  final ReturnService _returnService = ReturnService();
+  final ExchangeService _exchangeService = ExchangeService();
+
   SaleModel? _sale;
   List<SaleItemModel> _saleItems = [];
-  CustomerModel? _customer;
+  Customer? _customer;
   bool _isLoading = true;
-  bool _hasBeenRefunded = false;
+
+  /// Every sold unit has come back. Only then is the sale closed to returns.
+  bool _isFullyReturned = false;
+
+  /// Some, but not all, has come back — the rest is still returnable.
+  bool _isPartiallyReturned = false;
+
+  bool get _hasBeenRefunded => _isFullyReturned || _isPartiallyReturned;
+
+  /// Money still owed on this bill — a partial payment or a pay-later sale.
+  /// A return's header is negative, so it is never "outstanding".
+  bool get _hasOutstanding =>
+      _sale != null && !(_sale!.isReturn ?? false) && _sale!.dueAmount > 0.009;
+
+  /// This sale's exchange lost its replacement half — surfaced rather than
+  /// auto-repaired, because a repair that guesses wrong about money is worse
+  /// than a visible flag.
+  bool _exchangeIncomplete = false;
 
   @override
   void initState() {
@@ -43,20 +77,32 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
       final sale = await saleStore.getSaleById(widget.saleId);
 
       // Load sale items
-      final items = await saleItemRepository.getItemsBySaleId(widget.saleId);
+      final items = await saleStore.getItemsForSale(widget.saleId);
 
       // Load customer if exists
-      CustomerModel? customer;
+      Customer? customer;
       if (sale?.customerId != null) {
-        customer = await customerStoreRestail.getCustomerById(sale!.customerId!);
+        customer = await customerStore.getCustomerById(sale!.customerId!);
       }
 
-      // Check if this sale has been refunded (look for return transactions)
-      bool hasRefund = false;
-      if (sale != null) {
-        final allSales = await saleStore.getAllSales();
-        hasRefund = allSales.any((s) =>
-          (s.isReturn ?? false) && s.originalSaleId == widget.saleId
+      // How much has come back, by QUANTITY. "Any return exists" used to close
+      // the sale outright, so returning 1 of 3 units made the other 2
+      // permanently unreturnable.
+      var fullyReturned = false;
+      var partiallyReturned = false;
+      if (sale != null && !(sale.isReturn ?? false)) {
+        fullyReturned = await _returnService.isFullyReturned(widget.saleId);
+        partiallyReturned =
+            !fullyReturned &&
+            await _returnService.isPartiallyReturned(widget.saleId);
+      }
+
+      // A return stamped with an exchange group whose replacement never landed.
+      var exchangeIncomplete = false;
+      if (sale?.exchangeGroupId != null) {
+        final orphans = await _exchangeService.findIncomplete();
+        exchangeIncomplete = orphans.any(
+          (o) => o.exchangeGroupId == sale!.exchangeGroupId,
         );
       }
 
@@ -64,7 +110,9 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
         _sale = sale;
         _saleItems = items;
         _customer = customer;
-        _hasBeenRefunded = hasRefund;
+        _isFullyReturned = fullyReturned;
+        _isPartiallyReturned = partiallyReturned;
+        _exchangeIncomplete = exchangeIncomplete;
         _isLoading = false;
       });
     } catch (e) {
@@ -98,6 +146,9 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
       final storeEmail = await storeSettingsService.getStoreEmail();
       final gstNumber = await storeSettingsService.getGSTNumber();
 
+      // Five awaits happened above, so the screen may be gone by now.
+      if (!mounted) return;
+
       // Show print options dialog
       final printService = PrintService();
       await printService.showPrintOptionsDialog(
@@ -110,6 +161,14 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
         storePhone: storePhone,
         storeEmail: storeEmail,
         gstNumber: gstNumber,
+        // Same four the checkout screen passes, read off the STORED sale.
+        // Omitting them printed a reprint that differed from the original: the
+        // "Points Redeemed" and round-off lines vanished, so Sub Total,
+        // Discount and Tax no longer added up to the Grand Total.
+        itemTotal: _sale!.subtotal,
+        loyaltyPointsDiscount: _sale!.loyaltyPointsUsed,
+        roundOff: _sale!.roundOff,
+        isTaxInclusive: _sale!.isTaxInclusive,
       );
     } catch (e) {
       if (mounted) {
@@ -134,36 +193,24 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
   Color _getPaymentColor(String paymentType) {
     switch (paymentType.toLowerCase()) {
       case 'cash':
-        return const Color(0xFF4CAF50);
+        return AppColors.success;
       case 'card':
-        return const Color(0xFF2196F3);
+        return AppColors.info;
       case 'upi':
-        return const Color(0xFF9C27B0);
+        return AppColors.secondary;
       default:
-        return const Color(0xFF6B6B6B);
+        return AppColors.textSecondary;
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
-      appBar: AppBar(
-        title: const Text(
-          'Sale Details',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
-        ),
-        centerTitle: true,
-        elevation: 0,
-        backgroundColor: Colors.white,
+      backgroundColor: AppColors.surfaceLight,
+      appBar: buildPrimaryAppBar(
+        title: 'Sale Details',
+        titleFontSize: AppResponsive.subheadingFontSize(context),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.share_outlined),
-            onPressed: () {
-              // TODO: Implement share functionality
-              NotificationService.instance.showSuccess('Share feature coming soon');
-            },
-          ),
           IconButton(
             icon: const Icon(Icons.print_outlined),
             onPressed: _isLoading || _sale == null ? null : _printBill,
@@ -173,48 +220,216 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _sale == null
-              ? _buildErrorView()
-              : _buildSaleDetail(),
+          ? _buildErrorView()
+          : _buildSaleDetail(),
 
-      bottomNavigationBar: _sale != null && !(_sale!.isReturn ?? false) && !_hasBeenRefunded && !_isLoading
-          ? _buildReturnButton()
+      // Only a FULLY returned sale closes the action. A partial return leaves
+      // the remaining units returnable — gating on "any return exists" stranded
+      // them permanently.
+      bottomNavigationBar:
+          _sale != null &&
+              !(_sale!.isReturn ?? false) &&
+              !_isFullyReturned &&
+              !_isLoading &&
+              (AppSettings.refundsEnabled || _exchangeService.canExchange)
+          ? _buildActionBar()
           : null,
     );
   }
 
-  Widget _buildReturnButton() {
+  bool get _isRefundWindowExpired {
+    if (_sale == null) return false;
+    final windowMinutes = AppSettings.refundWindowMinutes;
+    if (windowMinutes == 0) return false; // 0 = No Limit
+    final saleDate = DateTime.tryParse(_sale!.date);
+    if (saleDate == null) return false;
+    return DateTime.now().difference(saleDate).inMinutes > windowMinutes;
+  }
+
+  /// Return, plus Exchange when the user is allowed to run one.
+  ///
+  /// Exchange is HIDDEN rather than shown-and-refused for a non-admin — the
+  /// pattern every money-sensitive retail action follows.
+  Widget _buildActionBar() {
+    final canReturn = AppSettings.refundsEnabled;
+    final canExchange = _exchangeService.canExchange;
+
+    if (!canExchange && canReturn) return _buildReturnButton();
+    if (!canReturn && canExchange) {
+      return Container(
+        padding: AppResponsive.padding(context),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 8,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: AppResponsive.constrainedContent(
+          context: context,
+          alignment: Alignment.topCenter,
+          maxWidth: AppResponsive.maxCardWidth(context),
+          heightFactor: 1,
+          child: _exchangeButton(),
+        ),
+      );
+    }
+
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: AppResponsive.padding(context),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, -2),
           ),
         ],
       ),
-      child: ElevatedButton.icon(
-        onPressed: () async {
-          final result = await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => SaleReturnScreen(saleId: widget.saleId),
-            ),
-          );
+      child: AppResponsive.constrainedContent(
+        context: context,
+        alignment: Alignment.topCenter,
+        maxWidth: AppResponsive.maxCardWidth(context),
+        heightFactor: 1,
+        child: Row(
+          children: [
+            Expanded(child: _exchangeButton()),
+            SizedBox(width: AppResponsive.smallSpacing(context)),
+            Expanded(child: _returnAction(compact: true)),
+          ],
+        ),
+      ),
+    );
+  }
 
-          if (result == true && mounted) {
-            Navigator.pop(context, true); // Go back to sales history
-          }
-        },
-        icon: const Icon(Icons.keyboard_return),
-        label: const Text('Process Return/Refund', style: TextStyle(fontSize: 16)),
+  Widget _exchangeButton() {
+    return ElevatedButton.icon(
+      onPressed: () async {
+        final result = await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ExchangeScreen(saleId: widget.saleId),
+          ),
+        );
+        if (result == true && mounted) Navigator.pop(context, true);
+      },
+      icon: Icon(
+        Icons.swap_horiz_rounded,
+        size: AppResponsive.iconSize(context),
+      ),
+      label: Text(
+        'Exchange',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: GoogleFonts.poppins(
+          fontSize: AppResponsive.bodyFontSize(context),
+        ),
+      ),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        padding: EdgeInsets.symmetric(
+          vertical: AppResponsive.largeSpacing(context),
+        ),
+        minimumSize: Size(0, AppResponsive.buttonHeight(context) + 2),
+      ),
+    );
+  }
+
+  Widget _buildReturnButton() {
+    return Container(
+      padding: AppResponsive.padding(context),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: AppResponsive.constrainedContent(
+        context: context,
+        alignment: Alignment.topCenter,
+        maxWidth: AppResponsive.maxCardWidth(context),
+        heightFactor: 1,
+        child: _returnAction(),
+      ),
+    );
+  }
+
+  /// The Return action itself. [compact] shortens the label and drops the
+  /// full-width minimum so it can sit beside Exchange in a Row.
+  Widget _returnAction({bool compact = false}) {
+    final windowExpired = _isRefundWindowExpired;
+    final isEnabled = AppSettings.refundsEnabled && !windowExpired;
+
+    final windowMinutes = AppSettings.refundWindowMinutes;
+    final windowLabel = windowMinutes < 60
+        ? '$windowMinutes min'
+        : '${windowMinutes ~/ 60} hr';
+
+    final tooltipMsg = !AppSettings.refundsEnabled
+        ? 'Refunds are disabled in Settings'
+        : windowExpired
+        ? 'Refund window has passed ($windowLabel limit)'
+        : '';
+
+    return Tooltip(
+      message: tooltipMsg,
+      child: ElevatedButton.icon(
+        onPressed: isEnabled
+            ? () async {
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        SaleReturnScreen(saleId: widget.saleId),
+                  ),
+                );
+
+                if (result == true && mounted) {
+                  Navigator.pop(context, true); // Go back to sales history
+                }
+              }
+            : null,
+        icon: Icon(
+          Icons.keyboard_return,
+          size: AppResponsive.iconSize(context),
+        ),
+        label: Text(
+          !AppSettings.refundsEnabled
+              ? 'Refunds Disabled'
+              : windowExpired
+              ? (compact ? 'Window Expired' : 'Refund Window Expired')
+              : (compact ? 'Return' : 'Process Return/Refund'),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: GoogleFonts.poppins(
+            fontSize: compact
+                ? AppResponsive.bodyFontSize(context)
+                : AppResponsive.subheadingFontSize(context),
+          ),
+        ),
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.red,
+          backgroundColor: isEnabled ? Colors.red : Colors.grey,
           foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          minimumSize: const Size(double.infinity, 50),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          padding: EdgeInsets.symmetric(
+            vertical: AppResponsive.largeSpacing(context),
+          ),
+          minimumSize: Size(
+            compact ? 0 : double.infinity,
+            AppResponsive.buttonHeight(context) + 2,
+          ),
         ),
       ),
     );
@@ -222,65 +437,87 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
 
   Widget _buildErrorView() {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(
-            Icons.error_outline,
-            size: 64,
-            color: Color(0xFFD0D0D0),
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'Sale not found',
-            style: TextStyle(fontSize: 16, color: Color(0xFF6B6B6B)),
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Go Back'),
-          ),
-        ],
+      child: Padding(
+        padding: AppResponsive.padding(context),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.error_outline,
+              size: AppResponsive.getValue(
+                context,
+                mobile: 64.0,
+                tablet: 76.0,
+                desktop: 88.0,
+              ),
+              color: AppColors.divider,
+            ),
+            SizedBox(height: AppResponsive.largeSpacing(context)),
+            Text(
+              'Sale not found',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.subheadingFontSize(context),
+                color: AppColors.textSecondary,
+              ),
+            ),
+            SizedBox(height: AppResponsive.extraLargeSpacing(context)),
+            SizedBox(
+              height: AppResponsive.buttonHeight(context),
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Go Back'),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildSaleDetail() {
     return SingleChildScrollView(
-      child: Column(
-        children: [
-          // Sale Header Card
-          _buildSaleHeaderCard(),
+      child: AppResponsive.constrainedContent(
+        context: context,
+        alignment: Alignment.topCenter,
+        maxWidth: AppResponsive.maxCardWidth(context),
+        child: Column(
+          children: [
+            // Sale Header Card
+            _buildSaleHeaderCard(),
 
-          // Sale Items List
-          _buildSaleItemsList(),
+            // Sale Items List
+            _buildSaleItemsList(),
 
-          // Summary Card
-          _buildSummaryCard(),
+            // Summary Card
+            _buildSummaryCard(),
 
-          const SizedBox(height: 20),
-        ],
+            SizedBox(height: AppResponsive.extraLargeSpacing(context)),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildSaleHeaderCard() {
     return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(20),
+      margin: AppResponsive.padding(context),
+      padding: AppResponsive.cardPadding(context),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
             _getPaymentColor(_sale!.paymentType),
-            _getPaymentColor(_sale!.paymentType).withOpacity(0.7),
+            _getPaymentColor(_sale!.paymentType).withValues(alpha: 0.7),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         boxShadow: [
           BoxShadow(
-            color: _getPaymentColor(_sale!.paymentType).withOpacity(0.3),
+            color: _getPaymentColor(_sale!.paymentType).withValues(alpha: 0.3),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -289,43 +526,35 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Refund Status Banner
-          if (_hasBeenRefunded) ...[
+          // An exchange whose replacement half never landed. Shown, not
+          // auto-repaired: the return itself is correct and complete, and
+          // guessing at the missing sale would invent money.
+          if (_exchangeIncomplete) ...[
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              padding: EdgeInsets.symmetric(
+                horizontal: AppResponsive.mediumSpacing(context),
+                vertical: AppResponsive.smallSpacing(context),
+              ),
               decoration: BoxDecoration(
-                color: Colors.red.shade600,
-                borderRadius: BorderRadius.circular(8),
+                color: AppColors.warning,
+                borderRadius: BorderRadius.circular(
+                  AppResponsive.smallBorderRadius(context),
+                ),
               ),
               child: Row(
                 children: [
-                  const Icon(
-                    Icons.keyboard_return,
+                  Icon(
+                    Icons.warning_amber_rounded,
                     color: Colors.white,
-                    size: 20,
+                    size: AppResponsive.iconSize(context),
                   ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'REFUNDED',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: const Text(
-                      'Full Return',
-                      style: TextStyle(
+                  SizedBox(width: AppResponsive.smallSpacing(context)),
+                  Expanded(
+                    child: Text(
+                      'Exchange incomplete — the replacement was never created',
+                      style: GoogleFonts.poppins(
                         color: Colors.white,
-                        fontSize: 11,
+                        fontSize: AppResponsive.smallFontSize(context),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -333,52 +562,196 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
           ],
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+
+          // Unsettled bill. Sat only in `dueAmount`/`status` before, so a
+          // ₹200 bill with ₹50 collected read here as an ordinary paid sale.
+          if (_hasOutstanding) ...[
+            Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: AppResponsive.mediumSpacing(context),
+                vertical: AppResponsive.smallSpacing(context),
+              ),
+              decoration: BoxDecoration(
+                color: AppColors.warning,
+                borderRadius: BorderRadius.circular(
+                  AppResponsive.smallBorderRadius(context),
+                ),
+              ),
+              child: Row(
                 children: [
-                  const Text(
-                    'Sale ID',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w400,
+                  Icon(
+                    Icons.schedule_rounded,
+                    color: Colors.white,
+                    size: AppResponsive.iconSize(context),
+                  ),
+                  SizedBox(width: AppResponsive.smallSpacing(context)),
+                  Expanded(
+                    child: Text(
+                      _sale!.statusDisplayText.toUpperCase(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.poppins(
+                        color: Colors.white,
+                        fontSize: AppResponsive.bodyFontSize(context),
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.2,
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _sale!.saleId.substring(0, 13).toUpperCase(),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 1,
+                  SizedBox(width: AppResponsive.smallSpacing(context)),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      'Balance ${formatMoney(_sale!.dueAmount)}',
+                      maxLines: 1,
+                      style: GoogleFonts.poppins(
+                        color: Colors.white,
+                        fontSize: AppResponsive.captionFontSize(context),
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ],
               ),
+            ),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
+          ],
+
+          // Refund Status Banner
+          if (_hasBeenRefunded) ...[
+            Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: AppResponsive.mediumSpacing(context),
+                vertical: AppResponsive.smallSpacing(context),
+              ),
+              decoration: BoxDecoration(
+                // Amber for a partial return: the sale is not closed and more
+                // can still come back, so it must not read as final.
+                color: _isFullyReturned
+                    ? Colors.red.shade600
+                    : AppColors.warning,
+                borderRadius: BorderRadius.circular(
+                  AppResponsive.smallBorderRadius(context),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.keyboard_return,
+                    color: Colors.white,
+                    size: AppResponsive.iconSize(context),
+                  ),
+                  SizedBox(width: AppResponsive.smallSpacing(context)),
+                  Expanded(
+                    child: Text(
+                      _isFullyReturned ? 'REFUNDED' : 'PARTIALLY RETURNED',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.poppins(
+                        color: Colors.white,
+                        fontSize: AppResponsive.bodyFontSize(context),
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: AppResponsive.smallSpacing(context)),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      _isFullyReturned
+                          ? 'Full Return'
+                          : 'Items still returnable',
+                      maxLines: 1,
+                      style: GoogleFonts.poppins(
+                        color: Colors.white,
+                        fontSize: AppResponsive.captionFontSize(context),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: AppResponsive.largeSpacing(context)),
+          ],
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Sale ID',
+                      style: GoogleFonts.poppins(
+                        color: Colors.white70,
+                        fontSize: AppResponsive.smallFontSize(context),
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _sale!.displayNumber,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.poppins(
+                        color: Colors.white,
+                        fontSize: AppResponsive.subheadingFontSize(context),
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(width: AppResponsive.smallSpacing(context)),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppResponsive.largeSpacing(context),
+                  vertical: AppResponsive.smallSpacing(context),
+                ),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
+                  color: Colors.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       _getPaymentIcon(_sale!.paymentType),
-                      style: const TextStyle(fontSize: 20),
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.iconSize(context),
+                      ),
                     ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: AppResponsive.smallSpacing(context)),
                     Text(
-                      _sale!.paymentType.toUpperCase(),
-                      style: const TextStyle(
+                      // Via the shared label so an exchange reads "Exchange"
+                      // or "Exchange + UPI" rather than a bare payment method
+                      // the customer never actually tendered.
+                      RetailPaymentModeSummary.methodLabel(
+                        _sale!,
+                      ).toUpperCase(),
+                      maxLines: 1,
+                      style: GoogleFonts.poppins(
                         color: Colors.white,
-                        fontSize: 14,
+                        fontSize: AppResponsive.bodyFontSize(context),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -387,51 +760,18 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              const Icon(Icons.calendar_today, color: Colors.white70, size: 16),
-              const SizedBox(width: 8),
-              Text(
-                _formatDate(_sale!.date),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              const Icon(Icons.shopping_bag_outlined, color: Colors.white70, size: 16),
-              const SizedBox(width: 8),
-              Text(
-                '${_sale!.totalItems} items',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                ),
-              ),
-            ],
+          SizedBox(height: AppResponsive.extraLargeSpacing(context)),
+          _headerMetaRow(Icons.calendar_today, _formatDate(_sale!.date)),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
+          _headerMetaRow(
+            Icons.shopping_bag_outlined,
+            '${_sale!.totalItems} items',
           ),
           if (_customer != null) ...[
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                const Icon(Icons.person_outline, color: Colors.white70, size: 16),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    '${_customer!.name} (${_customer!.phone})',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
+            _headerMetaRow(
+              Icons.person_outline,
+              '${_customer!.name} (${_customer!.phone})',
             ),
           ],
         ],
@@ -439,49 +779,84 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
     );
   }
 
+  /// One icon+text line of the coloured header card.
+  Widget _headerMetaRow(IconData icon, String text) {
+    return Row(
+      children: [
+        Icon(
+          icon,
+          color: Colors.white70,
+          size: AppResponsive.smallIconSize(context),
+        ),
+        SizedBox(width: AppResponsive.smallSpacing(context)),
+        Expanded(
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.poppins(
+              color: Colors.white,
+              fontSize: AppResponsive.bodyFontSize(context),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildSaleItemsList() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
+      margin: EdgeInsets.symmetric(
+        horizontal: AppResponsive.padding(context).left,
+      ),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE8E8E8), width: 0.5),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
+        border: Border.all(color: AppColors.divider, width: 0.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: AppResponsive.padding(context),
             child: Row(
               children: [
-                const Text(
+                Text(
                   'Items Sold',
-                  style: TextStyle(
-                    fontSize: 16,
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.subheadingFontSize(context),
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF1A1A1A),
+                    color: AppColors.textPrimary,
                   ),
                 ),
                 const Spacer(),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF4CAF50).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
+                    color: AppColors.success.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(
+                      AppResponsive.borderRadius(context),
+                    ),
                   ),
                   child: Text(
                     '${_saleItems.length} products',
-                    style: const TextStyle(
-                      fontSize: 12,
+                    maxLines: 1,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.smallFontSize(context),
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF4CAF50),
+                      color: AppColors.success,
                     ),
                   ),
                 ),
               ],
             ),
           ),
-          const Divider(height: 1, thickness: 0.5, color: Color(0xFFE8E8E8)),
+          const Divider(height: 1, thickness: 0.5, color: AppColors.divider),
           ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -489,7 +864,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
             separatorBuilder: (context, index) => const Divider(
               height: 1,
               thickness: 0.5,
-              color: Color(0xFFE8E8E8),
+              color: AppColors.divider,
               indent: 16,
               endIndent: 16,
             ),
@@ -505,7 +880,7 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
 
   Widget _buildSaleItemTile(SaleItemModel item, int itemNumber) {
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: AppResponsive.cardPadding(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -514,24 +889,26 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
             children: [
               // Item Number Badge
               Container(
-                width: 32,
-                height: 32,
+                width: AppResponsive.smallAvatarSize(context),
+                height: AppResponsive.smallAvatarSize(context),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF4CAF50).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
+                  color: AppColors.success.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(
+                    AppResponsive.smallBorderRadius(context),
+                  ),
                 ),
                 child: Center(
                   child: Text(
                     '$itemNumber',
-                    style: const TextStyle(
-                      fontSize: 14,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.bodyFontSize(context),
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF4CAF50),
+                      color: AppColors.success,
                     ),
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: AppResponsive.mediumSpacing(context)),
               // Product Details
               Expanded(
                 child: Column(
@@ -539,10 +916,12 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                   children: [
                     Text(
                       item.productName ?? 'Unknown Product',
-                      style: const TextStyle(
-                        fontSize: 15,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.bodyFontSize(context),
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF1A1A1A),
+                        color: AppColors.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -550,10 +929,15 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                       spacing: 8,
                       runSpacing: 4,
                       children: [
-                        if (item.size != null)
-                          _buildPropertyChip('Size: ${item.size}'),
-                        if (item.color != null)
-                          _buildPropertyChip('Color: ${item.color}'),
+                        ...attributeStore
+                            .describeAttributes(
+                              item.attributes,
+                              size: item.size,
+                              color: item.color,
+                            )
+                            .split(' · ')
+                            .where((p) => p.isNotEmpty)
+                            .map(_buildPropertyChip),
                         if (item.barcode != null)
                           _buildPropertyChip('📦 ${item.barcode}'),
                       ],
@@ -563,26 +947,33 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
           // Price Breakdown
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFFFAFAFA),
-              borderRadius: BorderRadius.circular(8),
+              color: AppColors.surfaceLight,
+              borderRadius: BorderRadius.circular(
+                AppResponsive.smallBorderRadius(context),
+              ),
             ),
             child: Column(
               children: [
                 _buildPriceRow(
-                  '${item.qty} × ₹${item.price.toStringAsFixed(2)}',
-                  '₹${(item.qty * item.price).toStringAsFixed(2)}',
+                  '${item.qty} × ${formatMoney(item.price)}',
+                  formatMoney((item.qty * item.price)),
                   isBold: false,
                 ),
-                if (item.discountAmount != null && item.discountAmount! > 0) ...[
+                // The line's OWN discount only. `discountAmount` also carries
+                // this line's share of the order-level discount, which the
+                // totals block below subtracts once as "Bill Discount" — showing
+                // it here too would read as a double deduction. Same rule the
+                // receipt follows.
+                if (receiptLineDiscount(item) > 0.009) ...[
                   const SizedBox(height: 6),
                   _buildPriceRow(
                     'Discount',
-                    '- ₹${item.discountAmount!.toStringAsFixed(2)}',
+                    '- ${formatMoney(receiptLineDiscount(item))}',
                     color: Colors.red,
                     isBold: false,
                   ),
@@ -591,15 +982,15 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                   const SizedBox(height: 6),
                   _buildPriceRow(
                     'Tax',
-                    '+ ₹${item.taxAmount!.toStringAsFixed(2)}',
-                    color: const Color(0xFF4CAF50),
+                    '+ ${formatMoney(item.taxAmount!)}',
+                    color: AppColors.success,
                     isBold: false,
                   ),
                 ],
                 const Divider(height: 16, thickness: 0.5),
                 _buildPriceRow(
                   'Item Total',
-                  '₹${item.total.toStringAsFixed(2)}',
+                  formatMoney(item.total),
                   isBold: true,
                 ),
               ],
@@ -612,17 +1003,21 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
 
   Widget _buildPropertyChip(String label) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: EdgeInsets.symmetric(
+        horizontal: AppResponsive.smallSpacing(context),
+        vertical: 4,
+      ),
       decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F5),
+        color: AppColors.surfaceMedium,
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: const Color(0xFFE8E8E8), width: 0.5),
+        border: Border.all(color: AppColors.divider, width: 0.5),
       ),
       child: Text(
         label,
-        style: const TextStyle(
-          fontSize: 11,
-          color: Color(0xFF6B6B6B),
+        maxLines: 1,
+        style: GoogleFonts.poppins(
+          fontSize: AppResponsive.captionFontSize(context),
+          color: AppColors.textSecondary,
         ),
       ),
     );
@@ -630,65 +1025,126 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
 
   Widget _buildSummaryCard() {
     return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(20),
+      margin: AppResponsive.padding(context),
+      padding: AppResponsive.cardPadding(context),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE8E8E8), width: 0.5),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
+        border: Border.all(color: AppColors.divider, width: 0.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Payment Summary',
-            style: TextStyle(
-              fontSize: 16,
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.subheadingFontSize(context),
               fontWeight: FontWeight.w600,
-              color: Color(0xFF1A1A1A),
+              color: AppColors.textPrimary,
             ),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: AppResponsive.largeSpacing(context)),
           _buildPriceRow(
             'Subtotal',
-            '₹${_sale!.subtotal.toStringAsFixed(2)}',
+            formatMoney(_sale!.subtotal),
             isBold: false,
           ),
-          const SizedBox(height: 12),
-          _buildPriceRow(
-            'Discount',
-            '- ₹${_sale!.discountAmount.toStringAsFixed(2)}',
-            color: Colors.red,
-            isBold: false,
-          ),
-          const SizedBox(height: 12),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
+          // Split exactly as the receipt and the checkout screen do, from the
+          // same items, so all three views group the numbers identically.
+          if (receiptLineDiscountTotal(_saleItems) > 0.009) ...[
+            _buildPriceRow(
+              'Item Discounts',
+              '- ${formatMoney(receiptLineDiscountTotal(_saleItems))}',
+              color: Colors.red,
+              isBold: false,
+            ),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
+          ],
+          if (receiptBillDiscountRemainder(_sale!, _saleItems) > 0.009) ...[
+            _buildPriceRow(
+              receiptLineDiscountTotal(_saleItems) > 0.009
+                  ? 'Bill Discount'
+                  : 'Discount',
+              '- ${formatMoney(receiptBillDiscountRemainder(_sale!, _saleItems))}',
+              color: Colors.red,
+              isBold: false,
+            ),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
+          ],
           _buildPriceRow(
             'Tax',
-            '+ ₹${_sale!.taxAmount.toStringAsFixed(2)}',
-            color: const Color(0xFF4CAF50),
+            '+ ${formatMoney(_sale!.taxAmount)}',
+            color: AppColors.success,
             isBold: false,
           ),
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 16),
-            child: Divider(height: 1, thickness: 0.5, color: Color(0xFFE8E8E8)),
+            child: Divider(height: 1, thickness: 0.5, color: AppColors.divider),
           ),
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: AppResponsive.cardPadding(context),
             decoration: BoxDecoration(
-              color: const Color(0xFF4CAF50).withOpacity(0.05),
-              borderRadius: BorderRadius.circular(8),
+              color: AppColors.success.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(
+                AppResponsive.smallBorderRadius(context),
+              ),
               border: Border.all(
-                color: const Color(0xFF4CAF50).withOpacity(0.2),
+                color: AppColors.success.withValues(alpha: 0.2),
                 width: 1,
               ),
             ),
             child: _buildPriceRow(
               'Grand Total',
-              '₹${_sale!.totalAmount.toStringAsFixed(2)}',
+              formatMoney(_sale!.totalAmount),
               isBold: true,
-              fontSize: 20,
+              fontSize: AppResponsive.headingFontSize(context),
             ),
           ),
+          // What was actually collected against that total. Shown only when
+          // they differ — on a settled bill the Grand Total says it all.
+          if (_hasOutstanding) ...[
+            SizedBox(height: AppResponsive.largeSpacing(context)),
+            _buildPriceRow(
+              'Paid',
+              formatMoney(_sale!.paidAmount),
+              color: AppColors.success,
+            ),
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
+            Container(
+              padding: AppResponsive.cardPadding(context),
+              decoration: BoxDecoration(
+                color: AppColors.warning.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(
+                  AppResponsive.smallBorderRadius(context),
+                ),
+                border: Border.all(
+                  color: AppColors.warning.withValues(alpha: 0.3),
+                  width: 1,
+                ),
+              ),
+              child: _buildPriceRow(
+                'Balance Due',
+                formatMoney(_sale!.dueAmount),
+                isBold: true,
+                fontSize: AppResponsive.subheadingFontSize(context),
+                color: AppColors.warning,
+              ),
+            ),
+            if (_customer != null) ...[
+              SizedBox(height: AppResponsive.smallSpacing(context)),
+              Text(
+                "On ${_customer!.name}'s account — collect from Receive Payment.",
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.captionFontSize(context),
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ],
+
           // Split Payment Breakdown
           _buildSplitPaymentBreakdown(),
         ],
@@ -707,14 +1163,16 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 20),
+        SizedBox(height: AppResponsive.largeSpacing(context)),
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: AppResponsive.cardPadding(context),
           decoration: BoxDecoration(
-            color: const Color(0xFF2196F3).withOpacity(0.05),
-            borderRadius: BorderRadius.circular(8),
+            color: AppColors.info.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(
+              AppResponsive.smallBorderRadius(context),
+            ),
             border: Border.all(
-              color: const Color(0xFF2196F3).withOpacity(0.2),
+              color: AppColors.info.withValues(alpha: 0.2),
               width: 1,
             ),
           ),
@@ -725,119 +1183,168 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                 children: [
                   Icon(
                     Icons.payment,
-                    size: 18,
-                    color: const Color(0xFF2196F3),
+                    size: AppResponsive.smallIconSize(context),
+                    color: AppColors.info,
                   ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Split Payment Breakdown',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF2196F3),
+                  SizedBox(width: AppResponsive.smallSpacing(context)),
+                  Expanded(
+                    child: Text(
+                      'Split Payment Breakdown',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.bodyFontSize(context),
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.info,
+                      ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: AppResponsive.mediumSpacing(context)),
               ...paymentList.map((payment) {
-                final method = (payment['method'] as String?)?.toUpperCase() ?? 'OTHER';
+                final method =
+                    (payment['method'] as String?)?.toUpperCase() ?? 'OTHER';
                 final amount = (payment['amount'] as num?)?.toDouble() ?? 0;
                 final ref = payment['ref'] as String?;
                 final received = (payment['received'] as num?)?.toDouble();
                 final change = (payment['change'] as num?)?.toDouble();
 
                 return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
+                  padding: EdgeInsets.only(
+                    bottom: AppResponsive.smallSpacing(context),
+                  ),
                   child: Column(
                     children: [
                       Row(
                         children: [
                           Container(
-                            width: 32,
-                            height: 32,
+                            width: AppResponsive.smallAvatarSize(context),
+                            height: AppResponsive.smallAvatarSize(context),
                             decoration: BoxDecoration(
-                              color: _getPaymentMethodColor(method).withOpacity(0.1),
+                              color: _getPaymentMethodColor(
+                                method,
+                              ).withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Center(
                               child: Text(
                                 _getPaymentMethodIcon(method),
-                                style: const TextStyle(fontSize: 16),
+                                style: GoogleFonts.poppins(
+                                  fontSize: AppResponsive.subheadingFontSize(
+                                    context,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          SizedBox(width: AppResponsive.mediumSpacing(context)),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
                                   method,
-                                  style: const TextStyle(
-                                    fontSize: 13,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.poppins(
+                                    fontSize: AppResponsive.smallFontSize(
+                                      context,
+                                    ),
                                     fontWeight: FontWeight.w600,
-                                    color: Color(0xFF1A1A1A),
+                                    color: AppColors.textPrimary,
                                   ),
                                 ),
                                 if (ref != null && ref.isNotEmpty)
                                   Text(
                                     'Ref: $ref',
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      color: Color(0xFF6B6B6B),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: GoogleFonts.poppins(
+                                      fontSize: AppResponsive.captionFontSize(
+                                        context,
+                                      ),
+                                      color: AppColors.textSecondary,
                                     ),
                                   ),
                               ],
                             ),
                           ),
+                          SizedBox(width: AppResponsive.smallSpacing(context)),
                           Text(
-                            '₹${amount.toStringAsFixed(2)}',
-                            style: const TextStyle(
-                              fontSize: 14,
+                            formatMoney(amount),
+                            maxLines: 1,
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.bodyFontSize(context),
                               fontWeight: FontWeight.w600,
-                              color: Color(0xFF1A1A1A),
+                              color: AppColors.textPrimary,
                             ),
                           ),
                         ],
                       ),
                       // Show cash received and change for cash payments
-                      if (method == 'CASH' && received != null && received > 0) ...[
+                      if (method == 'CASH' &&
+                          received != null &&
+                          received > 0) ...[
                         const SizedBox(height: 6),
                         Container(
                           margin: const EdgeInsets.only(left: 44),
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF5F5F5),
+                            color: AppColors.surfaceMedium,
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Column(
                             children: [
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
-                                  const Text(
+                                  Text(
                                     'Cash Received',
-                                    style: TextStyle(fontSize: 12, color: Color(0xFF6B6B6B)),
+                                    style: GoogleFonts.poppins(
+                                      fontSize: AppResponsive.smallFontSize(
+                                        context,
+                                      ),
+                                      color: AppColors.textSecondary,
+                                    ),
                                   ),
                                   Text(
-                                    '₹${received.toStringAsFixed(2)}',
-                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                                    formatMoney(received),
+                                    maxLines: 1,
+                                    style: GoogleFonts.poppins(
+                                      fontSize: AppResponsive.smallFontSize(
+                                        context,
+                                      ),
+                                      fontWeight: FontWeight.w500,
+                                    ),
                                   ),
                                 ],
                               ),
                               if (change != null && change > 0) ...[
                                 const SizedBox(height: 4),
                                 Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
-                                    const Text(
+                                    Text(
                                       'Change Given',
-                                      style: TextStyle(fontSize: 12, color: Colors.orange, fontWeight: FontWeight.w600),
+                                      style: GoogleFonts.poppins(
+                                        fontSize: AppResponsive.smallFontSize(
+                                          context,
+                                        ),
+                                        color: Colors.orange,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
                                     Text(
-                                      '₹${change.toStringAsFixed(2)}',
-                                      style: const TextStyle(fontSize: 12, color: Colors.orange, fontWeight: FontWeight.w600),
+                                      formatMoney(change),
+                                      maxLines: 1,
+                                      style: GoogleFonts.poppins(
+                                        fontSize: AppResponsive.smallFontSize(
+                                          context,
+                                        ),
+                                        color: Colors.orange,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -851,19 +1358,20 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
                 );
               }),
               // Show total paid and change if any
-              if (_sale!.totalPaid != null && _sale!.totalPaid! > _sale!.totalAmount) ...[
+              if (_sale!.totalPaid != null &&
+                  _sale!.totalPaid! > _sale!.totalAmount) ...[
                 const Divider(height: 16, thickness: 0.5),
                 _buildPriceRow(
                   'Total Paid',
-                  '₹${_sale!.totalPaid!.toStringAsFixed(2)}',
+                  formatMoney(_sale!.totalPaid!),
                   isBold: true,
                 ),
               ],
               if (_sale!.changeReturn != null && _sale!.changeReturn! > 0) ...[
-                const SizedBox(height: 8),
+                SizedBox(height: AppResponsive.smallSpacing(context)),
                 _buildPriceRow(
                   'Change Returned',
-                  '₹${_sale!.changeReturn!.toStringAsFixed(2)}',
+                  formatMoney(_sale!.changeReturn!),
                   color: Colors.orange,
                   isBold: true,
                 ),
@@ -895,17 +1403,17 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
   Color _getPaymentMethodColor(String method) {
     switch (method.toLowerCase()) {
       case 'cash':
-        return const Color(0xFF4CAF50);
+        return AppColors.success;
       case 'card':
-        return const Color(0xFF2196F3);
+        return AppColors.info;
       case 'upi':
-        return const Color(0xFF9C27B0);
+        return AppColors.secondary;
       case 'wallet':
-        return const Color(0xFFFF9800);
+        return AppColors.warning;
       case 'credit':
-        return const Color(0xFFE91E63);
+        return AppColors.accent;
       default:
-        return const Color(0xFF6B6B6B);
+        return AppColors.textSecondary;
     }
   }
 
@@ -921,18 +1429,18 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
       children: [
         Text(
           label,
-          style: TextStyle(
-            fontSize: fontSize ?? 14,
+          style: GoogleFonts.poppins(
+            fontSize: fontSize ?? AppResponsive.bodyFontSize(context),
             fontWeight: isBold ? FontWeight.w600 : FontWeight.w400,
-            color: color ?? const Color(0xFF6B6B6B),
+            color: color ?? AppColors.textSecondary,
           ),
         ),
         Text(
           value,
-          style: TextStyle(
-            fontSize: fontSize ?? 14,
+          style: GoogleFonts.poppins(
+            fontSize: fontSize ?? AppResponsive.bodyFontSize(context),
             fontWeight: isBold ? FontWeight.w700 : FontWeight.w500,
-            color: color ?? const Color(0xFF1A1A1A),
+            color: color ?? AppColors.textPrimary,
           ),
         ),
       ],

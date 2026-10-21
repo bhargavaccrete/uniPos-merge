@@ -15,6 +15,10 @@ class SaleItemRepository {
     return _saleItemBox.values.toList();
   }
 
+  /// Every sale line in box order, without copying the box. Same order as
+  /// [getAllSaleItems]; iterate synchronously — a write mid-iteration is unsafe.
+  Iterable<SaleItemModel> saleItemsInStorageOrder() => _saleItemBox.values;
+
   /// Get a sale item by ID
   SaleItemModel? getSaleItemById(String saleItemId) {
     return _saleItemBox.get(saleItemId);
@@ -65,9 +69,9 @@ class SaleItemRepository {
   }
 
   /// Get total quantity of items in a sale
-  Future<int> getTotalItemsInSale(String saleId) async {
+  Future<double> getTotalItemsInSale(String saleId) async {
     final items = await getItemsBySaleId(saleId);
-    return items.fold<int>(0, (sum, item) => sum + item.qty);
+    return items.fold<double>(0.0, (sum, item) => sum + item.qty);
   }
 
   /// Get subtotal (before discount/tax) for a sale
@@ -115,9 +119,9 @@ class SaleItemRepository {
   }
 
   /// Get total quantity sold for a variant
-  Future<int> getTotalQuantitySold(String variantId) async {
+  Future<double> getTotalQuantitySold(String variantId) async {
     final items = await getItemsByVariantId(variantId);
-    return items.fold<int>(0, (sum, item) => sum + item.qty);
+    return items.fold<double>(0.0, (sum, item) => sum + item.qty);
   }
 
   /// Get total revenue for a variant
@@ -138,7 +142,7 @@ class SaleItemRepository {
     if (items.isEmpty) return 0.0;
 
     final totalRevenue = items.fold(0.0, (sum, item) => sum + (item.price * item.qty));
-    final totalQuantity = items.fold(0, (sum, item) => sum + item.qty);
+    final totalQuantity = items.fold(0.0, (sum, item) => sum + item.qty);
 
     return totalQuantity > 0 ? totalRevenue / totalQuantity : 0.0;
   }
@@ -174,7 +178,7 @@ class SaleItemRepository {
 
     // Convert to list and sort by quantity
     final statsList = productStats.values.toList()
-      ..sort((a, b) => (b['totalQuantity'] as int).compareTo(a['totalQuantity'] as int));
+      ..sort((a, b) => (b['totalQuantity'] as num).compareTo(a['totalQuantity'] as num));
 
     return statsList.take(limit).toList();
   }
@@ -205,7 +209,7 @@ class SaleItemRepository {
 
     // Convert to list and sort by quantity
     final statsList = variantStats.values.toList()
-      ..sort((a, b) => (b['totalQuantity'] as int).compareTo(a['totalQuantity'] as int));
+      ..sort((a, b) => (b['totalQuantity'] as num).compareTo(a['totalQuantity'] as num));
 
     return statsList.take(limit).toList();
   }
@@ -258,7 +262,7 @@ class SaleItemRepository {
   Future<Map<String, dynamic>> getSalesItemStats() async {
     final allItems = _saleItemBox.values.toList();
 
-    final totalItemsSold = allItems.fold<int>(0, (sum, item) => sum + item.qty);
+    final totalItemsSold = allItems.fold<double>(0.0, (sum, item) => sum + item.qty);
     final totalRevenue = allItems.fold<double>(0.0, (sum, item) => sum + item.total);
     final totalDiscount = allItems.fold<double>(0.0, (sum, item) => sum + (item.discountAmount ?? 0.0));
     final totalTax = allItems.fold<double>(0.0, (sum, item) => sum + (item.taxAmount ?? 0.0));

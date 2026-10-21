@@ -4,6 +4,8 @@ import 'handlers/order_handler.dart';
 import 'handlers/kds_handler.dart';
 import 'handlers/captain_handler.dart';
 
+// NOTE: /kds/* and /captain/* are licensing-gated by `entitlementGate()` in
+// server.dart (path-based middleware), so handler signatures stay intact.
 Router createRouter() {
   final router = Router();
 

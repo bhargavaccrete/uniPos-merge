@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/util/color.dart';
 
 import '../../../../../constants/restaurant/color.dart';
@@ -35,7 +37,7 @@ class _DropdownState extends State<Dropdown> {
     final height = MediaQuery.of(context).size.height * 1;
     return Container(
       width: width * 0.66,
-      height: height*0.09,
+      height: height * 0.09,
       alignment: Alignment.centerLeft,
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
@@ -50,7 +52,7 @@ class _DropdownState extends State<Dropdown> {
               value: item,
               child: Text(
                 item,
-                style: TextStyle(color: AppColors.primary),
+                style: GoogleFonts.poppins(color: AppColors.primary),
               ),
             );
           }).toList(),
@@ -60,7 +62,8 @@ class _DropdownState extends State<Dropdown> {
                 _selectedValue = value;
               });
               widget.onChanged(
-                  value); // Calls the callback to update parent widget
+                value,
+              ); // Calls the callback to update parent widget
             }
           },
         ),

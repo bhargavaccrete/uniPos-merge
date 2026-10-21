@@ -88,6 +88,16 @@ abstract class _EodStore with Store {
   }
 
   @action
+  Future<EndOfDayReport?> getEODBySession(String sessionId) async {
+    try {
+      return await _repository.getEODBySession(sessionId);
+    } catch (e) {
+      errorMessage = 'Failed to get EOD by session: $e';
+      return null;
+    }
+  }
+
+  @action
   Future<EndOfDayReport?> getLatestEOD() async {
     try {
       return await _repository.getLatestEOD();

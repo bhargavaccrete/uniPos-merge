@@ -16,6 +16,15 @@ enum DamagedHandling {
 
 /// GRN Item - Records what was ordered vs what was actually received
 /// This is where we compare: Ordered 50, Received 45
+///
+/// **Two quantities, two jobs.** [acceptedQty] is what enters inventory;
+/// [billableQty] is what the supplier invoices. They differ whenever units
+/// arrive damaged, because the supplier delivered them either way.
+///
+/// The receipt accrues the FULL received value. [damagedHandling] does not
+/// change what is owed — it only decides which document is raised, and each of
+/// those carries its own later credit (a return's credit note, a settled
+/// claim). A write-off carries none, so that damage stays a real cost.
 @HiveType(typeId: HiveTypeIds.retailGrnItem)
 class GRNItemModel extends HiveObject {
   @HiveField(0)
@@ -40,16 +49,16 @@ class GRNItemModel extends HiveObject {
   final String? variantInfo; // e.g., "Size: L, Color: Red"
 
   @HiveField(7)
-  final int orderedQty; // Quantity that was ordered in PO
+  final double orderedQty; // Quantity that was ordered in PO
 
   @HiveField(8)
-  final int receivedQty; // Quantity actually received (total physical receipt)
+  final double receivedQty; // Quantity actually received (total physical receipt)
 
   @HiveField(9)
-  final int acceptedQty; // Quantity accepted into stock (good items only)
+  final double acceptedQty; // Quantity accepted into stock (good items only)
 
   @HiveField(10)
-  final int? damagedQty; // Quantity damaged
+  final double? damagedQty; // Quantity damaged
 
   @HiveField(11)
   final String? damagedHandling; // How to handle damaged items (DamagedHandling enum)
@@ -57,8 +66,10 @@ class GRNItemModel extends HiveObject {
   @HiveField(12)
   final double? costPrice; // Actual cost price per unit
 
+  /// Inventory value: acceptedQty * costPrice. **Not** what the supplier is
+  /// owed for this line — see [billableAmount].
   @HiveField(13)
-  final double? totalAmount; // acceptedQty * costPrice (only for good items)
+  final double? totalAmount;
 
   @HiveField(14)
   final String? remarks; // Notes about this item
@@ -96,10 +107,10 @@ class GRNItemModel extends HiveObject {
     required String productId,
     String? productName,
     String? variantInfo,
-    required int orderedQty,
-    required int receivedQty,
-    required int acceptedQty,
-    int? damagedQty,
+    required double orderedQty,
+    required double receivedQty,
+    required double acceptedQty,
+    double? damagedQty,
     DamagedHandling? damagedHandling,
     double? costPrice,
     String? remarks,
@@ -129,7 +140,7 @@ class GRNItemModel extends HiveObject {
   }
 
   /// Shortage quantity (ordered but not received)
-  int get shortageQty => orderedQty - receivedQty;
+  double get shortageQty => orderedQty - receivedQty;
 
   /// Check if fully received
   bool get isFullyReceived => receivedQty >= orderedQty;
@@ -141,7 +152,19 @@ class GRNItemModel extends HiveObject {
   bool get isNotReceived => receivedQty == 0;
 
   /// Good quantity (received minus damaged)
-  int get goodQty => receivedQty - (damagedQty ?? 0);
+  double get goodQty => receivedQty - (damagedQty ?? 0);
+
+  /// Units the supplier invoices — everything delivered, damaged included.
+  ///
+  /// Derived, not stored: the receipt always accrues the full delivery, so this
+  /// is `receivedQty` unconditionally. Damaged units are recovered later
+  /// through a return credit note or a settled claim, never by shrinking the
+  /// original bill.
+  double get billableQty => receivedQty;
+
+  /// What the supplier is owed for this line.
+  double? get billableAmount =>
+      costPrice != null ? receivedQty * costPrice! : null;
 
   Map<String, dynamic> toMap() {
     return {
@@ -174,10 +197,10 @@ class GRNItemModel extends HiveObject {
       productId: map['productId'] as String,
       productName: map['productName'] as String?,
       variantInfo: map['variantInfo'] as String?,
-      orderedQty: (map['orderedQty'] as num).toInt(),
-      receivedQty: (map['receivedQty'] as num).toInt(),
-      acceptedQty: (map['acceptedQty'] as num).toInt(),
-      damagedQty: (map['damagedQty'] as num?)?.toInt(),
+      orderedQty: (map['orderedQty'] as num).toDouble(),
+      receivedQty: (map['receivedQty'] as num).toDouble(),
+      acceptedQty: (map['acceptedQty'] as num).toDouble(),
+      damagedQty: (map['damagedQty'] as num?)?.toDouble(),
       damagedHandling: map['damagedHandling'] as String?,
       damagedAmount: (map['damagedAmount'] as num?)?.toDouble(),
       costPrice: (map['costPrice'] as num?)?.toDouble(),
@@ -195,10 +218,10 @@ class GRNItemModel extends HiveObject {
     String? productId,
     String? productName,
     String? variantInfo,
-    int? orderedQty,
-    int? receivedQty,
-    int? acceptedQty,
-    int? damagedQty,
+    double? orderedQty,
+    double? receivedQty,
+    double? acceptedQty,
+    double? damagedQty,
     String? damagedHandling,
     double? damagedAmount,
     double? costPrice,

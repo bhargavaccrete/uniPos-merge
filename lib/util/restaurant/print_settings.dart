@@ -10,6 +10,9 @@ class PrintSettings {
   /// ---- Default Values ----
   static const Map<String, bool> _defaultPrintSettings = {
     "Order ID": true,
+    // Logo prints on PDF/A4 receipts only — the raw ESC/POS builder has no
+    // image support, so a directly-connected thermal printer ignores this.
+    "Restaurant Logo": true,
     "Restaurant Name": true,
     "Restaurant Address": false,
     "Restaurant Mobile No": false,
@@ -22,6 +25,7 @@ class PrintSettings {
     "Subtotal": true,
     "Payment Paid": true,
     "UPI QR": true,
+    "UPI QR Amount": true,
     "Powered By": true,
     "Custom Field": false,
     "Extra Info": false,
@@ -47,6 +51,51 @@ class PrintSettings {
     await prefs.setString(_billFormatKey, value);
   }
 
+  /// Owner-editable footer / "Thank You" message printed at the bottom of bills.
+  /// Supports multiple lines (split on \n). Blank prints no footer message.
+  static const String _footerMessageKey = 'print_footer_message';
+  static const String _footerMessageDefault = 'Thank you! Visit us again!';
+  static final ValueNotifier<String> footerMessageNotifier =
+      ValueNotifier(_footerMessageDefault);
+
+  static String get footerMessage => footerMessageNotifier.value;
+
+  static Future<void> setFooterMessage(String value) async {
+    footerMessageNotifier.value = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_footerMessageKey, value);
+  }
+
+  /// Bill template: 'simple' or 'paper_saver'
+  static const String _billTemplateKey = 'print_bill_template';
+  static const String _billTemplateDefault = 'simple';
+  static final ValueNotifier<String> billTemplateNotifier =
+      ValueNotifier(_billTemplateDefault);
+
+  static String get billTemplate => billTemplateNotifier.value;
+  static bool get isBillTemplatePaperSaver => billTemplate == 'paper_saver';
+
+  static Future<void> setBillTemplate(String value) async {
+    billTemplateNotifier.value = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_billTemplateKey, value);
+  }
+
+  /// KOT template: 'standard' or 'paper_saver'
+  static const String _kotTemplateKey = 'print_kot_template';
+  static const String _kotTemplateDefault = 'standard';
+  static final ValueNotifier<String> kotTemplateNotifier =
+      ValueNotifier(_kotTemplateDefault);
+
+  static String get kotTemplate => kotTemplateNotifier.value;
+  static bool get isKotTemplatePaperSaver => kotTemplate == 'paper_saver';
+
+  static Future<void> setKotTemplate(String value) async {
+    kotTemplateNotifier.value = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kotTemplateKey, value);
+  }
+
   /// ---- Public Getters ----
   static Map<String, bool> get values => settingsNotifier.value;
 
@@ -54,6 +103,7 @@ class PrintSettings {
 
   // Individual getters for easy access in code
   static bool get showOrderId => getSetting("Order ID");
+  static bool get showRestaurantLogo => getSetting("Restaurant Logo");
   static bool get showRestaurantName => getSetting("Restaurant Name");
   static bool get showRestaurantAddress => getSetting("Restaurant Address");
   static bool get showRestaurantMobile => getSetting("Restaurant Mobile No");
@@ -66,6 +116,7 @@ class PrintSettings {
   static bool get showSubtotal => getSetting("Subtotal");
   static bool get showPaymentPaid => getSetting("Payment Paid");
   static bool get showUpiQr => getSetting("UPI QR");
+  static bool get showUpiQrAmount => getSetting("UPI QR Amount");
   static bool get showPoweredBy => getSetting("Powered By");
   static bool get showCustomField => getSetting("Custom Field");
   static bool get showExtraInfo => getSetting("Extra Info");
@@ -81,6 +132,9 @@ class PrintSettings {
   static Future<void> resetToDefaults() async {
     settingsNotifier.value = Map.from(_defaultPrintSettings);
     await setBillFormat(_billFormatDefault);
+    await setFooterMessage(_footerMessageDefault);
+    await setBillTemplate(_billTemplateDefault);
+    await setKotTemplate(_kotTemplateDefault);
     await _save();
   }
 
@@ -103,5 +157,11 @@ class PrintSettings {
     settingsNotifier.value = loaded;
     billFormatNotifier.value =
         prefs.getString(_billFormatKey) ?? _billFormatDefault;
+    footerMessageNotifier.value =
+        prefs.getString(_footerMessageKey) ?? _footerMessageDefault;
+    billTemplateNotifier.value =
+        prefs.getString(_billTemplateKey) ?? _billTemplateDefault;
+    kotTemplateNotifier.value =
+        prefs.getString(_kotTemplateKey) ?? _kotTemplateDefault;
   }
 }

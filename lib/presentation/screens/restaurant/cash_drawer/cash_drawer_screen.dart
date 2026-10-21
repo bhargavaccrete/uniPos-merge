@@ -1,4 +1,3 @@
-
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,15 +9,18 @@ import 'package:billberrylite/data/models/restaurant/db/cash_handover_model.dart
 import 'package:billberrylite/data/repositories/restaurant/cash_handover_repository.dart';
 import 'package:billberrylite/data/models/restaurant/db/pastordermodel_313.dart';
 import 'package:billberrylite/data/models/restaurant/db/expensel_316.dart';
+import 'package:billberrylite/domain/services/common/notification_service.dart';
 import 'package:billberrylite/domain/services/restaurant/day_management_service.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/presentation/widget/componets/common/dialog_dispose_scope.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/util/restaurant/restaurant_session.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/util/restaurant/order_status_filter.dart';
 
 // ─── Entry type for the merged activity log ───────────────────────────────────
 
@@ -45,10 +47,10 @@ class _LogEntry {
 }
 
 enum _LogType {
-  opening,    // 🔵 Opening balance
-  sale,       // 🟢 Cash sale
-  expense,    // 🔴 Cash expense
-  movement,   // 🟣 Manual Cash In / Cash Out
+  opening, // 🔵 Opening balance
+  sale, // 🟢 Cash sale
+  expense, // 🔴 Cash expense
+  movement, // 🟣 Manual Cash In / Cash Out
   adjustment, // 🟠 System adjustment (EOD discrepancy / opening balance change)
 }
 
@@ -68,6 +70,16 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
   double _openingBalance = 0.0;
   double _cashSales = 0.0;
   double _cashExpenses = 0.0;
+  // Digital (non-cash) collections for the active session — powers the
+  // "Shift Sales Summary" card. Same source of truth (paymentListJson) as the
+  // cash total, so these always match the End-of-Day report.
+  double _upiSales = 0.0;
+  double _cardSales = 0.0;
+  double _otherDigitalSales = 0.0;
+  double get _digitalTotal => _upiSales + _cardSales + _otherDigitalSales;
+  double get _combinedRevenue => _cashSales + _digitalTotal;
+  // "Shift Sales Summary" card starts collapsed — staff open it only to check.
+  bool _digitalSummaryExpanded = false;
   DateTime? _dayStart;
   List<_LogEntry> _log = [];
   List<CashHandoverModel> _handovers = [];
@@ -104,14 +116,18 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
 
     // If day has never been started (no timestamp), show "Day not started" UI
     if (!dayStarted && _dayStart == null) {
-      setState(() { _isLoading = false; _dayEnded = false; });
+      setState(() {
+        _isLoading = false;
+        _dayEnded = false;
+      });
       return;
     }
 
     // Day was started but has since ended — show read-only view with banner
     _dayEnded = !dayStarted;
 
-    final dayStart = _dayStart ?? DateTime.now().copyWith(hour: 0, minute: 0, second: 0);
+    final dayStart =
+        _dayStart ?? DateTime.now().copyWith(hour: 0, minute: 0, second: 0);
 
     // Get current session
     final currentSession = await DayManagementService.getCurrentSession();
@@ -126,13 +142,16 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
       cashMovementStore.movements.retainWhere((m) {
         if (m.sessionId == targetSessionId) return true;
         // Fallback for legacy compatibility
-        final isOpeningFromSession = m.type == 'opening' && (m.note?.contains(targetSessionId) ?? false);
+        final isOpeningFromSession =
+            m.type == 'opening' && (m.note?.contains(targetSessionId) ?? false);
         if (m.sessionId == null) {
-          return m.timestamp.isAfter(dayStart) || m.timestamp.isAtSameMomentAs(dayStart) || isOpeningFromSession;
+          return m.timestamp.isAfter(dayStart) ||
+              m.timestamp.isAtSameMomentAs(dayStart) ||
+              isOpeningFromSession;
         }
         return false;
       });
-      // Recalculate totals - Note: totalCashIn and totalCashOut are computed properties 
+      // Recalculate totals - Note: totalCashIn and totalCashOut are computed properties
       // in the store, but we can't set them directly if they don't have setters.
       // Instead, the store recalculates them automatically if it's properly implemented with MobX,
       // or we can just rely on the filtered `movements` list and compute them when needed.
@@ -145,14 +164,15 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
     final cashOrders = pastOrderStore.pastOrders.where((o) {
       // Skip voided orders — no money changed hands
       final status = (o.orderStatus ?? '').toUpperCase();
-      if (status == 'VOIDED' || status.contains('VOID')) return false;
+      if (OrderStatusFilter.isVoided(status)) return false;
 
       // Filter by session ID
       if (targetSessionId != null) {
         if (o.sessionId != targetSessionId) return false;
       } else {
         // Fallback for legacy data without session ID
-        final isToday = o.orderAt != null &&
+        final isToday =
+            o.orderAt != null &&
             o.orderAt!.isAfter(dayStart.subtract(const Duration(seconds: 1)));
         if (!isToday) return false;
       }
@@ -164,12 +184,25 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
       // Split payment with a cash component
       if (o.isSplitPayment == true) {
         return o.paymentList.any(
-            (p) => (p['method'] as String? ?? '').toLowerCase() == 'cash');
+          (p) => (p['method'] as String? ?? '').toLowerCase() == 'cash',
+        );
       }
 
       return false;
     }).toList();
     _cashSales = cashOrders.fold(0.0, (s, o) => s + _cashComponentOf(o));
+
+    // Digital (non-cash) collections for the SAME session — identical void /
+    // session filter as the cash total, so Cash + Digital form one coherent
+    // shift figure that reconciles with the End-of-Day report.
+    final sessionOrders = pastOrderStore.pastOrders.where((o) {
+      final status = (o.orderStatus ?? '').toUpperCase();
+      if (OrderStatusFilter.isVoided(status)) return false;
+      if (targetSessionId != null) return o.sessionId == targetSessionId;
+      return o.orderAt != null &&
+          o.orderAt!.isAfter(dayStart.subtract(const Duration(seconds: 1)));
+    }).toList();
+    _computeDigitalTotals(sessionOrders);
 
     // 4. Load cash expenses (today only, paymentType == 'cash')
     await expenseStore.loadExpenses();
@@ -180,8 +213,9 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
         return isC && e.sessionId == targetSessionId;
       } else {
         // Fallback for legacy data
-        final isToday = e.dateandTime
-            .isAfter(dayStart.subtract(const Duration(seconds: 1)));
+        final isToday = e.dateandTime.isAfter(
+          dayStart.subtract(const Duration(seconds: 1)),
+        );
         return isC && isToday;
       }
     }).toList();
@@ -231,6 +265,49 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
     return 0.0;
   }
 
+  /// Aggregates the session's NON-cash collections into UPI / Card / Others.
+  /// Mirrors [_cashComponentOf]'s source of truth (paymentListJson, else
+  /// paymentmode) and is net of refunds. Cash is excluded — it's shown as the
+  /// drawer balance. (No credit/pay-later on the restaurant side, so every
+  /// non-cash amount here is money actually collected.)
+  void _computeDigitalTotals(List<PastOrderModel> orders) {
+    double upi = 0, card = 0, others = 0;
+    for (final o in orders) {
+      final refund = o.refundAmount ?? 0.0;
+      final ratio = (refund > 0 && o.totalPrice > 0)
+          ? ((o.totalPrice - refund) / o.totalPrice)
+          : 1.0;
+      if (o.paymentListJson != null && o.paymentListJson!.isNotEmpty) {
+        for (final p in o.paymentList) {
+          final m = (p['method'] as String? ?? '').toLowerCase().trim();
+          if (m == 'cash' || m.isEmpty) continue;
+          final amt = ((p['amount'] as num?)?.toDouble() ?? 0.0) * ratio;
+          if (m == 'upi') {
+            upi += amt;
+          } else if (m == 'card') {
+            card += amt;
+          } else {
+            others += amt;
+          }
+        }
+      } else {
+        final m = (o.paymentmode ?? '').toLowerCase().trim();
+        if (m == 'cash' || m.isEmpty) continue;
+        final amt = (o.totalPrice - refund).clamp(0.0, double.infinity);
+        if (m == 'upi') {
+          upi += amt;
+        } else if (m == 'card') {
+          card += amt;
+        } else {
+          others += amt;
+        }
+      }
+    }
+    _upiSales = upi;
+    _cardSales = card;
+    _otherDigitalSales = others;
+  }
+
   /// Returns the staff name whose shift was active at [time].
   String _staffNameForTime(DateTime time) {
     for (final s in shiftStore.shifts) {
@@ -244,7 +321,11 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
   }
 
   /// Merges all cash events into one time-sorted list for the activity log.
-  void _buildLog(DateTime dayStart, List<PastOrderModel> cashOrders, List<Expense> cashExp) {
+  void _buildLog(
+    DateTime dayStart,
+    List<PastOrderModel> cashOrders,
+    List<Expense> cashExp,
+  ) {
     // shiftId → staffName for direct lookup on orders
     final shiftIdToName = <String, String>{
       for (final s in shiftStore.shifts) s.id: s.staffName,
@@ -257,47 +338,54 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
     final entries = <_LogEntry>[];
 
     // Opening balance entry (pinned to day start time)
-    entries.add(_LogEntry(
-      time: dayStart,
-      description: 'Opening Balance',
-      signedAmount: _openingBalance,
-      staffName: 'Admin',
-      type: _LogType.opening,
-    ));
+    entries.add(
+      _LogEntry(
+        time: dayStart,
+        description: 'Opening Balance',
+        signedAmount: _openingBalance,
+        staffName: 'Admin',
+        type: _LogType.opening,
+      ),
+    );
 
     // Cash sales (each order is one entry)
     for (final o in cashOrders) {
       if (o.orderAt == null) continue;
       // Prefer direct shiftId lookup; fall back to time-window match
-      final saleStaff = (o.shiftId != null ? shiftIdToName[o.shiftId] : null)
-          ?? _staffNameForTime(o.orderAt!);
+      final saleStaff =
+          (o.shiftId != null ? shiftIdToName[o.shiftId] : null) ??
+          _staffNameForTime(o.orderAt!);
       final cashAmt = _cashComponentOf(o);
       final hasSplitCash = o.isSplitPayment == true;
       final hasRefund = (o.refundAmount ?? 0.0) > 0;
       final label = hasSplitCash
           ? 'Sale #${o.billNumber ?? o.id.substring(0, 6)} (cash portion)'
           : hasRefund
-              ? 'Sale #${o.billNumber ?? o.id.substring(0, 6)} (net of refund)'
-              : 'Sale #${o.billNumber ?? o.id.substring(0, 6)}';
-      entries.add(_LogEntry(
-        time: o.orderAt!,
-        description: label,
-        signedAmount: cashAmt,
-        staffName: saleStaff,
-        type: _LogType.sale,
-      ));
+          ? 'Sale #${o.billNumber ?? o.id.substring(0, 6)} (net of refund)'
+          : 'Sale #${o.billNumber ?? o.id.substring(0, 6)}';
+      entries.add(
+        _LogEntry(
+          time: o.orderAt!,
+          description: label,
+          signedAmount: cashAmt,
+          staffName: saleStaff,
+          type: _LogType.sale,
+        ),
+      );
     }
 
     // Cash expenses — resolve category name and staff from shift time window
     for (final e in cashExp) {
       final catName = categoryIdToName[e.categoryOfExpense] ?? 'Misc';
-      entries.add(_LogEntry(
-        time: e.dateandTime,
-        description: 'Expense — $catName',
-        signedAmount: -(e.amount),
-        staffName: _staffNameForTime(e.dateandTime),
-        type: _LogType.expense,
-      ));
+      entries.add(
+        _LogEntry(
+          time: e.dateandTime,
+          description: 'Expense — $catName',
+          signedAmount: -(e.amount),
+          staffName: _staffNameForTime(e.dateandTime),
+          type: _LogType.expense,
+        ),
+      );
     }
 
     // Manual Cash In / Cash Out movements + system adjustments.
@@ -305,18 +393,20 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
     for (final m in cashMovementStore.movements) {
       if (m.type == 'opening') continue; // covered by synthetic opening entry
       final isAdj = m.type == 'adjustment';
-      entries.add(_LogEntry(
-        time: m.timestamp,
-        description: isAdj
-            ? '${m.reason}${m.note != null ? ' — ${m.note}' : ''}'
-            : m.label,
-        signedAmount: isAdj
-            // amount is already signed (negative = shortage/reduction, positive = overage/increase)
-            ? m.amount
-            : m.signedAmount,
-        staffName: m.staffName,
-        type: isAdj ? _LogType.adjustment : _LogType.movement,
-      ));
+      entries.add(
+        _LogEntry(
+          time: m.timestamp,
+          description: isAdj
+              ? '${m.reason}${m.note != null ? ' — ${m.note}' : ''}'
+              : m.label,
+          signedAmount: isAdj
+              // amount is already signed (negative = shortage/reduction, positive = overage/increase)
+              ? m.amount
+              : m.signedAmount,
+          staffName: m.staffName,
+          type: isAdj ? _LogType.adjustment : _LogType.movement,
+        ),
+      );
     }
 
     // Sort by time ascending so the log reads oldest → newest
@@ -351,6 +441,8 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
   Future<void> _showMovementDialog(String type) async {
     final amountCtrl = TextEditingController();
     final noteCtrl = TextEditingController();
+    final amountFocus = FocusNode();
+    final noteFocus = FocusNode();
 
     final isCashIn = type == 'in';
     // Separate reason lists for Cash In vs Cash Out
@@ -377,136 +469,174 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
 
     await showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDs) => AppDialogShell(
-          title: isCashIn ? 'Cash In' : 'Cash Out',
-          accent: accent,
-          icon: isCashIn
-              ? Icons.add_circle_outline
-              : Icons.remove_circle_outline,
-          body: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Amount
-              AppTextField(
-                controller: amountCtrl,
-                label: 'Amount',
-                hint: '0.00',
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))
-                ],
-                prefixWidget: Padding(
-                  padding: const EdgeInsets.only(left: 14, right: 8),
-                  child: Text(
-                    CurrencyHelper.currentSymbol,
-                    style: GoogleFonts.poppins(
-                        fontSize: 14,
+      builder: (ctx) => DialogDisposeScope(
+        disposables: [amountCtrl, noteCtrl, amountFocus, noteFocus],
+        child: StatefulBuilder(
+          builder: (ctx, setDs) => AppDialogShell(
+            title: isCashIn ? 'Cash In' : 'Cash Out',
+            accent: accent,
+            icon: isCashIn
+                ? Icons.add_circle_outline
+                : Icons.remove_circle_outline,
+            body: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Amount
+                AppTextField(
+                  controller: amountCtrl,
+                  focusNode: amountFocus,
+                  autofocus: true,
+                  label: 'Amount',
+                  hint: '0.00',
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(
+                      RegExp(r'^\d+\.?\d{0,2}'),
+                    ),
+                  ],
+                  textInputAction: TextInputAction.next,
+                  onFieldSubmitted: (_) => noteFocus.requestFocus(),
+                  prefixWidget: Padding(
+                    padding: const EdgeInsets.only(left: 14, right: 8),
+                    child: Text(
+                      CurrencyHelper.currentSymbol,
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.bodyFontSize(context),
                         fontWeight: FontWeight.w600,
-                        color: AppColors.primary),
+                        color: AppColors.primary,
+                      ),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
+                const SizedBox(height: 16),
 
-              // Reason dropdown
-              DropdownButtonFormField<String>(
-                value: selectedReason,
-                style: GoogleFonts.poppins(
-                    fontSize: 14, color: AppColors.textPrimary),
-                decoration: InputDecoration(
-                  labelText: 'Reason',
-                  labelStyle: GoogleFonts.poppins(
-                      fontSize: 13, color: AppColors.textSecondary),
-                  prefixIcon: const Icon(Icons.list_alt_rounded,
-                      color: AppColors.primary, size: 20),
-                  filled: true,
-                  fillColor: AppColors.surfaceLight,
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          const BorderSide(color: AppColors.divider)),
-                  enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide:
-                          const BorderSide(color: AppColors.divider)),
-                  focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(
-                          color: AppColors.primary, width: 1.5)),
-                  contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 14),
+                // Reason — inline selectable chips (no native dropdown overlay)
+                Text(
+                  'Reason',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.bodyFontSize(context),
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
-                items: reasons
-                    .map((r) => DropdownMenuItem(
-                        value: r,
-                        child: Text(r,
-                            style: GoogleFonts.poppins(fontSize: 14))))
-                    .toList(),
-                onChanged: (v) =>
-                    setDs(() => selectedReason = v ?? reasons.first),
-              ),
-              const SizedBox(height: 16),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: reasons.map((r) {
+                    final selected = r == selectedReason;
+                    return InkWell(
+                      onTap: () => setDs(() => selectedReason = r),
+                      borderRadius: BorderRadius.circular(9),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 9,
+                        ),
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? accent.withValues(alpha: 0.12)
+                              : AppColors.surfaceLight,
+                          borderRadius: BorderRadius.circular(9),
+                          border: Border.all(
+                            color: selected ? accent : AppColors.divider,
+                            width: selected ? 1.5 : 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (selected) ...[
+                              Icon(
+                                Icons.check_rounded,
+                                size: 15,
+                                color: accent,
+                              ),
+                              const SizedBox(width: 5),
+                            ],
+                            Text(
+                              r,
+                              style: GoogleFonts.poppins(
+                                fontSize: AppResponsive.smallFontSize(context),
+                                fontWeight: selected
+                                    ? FontWeight.w600
+                                    : FontWeight.w500,
+                                color: selected
+                                    ? accent
+                                    : AppColors.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 16),
 
-              // Optional note
-              AppTextField(
-                controller: noteCtrl,
-                label: 'Note',
-                hint: 'Add extra details... (optional)',
-                icon: Icons.notes_rounded,
+                // Optional note
+                AppTextField(
+                  controller: noteCtrl,
+                  focusNode: noteFocus,
+                  label: 'Note',
+                  hint: 'Add extra details... (optional)',
+                  icon: Icons.notes_rounded,
+                  textInputAction: TextInputAction.done,
+                  onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
+                ),
+              ],
+            ),
+            actions: [
+              appDialogCancelButton(ctx),
+              const SizedBox(width: 12),
+              appDialogPrimaryButton(
+                label: isCashIn ? 'Add Cash In' : 'Add Cash Out',
+                color: accent,
+                onPressed: () async {
+                  final amount = double.tryParse(amountCtrl.text.trim()) ?? 0;
+                  if (amount <= 0) {
+                    NotificationService.instance.showError(
+                      'Enter a valid amount',
+                    );
+                    return;
+                  }
+                  // Guard: warn if Cash Out would make the drawer go negative.
+                  if (type == 'out' && amount > _balance) {
+                    final proceed = await showAppConfirmDialog(
+                      context: ctx,
+                      title: 'Balance Warning',
+                      message:
+                          'This withdrawal (${CurrencyHelper.currentSymbol} ${amount.toStringAsFixed(DecimalSettings.precision)}) '
+                          'exceeds the estimated drawer balance '
+                          '(${CurrencyHelper.currentSymbol} ${_balance.toStringAsFixed(DecimalSettings.precision)}).\n\n'
+                          'The drawer balance would go negative. '
+                          'Proceed only if you have physically verified the cash.',
+                      confirmLabel: 'Proceed Anyway',
+                      accent: Colors.orange.shade700,
+                      icon: Icons.warning_amber_rounded,
+                    );
+                    if (proceed != true) return;
+                  }
+                  Navigator.pop(ctx);
+                  final ok = await cashMovementStore.addMovement(
+                    type: type,
+                    amount: amount,
+                    reason: selectedReason,
+                    note: noteCtrl.text.trim().isEmpty
+                        ? null
+                        : noteCtrl.text.trim(),
+                  );
+                  if (ok) {
+                    // Rebuild the log to include the new entry
+                    await _loadAll();
+                  }
+                },
               ),
             ],
           ),
-          actions: [
-            appDialogCancelButton(ctx),
-            const SizedBox(width: 12),
-            appDialogPrimaryButton(
-              label: isCashIn ? 'Add Cash In' : 'Add Cash Out',
-              color: accent,
-              onPressed: () async {
-                final amount =
-                    double.tryParse(amountCtrl.text.trim()) ?? 0;
-                if (amount <= 0) {
-                  ScaffoldMessenger.of(ctx).showSnackBar(
-                    const SnackBar(
-                        content: Text('Enter a valid amount')),
-                  );
-                  return;
-                }
-                // Guard: warn if Cash Out would make the drawer go negative.
-                if (type == 'out' && amount > _balance) {
-                  final proceed = await showAppConfirmDialog(
-                    context: ctx,
-                    title: 'Balance Warning',
-                    message:
-                        'This withdrawal (${CurrencyHelper.currentSymbol} ${amount.toStringAsFixed(DecimalSettings.precision)}) '
-                        'exceeds the estimated drawer balance '
-                        '(${CurrencyHelper.currentSymbol} ${_balance.toStringAsFixed(DecimalSettings.precision)}).\n\n'
-                        'The drawer balance would go negative. '
-                        'Proceed only if you have physically verified the cash.',
-                    confirmLabel: 'Proceed Anyway',
-                    accent: Colors.orange.shade700,
-                    icon: Icons.warning_amber_rounded,
-                  );
-                  if (proceed != true) return;
-                }
-                Navigator.pop(ctx);
-                final ok = await cashMovementStore.addMovement(
-                  type: type,
-                  amount: amount,
-                  reason: selectedReason,
-                  note: noteCtrl.text.trim().isEmpty
-                      ? null
-                      : noteCtrl.text.trim(),
-                );
-                if (ok) {
-                  // Rebuild the log to include the new entry
-                  await _loadAll();
-                }
-              },
-            ),
-          ],
         ),
       ),
     );
@@ -525,23 +655,31 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Cash Drawer',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.poppins(
-                    fontSize: AppResponsive.headingFontSize(context),
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white)),
+            Text(
+              'Cash Drawer',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.headingFontSize(context),
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
             Builder(
               builder: (context) {
                 if (_dayStart == null) {
-                  return Text(DateFormat('dd MMM yyyy').format(DateTime.now()),
-                      style: GoogleFonts.poppins(
-                          fontSize: AppResponsive.smallFontSize(context), color: Colors.white70));
+                  return Text(
+                    DateFormat('dd MMM yyyy').format(DateTime.now()),
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.smallFontSize(context),
+                      color: Colors.white70,
+                    ),
+                  );
                 }
 
                 final now = DateTime.now();
-                final isSameDay = _dayStart!.year == now.year &&
+                final isSameDay =
+                    _dayStart!.year == now.year &&
                     _dayStart!.month == now.month &&
                     _dayStart!.day == now.day;
 
@@ -549,33 +687,38 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
                     ? DateFormat('dd MMM yyyy').format(_dayStart!)
                     : 'Session: ${DateFormat('dd MMM').format(_dayStart!)} - ${DateFormat('dd MMM').format(now)}';
 
-                return Text(dateText,
-                    style: GoogleFonts.poppins(
-                        fontSize: 12, color: Colors.white70));
+                return Text(
+                  dateText,
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.smallFontSize(context),
+                    color: Colors.white70,
+                  ),
+                );
               },
             ),
           ],
         ),
-        actions: [
-          IconButton(
-            onPressed: _loadAll,
-            icon: const Icon(Icons.refresh),
-          ),
-        ],
       ),
-      body: Column(children: [
-        Expanded(
-          child: _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : _dayStart == null
+      body: AppResponsive.constrainedContent(
+        context: context,
+        maxWidth: AppResponsive.maxContentWidth(context),
+        alignment: Alignment.topCenter,
+        child: Column(
+          children: [
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _dayStart == null
                   ? _buildNoDayState(context)
                   : Observer(
                       // Observer wraps the body so it rebuilds when
                       // cashMovementStore.movements changes (new Cash In/Out)
                       builder: (_) => _buildBody(context, currency),
                     ),
+            ),
+          ],
         ),
-      ]),
+      ),
     );
   }
 
@@ -588,6 +731,8 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
         if (_dayEnded) _buildDayEndedBanner(context),
         if (_dayEnded) SizedBox(height: AppResponsive.mediumSpacing(context)),
         _buildBalanceCard(context, currency),
+        SizedBox(height: AppResponsive.largeSpacing(context)),
+        _buildDigitalSummaryCard(context, currency),
         SizedBox(height: AppResponsive.largeSpacing(context)),
         if (!_dayEnded) _buildActionButtons(context),
         if (!_dayEnded) SizedBox(height: AppResponsive.largeSpacing(context)),
@@ -607,59 +752,79 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
       padding: EdgeInsets.all(AppResponsive.largeSpacing(context)),
       decoration: BoxDecoration(
         color: Colors.amber.shade50,
-        borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: Colors.amber.shade300),
       ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Icon(Icons.lock_clock_rounded, color: Colors.amber.shade700,
-              size: AppResponsive.iconSize(context)),
-          SizedBox(width: AppResponsive.mediumSpacing(context)),
-          Expanded(
-            child: Text(
-              'Day Ended — Read-only view',
-              style: GoogleFonts.poppins(
-                fontSize: AppResponsive.bodyFontSize(context),
-                color: Colors.amber.shade800,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ]),
-        SizedBox(height: AppResponsive.smallSpacing(context)),
-        // Show how much cash should still be in drawer
-        Container(
-          padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              Text('Cash still in drawer:',
+              Icon(
+                Icons.lock_clock_rounded,
+                color: Colors.amber.shade700,
+                size: AppResponsive.iconSize(context),
+              ),
+              SizedBox(width: AppResponsive.mediumSpacing(context)),
+              Expanded(
+                child: Text(
+                  'Day Ended — Read-only view',
                   style: GoogleFonts.poppins(
-                      fontSize: AppResponsive.smallFontSize(context),
-                      color: Colors.amber.shade800)),
-              Text('$currency${closingBalance.toStringAsFixed(DecimalSettings.precision)}',
-                  style: GoogleFonts.poppins(
-                      fontSize: AppResponsive.bodyFontSize(context),
-                      fontWeight: FontWeight.w700,
-                      color: closingBalance > 0 ? Colors.teal.shade700 : AppColors.textSecondary)),
+                    fontSize: AppResponsive.bodyFontSize(context),
+                    color: Colors.amber.shade800,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
             ],
           ),
-        ),
-        SizedBox(height: AppResponsive.smallSpacing(context)),
-        Text(
-          closingBalance > 0
-              ? 'Safe-drop $currency${closingBalance.toStringAsFixed(DecimalSettings.precision)} or use it as tomorrow\'s opening balance.'
-              : 'Start a new day when ready.',
-          style: GoogleFonts.poppins(
-            fontSize: AppResponsive.captionFontSize(context),
-            color: Colors.amber.shade700,
+          SizedBox(height: AppResponsive.smallSpacing(context)),
+          // Show how much cash should still be in drawer
+          Container(
+            padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(
+                AppResponsive.smallBorderRadius(context),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Cash still in drawer:',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.smallFontSize(context),
+                    color: Colors.amber.shade800,
+                  ),
+                ),
+                Text(
+                  '$currency${closingBalance.toStringAsFixed(DecimalSettings.precision)}',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.bodyFontSize(context),
+                    fontWeight: FontWeight.w700,
+                    color: closingBalance > 0
+                        ? Colors.teal.shade700
+                        : AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      ]),
+          SizedBox(height: AppResponsive.smallSpacing(context)),
+          Text(
+            closingBalance > 0
+                ? 'Safe-drop $currency${closingBalance.toStringAsFixed(DecimalSettings.precision)} or use it as tomorrow\'s opening balance.'
+                : 'Start a new day when ready.',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.captionFontSize(context),
+              color: Colors.amber.shade700,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -670,7 +835,9 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
       padding: EdgeInsets.all(AppResponsive.largeSpacing(context)),
       decoration: BoxDecoration(
         color: AppColors.primary,
-        borderRadius: BorderRadius.circular(AppResponsive.largeBorderRadius(context)),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.largeBorderRadius(context),
+        ),
         boxShadow: [
           BoxShadow(
             color: AppColors.primary.withValues(alpha: 0.35),
@@ -679,78 +846,271 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
           ),
         ],
       ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Estimated Cash in Drawer',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Estimated Cash in Drawer',
             style: GoogleFonts.poppins(
-                fontSize: AppResponsive.smallFontSize(context),
-                color: Colors.white.withValues(alpha: 0.8))),
-        SizedBox(height: AppResponsive.smallSpacing(context)),
-        // The balance rebuilds automatically via Observer when movements change
-        Text(
-          '$currency ${_balance.toStringAsFixed(DecimalSettings.precision)}',
-          style: GoogleFonts.poppins(
-            fontSize: AppResponsive.getValue<double>(context,
-                mobile: 32, tablet: 38, desktop: 44),
-            fontWeight: FontWeight.w800,
-            color: Colors.white,
+              fontSize: AppResponsive.smallFontSize(context),
+              color: Colors.white.withValues(alpha: 0.8),
+            ),
           ),
-        ),
-        SizedBox(height: AppResponsive.mediumSpacing(context)),
-        // Formula hint so staff understands the number
-        Text(
-          'Opening $_openingBalance  '
-          '+ Sales ${_cashSales.toStringAsFixed(0)}  '
-          '+ In ${cashMovementStore.totalCashIn.toStringAsFixed(0)}  '
-          '− Out ${cashMovementStore.totalCashOut.toStringAsFixed(0)}  '
-          '− Exp ${_cashExpenses.toStringAsFixed(0)}',
-          style: GoogleFonts.poppins(
+          SizedBox(height: AppResponsive.smallSpacing(context)),
+          // The balance rebuilds automatically via Observer when movements change
+          Text(
+            '$currency ${_balance.toStringAsFixed(DecimalSettings.precision)}',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.getValue<double>(
+                context,
+                mobile: 32,
+                tablet: 38,
+                desktop: 44,
+              ),
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+            ),
+          ),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
+          // Formula hint so staff understands the number
+          Text(
+            'Opening $_openingBalance  '
+            '+ Sales ${_cashSales.toStringAsFixed(0)}  '
+            '+ In ${cashMovementStore.totalCashIn.toStringAsFixed(0)}  '
+            '− Out ${cashMovementStore.totalCashOut.toStringAsFixed(0)}  '
+            '− Exp ${_cashExpenses.toStringAsFixed(0)}',
+            style: GoogleFonts.poppins(
               fontSize: AppResponsive.captionFontSize(context),
-              color: Colors.white.withValues(alpha: 0.7)),
+              color: Colors.white.withValues(alpha: 0.7),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Digital & Total sales summary ─────────────────────────────────────────
+
+  /// Separate from the physical cash-drawer balance: shows what was COLLECTED
+  /// this shift by method (Cash + digital) and the combined revenue. Reuses the
+  /// same session data, so nothing new is tracked — it just surfaces existing
+  /// payment data that was otherwise only visible in the End-of-Day report.
+  Widget _buildDigitalSummaryCard(BuildContext context, String currency) {
+    String money(double v) =>
+        '$currency${v.toStringAsFixed(DecimalSettings.precision)}';
+    final pad = AppResponsive.largeSpacing(context);
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
         ),
-      ]),
+        border: Border.all(color: AppColors.divider),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Tappable header — collapsed by default; tap to reveal the breakdown.
+          InkWell(
+            borderRadius: BorderRadius.circular(
+              AppResponsive.borderRadius(context),
+            ),
+            onTap: () => setState(
+              () => _digitalSummaryExpanded = !_digitalSummaryExpanded,
+            ),
+            child: Padding(
+              padding: EdgeInsets.all(pad),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.account_balance_wallet_rounded,
+                    color: AppColors.primary,
+                    size: AppResponsive.iconSize(context),
+                  ),
+                  SizedBox(width: AppResponsive.mediumSpacing(context)),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Shift Sales Summary',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.subheadingFontSize(context),
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        SizedBox(
+                          height: AppResponsive.smallSpacing(context) / 2,
+                        ),
+                        Text(
+                          _digitalSummaryExpanded
+                              ? 'Collected this shift, by payment method'
+                              : 'Tap to view collections by method',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.captionFontSize(context),
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(width: AppResponsive.mediumSpacing(context)),
+                  AnimatedRotation(
+                    turns: _digitalSummaryExpanded ? 0.5 : 0.0,
+                    duration: const Duration(milliseconds: 200),
+                    child: Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: AppColors.textSecondary,
+                      size: AppResponsive.iconSize(context),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // Expandable body — animates open/closed.
+          AnimatedCrossFade(
+            firstChild: const SizedBox(width: double.infinity, height: 0),
+            secondChild: Padding(
+              padding: EdgeInsets.fromLTRB(pad, 0, pad, pad),
+              child: Column(
+                children: [
+                  Divider(height: 1, color: AppColors.divider),
+                  SizedBox(height: AppResponsive.smallSpacing(context)),
+                  _summaryLine(context, 'Cash', money(_cashSales)),
+                  _summaryLine(context, 'UPI', money(_upiSales)),
+                  _summaryLine(context, 'Card', money(_cardSales)),
+                  if (_otherDigitalSales > 0)
+                    _summaryLine(context, 'Others', money(_otherDigitalSales)),
+                  Padding(
+                    padding: EdgeInsets.symmetric(
+                      vertical: AppResponsive.smallSpacing(context),
+                    ),
+                    child: Divider(height: 1, color: AppColors.divider),
+                  ),
+                  _summaryLine(
+                    context,
+                    'Combined Shift Revenue',
+                    money(_combinedRevenue),
+                    emphasize: true,
+                  ),
+                ],
+              ),
+            ),
+            crossFadeState: _digitalSummaryExpanded
+                ? CrossFadeState.showSecond
+                : CrossFadeState.showFirst,
+            duration: const Duration(milliseconds: 200),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _summaryLine(
+    BuildContext context,
+    String label,
+    String value, {
+    bool emphasize = false,
+  }) {
+    return Padding(
+      padding: EdgeInsets.symmetric(
+        vertical: AppResponsive.smallSpacing(context) / 2,
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: emphasize
+                  ? AppResponsive.bodyFontSize(context)
+                  : AppResponsive.smallFontSize(context),
+              fontWeight: emphasize ? FontWeight.w700 : FontWeight.w500,
+              color: emphasize
+                  ? AppColors.textPrimary
+                  : AppColors.textSecondary,
+            ),
+          ),
+          Text(
+            value,
+            style: GoogleFonts.poppins(
+              fontSize: emphasize
+                  ? AppResponsive.subheadingFontSize(context)
+                  : AppResponsive.bodyFontSize(context),
+              fontWeight: emphasize ? FontWeight.w700 : FontWeight.w600,
+              color: emphasize ? AppColors.primary : AppColors.textPrimary,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   // ── Action buttons ────────────────────────────────────────────────────────
 
   Widget _buildActionButtons(BuildContext context) {
-    return Row(children: [
-      Expanded(
-        child: ElevatedButton.icon(
-          onPressed: () => _showMovementDialog('in'),
-          icon: const Icon(Icons.add_circle_outline, color: Colors.white),
-          label: Text('Cash In',
+    return Row(
+      children: [
+        Expanded(
+          child: ElevatedButton.icon(
+            onPressed: () => _showMovementDialog('in'),
+            icon: const Icon(Icons.add_circle_outline, color: Colors.white),
+            label: Text(
+              'Cash In',
               style: GoogleFonts.poppins(
-                  fontWeight: FontWeight.w600, color: Colors.white)),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.green.shade600,
-            padding: EdgeInsets.symmetric(
-                vertical: AppResponsive.mediumSpacing(context) + 2),
-            shape: RoundedRectangleBorder(
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green.shade600,
+              padding: EdgeInsets.symmetric(
+                vertical: AppResponsive.mediumSpacing(context) + 2,
+              ),
+              shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(
-                    AppResponsive.borderRadius(context))),
+                  AppResponsive.borderRadius(context),
+                ),
+              ),
+            ),
           ),
         ),
-      ),
-      SizedBox(width: AppResponsive.mediumSpacing(context)),
-      Expanded(
-        child: ElevatedButton.icon(
-          onPressed: () => _showMovementDialog('out'),
-          icon: const Icon(Icons.remove_circle_outline, color: Colors.white),
-          label: Text('Cash Out',
+        SizedBox(width: AppResponsive.mediumSpacing(context)),
+        Expanded(
+          child: ElevatedButton.icon(
+            onPressed: () => _showMovementDialog('out'),
+            icon: const Icon(Icons.remove_circle_outline, color: Colors.white),
+            label: Text(
+              'Cash Out',
               style: GoogleFonts.poppins(
-                  fontWeight: FontWeight.w600, color: Colors.white)),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.red.shade600,
-            padding: EdgeInsets.symmetric(
-                vertical: AppResponsive.mediumSpacing(context) + 2),
-            shape: RoundedRectangleBorder(
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red.shade600,
+              padding: EdgeInsets.symmetric(
+                vertical: AppResponsive.mediumSpacing(context) + 2,
+              ),
+              shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(
-                    AppResponsive.borderRadius(context))),
+                  AppResponsive.borderRadius(context),
+                ),
+              ),
+            ),
           ),
         ),
-      ),
-    ]);
+      ],
+    );
   }
 
   // ── Balance breakdown row ─────────────────────────────────────────────────
@@ -760,65 +1120,123 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
       padding: EdgeInsets.all(AppResponsive.largeSpacing(context)),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: AppColors.divider),
       ),
-      child: Column(children: [
-        _breakdownLine(context, 'Opening Balance', _openingBalance, currency,
-            Colors.blue, true),
-        _breakdownLine(context, 'Cash Sales', _cashSales, currency,
-            Colors.green, true),
-        _breakdownLine(context, 'Cash In (movements)',
-            cashMovementStore.totalCashIn, currency, Colors.teal, true),
-        _breakdownLine(context, 'Cash Out (movements)',
-            cashMovementStore.totalCashOut, currency, Colors.orange, false),
-        _breakdownLine(context, 'Cash Expenses', _cashExpenses, currency,
-            Colors.red, false),
-        const Padding(
-          padding: EdgeInsets.symmetric(vertical: 8),
-          child: Divider(height: 1),
-        ),
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Text('Expected in Drawer',
-              style: GoogleFonts.poppins(
+      child: Column(
+        children: [
+          _breakdownLine(
+            context,
+            'Opening Balance',
+            _openingBalance,
+            currency,
+            Colors.blue,
+            true,
+          ),
+          _breakdownLine(
+            context,
+            'Cash Sales',
+            _cashSales,
+            currency,
+            Colors.green,
+            true,
+          ),
+          _breakdownLine(
+            context,
+            'Cash In (movements)',
+            cashMovementStore.totalCashIn,
+            currency,
+            Colors.teal,
+            true,
+          ),
+          _breakdownLine(
+            context,
+            'Cash Out (movements)',
+            cashMovementStore.totalCashOut,
+            currency,
+            Colors.orange,
+            false,
+          ),
+          _breakdownLine(
+            context,
+            'Cash Expenses',
+            _cashExpenses,
+            currency,
+            Colors.red,
+            false,
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Divider(height: 1),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Expected in Drawer',
+                style: GoogleFonts.poppins(
                   fontWeight: FontWeight.w700,
                   fontSize: AppResponsive.bodyFontSize(context),
-                  color: AppColors.textPrimary)),
-          Text('$currency ${_balance.toStringAsFixed(DecimalSettings.precision)}',
-              style: GoogleFonts.poppins(
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              Text(
+                '$currency ${_balance.toStringAsFixed(DecimalSettings.precision)}',
+                style: GoogleFonts.poppins(
                   fontWeight: FontWeight.w700,
                   fontSize: AppResponsive.bodyFontSize(context),
-                  color: AppColors.primary)),
-        ]),
-      ]),
+                  color: AppColors.primary,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _breakdownLine(BuildContext context, String label, double amount,
-      String currency, Color color, bool isPositive) {
+  Widget _breakdownLine(
+    BuildContext context,
+    String label,
+    double amount,
+    String currency,
+    Color color,
+    bool isPositive,
+  ) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(children: [
-            Container(
+          Row(
+            children: [
+              Container(
                 width: 3,
                 height: 14,
                 decoration: BoxDecoration(
-                    color: color, borderRadius: BorderRadius.circular(2))),
-            const SizedBox(width: 8),
-            Text(label,
+                  color: color,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                label,
                 style: GoogleFonts.poppins(
-                    fontSize: AppResponsive.smallFontSize(context),
-                    color: AppColors.textSecondary)),
-          ]),
+                  fontSize: AppResponsive.smallFontSize(context),
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
           Text(
             '${isPositive ? '+' : '−'} $currency ${amount.toStringAsFixed(DecimalSettings.precision)}',
             style: GoogleFonts.poppins(
-                fontSize: AppResponsive.smallFontSize(context),
-                fontWeight: FontWeight.w600,
-                color: color),
+              fontSize: AppResponsive.smallFontSize(context),
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
           ),
         ],
       ),
@@ -832,10 +1250,13 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
       return Center(
         child: Padding(
           padding: EdgeInsets.all(AppResponsive.largeSpacing(context)),
-          child: Text('No activity yet today',
-              style: GoogleFonts.poppins(
-                  color: AppColors.textSecondary,
-                  fontSize: AppResponsive.bodyFontSize(context))),
+          child: Text(
+            'No activity yet today',
+            style: GoogleFonts.poppins(
+              color: AppColors.textSecondary,
+              fontSize: AppResponsive.bodyFontSize(context),
+            ),
+          ),
         ),
       );
     }
@@ -843,17 +1264,21 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text("Session Activity",
-            style: GoogleFonts.poppins(
-                fontSize: AppResponsive.bodyFontSize(context),
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary)),
+        Text(
+          "Session Activity",
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.bodyFontSize(context),
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+          ),
+        ),
         SizedBox(height: AppResponsive.smallSpacing(context)),
         Container(
           decoration: BoxDecoration(
             color: AppColors.white,
-            borderRadius:
-                BorderRadius.circular(AppResponsive.borderRadius(context)),
+            borderRadius: BorderRadius.circular(
+              AppResponsive.borderRadius(context),
+            ),
             border: Border.all(color: AppColors.divider),
           ),
           child: ListView.separated(
@@ -897,7 +1322,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
         dotIcon = Icons.warning_amber_rounded;
     }
 
-    final timeStr = entry.time.day != _dayStart?.day 
+    final timeStr = entry.time.day != _dayStart?.day
         ? '${DateFormat('dd MMM').format(entry.time)}, ${entry.time.hour.toString().padLeft(2, '0')}:${entry.time.minute.toString().padLeft(2, '0')}'
         : '${entry.time.hour.toString().padLeft(2, '0')}:${entry.time.minute.toString().padLeft(2, '0')}';
     final isPositive = entry.signedAmount >= 0;
@@ -908,78 +1333,102 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
         horizontal: AppResponsive.largeSpacing(context),
         vertical: AppResponsive.smallSpacing(context) + 2,
       ),
-      child: Row(children: [
-        // Dot icon
-        Container(
-          padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(
-            color: dotColor.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(8),
+      child: Row(
+        children: [
+          // Dot icon
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: dotColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              dotIcon,
+              size: AppResponsive.smallIconSize(context),
+              color: dotColor,
+            ),
           ),
-          child: Icon(dotIcon, size: AppResponsive.smallIconSize(context), color: dotColor),
-        ),
-        SizedBox(width: AppResponsive.mediumSpacing(context)),
+          SizedBox(width: AppResponsive.mediumSpacing(context)),
 
-        // Time + description + staff
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(entry.description,
+          // Time + description + staff
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  entry.description,
                   style: GoogleFonts.poppins(
-                      fontSize: AppResponsive.smallFontSize(context),
-                      fontWeight: FontWeight.w600,
-                      color: isAdj ? Colors.orange.shade800 : AppColors.textPrimary)),
-              if (isAdj)
-                Text('audit only — does not affect balance',
+                    fontSize: AppResponsive.smallFontSize(context),
+                    fontWeight: FontWeight.w600,
+                    color: isAdj
+                        ? Colors.orange.shade800
+                        : AppColors.textPrimary,
+                  ),
+                ),
+                if (isAdj)
+                  Text(
+                    'audit only — does not affect balance',
                     style: GoogleFonts.poppins(
-                        fontSize: AppResponsive.captionFontSize(context),
-                        fontStyle: FontStyle.italic,
-                        color: Colors.orange.shade600))
-              else if (entry.staffName.isNotEmpty)
-                Text('$timeStr  ·  ${entry.staffName}',
+                      fontSize: AppResponsive.captionFontSize(context),
+                      color: Colors.orange.shade600,
+                    ),
+                  )
+                else if (entry.staffName.isNotEmpty)
+                  Text(
+                    '$timeStr  ·  ${entry.staffName}',
                     style: GoogleFonts.poppins(
-                        fontSize: AppResponsive.captionFontSize(context),
-                        color: AppColors.textSecondary))
-              else
-                Text(timeStr,
+                      fontSize: AppResponsive.captionFontSize(context),
+                      color: AppColors.textSecondary,
+                    ),
+                  )
+                else
+                  Text(
+                    timeStr,
                     style: GoogleFonts.poppins(
-                        fontSize: AppResponsive.captionFontSize(context),
-                        color: AppColors.textSecondary)),
-            ],
+                      fontSize: AppResponsive.captionFontSize(context),
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+              ],
+            ),
           ),
-        ),
 
-        // Amount + running balance
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(
-              '${isPositive ? '+' : ''}$currency ${entry.signedAmount.abs().toStringAsFixed(DecimalSettings.precision)}',
-              style: GoogleFonts.poppins(
+          // Amount + running balance
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '${isPositive ? '+' : ''}$currency ${entry.signedAmount.abs().toStringAsFixed(DecimalSettings.precision)}',
+                style: GoogleFonts.poppins(
                   fontWeight: FontWeight.w700,
                   fontSize: AppResponsive.smallFontSize(context),
                   color: isAdj
                       ? Colors.orange.shade700
-                      : isPositive ? Colors.green.shade700 : Colors.red.shade700),
-            ),
-            if (!isAdj)
-              Text(
-                'Bal: $currency ${entry.runningBalance.toStringAsFixed(DecimalSettings.precision)}',
-                style: GoogleFonts.poppins(
-                    fontSize: AppResponsive.captionFontSize(context),
-                    color: AppColors.textSecondary),
+                      : isPositive
+                      ? Colors.green.shade700
+                      : Colors.red.shade700,
+                ),
               ),
-            if (isAdj)
-              Text(
-                '$timeStr  ·  ${entry.staffName}',
-                style: GoogleFonts.poppins(
+              if (!isAdj)
+                Text(
+                  'Bal: $currency ${entry.runningBalance.toStringAsFixed(DecimalSettings.precision)}',
+                  style: GoogleFonts.poppins(
                     fontSize: AppResponsive.captionFontSize(context),
-                    color: AppColors.textSecondary),
-              ),
-          ],
-        ),
-      ]),
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              if (isAdj)
+                Text(
+                  '$timeStr  ·  ${entry.staffName}',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.captionFontSize(context),
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -993,105 +1442,196 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
     return Container(
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(AppResponsive.largeBorderRadius(context)),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.largeBorderRadius(context),
+        ),
         border: Border.all(color: AppColors.divider),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2)),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Padding(
-          padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
-          child: Row(children: [
-            const Icon(Icons.swap_horiz_rounded, size: 20, color: Colors.indigo),
-            const SizedBox(width: 8),
-            Text('Handover History',
-                style: GoogleFonts.poppins(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.swap_horiz_rounded,
+                  size: 20,
+                  color: Colors.indigo,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Handover History',
+                  style: GoogleFonts.poppins(
                     fontSize: AppResponsive.bodyFontSize(context),
                     fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary)),
-          ]),
-        ),
-        const Divider(height: 1),
-        ListView.separated(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: _handovers.length,
-          separatorBuilder: (_, __) => const Divider(height: 1, indent: 16, endIndent: 16),
-          itemBuilder: (_, i) {
-            final h = _handovers[i];
-            final isDiscrepancy = h.status == 'DISCREPANCY';
-            final isPending = h.status == 'PENDING';
-            final statusColor = isPending ? Colors.orange : isDiscrepancy ? Colors.red : Colors.green;
-            final statusLabel = isPending ? 'PENDING' : isDiscrepancy ? 'DISCREPANCY' : 'MATCHED';
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _handovers.length,
+            separatorBuilder: (_, __) =>
+                const Divider(height: 1, indent: 16, endIndent: 16),
+            itemBuilder: (_, i) {
+              final h = _handovers[i];
+              final isDiscrepancy = h.status == 'DISCREPANCY';
+              final isPending = h.status == 'PENDING';
+              final statusColor = isPending
+                  ? Colors.orange
+                  : isDiscrepancy
+                  ? Colors.red
+                  : Colors.green;
+              final statusLabel = isPending
+                  ? 'PENDING'
+                  : isDiscrepancy
+                  ? 'DISCREPANCY'
+                  : 'MATCHED';
 
-            return Padding(
-              padding: EdgeInsets.symmetric(
+              return Padding(
+                padding: EdgeInsets.symmetric(
                   horizontal: AppResponsive.mediumSpacing(context),
-                  vertical: AppResponsive.smallSpacing(context)),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                  Text(fmt.format(h.closedAt),
-                      style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary)),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: statusColor.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(6),
+                  vertical: AppResponsive.smallSpacing(context),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          fmt.format(h.closedAt),
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.smallFontSize(context),
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: statusColor.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            statusLabel,
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.captionFontSize(context),
+                              fontWeight: FontWeight.w700,
+                              color: statusColor,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    child: Text(statusLabel,
-                        style: GoogleFonts.poppins(
-                            fontSize: 11, fontWeight: FontWeight.w700, color: statusColor)),
-                  ),
-                ]),
-                const SizedBox(height: 6),
-                Row(children: [
-                  const Icon(Icons.arrow_upward, size: 14, color: Colors.orange),
-                  const SizedBox(width: 4),
-                  Text('${h.closedBy} reported ',
-                      style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textSecondary)),
-                  Text('$currency ${h.closedAmount.toStringAsFixed(DecimalSettings.precision)}',
-                      style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w700)),
-                ]),
-                if (h.receivedBy != null) ...[
-                  const SizedBox(height: 2),
-                  Row(children: [
-                    const Icon(Icons.arrow_downward, size: 14, color: Colors.blue),
-                    const SizedBox(width: 4),
-                    Text('${h.receivedBy} received ',
-                        style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textSecondary)),
-                    Text('$currency ${h.receivedAmount!.toStringAsFixed(DecimalSettings.precision)}',
-                        style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w700)),
-                  ]),
-                ],
-                if (isDiscrepancy && h.variance != null) ...[
-                  const SizedBox(height: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.red.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.red.shade200),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.arrow_upward,
+                          size: 14,
+                          color: Colors.orange,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${h.closedBy} reported ',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.smallFontSize(context),
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        Text(
+                          '$currency ${h.closedAmount.toStringAsFixed(DecimalSettings.precision)}',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.smallFontSize(context),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
                     ),
-                    child: Row(children: [
-                      const Icon(Icons.warning_amber_rounded, size: 16, color: Colors.red),
-                      const SizedBox(width: 6),
-                      Text(
-                        h.variance! < 0
-                            ? 'Shortage: $currency ${h.variance!.abs().toStringAsFixed(DecimalSettings.precision)}'
-                            : 'Overage: $currency ${h.variance!.toStringAsFixed(DecimalSettings.precision)}',
-                        style: GoogleFonts.poppins(
-                            fontSize: 12, fontWeight: FontWeight.w600, color: Colors.red.shade700),
+                    if (h.receivedBy != null) ...[
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.arrow_downward,
+                            size: 14,
+                            color: Colors.blue,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${h.receivedBy} received ',
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.smallFontSize(context),
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          Text(
+                            '$currency ${h.receivedAmount!.toStringAsFixed(DecimalSettings.precision)}',
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.smallFontSize(context),
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
                       ),
-                    ]),
-                  ),
-                ],
-              ]),
-            );
-          },
-        ),
-        const SizedBox(height: 8),
-      ]),
+                    ],
+                    if (isDiscrepancy && h.variance != null) ...[
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.red.shade200),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.warning_amber_rounded,
+                              size: 16,
+                              color: Colors.red,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              h.variance! < 0
+                                  ? 'Shortage: $currency ${h.variance!.abs().toStringAsFixed(DecimalSettings.precision)}'
+                                  : 'Overage: $currency ${h.variance!.toStringAsFixed(DecimalSettings.precision)}',
+                              style: GoogleFonts.poppins(
+                                fontSize: AppResponsive.smallFontSize(context),
+                                fontWeight: FontWeight.w600,
+                                color: Colors.red.shade700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
     );
   }
 
@@ -1099,22 +1639,33 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
 
   Widget _buildNoDayState(BuildContext context) {
     return Center(
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Icon(Icons.point_of_sale_outlined,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.point_of_sale_outlined,
             size: AppResponsive.largeIconSize(context) * 2,
-            color: AppColors.divider),
-        SizedBox(height: AppResponsive.mediumSpacing(context)),
-        Text('Day not started',
+            color: AppColors.divider,
+          ),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
+          Text(
+            'Day not started',
             style: GoogleFonts.poppins(
-                fontSize: AppResponsive.bodyFontSize(context),
-                color: AppColors.textSecondary)),
-        SizedBox(height: AppResponsive.smallSpacing(context)),
-        Text('Start the day from the Home screen to use Cash Drawer',
+              fontSize: AppResponsive.bodyFontSize(context),
+              color: AppColors.textSecondary,
+            ),
+          ),
+          SizedBox(height: AppResponsive.smallSpacing(context)),
+          Text(
+            'Start the day from the Home screen to use Cash Drawer',
             textAlign: TextAlign.center,
             style: GoogleFonts.poppins(
-                fontSize: AppResponsive.smallFontSize(context),
-                color: AppColors.textSecondary.withValues(alpha: 0.6))),
-      ]),
+              fontSize: AppResponsive.smallFontSize(context),
+              color: AppColors.textSecondary.withValues(alpha: 0.6),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1135,12 +1686,16 @@ class CashHandoverCloseDialog extends StatefulWidget {
 class _CashHandoverCloseDialogState extends State<CashHandoverCloseDialog> {
   final _amountCtrl = TextEditingController();
   final _noteCtrl = TextEditingController();
+  final _amountFocus = FocusNode();
+  final _noteFocus = FocusNode();
   bool _isSaving = false;
 
   @override
   void dispose() {
     _amountCtrl.dispose();
     _noteCtrl.dispose();
+    _amountFocus.dispose();
+    _noteFocus.dispose();
     super.dispose();
   }
 
@@ -1148,7 +1703,10 @@ class _CashHandoverCloseDialogState extends State<CashHandoverCloseDialog> {
   Widget build(BuildContext context) {
     final currency = CurrencyHelper.currentSymbol;
     final hInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        ? ((AppResponsive.screenWidth(context) -
+                      AppResponsive.dialogWidth(context)) /
+                  2)
+              .clamp(40.0, double.infinity)
         : 24.0;
 
     return AlertDialog(
@@ -1156,154 +1714,202 @@ class _CashHandoverCloseDialogState extends State<CashHandoverCloseDialog> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       contentPadding: EdgeInsets.zero,
       // barrierDismissible: false is set by the caller
-      content: Column(mainAxisSize: MainAxisSize.min, children: [
-        // Header
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: const BoxDecoration(
-            color: Color(0xFFFFF3E0),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-          ),
-          child: Row(children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.orange.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(Icons.swap_horiz_rounded,
-                  color: Colors.orange, size: 24),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: const BoxDecoration(
+              color: Color(0xFFFFF3E0),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Cash Handover',
-                        style: GoogleFonts.poppins(
-                            fontSize: 16, fontWeight: FontWeight.w700)),
-                    Text('Count the drawer before you leave',
-                        style: GoogleFonts.poppins(
-                            fontSize: 12, color: AppColors.textSecondary)),
-                  ]),
-            ),
-          ]),
-        ),
-
-        Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Context info
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceLight,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(children: [
-                  const Icon(Icons.person_outline,
-                      size: 18, color: AppColors.textSecondary),
-                  const SizedBox(width: 8),
-                  Text('Handing over as: ${widget.staffName}',
-                      style: GoogleFonts.poppins(
-                          fontSize: 13, fontWeight: FontWeight.w500)),
-                ]),
-              ),
-              const SizedBox(height: 16),
-
-              // Cash count input
-              AppTextField(
-                controller: _amountCtrl,
-                label: 'Cash counted in drawer',
-                hint: '0.00',
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))
-                ],
-                prefixWidget: Padding(
-                  padding: const EdgeInsets.only(left: 14, right: 8),
-                  child: Text(
-                    currency,
-                    style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.primary),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.swap_horiz_rounded,
+                    color: Colors.orange,
+                    size: 24,
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
-
-              // Optional note
-              AppTextField(
-                controller: _noteCtrl,
-                label: 'Note',
-                hint: 'e.g. "Left ₹1500, all good" (optional)',
-                icon: Icons.notes_rounded,
-              ),
-            ],
-          ),
-        ),
-
-        // Buttons
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-          child: Row(children: [
-            Expanded(
-              child: OutlinedButton(
-                onPressed:
-                    _isSaving ? null : () => Navigator.pop(context),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                ),
-                child: Text('Skip',
-                    style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: ElevatedButton(
-                onPressed: _isSaving ? null : _save,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange.shade700,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                ),
-                child: _isSaving
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                            color: Colors.white, strokeWidth: 2))
-                    : Text('Confirm Handover',
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Cash Handover',
                         style: GoogleFonts.poppins(
-                            color: Colors.white, fontWeight: FontWeight.w600)),
-              ),
+                          fontSize: AppResponsive.subheadingFontSize(context),
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        'Count the drawer before you leave',
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.smallFontSize(context),
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ]),
-        ),
-      ]),
+          ),
+
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Context info
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceLight,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.person_outline,
+                        size: 18,
+                        color: AppColors.textSecondary,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Handing over as: ${widget.staffName}',
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.bodyFontSize(context),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Cash count input
+                AppTextField(
+                  controller: _amountCtrl,
+                  focusNode: _amountFocus,
+                  autofocus: true,
+                  label: 'Cash counted in drawer',
+                  hint: '0.00',
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(
+                      RegExp(r'^\d+\.?\d{0,2}'),
+                    ),
+                  ],
+                  textInputAction: TextInputAction.next,
+                  onFieldSubmitted: (_) => _noteFocus.requestFocus(),
+                  prefixWidget: Padding(
+                    padding: const EdgeInsets.only(left: 14, right: 8),
+                    child: Text(
+                      currency,
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.bodyFontSize(context),
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Optional note
+                AppTextField(
+                  controller: _noteCtrl,
+                  focusNode: _noteFocus,
+                  label: 'Note',
+                  hint:
+                      'e.g. "Left ${CurrencyHelper.currentSymbol}1500, all good" (optional)',
+                  icon: Icons.notes_rounded,
+                  textInputAction: TextInputAction.done,
+                  onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
+                ),
+              ],
+            ),
+          ),
+
+          // Buttons
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _isSaving ? null : () => Navigator.pop(context),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: Text(
+                      'Skip',
+                      style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _isSaving ? null : _save,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange.shade700,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: _isSaving
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : Text(
+                            'Confirm Handover',
+                            style: GoogleFonts.poppins(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   Future<void> _save() async {
     final amount = double.tryParse(_amountCtrl.text.trim()) ?? 0;
     if (amount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Enter the cash amount')));
+      NotificationService.instance.showError('Enter the cash amount');
       return;
     }
     setState(() => _isSaving = true);
     await cashHandoverStore.createHandover(
       closedBy: widget.staffName,
       closedAmount: amount,
-      closedNote:
-          _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
+      closedNote: _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
     );
     setState(() => _isSaving = false);
     if (mounted) Navigator.pop(context);
@@ -1332,13 +1938,14 @@ class HandoverReceiveDialog extends StatefulWidget {
   });
 
   @override
-  State<HandoverReceiveDialog> createState() =>
-      _HandoverReceiveDialogState();
+  State<HandoverReceiveDialog> createState() => _HandoverReceiveDialogState();
 }
 
 class _HandoverReceiveDialogState extends State<HandoverReceiveDialog> {
   final _amountCtrl = TextEditingController();
   final _noteCtrl = TextEditingController();
+  final _amountFocus = FocusNode();
+  final _noteFocus = FocusNode();
   bool _isSaving = false;
   // After completion, show result before closing
   String? _resultStatus;
@@ -1355,6 +1962,8 @@ class _HandoverReceiveDialogState extends State<HandoverReceiveDialog> {
   void dispose() {
     _amountCtrl.dispose();
     _noteCtrl.dispose();
+    _amountFocus.dispose();
+    _noteFocus.dispose();
     super.dispose();
   }
 
@@ -1363,7 +1972,10 @@ class _HandoverReceiveDialogState extends State<HandoverReceiveDialog> {
     final currency = CurrencyHelper.currentSymbol;
     final fmt = DateFormat('dd MMM  HH:mm');
     final hInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        ? ((AppResponsive.screenWidth(context) -
+                      AppResponsive.dialogWidth(context)) /
+                  2)
+              .clamp(40.0, double.infinity)
         : 24.0;
 
     // After confirming, show result screen before letting user proceed
@@ -1374,159 +1986,212 @@ class _HandoverReceiveDialogState extends State<HandoverReceiveDialog> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       contentPadding: EdgeInsets.zero,
       content: SingleChildScrollView(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          // Header
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: const BoxDecoration(
-              color: Color(0xFFE3F2FD),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-            ),
-            child: Row(children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.blue.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.pending_actions_rounded,
-                    color: Colors.blue, size: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: const BoxDecoration(
+                color: Color(0xFFE3F2FD),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Pending Cash Handover',
-                          style: GoogleFonts.poppins(
-                              fontSize: 16, fontWeight: FontWeight.w700)),
-                      Text('Confirm the cash you received',
-                          style: GoogleFonts.poppins(
-                              fontSize: 12, color: AppColors.textSecondary)),
-                    ]),
-              ),
-            ]),
-          ),
-
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Previous staff info — the accountability record
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.withValues(alpha: 0.06),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                        color: Colors.blue.withValues(alpha: 0.2)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Left by ${widget.closedBy}',
-                          style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.w600, fontSize: 14)),
-                      const SizedBox(height: 4),
-                      Text(fmt.format(widget.closedAt),
-                          style: GoogleFonts.poppins(
-                              fontSize: 12,
-                              color: AppColors.textSecondary)),
-                      const SizedBox(height: 8),
-                      Row(children: [
-                        Text('Reported:  ',
-                            style: GoogleFonts.poppins(
-                                fontSize: 13,
-                                color: AppColors.textSecondary)),
-                        Text(
-                          '$currency ${widget.closedAmount.toStringAsFixed(DecimalSettings.precision)}',
-                          style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 16,
-                              color: AppColors.textPrimary),
-                        ),
-                      ]),
-                      if (widget.closedNote != null) ...[
-                        const SizedBox(height: 4),
-                        Text('"${widget.closedNote}"',
-                            style: GoogleFonts.poppins(
-                                fontSize: 12,
-                                fontStyle: FontStyle.italic,
-                                color: AppColors.textSecondary)),
-                      ],
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-
-                // Incoming staff counts
-                AppTextField(
-                  controller: _amountCtrl,
-                  label: 'Count the cash now',
-                  hint: '0.00',
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))
-                  ],
-                  prefixWidget: Padding(
-                    padding: const EdgeInsets.only(left: 14, right: 8),
-                    child: Text(
-                      currency,
-                      style: GoogleFonts.poppins(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.primary),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.pending_actions_rounded,
+                      color: Colors.blue,
+                      size: 24,
                     ),
                   ),
-                ),
-
-                // Live comparison panel — updates on every keystroke
-                if (_amountCtrl.text.trim().isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  _buildLiveComparisonPanel(currency),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Pending Cash Handover',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.subheadingFontSize(context),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Text(
+                          'Confirm the cash you received',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.smallFontSize(context),
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
-
-                const SizedBox(height: 16),
-                AppTextField(
-                  controller: _noteCtrl,
-                  label: 'Note',
-                  hint: 'Any remarks... (optional)',
-                  icon: Icons.notes_rounded,
-                ),
-              ],
-            ),
-          ),
-
-          // Confirm button
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-            child: SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _isSaving ? null : _confirm,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                ),
-                child: _isSaving
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                            color: Colors.white, strokeWidth: 2))
-                    : Text('Confirm Receipt',
-                        style: GoogleFonts.poppins(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 15)),
               ),
             ),
-          ),
-        ]),
+
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Previous staff info — the accountability record
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: Colors.blue.withValues(alpha: 0.2),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Left by ${widget.closedBy}',
+                          style: GoogleFonts.poppins(
+                            fontWeight: FontWeight.w600,
+                            fontSize: AppResponsive.bodyFontSize(context),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          fmt.format(widget.closedAt),
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.smallFontSize(context),
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Text(
+                              'Reported:  ',
+                              style: GoogleFonts.poppins(
+                                fontSize: AppResponsive.smallFontSize(context),
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                            Text(
+                              '$currency ${widget.closedAmount.toStringAsFixed(DecimalSettings.precision)}',
+                              style: GoogleFonts.poppins(
+                                fontWeight: FontWeight.w700,
+                                fontSize: AppResponsive.subheadingFontSize(
+                                  context,
+                                ),
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (widget.closedNote != null) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            '"${widget.closedNote}"',
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.smallFontSize(context),
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Incoming staff counts
+                  AppTextField(
+                    controller: _amountCtrl,
+                    focusNode: _amountFocus,
+                    autofocus: true,
+                    label: 'Count the cash now',
+                    hint: '0.00',
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(
+                        RegExp(r'^\d+\.?\d{0,2}'),
+                      ),
+                    ],
+                    textInputAction: TextInputAction.next,
+                    onFieldSubmitted: (_) => _noteFocus.requestFocus(),
+                    prefixWidget: Padding(
+                      padding: const EdgeInsets.only(left: 14, right: 8),
+                      child: Text(
+                        currency,
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.bodyFontSize(context),
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Live comparison panel — updates on every keystroke
+                  if (_amountCtrl.text.trim().isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    _buildLiveComparisonPanel(currency),
+                  ],
+
+                  const SizedBox(height: 16),
+                  AppTextField(
+                    controller: _noteCtrl,
+                    focusNode: _noteFocus,
+                    label: 'Note',
+                    hint: 'Any remarks... (optional)',
+                    icon: Icons.notes_rounded,
+                    textInputAction: TextInputAction.done,
+                    onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
+                  ),
+                ],
+              ),
+            ),
+
+            // Confirm button
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _isSaving ? null : _confirm,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: _isSaving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : Text(
+                          'Confirm Receipt',
+                          style: GoogleFonts.poppins(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                            fontSize: AppResponsive.buttonFontSize(context),
+                          ),
+                        ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1570,28 +2235,44 @@ class _HandoverReceiveDialogState extends State<HandoverReceiveDialog> {
       ),
       child: Column(
         children: [
-          _buildCompareRow('Reported by ${widget.closedBy}',
-              '$currency ${widget.closedAmount.toStringAsFixed(DecimalSettings.precision)}', AppColors.textSecondary),
+          _buildCompareRow(
+            'Reported by ${widget.closedBy}',
+            '$currency ${widget.closedAmount.toStringAsFixed(DecimalSettings.precision)}',
+            AppColors.textSecondary,
+          ),
           const SizedBox(height: 6),
-          _buildCompareRow('You counted',
-              '$currency ${counted.toStringAsFixed(DecimalSettings.precision)}', AppColors.textPrimary),
+          _buildCompareRow(
+            'You counted',
+            '$currency ${counted.toStringAsFixed(DecimalSettings.precision)}',
+            AppColors.textPrimary,
+          ),
           const Divider(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(children: [
-                Icon(icon, size: 16, color: textColor),
-                const SizedBox(width: 6),
-                Text(label,
+              Row(
+                children: [
+                  Icon(icon, size: 16, color: textColor),
+                  const SizedBox(width: 6),
+                  Text(
+                    label,
                     style: GoogleFonts.poppins(
-                        fontSize: 13, fontWeight: FontWeight.w600, color: textColor)),
-              ]),
+                      fontSize: AppResponsive.smallFontSize(context),
+                      fontWeight: FontWeight.w600,
+                      color: textColor,
+                    ),
+                  ),
+                ],
+              ),
               Text(
                 isMatch
                     ? 'No difference'
                     : '${diff < 0 ? '-' : '+'}$currency ${diff.abs().toStringAsFixed(DecimalSettings.precision)}',
                 style: GoogleFonts.poppins(
-                    fontSize: 13, fontWeight: FontWeight.w700, color: textColor),
+                  fontSize: AppResponsive.smallFontSize(context),
+                  fontWeight: FontWeight.w700,
+                  color: textColor,
+                ),
               ),
             ],
           ),
@@ -1601,7 +2282,10 @@ class _HandoverReceiveDialogState extends State<HandoverReceiveDialog> {
               isShortage
                   ? 'The missing amount will be flagged as a discrepancy for manager review. It does NOT affect the drawer balance automatically.'
                   : 'The extra amount stays in the drawer and will be flagged as overage for manager review.',
-              style: GoogleFonts.poppins(fontSize: 11, color: textColor),
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.captionFontSize(context),
+                color: textColor,
+              ),
             ),
           ],
         ],
@@ -1613,11 +2297,21 @@ class _HandoverReceiveDialogState extends State<HandoverReceiveDialog> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label,
-            style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary)),
-        Text(value,
-            style: GoogleFonts.poppins(
-                fontSize: 13, fontWeight: FontWeight.w600, color: valueColor)),
+        Text(
+          label,
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.smallFontSize(context),
+            color: AppColors.textSecondary,
+          ),
+        ),
+        Text(
+          value,
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.bodyFontSize(context),
+            fontWeight: FontWeight.w600,
+            color: valueColor,
+          ),
+        ),
       ],
     );
   }
@@ -1627,65 +2321,84 @@ class _HandoverReceiveDialogState extends State<HandoverReceiveDialog> {
   Widget _buildResult(BuildContext context) {
     final currency = CurrencyHelper.currentSymbol;
     final hInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        ? ((AppResponsive.screenWidth(context) -
+                      AppResponsive.dialogWidth(context)) /
+                  2)
+              .clamp(40.0, double.infinity)
         : 24.0;
     final isMatched = _resultStatus == 'MATCHED';
     final color = isMatched ? Colors.green : Colors.orange;
-    final icon =
-        isMatched ? Icons.check_circle_outline : Icons.warning_amber_rounded;
+    final icon = isMatched
+        ? Icons.check_circle_outline
+        : Icons.warning_amber_rounded;
     final title = isMatched ? 'Amounts Match ✓' : 'Discrepancy Found';
     final msg = isMatched
         ? 'Handover confirmed. Both counts agree.'
         : 'Variance: $currency ${_variance!.abs().toStringAsFixed(DecimalSettings.precision)}'
-            ' ${_variance! < 0 ? '(Shortage)' : '(Overage)'}.\n'
-            'This has been recorded and the manager has been notified.';
+              ' ${_variance! < 0 ? '(Shortage)' : '(Overage)'}.\n'
+              'This has been recorded and the manager has been notified.';
 
     return AlertDialog(
       insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      content: Column(mainAxisSize: MainAxisSize.min, children: [
-        Icon(icon, size: 56, color: color),
-        const SizedBox(height: 16),
-        Text(title,
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 56, color: color),
+          const SizedBox(height: 16),
+          Text(
+            title,
             style: GoogleFonts.poppins(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary)),
-        const SizedBox(height: 8),
-        Text(msg,
+              fontSize: AppResponsive.subheadingFontSize(context),
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            msg,
             textAlign: TextAlign.center,
             style: GoogleFonts.poppins(
-                fontSize: 13, color: AppColors.textSecondary)),
-        const SizedBox(height: 20),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: () => Navigator.pop(context),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: color,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+              fontSize: AppResponsive.smallFontSize(context),
+              color: AppColors.textSecondary,
             ),
-            child: Text('Continue',
-                style: GoogleFonts.poppins(
-                    color: Colors.white, fontWeight: FontWeight.w600)),
           ),
-        ),
-      ]),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: color,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              child: Text(
+                'Continue',
+                style: GoogleFonts.poppins(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   Future<void> _confirm() async {
     if (_amountCtrl.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Count the cash and enter the amount first')));
+      NotificationService.instance.showError(
+        'Count the cash and enter the amount first',
+      );
       return;
     }
     final amount = double.tryParse(_amountCtrl.text.trim()) ?? 0;
     if (amount < 0) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Amount cannot be negative')));
+      NotificationService.instance.showError('Amount cannot be negative');
       return;
     }
     setState(() => _isSaving = true);
@@ -1698,8 +2411,9 @@ class _HandoverReceiveDialogState extends State<HandoverReceiveDialog> {
       handoverId: widget.handoverId,
       receivedBy: receiverName,
       receivedAmount: amount,
-      receivedNote:
-          _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim(),
+      receivedNote: _noteCtrl.text.trim().isEmpty
+          ? null
+          : _noteCtrl.text.trim(),
     );
 
     setState(() {

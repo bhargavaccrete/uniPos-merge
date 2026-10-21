@@ -9,15 +9,15 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 
 import '../../../data/models/restaurant/db/cartmodel_308.dart';
-import '../../../data/models/restaurant/db/categorymodel_300.dart';
+import '../../../data/models/common/categorymodel_300.dart';
 import '../../../data/models/restaurant/db/eodmodel_317.dart';
 import '../../../data/models/restaurant/db/extramodel_303.dart';
 import '../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../data/models/restaurant/db/pastordermodel_313.dart';
-import '../../../data/models/restaurant/db/staffModel_310.dart';
+import '../../../data/models/common/staffModel_310.dart';
 import '../../../data/models/restaurant/db/table_Model_311.dart';
-import '../../../data/models/restaurant/db/taxmodel_314.dart';
+import '../../../data/models/common/taxmodel_314.dart';
 import '../../../data/models/restaurant/db/toppingmodel_304.dart';
 import '../../../data/models/restaurant/db/variantmodel_305.dart';
 
@@ -148,7 +148,7 @@ class ComprehensiveDataGenerator {
 
   // 3. Generate Tax Rates
   static Future<int> generateTaxRates(int count) async {
-    final box = Hive.box<Tax>('restaurant_taxes');
+    final box = Hive.box<Tax>('taxes');
     print('📦 Generating $count tax rates...');
 
     final startTime = DateTime.now();
@@ -795,7 +795,7 @@ class ComprehensiveDataGenerator {
       'pastorderBox',
       'tablesBox',
       'staffBox',
-      'restaurant_taxes',
+      'taxes',
       'restaurant_eodBox',
       'cart_box',
     ];
@@ -825,7 +825,7 @@ class ComprehensiveDataGenerator {
       'pastOrders': Hive.box<PastOrderModel>('pastorderBox').length,
       'tables': Hive.box<TableModel>('tablesBox').length,
       'staff': Hive.box<StaffModel>('staffBox').length,
-      'taxRates': Hive.box<Tax>('restaurant_taxes').length,
+      'taxRates': Hive.box<Tax>('taxes').length,
       'eodReports': Hive.box<EndOfDayReport>('restaurant_eodBox').length,
       'cart': Hive.box<CartItem>('cart_box').length,
     };
@@ -837,7 +837,7 @@ class ComprehensiveDataGenerator {
 
     final boxes = [
       'categories', 'itemBoxs', 'variante', 'extra', 'orderBox',
-      'pastorderBox', 'tablesBox', 'staffBox', 'restaurant_taxes', 'restaurant_eodBox', 'cart_box',
+      'pastorderBox', 'tablesBox', 'staffBox', 'taxes', 'restaurant_eodBox', 'cart_box',
     ];
 
     for (final boxName in boxes) {

@@ -5,14 +5,11 @@ class RouteNames {
   static const userSelection = '/userSelectionScreen';
   static const restore = '/existingUserRestoreScreen';
   static const licenseKeyEntry = '/license-key-entry';
+  static const licenseLock = '/license-lock';
   static const setupWizard = '/setup-wizard';
 
   // Restaurant - Auth
   static const restaurantLogin = '/restaurant-login';
-  static const restaurantAdminLogin = '/restaurant-admin-login';
-  static const restaurantCashierWaiter = '/restaurant-cashier-waiter';
-  static const restaurantSignup = '/restaurant-signup';
-  static const restaurantAuthSelection = '/restaurant-auth-selection';
 
   // Restaurant - Home & Dashboard
   static const restaurantHome = '/restaurant-home';
@@ -39,7 +36,6 @@ class RouteNames {
   // Restaurant - Customers
   static const restaurantCustomers = '/restaurant-customers';
   static const restaurantManageCustomers = '/restaurant-manage-customers';
-  static const restaurantAddEditCustomer = '/restaurant-add-edit-customer';
   static const restaurantCustomerDetail = '/restaurant-customer-detail';
 
   // Restaurant - Online Orders
@@ -52,6 +48,11 @@ class RouteNames {
   // Restaurant - Inventory
   static const restaurantInventory = '/restaurant-inventory';
 
+  /// The low-stock work list. Named so a low-stock notification can land on
+  /// the screen that actually restocks, rather than on the Inventory hub —
+  /// retail's `stockAlerts` already worked this way.
+  static const restaurantLowStock = '/restaurant-low-stock';
+
   // Restaurant - Staff
   static const restaurantStaff = '/restaurant-staff';
 
@@ -63,33 +64,62 @@ class RouteNames {
 
   // Restaurant - Reports
   static const restaurantReports = '/restaurant-reports';
-  static const restaurantFilterOrders = '/restaurant-filter-orders';
   static const restaurantPerformanceStats = '/restaurant-performance-stats';
   static const restaurantReportsTotalSales = '/restaurant-report-totalsales';
   static const restaurantReportsSalesBYItem = '/restaurant-report-salebyitem';
-  static const restaurantReportsSalesByCategory = '/restaurant-report-salebycatgeory';
-  static const restaurantReportsDailyClosingReport = '/restaurant-report-dailyclosingreport';
-  static const restaurantReportsCustomerList = '/restaurant-report-customerlist';
-  static const restaurantReportsComparisionByWeek = '/restaurant-report-comparisionbyweek';
-  static const restaurantReportsComparisionByMonth  = '/restaurant-report-comparisionbymonth';
-  static const restaurantReportsComparisionByYear  = '/restaurant-report-comparisionbyyear';
-  static const restaurantReportsComparisionByProduct  = '/restaurant-report-comparisionbyproduct';
-  static const restaurantReportsRefundDetails  = '/restaurant-report-refunddetails';
-  static const restaurantReportsVoidOrderReport  = '/restaurant-report-voidorderreport';
-  static const restaurantReportsItemCancellation  = '/restaurant-report-itemcancellation';
-  static const restaurantReportsDiscountOrderReport  = '/restaurant-report-discountoderreport';
-  static const restaurantReportsPosOrder  = '/restaurant-report-posorderreport';
-  static const restaurantReportsCustomerListByRevenue = '/restaurant-report-customerlistbyrevenue';
-  static const restaurantReportsExpense  = '/restaurant-report-expensereport';
+  static const restaurantReportsSalesByCategory =
+      '/restaurant-report-salebycatgeory';
+  static const restaurantReportsDailyClosingReport =
+      '/restaurant-report-dailyclosingreport';
+  static const restaurantReportsCustomerList =
+      '/restaurant-report-customerlist';
+  static const restaurantReportsSalesComparison =
+      '/restaurant-report-sales-comparison';
+  static const restaurantReportsComparisionByProduct =
+      '/restaurant-report-comparisionbyproduct';
+  static const restaurantReportsRefundDetails =
+      '/restaurant-report-refunddetails';
+  static const restaurantReportsVoidOrderReport =
+      '/restaurant-report-voidorderreport';
+  static const restaurantReportsItemCancellation =
+      '/restaurant-report-itemcancellation';
+  static const restaurantReportsDiscountOrderReport =
+      '/restaurant-report-discountoderreport';
+  static const restaurantReportsPosOrder = '/restaurant-report-posorderreport';
+  static const restaurantReportsCustomerListByRevenue =
+      '/restaurant-report-customerlistbyrevenue';
+  static const restaurantReportsExpense = '/restaurant-report-expensereport';
+  static const restaurantReportsPaymentMode = '/restaurant-report-paymentmode';
+
+  // Purchasing reports. PO Status needs three routes for one screen —
+  // Navigator.pushNamed has no other way to pick a named constructor.
+  static const restaurantReportsPurchaseSummary =
+      '/restaurant-report-purchase-summary';
+  static const restaurantReportsSupplierPurchase =
+      '/restaurant-report-supplier-purchase';
+  static const restaurantReportsPoPending = '/restaurant-report-po-pending';
+  static const restaurantReportsPoPartial = '/restaurant-report-po-partial';
+  static const restaurantReportsPoCompleted = '/restaurant-report-po-completed';
+  static const restaurantReportsGrn = '/restaurant-report-grn';
+  static const restaurantReportsDamagedItems =
+      '/restaurant-report-damaged-items';
+  static const restaurantReportsPurchaseReturn =
+      '/restaurant-report-purchase-return';
+  static const restaurantReportsStockAdjustment =
+      '/restaurant-report-stock-adjustment';
+  static const restaurantReportsLowStock = '/restaurant-report-low-stock';
+  static const restaurantReportsSupplierStatement =
+      '/restaurant-report-supplier-statement';
   static const restaurantShiftReport = '/restaurant-shift-report';
   static const restaurantStaffPerformance = '/restaurant-staff-performance';
   static const restaurantCashDrawer = '/restaurant-cash-drawer';
   static const restaurantCashDrawerHistory = '/restaurant-cash-drawer-history';
   // static const restaurantReportsPerformanceStatistics  = '/restaurant-report-performanxestatisticsreport';
 
-
   // Restaurant - Settings
   static const restaurantSettings = '/restaurant-settings';
+  static const restaurantStoreInfo = '/restaurant-store-info';
+  static const restaurantUsageLimit = '/restaurant-usage-limit';
   static const restaurantLicensing = '/restaurant-licensing';
   static const restaurantOrderSettings = '/restaurant-order-settings';
   static const restaurantPaymentMethods = '/restaurant-payment-methods';
@@ -98,11 +128,11 @@ class RouteNames {
   // Restaurant - Tax
   static const restaurantTaxSettings = '/restaurant-tax-settings';
   static const restaurantApplyTax = '/restaurant-apply-tax';
-  static const restaurantAddMultipleTax = '/restaurant-add-multiple-tax';
 
   // Restaurant - Printer
   static const restaurantPrinterSettings = '/restaurant-printer-settings';
-  static const restaurantPrinterCustomization = '/restaurant-printer-customization';
+  static const restaurantPrinterCustomization =
+      '/restaurant-printer-customization';
 
   // Restaurant - End Day
   static const restaurantEndDay = '/restaurant-end-day';
@@ -113,33 +143,35 @@ class RouteNames {
 
   // Restaurant - Other
   static const restaurantNeedHelp = '/restaurant-need-help';
-  static const restaurantSupport = '/restaurant-support';
   static const restaurantCustomizationDrawer = '/restaurant-customization';
   static const restaurantTestData = '/restaurant-testdatascreen';
   static const restaurantAddPrinter = '/restaurant-addprinter';
   static const restaurantBulkImport = '/restaurant-bulk-import';
   static const restaurantDataGenratorScreen = '/restaurant-datageneratorscreen';
   static const restaurantSplashPreview = '/restaurant-splash-preview';
-  static const restaurantLicenseEmailDemo = '/restaurant-license-email-demo';
-  static const restaurantEmailSetupDemo = '/restaurant-email-setup-demo';
-  static const restaurantlogin  = '/restaurant-login';
-
-
-
+  static const restaurantlogin = '/restaurant-login';
 
   // Retail
   static const retailBilling = '/retail-billing';
   static const retailMenu = '/retail-menu';
+
+  /// Shared notification feed, retail entrance. The screen behind this and
+  /// behind [restaurantNotifications] is the same widget — the two names exist
+  /// only so each vertical applies its own route guard.
+  static const notifications = '/notifications';
 
   // Retail – Sales
   static const checkout = '/checkout';
   static const parkedSales = '/parked-sales';
 
   // Retail – Inventory
+  /// Catalog hub: Products + Categories + Attributes tabs.
+  static const productManagement = '/product-management';
   static const inventory = '/inventory';
   static const addProduct = '/add-product';
   static const categories = '/categories';
   static const stockAlerts = '/stock-alerts';
+  static const expiryAlerts = '/expiry-alerts';
 
   // Retail – Customers
   static const customers = '/customers';
@@ -148,13 +180,14 @@ class RouteNames {
   // Retail – Purchasing
   static const suppliers = '/suppliers';
   static const purchaseOrders = '/purchase-orders';
-  static const addPurchase = '/add-purchase';
-  static const purchaseHistory = '/purchase-history';
+  static const damagedGoods = '/damaged-goods';
+  static const purchaseReturns = '/purchase-returns';
+  static const supplierClaims = '/supplier-claims';
+  static const inventoryLosses = '/inventory-losses';
 
   // Retail – Reports
   static const reports = '/reports';
   static const salesHistory = '/sales-history';
-  static const eodReport = '/eod-report';
   static const gstReport = '/gst-report';
 
   // Retail – Settings
@@ -162,6 +195,14 @@ class RouteNames {
   static const storeInfo = '/store-info';
   static const gstSettings = '/gst-settings';
   static const paymentSetup = '/payment-setup';
+  // Kept as '/staff-setup' so existing links keep working; it now opens the
+  // real Manage Staff CRUD screen rather than the in-memory stub it used to.
   static const staffSetup = '/staff-setup';
   static const backup = '/backup';
+
+  // Retail – Staff
+  static const retailAttendance = '/attendance';
+  static const retailAttendanceReport = '/attendance-report';
+  static const retailShiftReport = '/shift-report';
+  static const retailStaffPerformance = '/staff-performance';
 }

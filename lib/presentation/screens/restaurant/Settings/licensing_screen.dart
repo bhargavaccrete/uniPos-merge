@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
@@ -6,7 +5,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/data/models/restaurant/license_model.dart';
-import 'package:billberrylite/domain/store/restaurant/company_store.dart';
 import 'package:billberrylite/domain/store/restaurant/license_store.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/util/color.dart';
@@ -77,41 +75,49 @@ class _LicensingScreenState extends State<LicensingScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(msg),
-        backgroundColor:
-            isError ? AppColors.danger : AppColors.success,
+        backgroundColor: isError ? AppColors.danger : AppColors.success,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final isTablet = !AppResponsive.isMobile(context);
-    final pad = isTablet ? 24.0 : 20.0;
+    final pad = AppResponsive.getValue(
+      context,
+      mobile: 20.0,
+      tablet: 24.0,
+      desktop: 28.0,
+    );
 
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(
         title: 'License & Subscription',
-        titleFontSize: isTablet ? 22 : 20,
+        titleFontSize: AppResponsive.headingFontSize(context),
       ),
       body: SafeArea(
         child: Observer(
           builder: (_) => SingleChildScrollView(
             padding: EdgeInsets.all(pad),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _licenseStatusCard(isTablet),
-                const SizedBox(height: 16),
-                if (_store.licenseInfo?.deviceInfo != null) ...[
-                  _deviceInfoCard(_store.licenseInfo!.deviceInfo!, isTablet),
+            child: AppResponsive.constrainedContent(
+              context: context,
+              maxWidth: AppResponsive.maxContentWidth(context),
+              alignment: Alignment.topCenter,
+              heightFactor: 1,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _licenseStatusCard(),
                   const SizedBox(height: 16),
+                  if (_store.licenseInfo?.deviceInfo != null) ...[
+                    _deviceInfoCard(_store.licenseInfo!.deviceInfo!),
+                    const SizedBox(height: 16),
+                  ],
+                  _actionsCard(),
                 ],
-                _actionsCard(isTablet),
-              ],
+              ),
             ),
           ),
         ),
@@ -119,16 +125,15 @@ class _LicensingScreenState extends State<LicensingScreen> {
     );
   }
 
-  Widget _licenseStatusCard(bool isTablet) {
+  Widget _licenseStatusCard() {
     final info = _store.licenseInfo;
     final status = _store.status;
 
     return _card(
-      isTablet: isTablet,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _cardHeader(Icons.verified_rounded, 'License Status', isTablet),
+          _cardHeader(Icons.verified_rounded, 'License Status'),
           const SizedBox(height: 16),
           Row(
             children: [
@@ -136,16 +141,18 @@ class _LicensingScreenState extends State<LicensingScreen> {
               const Spacer(),
               if (info != null && info.planName.isNotEmpty)
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
                     info.planName,
-                    style: TextStyle(
-                      fontSize: 12,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.smallFontSize(context),
                       color: AppColors.primary,
                       fontWeight: FontWeight.w600,
                     ),
@@ -156,16 +163,20 @@ class _LicensingScreenState extends State<LicensingScreen> {
           if (info != null) ...[
             const SizedBox(height: 14),
             _infoRow('License Key', info.maskedKey),
-            if (info.expiryDate != null)
-              _infoRow(
-                  'Expires', DateFormat('dd MMM yyyy').format(info.expiryDate!)),
+            _infoRow(
+              'Expires',
+              info.expiryDate != null
+                  ? DateFormat('dd MMM yyyy').format(info.expiryDate!)
+                  : 'Never',
+            ),
           ] else ...[
             const SizedBox(height: 12),
             Text(
               'No license activated on this device.',
-              style: TextStyle(
-                  fontSize: isTablet ? 14 : 13,
-                  color: AppColors.textSecondary),
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.smallFontSize(context),
+                color: AppColors.textSecondary,
+              ),
             ),
           ],
         ],
@@ -173,13 +184,12 @@ class _LicensingScreenState extends State<LicensingScreen> {
     );
   }
 
-  Widget _deviceInfoCard(DeviceInfo device, bool isTablet) {
+  Widget _deviceInfoCard(DeviceInfo device) {
     return _card(
-      isTablet: isTablet,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _cardHeader(Icons.devices_rounded, 'Device Information', isTablet),
+          _cardHeader(Icons.devices_rounded, 'Device Information'),
           const SizedBox(height: 16),
           _infoRow('Device ID', device.deviceId, copyable: true),
           _infoRow('Device Name', device.deviceName),
@@ -191,15 +201,14 @@ class _LicensingScreenState extends State<LicensingScreen> {
     );
   }
 
-  Widget _actionsCard(bool isTablet) {
+  Widget _actionsCard() {
     final hasLicense = _store.licenseInfo != null;
 
     return _card(
-      isTablet: isTablet,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _cardHeader(Icons.settings_outlined, 'Actions', isTablet),
+          _cardHeader(Icons.settings_outlined, 'Actions'),
           const SizedBox(height: 16),
           if (!hasLicense)
             _actionButton(
@@ -208,30 +217,6 @@ class _LicensingScreenState extends State<LicensingScreen> {
               color: AppColors.primary,
               onTap: () => _showActivateSheet(),
             ),
-          if (kDebugMode) ...[
-            _actionButton(
-              label: '[DEV] Inject Valid License (30 days)',
-              icon: Icons.science_rounded,
-              color: Colors.teal,
-              onTap: () async {
-                await _store.injectMockLicense(validityDays: 30);
-                _showSnack('Mock license injected', isError: false);
-                setState(() {});
-              },
-            ),
-            const SizedBox(height: 10),
-            _actionButton(
-              label: '[DEV] Inject Expired License',
-              icon: Icons.science_rounded,
-              color: Colors.orange,
-              onTap: () async {
-                await _store.injectExpiredLicense();
-                _showSnack('Expired license injected — restart to see lock', isError: false);
-                setState(() {});
-              },
-            ),
-            const SizedBox(height: 10),
-          ],
           if (hasLicense) ...[
             _actionButton(
               label: 'Re-activate / Change Key',
@@ -247,11 +232,16 @@ class _LicensingScreenState extends State<LicensingScreen> {
               onTap: _store.isLoading
                   ? null
                   : () async {
-                      await _store.refreshLicense();
+                      final planChanged = await _store.refreshLicense();
                       if (_store.errorMessage != null) {
                         _showSnack(_store.errorMessage!, isError: true);
                       } else {
-                        _showSnack('License refreshed', isError: false);
+                        _showSnack(
+                          planChanged
+                              ? 'Your plan was updated'
+                              : 'You already have the latest plan',
+                          isError: false,
+                        );
                       }
                     },
             ),
@@ -304,8 +294,11 @@ class _LicensingScreenState extends State<LicensingScreen> {
           const SizedBox(width: 6),
           Text(
             status.label,
-            style: TextStyle(
-                fontSize: 13, color: color, fontWeight: FontWeight.w600),
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.bodyFontSize(context),
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),
@@ -322,17 +315,20 @@ class _LicensingScreenState extends State<LicensingScreen> {
             width: 110,
             child: Text(
               label,
-              style: TextStyle(
-                  fontSize: 13, color: AppColors.textSecondary),
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+                color: AppColors.textSecondary,
+              ),
             ),
           ),
           Expanded(
             child: Text(
               value,
               style: GoogleFonts.poppins(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.textPrimary),
+                fontSize: AppResponsive.bodyFontSize(context),
+                fontWeight: FontWeight.w500,
+                color: AppColors.textPrimary,
+              ),
             ),
           ),
           if (copyable)
@@ -341,8 +337,11 @@ class _LicensingScreenState extends State<LicensingScreen> {
                 Clipboard.setData(ClipboardData(text: value));
                 _showSnack('Copied to clipboard', isError: false);
               },
-              child: Icon(Icons.copy_rounded,
-                  size: 16, color: AppColors.textSecondary),
+              child: Icon(
+                Icons.copy_rounded,
+                size: 16,
+                color: AppColors.textSecondary,
+              ),
             ),
         ],
       ),
@@ -360,8 +359,7 @@ class _LicensingScreenState extends State<LicensingScreen> {
       borderRadius: BorderRadius.circular(10),
       child: Container(
         width: double.infinity,
-        padding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(10),
@@ -373,10 +371,11 @@ class _LicensingScreenState extends State<LicensingScreen> {
             const SizedBox(width: 12),
             Text(
               label,
-              style: TextStyle(
-                  fontSize: 14,
-                  color: color,
-                  fontWeight: FontWeight.w500),
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+                color: color,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ],
         ),
@@ -384,7 +383,7 @@ class _LicensingScreenState extends State<LicensingScreen> {
     );
   }
 
-  Widget _cardHeader(IconData icon, String title, bool isTablet) {
+  Widget _cardHeader(IconData icon, String title) {
     return Row(
       children: [
         Container(
@@ -393,24 +392,34 @@ class _LicensingScreenState extends State<LicensingScreen> {
             color: AppColors.primary.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Icon(icon, size: isTablet ? 22 : 18, color: AppColors.primary),
+          child: Icon(
+            icon,
+            size: AppResponsive.getValue(
+              context,
+              mobile: 18.0,
+              tablet: 22.0,
+              desktop: 26.0,
+            ),
+            color: AppColors.primary,
+          ),
         ),
         const SizedBox(width: 10),
         Text(
           title,
           style: GoogleFonts.poppins(
-              fontSize: isTablet ? 15 : 13,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary),
+            fontSize: AppResponsive.bodyFontSize(context),
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
+          ),
         ),
       ],
     );
   }
 
-  Widget _card({required Widget child, required bool isTablet}) {
+  Widget _card({required Widget child}) {
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(isTablet ? 20 : 16),
+      padding: EdgeInsets.all(AppResponsive.largeSpacing(context)),
       decoration: BoxDecoration(
         color: AppColors.white,
         borderRadius: BorderRadius.circular(14),
@@ -458,8 +467,7 @@ class _ActivateSheetState extends State<_ActivateSheet> {
     }
     setState(() => _loading = true);
 
-    final businessName =
-        locator<CompanyStore>().company?.comapanyName ?? '';
+    final businessName = businessDetailsRepository.get()?.storeName ?? '';
     final success = await widget.store.activateLicense(
       key,
       businessName: businessName,
@@ -475,7 +483,6 @@ class _ActivateSheetState extends State<_ActivateSheet> {
   @override
   Widget build(BuildContext context) {
     final bottomPad = MediaQuery.of(context).viewInsets.bottom;
-    final isTablet = !AppResponsive.isMobile(context);
 
     return Container(
       padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + bottomPad),
@@ -499,42 +506,54 @@ class _ActivateSheetState extends State<_ActivateSheet> {
           ),
           const SizedBox(height: 16),
           Text(
-            widget.isReactivate
-                ? 'Re-activate License'
-                : 'Activate License',
+            widget.isReactivate ? 'Re-activate License' : 'Activate License',
             style: GoogleFonts.poppins(
-                fontSize: isTablet ? 18 : 16,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary),
+              fontSize: AppResponsive.subheadingFontSize(context),
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
           ),
           const SizedBox(height: 4),
           Text(
             'Enter the license key provided with your subscription.',
-            style: TextStyle(
-                fontSize: isTablet ? 14 : 13,
-                color: AppColors.textSecondary),
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.smallFontSize(context),
+              color: AppColors.textSecondary,
+            ),
           ),
           const SizedBox(height: 16),
           AppTextField(
             controller: widget.controller,
+            autofocus: true,
             label: 'License Key',
             hint: 'e.g. XXXX-XXXX-XXXX-XXXX',
             icon: Icons.key_rounded,
             enableSuggestions: false,
             autocorrect: false,
+            textInputAction: TextInputAction.done,
+            onFieldSubmitted: (_) {
+              if (!_loading) _activate();
+            },
           ),
           const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
-            height: isTablet ? 54 : 50,
+            height: AppResponsive.getValue(
+              context,
+              mobile: 50.0,
+              tablet: 54.0,
+              desktop: 58.0,
+            ),
             child: ElevatedButton(
               onPressed: _loading ? null : _activate,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
-                disabledBackgroundColor:
-                    AppColors.primary.withValues(alpha: 0.5),
+                disabledBackgroundColor: AppColors.primary.withValues(
+                  alpha: 0.5,
+                ),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 elevation: 0,
               ),
               child: _loading
@@ -542,14 +561,17 @@ class _ActivateSheetState extends State<_ActivateSheet> {
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white),
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
                     )
                   : Text(
                       'Activate',
                       style: GoogleFonts.poppins(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white),
+                        fontSize: AppResponsive.bodyFontSize(context),
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
                     ),
             ),
           ),

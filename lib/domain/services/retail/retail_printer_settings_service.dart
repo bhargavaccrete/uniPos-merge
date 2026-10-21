@@ -62,6 +62,12 @@ class RetailPrinterSettingsService {
     await _saveSettings();
   }
 
+  /// Thermal receipt layout. Has no effect on A4, whose layout is fixed.
+  Future<void> setBillTemplate(BillTemplate template) async {
+    _settings = _settings.copyWith(billTemplate: template);
+    await _saveSettings();
+  }
+
   // ==================== LOGO SETTINGS ====================
 
   Future<void> setShowLogo(bool show) async {
@@ -152,11 +158,6 @@ class RetailPrinterSettingsService {
 
   Future<void> setShowBarcode(bool show) async {
     _settings = _settings.copyWith(showBarcode: show);
-    await _saveSettings();
-  }
-
-  Future<void> setShowHSNCode(bool show) async {
-    _settings = _settings.copyWith(showHSNCode: show);
     await _saveSettings();
   }
 
@@ -298,11 +299,6 @@ class RetailPrinterSettingsService {
   }
 
   // ==================== LANGUAGE & FORMAT ====================
-
-  Future<void> setCurrencySymbol(String symbol) async {
-    _settings = _settings.copyWith(currencySymbol: symbol);
-    await _saveSettings();
-  }
 
   Future<void> setDateFormat(String format) async {
     _settings = _settings.copyWith(dateFormat: format);

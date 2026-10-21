@@ -1,4 +1,5 @@
 // import 'package:flutter/material.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 // import 'package:BillBerry/constant/color.dart';
 // import 'package:BillBerry/screens/online%20Order/Completed.dart';
 // import 'package:BillBerry/screens/online%20Order/inProgress.dart';
@@ -131,9 +132,7 @@ class _OnlineDesktopState extends State<OnlineDesktop> {
       case "Missed (0)":
         return Online_Missed();
       default:
-        return Center(
-          child: Text('NO Data Available'),
-        );
+        return Center(child: Text('NO Data Available'));
     }
   }
 
@@ -143,30 +142,26 @@ class _OnlineDesktopState extends State<OnlineDesktop> {
       appBar: buildPrimaryAppBar(
         title: "Orange",
         leading: IconButton(
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            icon: Icon(
-              Icons.arrow_back_ios,
-            )),
+          onPressed: () {
+            Navigator.pop(context);
+          },
+          icon: Icon(Icons.arrow_back_ios),
+        ),
         actions: [
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: Row(
               children: [
-                Icon(
-                  Icons.person_outline_outlined,
-                  size: 30,
-                ),
+                Icon(Icons.person_outline_outlined, size: 30),
                 Column(
                   children: [
                     Text('Admin', style: TextStyle(color: Colors.white)),
                     Text('Admin', style: TextStyle(color: Colors.white)),
                   ],
-                )
+                ),
               ],
             ),
-          )
+          ),
         ],
       ),
       body: Container(
@@ -187,9 +182,7 @@ class _OnlineDesktopState extends State<OnlineDesktop> {
                       });
                     },
                   ),
-                  SizedBox(
-                    width: 10,
-                  ),
+                  SizedBox(width: 10),
                   Filterbutton(
                     title: 'In Progress (0)',
                     selectedFilter: selectedFilter,
@@ -199,9 +192,7 @@ class _OnlineDesktopState extends State<OnlineDesktop> {
                       });
                     },
                   ),
-                  SizedBox(
-                    width: 10,
-                  ),
+                  SizedBox(width: 10),
                   Filterbutton(
                     title: 'Completed (0)',
                     selectedFilter: selectedFilter,
@@ -211,9 +202,7 @@ class _OnlineDesktopState extends State<OnlineDesktop> {
                       });
                     },
                   ),
-                  SizedBox(
-                    width: 10,
-                  ),
+                  SizedBox(width: 10),
                   Filterbutton(
                     title: 'Missed (0)',
                     selectedFilter: selectedFilter,
@@ -226,12 +215,22 @@ class _OnlineDesktopState extends State<OnlineDesktop> {
                 ],
               ),
             ),
-            Expanded(child: _getBody())
+            Expanded(
+              // Cap the CONTENT, not the tab strip above it. The children
+              // (Online_InProgress / Completed / Missed) stay uncapped so
+              // nothing is constrained twice.
+              child: AppResponsive.constrainedContent(
+                context: context,
+                maxWidth: AppResponsive.maxContentWidth(context),
+                alignment: Alignment.topCenter,
+                child: _getBody(),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-// CommonButton;
+  // CommonButton;
 }

@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/stores/payment_method_store.dart';
 import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 
 class PaymentSetupScreen extends StatefulWidget {
   final VoidCallback? onComplete;
   final VoidCallback? onSkip;
 
-  const PaymentSetupScreen({
-    Key? key,
-    this.onComplete,
-    this.onSkip,
-  }) : super(key: key);
+  const PaymentSetupScreen({Key? key, this.onComplete, this.onSkip})
+    : super(key: key);
 
   @override
   State<PaymentSetupScreen> createState() => _PaymentSetupScreenState();
@@ -49,84 +51,78 @@ class _PaymentSetupScreenState extends State<PaymentSetupScreen> {
 
     await showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Add Payment Method'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: nameController,
-                  decoration: InputDecoration(
-                    labelText: 'Display Name',
-                    hintText: 'e.g., PayTM, GPay',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AppDialogShell(
+          title: 'Add Payment Method',
+          icon: Icons.payment,
+          accent: AppColors.primary,
+          // No SingleChildScrollView here - AppDialogShell already wraps the
+          // body in Flexible(SingleChildScrollView(...)).
+          body: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AppTextField(
+                controller: nameController,
+                label: 'Display Name',
+                hint: 'e.g., PayTM, GPay',
+              ),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
+              AppTextField(
+                controller: valueController,
+                label: 'Internal Value',
+                hint: 'e.g., paytm, gpay',
+              ),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
+              DropdownButtonFormField<String>(
+                value: selectedIcon,
+                decoration: InputDecoration(
+                  labelText: 'Icon',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: valueController,
-                  decoration: InputDecoration(
-                    labelText: 'Internal Value',
-                    hintText: 'e.g., paytm, gpay',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
+                items: _availableIcons.entries.map((entry) {
+                  return DropdownMenuItem(
+                    value: entry.key,
+                    child: Row(
+                      children: [
+                        Icon(
+                          entry.value,
+                          size: AppResponsive.iconSize(context),
+                        ),
+                        SizedBox(width: AppResponsive.smallSpacing(context)),
+                        Text(entry.key),
+                      ],
                     ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  value: selectedIcon,
-                  decoration: InputDecoration(
-                    labelText: 'Icon',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  items: _availableIcons.entries.map((entry) {
-                    return DropdownMenuItem(
-                      value: entry.key,
-                      child: Row(
-                        children: [
-                          Icon(entry.value, size: 20),
-                          const SizedBox(width: 8),
-                          Text(entry.key),
-                        ],
-                      ),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    setDialogState(() {
-                      selectedIcon = value!;
-                    });
-                  },
-                ),
-              ],
-            ),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  setDialogState(() {
+                    selectedIcon = value!;
+                  });
+                },
+              ),
+            ],
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
+            appDialogCancelButton(dialogContext),
+            appDialogPrimaryButton(
+              label: 'Add',
               onPressed: () async {
-                if (nameController.text.isNotEmpty && valueController.text.isNotEmpty) {
-                  await _store.addPaymentMethod(
-                    name: nameController.text,
-                    value: valueController.text,
-                    iconName: selectedIcon,
-                  );
-                  if (mounted) Navigator.pop(context);
+                if (nameController.text.isEmpty ||
+                    valueController.text.isEmpty) {
+                  return;
                 }
+                // Navigator captured before the await - the dialog context is
+                // not what the State's `mounted` flag tracks.
+                final nav = Navigator.of(dialogContext);
+                await _store.addPaymentMethod(
+                  name: nameController.text,
+                  value: valueController.text,
+                  iconName: selectedIcon,
+                );
+                nav.pop();
               },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-              ),
-              child: const Text('Add'),
             ),
           ],
         ),
@@ -135,28 +131,16 @@ class _PaymentSetupScreenState extends State<PaymentSetupScreen> {
   }
 
   Future<void> _deleteMethod(String id) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showAppConfirmDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Payment Method'),
-        content: const Text('Are you sure you want to delete this payment method?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.danger,
-            ),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+      title: 'Delete Payment Method',
+      message: 'Are you sure you want to delete this payment method?',
+      confirmLabel: 'Delete',
+      accent: AppColors.danger,
+      icon: Icons.delete_outline_rounded,
     );
 
-    if (confirmed == true) {
+    if (confirmed) {
       await _store.deletePaymentMethod(id);
     }
   }
@@ -168,226 +152,269 @@ class _PaymentSetupScreenState extends State<PaymentSetupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Payment Methods Setup'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-      ),
-      body: Observer(
-        builder: (_) {
-          if (_store.isLoading && _store.paymentMethods.isEmpty) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      appBar: buildPrimaryAppBar(title: 'Payment Methods Setup'),
+      body: AppResponsive.constrainedContent(
+        context: context,
+        alignment: Alignment.topCenter,
+        maxWidth: AppResponsive.maxCardWidth(context),
+        child: Observer(
+          builder: (_) {
+            if (_store.isLoading && _store.paymentMethods.isEmpty) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-          return Column(
-            children: [
-              // Header Section
-              Container(
-                padding: const EdgeInsets.all(20),
-                color: Colors.grey[100],
-                child: Row(
-                  children: [
-                    Icon(Icons.info_outline, color: AppColors.primary),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'Enable or disable payment methods to show during checkout',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[700],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Payment Methods List
-              Expanded(
-                child: _store.paymentMethods.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.payment, size: 64, color: Colors.grey[400]),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No payment methods configured',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _store.paymentMethods.length,
-                        itemBuilder: (context, index) {
-                          final method = _store.paymentMethods[index];
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            elevation: 2,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: ListTile(
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 8,
-                              ),
-                              leading: Container(
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: method.isEnabled
-                                      ? AppColors.primary.withOpacity(0.1)
-                                      : Colors.grey[200],
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Icon(
-                                  _getIcon(method.iconName),
-                                  color: method.isEnabled
-                                      ? AppColors.primary
-                                      : Colors.grey[400],
-                                  size: 28,
-                                ),
-                              ),
-                              title: Text(
-                                method.name,
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: method.isEnabled
-                                      ? AppColors.darkNeutral
-                                      : Colors.grey[500],
-                                ),
-                              ),
-                              subtitle: Text(
-                                method.isEnabled ? 'Enabled' : 'Disabled',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: method.isEnabled
-                                      ? AppColors.success
-                                      : Colors.grey[500],
-                                ),
-                              ),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Switch(
-                                    value: method.isEnabled,
-                                    onChanged: (value) => _store.togglePaymentMethod(method.id),
-                                    activeColor: AppColors.primary,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  // Only show delete for custom methods (sortOrder > 6)
-                                  if (method.sortOrder > 6)
-                                    IconButton(
-                                      icon: Icon(Icons.delete, color: AppColors.danger),
-                                      onPressed: () => _deleteMethod(method.id),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-              ),
-
-              // Bottom Action Button
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, -2),
-                    ),
-                  ],
-                ),
-                child: SafeArea(
+            return Column(
+              children: [
+                // Header Section
+                Container(
+                  padding: AppResponsive.padding(context),
+                  color: Colors.grey[100],
                   child: Row(
                     children: [
+                      Icon(Icons.info_outline, color: AppColors.primary),
+                      SizedBox(width: AppResponsive.mediumSpacing(context)),
                       Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _showAddMethodDialog,
-                          icon: const Icon(Icons.add),
-                          label: const Text('Add Custom Method'),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            side: BorderSide(color: AppColors.primary),
-                            foregroundColor: AppColors.primary,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      if (widget.onSkip != null)
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: widget.onSkip,
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              side: BorderSide(color: Colors.grey[400]!),
-                              foregroundColor: Colors.grey[700],
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                            child: const Text(
-                              'Setup Later',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () {
-                            if (widget.onComplete != null) {
-                              widget.onComplete!();
-                            } else {
-                              Navigator.pop(context);
-                            }
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Payment methods saved successfully'),
-                                backgroundColor: Colors.green,
-                                duration: Duration(seconds: 2),
-                              ),
-                            );
-                          },
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            backgroundColor: AppColors.primary,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                          child: Text(
-                            widget.onComplete != null ? 'Next' : 'Done',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
+                        child: Text(
+                          'Enable or disable payment methods to show during checkout',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.bodyFontSize(context),
+                            color: Colors.grey[700],
                           ),
                         ),
                       ),
                     ],
                   ),
                 ),
-              ),
-            ],
-          );
-        },
+
+                // Payment Methods List
+                Expanded(
+                  child: _store.paymentMethods.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.payment,
+                                size: 64,
+                                color: Colors.grey[400],
+                              ),
+                              SizedBox(
+                                height: AppResponsive.largeSpacing(context),
+                              ),
+                              Text(
+                                'No payment methods configured',
+                                style: GoogleFonts.poppins(
+                                  fontSize: AppResponsive.subheadingFontSize(
+                                    context,
+                                  ),
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: AppResponsive.cardPadding(context),
+                          itemCount: _store.paymentMethods.length,
+                          itemBuilder: (context, index) {
+                            final method = _store.paymentMethods[index];
+                            return Card(
+                              // Explicit white + no surface tint — see
+                              // eod_reports_list_screen: an untinted Card
+                              // picks up M3's default lavender at elevation.
+                              color: AppColors.white,
+                              surfaceTintColor: Colors.transparent,
+                              margin: EdgeInsets.only(
+                                bottom: AppResponsive.mediumSpacing(context),
+                              ),
+                              elevation: 2,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(
+                                  AppResponsive.borderRadius(context),
+                                ),
+                              ),
+                              child: ListTile(
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 8,
+                                ),
+                                leading: Container(
+                                  padding: EdgeInsets.all(
+                                    AppResponsive.mediumSpacing(context),
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: method.isEnabled
+                                        ? AppColors.primary.withValues(
+                                            alpha: 0.1,
+                                          )
+                                        : Colors.grey[200],
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Icon(
+                                    _getIcon(method.iconName),
+                                    color: method.isEnabled
+                                        ? AppColors.primary
+                                        : Colors.grey[400],
+                                    size: 28,
+                                  ),
+                                ),
+                                title: Text(
+                                  method.name,
+                                  style: GoogleFonts.poppins(
+                                    fontSize: AppResponsive.subheadingFontSize(
+                                      context,
+                                    ),
+                                    fontWeight: FontWeight.w600,
+                                    color: method.isEnabled
+                                        ? AppColors.darkNeutral
+                                        : Colors.grey[500],
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  method.isEnabled ? 'Enabled' : 'Disabled',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: AppResponsive.smallFontSize(
+                                      context,
+                                    ),
+                                    color: method.isEnabled
+                                        ? AppColors.success
+                                        : Colors.grey[500],
+                                  ),
+                                ),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Switch(
+                                      value: method.isEnabled,
+                                      onChanged: (value) =>
+                                          _store.togglePaymentMethod(method.id),
+                                      activeColor: AppColors.primary,
+                                    ),
+                                    SizedBox(
+                                      width: AppResponsive.smallSpacing(
+                                        context,
+                                      ),
+                                    ),
+                                    // Only show delete for custom methods (sortOrder > 6)
+                                    if (method.sortOrder > 6)
+                                      IconButton(
+                                        icon: Icon(
+                                          Icons.delete,
+                                          color: AppColors.danger,
+                                        ),
+                                        onPressed: () =>
+                                            _deleteMethod(method.id),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+
+                // Bottom Action Button
+                Container(
+                  padding: AppResponsive.cardPadding(context),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, -2),
+                      ),
+                    ],
+                  ),
+                  child: SafeArea(
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _showAddMethodDialog,
+                            icon: const Icon(Icons.add),
+                            label: const Text('Add Custom Method'),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              side: BorderSide(color: AppColors.primary),
+                              foregroundColor: AppColors.primary,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: AppResponsive.mediumSpacing(context)),
+                        if (widget.onSkip != null)
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: widget.onSkip,
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
+                                side: BorderSide(color: Colors.grey[400]!),
+                                foregroundColor: Colors.grey[700],
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                              child: Text(
+                                'Setup Later',
+                                style: GoogleFonts.poppins(
+                                  fontSize: AppResponsive.subheadingFontSize(
+                                    context,
+                                  ),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                        SizedBox(width: AppResponsive.mediumSpacing(context)),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              if (widget.onComplete != null) {
+                                widget.onComplete!();
+                              } else {
+                                Navigator.pop(context);
+                              }
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Payment methods saved successfully',
+                                  ),
+                                  backgroundColor: Colors.green,
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              backgroundColor: AppColors.primary,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            child: Text(
+                              widget.onComplete != null ? 'Next' : 'Done',
+                              style: GoogleFonts.poppins(
+                                fontSize: AppResponsive.subheadingFontSize(
+                                  context,
+                                ),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }

@@ -26,7 +26,20 @@ class AppConfig {
   /// Feature flag: retail mode is hidden for now (restaurant-only release).
   /// The retail code is intact — flip this to `true` to re-enable retail in
   /// onboarding (business-type selection, splash/walkthrough copy, etc.).
-  static const bool retailEnabled = false;
+  static const bool retailEnabled = true;
+
+  /// TESTING ONLY — shows a "Skip for now" action on the retail licence step of
+  /// the setup wizard.
+  ///
+  /// Exists because the server Feature Catalog does not carry the `retail.*`
+  /// keys yet: without it, retail setup cannot be completed at all. Skipping
+  /// does NOT fake a licence or set a bypass flag — it just advances the wizard,
+  /// so `licenseInfo` stays null and retail keeps the same open behaviour it has
+  /// today (see `PlanEnforce._bypassed`).
+  ///
+  /// **Flip to `false` once the backend serves retail entitlements.** Restaurant
+  /// is unaffected either way — the action is retail-only.
+  static const bool retailLicenseSkipForTesting = true;
 
   static const String _boxName = 'appConfigBox';
   static const String _businessModeKey = 'businessMode';

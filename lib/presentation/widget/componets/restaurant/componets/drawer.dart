@@ -1,24 +1,20 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:flutter/services.dart' show FilteringTextInputFormatter;
-import 'package:share_plus/share_plus.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:lottie/lottie.dart';
-import 'package:billberrylite/presentation/widget/componets/restaurant/componets/Textform.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/util/restaurant/restaurant_session.dart';
 import 'package:billberrylite/util/restaurant/restaurant_auth_helper.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/core/plan/entitlement_keys.dart';
+import 'package:billberrylite/core/plan/plan_guard.dart';
 import 'package:billberrylite/core/routes/routes_name.dart';
-import 'package:billberrylite/domain/services/common/unified_backup_service.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
-import 'package:billberrylite/main.dart' as main_app;
-
-import '../../../../../util/images.dart';
 
 class Drawerr extends StatefulWidget {
   // Order-screen-only action; hidden on the Dashboard.
@@ -27,12 +23,19 @@ class Drawerr extends StatefulWidget {
   final bool showGridDuplicates;
   // Change PIN is shown on the Dashboard for staff.
   final bool showChangePin;
+  // Redundant on the Dashboard (that screen IS Home).
+  final bool showHome;
+  final bool showLogout;
+  final bool isManagementMode;
 
   const Drawerr({
     super.key,
     this.showClearCart = true,
     this.showGridDuplicates = true,
     this.showChangePin = false,
+    this.showHome = true,
+    this.showLogout = false,
+    this.isManagementMode = false,
   });
 
   @override
@@ -105,7 +108,7 @@ class _DrawerrState extends State<Drawerr> {
                   ),
                   SizedBox(height: 4),
                   Text(
-                    'POS System',
+                    widget.isManagementMode ? 'Restaurant Management' : 'POS System',
                     style: GoogleFonts.poppins(
                       fontSize: AppResponsive.getValue(context, mobile: 13, tablet: 14),
                       fontWeight: FontWeight.w400,
@@ -118,36 +121,57 @@ class _DrawerrState extends State<Drawerr> {
 
             // Menu Items
             Expanded(
-              child: ListView(
-                padding: EdgeInsets.symmetric(
-                  vertical: AppResponsive.getValue(context, mobile: 12, tablet: 16),
-                  horizontal: AppResponsive.getValue(context, mobile: 8, tablet: 12),
-                ),
-                children: [
-                  _buildDrawerItem(
-                    context: context,
-                    icon: Icons.home_rounded,
-                    title: 'Home',
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.pushNamed(context, RouteNames.restaurantAdminWelcome);
-                    },
-                    isTablet: isTablet,
+              child: Observer(
+                builder: (context) => ListView(
+                  padding: EdgeInsets.symmetric(
+                    vertical: AppResponsive.getValue(context, mobile: 12, tablet: 16),
+                    horizontal: AppResponsive.getValue(context, mobile: 8, tablet: 12),
                   ),
-
-                  if (widget.showClearCart)
+                  children: [
+                  if (widget.showHome)
                     _buildDrawerItem(
                       context: context,
-                      icon: Icons.cleaning_services_rounded,
-                      title: 'Clear Cart',
+                      icon: Icons.home_rounded,
+                      title: 'Home',
                       onTap: () {
                         Navigator.pop(context);
-                        _showClearCartDialog(context);
+                        Navigator.pushNamedAndRemoveUntil(
+                          context,
+                          RouteNames.restaurantAdminWelcome,
+                          (route) => false,
+                        );
                       },
                       isTablet: isTablet,
                     ),
 
-                  // Printer Settings Expandable (store config — admin/manager only)
+                  if (widget.showClearCart && cartStore.isNotEmpty)
+                    _buildDrawerItem(
+                      context: context,
+                      icon: Icons.cleaning_services_rounded,
+                      title: 'Clear Cart',
+                      onTap: () async {
+                        Navigator.pop(context);
+                        final confirmed = await showAppConfirmDialog(
+                          context: context,
+                          title: 'Clear Cart?',
+                          message: 'Are you sure you want to clear the cart?',
+                          confirmLabel: 'Clear',
+                          cancelLabel: 'Cancel',
+                          accent: Colors.orange,
+                          icon: Icons.warning_rounded,
+                        );
+                        if (confirmed) {
+                          await clearCart();
+                          if (context.mounted) {
+                            Navigator.pushNamed(context, RouteNames.restaurantStartOrder);
+                          }
+                        }
+                      },
+                      isTablet: isTablet,
+                    ),
+
+                  // Printer Settings Expandable (store config — admin/manager only).
+                  // Follows billing (printing is required to operate), not settings.
                   if (RestaurantSession.canAccess('settings'))
                   _buildExpandableSection(
                     context: context,
@@ -165,23 +189,19 @@ class _DrawerrState extends State<Drawerr> {
                         icon: Icons.add_circle_outline,
                         title: 'Add Printer',
                         onTap: () {
+                          if (!PlanGuard.allowedOr(context, EntKeys.billing, featureName: 'Printer Settings')) return;
                           Navigator.pop(context);
                           Navigator.pushNamed(context, RouteNames.restaurantPrinterSettings);
                         },
                         isTablet: isTablet,
                       ),
-                      _buildSubItem(
-                        context: context,
-                        icon: Icons.settings_outlined,
-                        title: 'Cash Drawer Setting',
-                        onTap: () {},
-                        isTablet: isTablet,
-                      ),
+
                       _buildSubItem(
                         context: context,
                         icon: Icons.tune_rounded,
                         title: 'Customize Printer',
                         onTap: () {
+                          if (!PlanGuard.allowedOr(context, EntKeys.billing, featureName: 'Printer Settings')) return;
                           Navigator.pop(context);
                           Navigator.pushNamed(context, RouteNames.restaurantPrinterCustomization);
                         },
@@ -197,6 +217,7 @@ class _DrawerrState extends State<Drawerr> {
                     icon: Icons.dashboard_customize_rounded,
                     title: 'Customization',
                     onTap: () {
+                      if (!PlanGuard.allowedOr(context, EntKeys.settings, featureName: 'Customization')) return;
                       Navigator.pop(context);
                       Navigator.pushNamed(context, RouteNames.restaurantCustomizationDrawer);
                     },
@@ -210,6 +231,7 @@ class _DrawerrState extends State<Drawerr> {
                       icon: Icons.bar_chart_rounded,
                       title: 'Reports',
                       onTap: () {
+                        if (!PlanGuard.allowedOr(context, EntKeys.reports, featureName: 'Reports')) return;
                         Navigator.pop(context);
                         Navigator.pushNamed(context, RouteNames.restaurantReports);
                       },
@@ -222,12 +244,14 @@ class _DrawerrState extends State<Drawerr> {
                       icon: Icons.account_balance_wallet_rounded,
                       title: 'Expenses',
                       onTap: () {
+                        if (!PlanGuard.allowedOr(context, EntKeys.expenses, featureName: 'Expenses')) return;
                         Navigator.pop(context);
                         Navigator.pushNamed(context, RouteNames.restaurantExpenses);
                       },
                       isTablet: isTablet,
                     ),
 
+                    // End Day is always reachable (day lifecycle close path).
                     if (RestaurantSession.canAccess('cashDrawer'))
                     _buildDrawerItem(
                       context: context,
@@ -244,21 +268,10 @@ class _DrawerrState extends State<Drawerr> {
                   if (RestaurantSession.canAccess('settings'))
                   _buildDrawerItem(
                     context: context,
-                    icon: Icons.import_export_rounded,
-                    title: 'Import/Export',
-                    onTap: () {
-                      Navigator.pop(context);
-                      _showImportExportDialog(context);
-                    },
-                    isTablet: isTablet,
-                  ),
-
-                  if (RestaurantSession.canAccess('settings'))
-                  _buildDrawerItem(
-                    context: context,
                     icon: Icons.data_object_rounded,
                     title: 'Test Data Generator',
                     onTap: () {
+                      if (!PlanGuard.allowedOr(context, EntKeys.settings, featureName: 'Settings')) return;
                       Navigator.pop(context);
                       Navigator.pushNamed(context, RouteNames.restaurantTestData);
                     },
@@ -292,10 +305,25 @@ class _DrawerrState extends State<Drawerr> {
                       },
                       isTablet: isTablet,
                     ),
+                  if (widget.showLogout) ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Divider(color: AppColors.divider, thickness: 1),
+                    ),
+                    _buildDrawerItem(
+                      context: context,
+                      icon: Icons.logout_rounded,
+                      title: 'Logout',
+                      onTap: () => _showLogoutDialog(context),
+                      isTablet: isTablet,
+                      color: Colors.red,
+                    ),
+                  ],
 
                 ],
               ),
             ),
+          ),
 
             // Footer
             Container(
@@ -495,93 +523,6 @@ class _DrawerrState extends State<Drawerr> {
     );
   }
 
-  void _showClearCartDialog(BuildContext context) {
-    final hInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-        : 24.0;
-    showDialog(
-      context: context,
-      builder: (BuildContext dialogContext) => AlertDialog(
-        insetPadding: EdgeInsets.symmetric(horizontal: hInset, vertical: 24),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Container(
-              padding: EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.orange.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.warning_rounded,
-                color: Colors.orange,
-                size: AppResponsive.getValue(context, mobile: 24, tablet: 28),
-              ),
-            ),
-            AppResponsive.horizontalSpace(context, size: SpacingSize.small),
-            Expanded(
-              child: Text(
-                'Clear Cart?',
-                style: GoogleFonts.poppins(
-                  fontSize: AppResponsive.getValue(context, mobile: 18, tablet: 20),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ),
-        content: Text(
-          'Are you sure you want to clear the cart?',
-          style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context)),
-        ),
-        actions: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogContext),
-                style: TextButton.styleFrom(
-                  padding: AppResponsive.horizontalPadding(context),
-                ),
-                child: Text(
-                  "No",
-                  style: GoogleFonts.poppins(
-                    fontSize: AppResponsive.buttonFontSize(context),
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-              AppResponsive.horizontalSpace(context, size: SpacingSize.small),
-              ElevatedButton(
-                onPressed: () async {
-                  Navigator.pop(dialogContext);
-                  await clearCart();
-                  Navigator.pushNamed(context, RouteNames.restaurantStartOrder);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orange,
-                  foregroundColor: Colors.white,
-                  padding: AppResponsive.horizontalPadding(context),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  elevation: 0,
-                ),
-                child: Text(
-                  "Yes",
-                  style: GoogleFonts.poppins(
-                    fontSize: AppResponsive.buttonFontSize(context),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 
   void _showChangePinDialog(BuildContext context) {
     final currentPinCtrl = TextEditingController();
@@ -690,322 +631,28 @@ class _DrawerrState extends State<Drawerr> {
     );
   }
 
-  void _showSyncDialog(BuildContext context) {
-    Timer(
-      Duration(seconds: 5),
-      () {
-        Navigator.of(context, rootNavigator: true).pop();
-      },
-    );
-
-    final syncHInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-        : 24.0;
-    showDialog(
+  void _showLogoutDialog(BuildContext context) async {
+    final navigator = Navigator.of(context);
+    final ok = await showAppConfirmDialog(
       context: context,
+      title: 'Logout',
+      message: 'Are you sure you want to logout?',
+      confirmLabel: 'Logout',
+      accent: Colors.red,
+      icon: Icons.logout_rounded,
       barrierDismissible: false,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          insetPadding: EdgeInsets.symmetric(horizontal: syncHInset, vertical: 24),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          content: Container(
-            padding: EdgeInsets.all(10),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Lottie.asset(
-                  AppImages.syncanimation,
-                  width: AppResponsive.getValue(context, mobile: 180, tablet: 220),
-                  height: AppResponsive.getValue(context, mobile: 130, tablet: 160),
-                ),
-                AppResponsive.verticalSpace(context, size: SpacingSize.large),
-                Text(
-                  'Sync in Progress...',
-                  style: GoogleFonts.poppins(
-                    color: AppColors.primary,
-                    fontSize: AppResponsive.getValue(context, mobile: 18, tablet: 20),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                AppResponsive.verticalSpace(context, size: SpacingSize.small),
-                Text(
-                  'Please wait while we update your data...',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context)),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+    );
+    if (!ok) return;
+    await _clearLoginState();
+    navigator.pushNamedAndRemoveUntil(
+      RouteNames.restaurantLogin,
+      (route) => false,
     );
   }
 
-  void _showImportExportDialog(BuildContext context) {
-    final importExportHInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
-        : 24.0;
-    showDialog(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              insetPadding: EdgeInsets.symmetric(horizontal: importExportHInset, vertical: 24),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              title: Center(
-                child: Text(
-                  'Backup & Restore',
-                  style: GoogleFonts.poppins(
-                    fontSize: AppResponsive.getValue(context, mobile: 18, tablet: 20),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Download to Downloads Button
-
-                    ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        minimumSize: Size(double.infinity, AppResponsive.buttonHeight(context)),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      icon: Icon(Icons.download, color: Colors.white),
-                      label: Text(
-                        'Download Backup',
-                        style: GoogleFonts.poppins(
-                          color: Colors.white,
-                          fontSize: AppResponsive.buttonFontSize(context),
-                        ),
-                      ),
-                      onPressed: () async {
-                        final outerContext = context;
-                        // Backups are always encrypted — make sure a password is set first.
-                        if (!await UnifiedBackupService
-                            .ensureBackupPassword(outerContext)) {
-                          return;
-                        }
-                        if (!outerContext.mounted) return;
-                        Navigator.pop(outerContext);
-
-                        final navigatorState =
-                            Navigator.of(outerContext, rootNavigator: true);
-                        final backupHInset = !AppResponsive.isMobile(outerContext)
-                            ? ((AppResponsive.screenWidth(outerContext) - AppResponsive.dialogWidth(outerContext)) / 2).clamp(40.0, 200.0)
-                            : 24.0;
-                        showDialog(
-                          context: outerContext,
-                          barrierDismissible: false,
-                          builder: (BuildContext context) {
-                            return WillPopScope(
-                              onWillPop: () async => false,
-                              child: AlertDialog(
-                                insetPadding: EdgeInsets.symmetric(horizontal: backupHInset, vertical: 24),
-                                content: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    CircularProgressIndicator(),
-                                    AppResponsive.verticalSpace(context, size: SpacingSize.medium),
-                                    Text(
-                                      'Creating backup...\nPlease wait',
-                                      textAlign: TextAlign.center,
-                                      style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context)),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        );
-
-                        String? filePath;
-                        try {
-                          filePath =
-                              await UnifiedBackupService.exportToDownloads();
-                        } catch (e) {
-                          debugPrint('❌ Backup error: $e');
-                        } finally {
-                          try {
-                            navigatorState.pop();
-                          } catch (e) {
-                            debugPrint('❌ Error closing dialog: $e');
-                          }
-                        }
-
-                        await Future.delayed(Duration(milliseconds: 300));
-
-                        if (filePath == null) {
-                          if (outerContext.mounted) {
-                            NotificationService.instance.showError('Backup failed');
-                          }
-                          return;
-                        }
-
-                        if (outerContext.mounted) {
-                          NotificationService.instance.showSuccess('Backup saved successfully! Location: Downloads folder');
-                        }
-                      },
-                    ),
-
-                    AppResponsive.verticalSpace(context, size: SpacingSize.medium),
-
-                    // Share Backup Button
-                    ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
-                        minimumSize: Size(double.infinity, AppResponsive.buttonHeight(context)),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      icon: Icon(Icons.share, color: Colors.white),
-                      label: Text(
-                        'Share Backup',
-                        style: GoogleFonts.poppins(
-                          color: Colors.white,
-                          fontSize: AppResponsive.buttonFontSize(context),
-                        ),
-                      ),
-                      onPressed: () async {
-                        final outerContext = context;
-                        // Backups are always encrypted — make sure a password is set first.
-                        if (!await UnifiedBackupService
-                            .ensureBackupPassword(outerContext)) {
-                          return;
-                        }
-                        if (!outerContext.mounted) return;
-                        Navigator.pop(outerContext);
-
-                        final navigatorState =
-                            Navigator.of(outerContext, rootNavigator: true);
-                        final shareHInset = !AppResponsive.isMobile(outerContext)
-                            ? ((AppResponsive.screenWidth(outerContext) - AppResponsive.dialogWidth(outerContext)) / 2).clamp(40.0, 200.0)
-                            : 24.0;
-                        showDialog(
-                          context: outerContext,
-                          barrierDismissible: false,
-                          builder: (BuildContext ctx) {
-                            return PopScope(
-                              canPop: false,
-                              child: AlertDialog(
-                                insetPadding: EdgeInsets.symmetric(horizontal: shareHInset, vertical: 24),
-                                content: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const CircularProgressIndicator(),
-                                    AppResponsive.verticalSpace(ctx, size: SpacingSize.medium),
-                                    Text(
-                                      'Creating backup...\nPlease wait',
-                                      textAlign: TextAlign.center,
-                                      style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(ctx)),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        );
-
-                        String? filePath;
-                        try {
-                          filePath = await UnifiedBackupService.exportToShare();
-                        } catch (e) {
-                          debugPrint('❌ Share backup error: $e');
-                        } finally {
-                          try {
-                            navigatorState.pop();
-                          } catch (e) {
-                            debugPrint('❌ Error closing dialog: $e');
-                          }
-                        }
-
-                        await Future.delayed(const Duration(milliseconds: 300));
-
-                        if (filePath == null) {
-                          final globalContext = main_app.navigatorKey.currentContext;
-                          if (globalContext != null && globalContext.mounted) {
-                            NotificationService.instance.showError('Backup creation failed');
-                          }
-                          return;
-                        }
-
-                        await Share.shareXFiles(
-                          [XFile(filePath)],
-                          subject: 'Bill Berry Lite Backup',
-                        );
-                      },
-                    ),
-
-                    AppResponsive.verticalSpace(context, size: SpacingSize.medium),
-                    Divider(),
-                    AppResponsive.verticalSpace(context, size: SpacingSize.small),
-
-                    // Import Button
-                    ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orange,
-                        minimumSize: Size(double.infinity, AppResponsive.buttonHeight(context)),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      icon: Icon(Icons.restore, color: Colors.white),
-                      label: Text(
-                        'Import Backup',
-                        style: GoogleFonts.poppins(
-                          color: Colors.white,
-                          fontSize: AppResponsive.buttonFontSize(context),
-                        ),
-                      ),
-                      onPressed: () async {
-                        Navigator.pop(context); // close the backup menu
-
-                        // importData shows its OWN file picker and (for encrypted
-                        // backups) a password prompt. Do NOT pre-show a blocking
-                        // "Importing…" modal here — a non-dismissible barrier sits
-                        // on top of that prompt, so the import would silently never
-                        // ask for the password.
-                        bool importSuccess = false;
-                        try {
-                          importSuccess =
-                              await UnifiedBackupService.importData(context);
-                        } catch (e) {
-                          debugPrint('Import error in drawer: $e');
-                        }
-
-                        if (importSuccess) {
-                            await Future.delayed(Duration(milliseconds: 300));
-
-                            final globalContext =
-                                main_app.navigatorKey.currentContext;
-                            if (globalContext != null) {
-                              await showAppInfoDialog(
-                                context: globalContext,
-                                title: 'Import Completed',
-                                message:
-                                    'Data imported successfully!\n\nPlease close and restart the app.',
-                                buttonLabel: 'Close App',
-                                accent: AppColors.success,
-                                icon: Icons.check_circle_rounded,
-                              );
-                              exit(0);
-                            }
-                          }
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
+  Future<void> _clearLoginState() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('restaurant_is_logged_in', false);
+    await RestaurantSession.clearSession();
   }
 }

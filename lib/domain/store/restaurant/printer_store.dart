@@ -4,6 +4,8 @@ import 'package:mobx/mobx.dart';
 import 'package:uuid/uuid.dart';
 import '../../../data/models/restaurant/db/saved_printer_model.dart';
 import '../../../data/repositories/restaurant/printer_repository.dart';
+import 'package:flutter/foundation.dart';
+import '../../services/common/windows_spooler/windows_spooler_service.dart';
 import '../../services/restaurant/thermal_printer_service.dart';
 
 part 'printer_store.g.dart';
@@ -15,8 +17,17 @@ abstract class _PrinterStore with Store {
   final PrinterRepository _repository;
   final ThermalPrinterService _thermalService;
 
-  /// Repository + service are injected via constructor.
-  _PrinterStore(this._repository, this._thermalService);
+  /// Windows print-spooler transport. Separate from [_thermalService] because
+  /// `flutter_thermal_printer` has no Windows implementation — this reaches the
+  /// printer through the OS queue instead of the hardware.
+  final WindowsSpoolerService _windowsSpooler;
+
+  /// Repository + services are injected via constructor.
+  _PrinterStore(
+    this._repository,
+    this._thermalService, {
+    WindowsSpoolerService? windowsSpooler,
+  }) : _windowsSpooler = windowsSpooler ?? WindowsSpoolerService();
 
   // ══════════════════════════════════════════════════════════════════════════
   // SAVED PRINTERS — persisted in Hive, survive app restarts
@@ -85,6 +96,12 @@ abstract class _PrinterStore with Store {
   List<SavedPrinterModel> get wifiPrinters =>
       savedPrinters.where((p) => p.isWifi).toList();
 
+  /// Both Windows transports — the tab lists RAW thermal and PDF printers
+  /// together, distinguished by their type.
+  @computed
+  List<SavedPrinterModel> get windowsPrinters =>
+      savedPrinters.where((p) => p.isWindows || p.isWindowsPdf).toList();
+
   /// Whether thermal printing is supported on this platform
   bool get isPrintingSupported => _thermalService.isSupported;
 
@@ -148,6 +165,7 @@ abstract class _PrinterStore with Store {
     int port = 9100,
     int paperSize = 80,
     String role = 'both',
+    String? assignRole,
   }) async {
     final printer = SavedPrinterModel(
       id: const Uuid().v4(),
@@ -159,6 +177,56 @@ abstract class _PrinterStore with Store {
       isDefault: savedPrinters.isEmpty,
     );
     await savePrinter(printer);
+    await _assignIfRequested(printer, assignRole);
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // ACTIONS — Windows Spooler Printer Management
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /// Save a printer that prints through a Windows queue.
+  ///
+  /// [queueName] is stored verbatim in `address` — Windows queue names can
+  /// contain a colon, so it must never be parsed the way WiFi's `ip:port` is.
+  ///
+  /// [asPdfPrinter] picks the OUTPUT MODE, and is an explicit user choice made
+  /// in the Windows tab — never inferred from the printer's name. False sends
+  /// RAW ESC/POS (thermal); true sends a rendered receipt PDF.
+  @action
+  Future<void> saveWindowsPrinter({
+    required String name,
+    required String queueName,
+    int paperSize = 80,
+    String role = 'both',
+    String? assignRole,
+    bool asPdfPrinter = false,
+  }) async {
+    final printer = SavedPrinterModel(
+      id: const Uuid().v4(),
+      name: name,
+      type: asPdfPrinter ? 'windows_pdf' : 'windows',
+      address: queueName,
+      paperSize: paperSize,
+      role: role,
+      isDefault: savedPrinters.isEmpty,
+    );
+    await savePrinter(printer);
+    await _assignIfRequested(printer, assignRole);
+  }
+
+  /// Point a slot at a freshly saved printer.
+  ///
+  /// Restaurant leaves this null — its Printer Management slots do the
+  /// assigning. Retail has exactly one slot (Billing) and no slot screen, so it
+  /// passes `'receipt'`: saving a printer there IS choosing it. Without this the
+  /// printer lands in Hive but no `default_*_printer_id` pointer ever gets set,
+  /// so `hasDefaultReceiptPrinter` stays false and nothing ever prints.
+  Future<void> _assignIfRequested(
+      SavedPrinterModel printer, String? assignRole) async {
+    if (assignRole == null) return;
+    // 'both' keeps the record valid for whichever slot(s) point at it.
+    await savePrinter(printer.copyWith(role: 'both'));
+    await setDefaultForRole(printer.id, assignRole);
   }
 
   @action
@@ -217,6 +285,8 @@ abstract class _PrinterStore with Store {
       _scanSubscription?.cancel();
       _scanSubscription = _thermalService.devicesStream.listen(
         (List<DiscoveredPrinter> printers) {
+          debugPrint('[USB] scan found ${printers.length} device(s): '
+              '${printers.map((p) => '${p.name}(vid=${p.vendorId})').join(', ')}');
           discoveredDevices = ObservableList.of(printers);
         },
         onError: (e) {
@@ -236,16 +306,21 @@ abstract class _PrinterStore with Store {
     required String name,
     int paperSize = 80,
     String role = 'both',
+    String? assignRole,
   }) async {
     final printer = SavedPrinterModel(
       id: const Uuid().v4(),
       name: name,
       type: 'usb',
-      address: device.address ?? device.vendorId ?? '',
+      // USB identity = "vendorId:productId" (mirrors WiFi's "ip:port"). Both are
+      // required for the native layer to match and open the device.
+      address:
+          '${device.vendorId ?? device.address ?? ''}:${device.productId ?? ''}',
       paperSize: paperSize,
       role: role,
     );
     await savePrinter(printer);
+    await _assignIfRequested(printer, assignRole);
   }
 
   @action
@@ -254,6 +329,7 @@ abstract class _PrinterStore with Store {
     required String name,
     int paperSize = 80,
     String role = 'both',
+    String? assignRole,
   }) async {
     final printer = SavedPrinterModel(
       id: const Uuid().v4(),
@@ -265,14 +341,24 @@ abstract class _PrinterStore with Store {
       isDefault: savedPrinters.isEmpty,
     );
     await savePrinter(printer);
+    await _assignIfRequested(printer, assignRole);
   }
 
   // ══════════════════════════════════════════════════════════════════════════
   // ACTIONS — Sending Bytes to Printer
   // ══════════════════════════════════════════════════════════════════════════
 
+  /// [verifyDelivery] asks the transport to confirm the job actually reached
+  /// the device before reporting success, at the cost of a short wait. Only
+  /// Test Print sets it — see [testPrint]. Currently honoured by the Windows
+  /// spooler, where an accepted job may simply be queued for a printer that is
+  /// switched off.
   @action
-  Future<bool> sendBytes(List<int> bytes, SavedPrinterModel printer) async {
+  Future<bool> sendBytes(
+    List<int> bytes,
+    SavedPrinterModel printer, {
+    bool verifyDelivery = false,
+  }) async {
     isPrinting = true;
     errorMessage = null;
 
@@ -283,6 +369,17 @@ abstract class _PrinterStore with Store {
         return await _sendViaBluetooth(bytes, printer.address);
       } else if (printer.type == 'usb') {
         return await _sendViaUsb(bytes, printer.address, printer.name);
+      } else if (printer.isWindows) {
+        return await _sendViaWindows(bytes, printer.address, printer.name,
+            verifyDelivery: verifyDelivery);
+      } else if (printer.isWindowsPdf) {
+        // Safety net for EVERY caller. A PDF/document printer cannot interpret
+        // ESC/POS — the spooler accepts the bytes, the writer discards them and
+        // the job completes, so a RAW send here looks successful while nothing
+        // is produced. Callers render a PDF instead (bills) or fall back to the
+        // PDF preview (KOT, EOD, retail).
+        errorMessage = 'PDF printer — sending as a PDF instead';
+        return false;
       }
       errorMessage = 'Unknown printer type: ${printer.type}';
       return false;
@@ -325,16 +422,66 @@ abstract class _PrinterStore with Store {
   Future<bool> _sendViaUsb(
       List<int> bytes, String address, String name) async {
     try {
+      // A saved USB printer stores its identity as "vendorId:productId". The
+      // native layer matches on BOTH, so split them back out here — passing only
+      // the vendorId made the match fail (device not found → silent no-op).
+      final parts = address.split(':');
+      final vendorId = parts.isNotEmpty ? parts[0] : address;
+      final productId = parts.length > 1 ? parts[1] : '';
       final device = DiscoveredPrinter(
         address: address,
+        vendorId: vendorId,
+        productId: productId,
         name: name,
         connectionType: 'USB',
       );
+      debugPrint('[USB] _sendViaUsb → vendorId=$vendorId productId=$productId '
+          'name=$name bytes=${bytes.length}');
+      if (productId.isEmpty) {
+        debugPrint('[USB] ⚠ no productId stored — re-add this printer '
+            '(old saved entry). Print will not reach the device.');
+      }
+      // The plugin reports success even when the USB device is gone, so verify
+      // the device is still PRESENT first. (Presence, not permission — so the
+      // first print can still raise the OS permission dialog.) If it's unplugged,
+      // fail cleanly so the caller shows the PDF instead of a false "printed".
+      if (!await _thermalService.isUsbPresent(device)) {
+        errorMessage = 'Printer not available';
+        debugPrint('[USB] device not present (unplugged) — caller shows PDF');
+        return false;
+      }
       return await _thermalService.printData(device, bytes);
     } catch (e) {
       errorMessage = 'USB print failed: $e';
+      debugPrint('[USB] _sendViaUsb FAILED: $e');
       return false;
     }
+  }
+
+  /// Print through a Windows spooler queue.
+  ///
+  /// [address] is the queue name, passed through whole — unlike WiFi it is not
+  /// an `ip:port` pair and must not be split. Returning false on failure keeps
+  /// the existing contract: callers fall back to the PDF preview rather than
+  /// reporting a bill as printed.
+  Future<bool> _sendViaWindows(
+    List<int> bytes,
+    String address,
+    String name, {
+    bool verifyDelivery = false,
+  }) async {
+    final result = await _windowsSpooler.send(
+      queueName: address,
+      bytes: bytes,
+      docName: name.isEmpty ? 'Receipt' : name,
+      verifyDrained: verifyDelivery,
+    );
+    if (!result.ok) {
+      errorMessage = result.message;
+      debugPrint('[WIN-SPOOL] queue="$address" failed: $result');
+      return false;
+    }
+    return true;
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -362,6 +509,9 @@ abstract class _PrinterStore with Store {
       0x1D, 0x56, 0x01,
     ];
 
-    return await sendBytes(bytes, printer);
+    // Test Print is where staff deliberately check the printer, so it is worth
+    // waiting to confirm the job actually reached the device rather than just
+    // being accepted by a queue.
+    return await sendBytes(bytes, printer, verifyDelivery: true);
   }
 }

@@ -1,5 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/core/config/app_config.dart';
 import 'package:billberrylite/core/init/hive_init.dart';
@@ -20,7 +23,9 @@ import 'util/restaurant/order_settings.dart';
 import 'domain/services/retail/retail_printer_settings_service.dart';
 import 'domain/services/restaurant/auto_backup_service.dart';
 import 'domain/services/common/local_notification_service.dart';
-import 'domain/services/restaurant/notification_sync_service.dart';
+import 'domain/services/common/firebase_messaging_service.dart';
+import 'domain/services/common/notification_sync.dart';
+import 'package:billberrylite/presentation/screens/retail/login_screen.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 final appStore = AppStore();
 
@@ -39,6 +44,11 @@ void main() async {
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
 
+    // Poppins is bundled locally (assets/fonts/, registered in pubspec.yaml)
+    // so GoogleFonts.poppins() must never try to fetch it over the network —
+    // this app needs to work fully offline.
+    GoogleFonts.config.allowRuntimeFetching = false;
+
     // Enable Wake Lock to prevent device from going to sleep
     WakelockPlus.enable();
 
@@ -54,19 +64,48 @@ void main() async {
 
     runApp(const BillBerryApp());
 
-    // Ask for notification permission once the UI is up. The Android 13+
-    // POST_NOTIFICATIONS prompt is ignored if requested before the activity
-    // is resumed, so we defer it to after the first frame.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (AppConfig.isRestaurant) {
-        LocalNotificationService.instance.requestPermissionIfNeeded();
-      }
-    });
+    // Ask for notification permission once the Activity is truly RESUMED.
+    // Firing from addPostFrameCallback alone is unreliable on cold start: the
+    // first frame paints during the launch-screen transition, before the
+    // Android 13+ activity resumes, so the POST_NOTIFICATIONS dialog is
+    // scheduled on resume.
+    _NotificationPermissionRequester.scheduleOnResume();
   }, (error, stackTrace) {
     print('🔴🔴🔴 ZONE ERROR CAUGHT 🔴🔴🔴');
     print('Error: $error');
     print('Stack trace: $stackTrace');
   });
+}
+
+/// Requests the Android 13+ notification permission on the first confirmed
+/// `resumed` lifecycle event, then removes itself. Waiting for `resumed` (not
+/// just the first frame) is what makes the POST_NOTIFICATIONS prompt reliable
+/// on a cold start — see the call site in [main].
+class _NotificationPermissionRequester with WidgetsBindingObserver {
+  _NotificationPermissionRequester._();
+  bool _done = false;
+
+  static void scheduleOnResume() {
+    final r = _NotificationPermissionRequester._();
+    // Already resumed (warm start)? go now. Else wait for the resumed event.
+    if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+      r._fire();
+    } else {
+      WidgetsBinding.instance.addObserver(r);
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _fire();
+  }
+
+  void _fire() {
+    if (_done) return;
+    _done = true;
+    WidgetsBinding.instance.removeObserver(this);
+    LocalNotificationService.instance.requestPermissionIfNeeded();
+  }
 }
 
 Future<void> _initializeApp() async {
@@ -166,21 +205,6 @@ Future<void> _initializeApp() async {
       print('   ⚠️  Failed to start Bill Berry Lite Local Server: $e');
     });
 
-    // Local notifications: init OS plugin, seed history + schedule reminders.
-    // Runs after the server is already binding — not time-critical.
-    // Wrapped so a notification failure (e.g. exact-alarm permission denied on
-    // Android 13/14) can never break or block app startup.
-    // Permission is requested AFTER the first frame (see main()) because the
-    // Android 13+ prompt needs a resumed activity.
-    try {
-      await LocalNotificationService.instance.init();
-      await notificationStore.load();
-      await NotificationSyncService.runStartupChecks();
-      print('   ✅ Local notifications ready');
-    } catch (e) {
-      print('   ⚠️  Local notifications init failed (non-fatal): $e');
-    }
-
   } else if (AppConfig.isRetail) {
     print('   Loading retail settings...');
     await Future.wait([
@@ -191,6 +215,39 @@ Future<void> _initializeApp() async {
     print('   ✅ Retail settings loaded');
   } else {
     print('   ⚠️  No business mode set - running in setup mode');
+  }
+
+  // ==================== NOTIFICATIONS (both modes) ====================
+  // Shared by restaurant and retail: one Hive box, one store, one screen.
+  // `NotificationSync` picks which startup checks to run for the active mode.
+  //
+  // Deliberately placed AFTER the mode branches so restaurant keeps its
+  // original ordering — the local server is already binding by now, and
+  // notifications are slow enough that they must not delay it.
+  //
+  // Both blocks are wrapped so a failure (exact-alarm permission denied on
+  // Android 13/14, a missing Firebase config) can never break or block
+  // startup. Permission is requested AFTER the first frame (see main()),
+  // because the Android 13+ prompt needs a resumed activity.
+  if (AppConfig.isBusinessModeSet) {
+    try {
+      await LocalNotificationService.instance.init();
+      await notificationStore.load();
+      await NotificationSync.runStartupChecks();
+      print('   ✅ Local notifications ready');
+    } catch (e) {
+      print('   ⚠️  Local notifications init failed (non-fatal): $e');
+    }
+
+    // Firebase Cloud Messaging (push). Runs after local notifications because
+    // foreground pushes are rendered through that plugin's channels. No-op on
+    // desktop/web (no google-services config for those platforms here).
+    try {
+      await FirebaseMessagingService.instance.init();
+      print('   ✅ Firebase push notifications ready');
+    } catch (e) {
+      print('   ⚠️  Firebase messaging init failed (non-fatal): $e');
+    }
   }
 
   // Debug: Print initialization status
@@ -275,12 +332,26 @@ class BillBerryApp extends StatelessWidget {
       title: 'Bill Berry Lite',
       debugShowCheckedModeBanner: false,
 
-      // Wrap all routes with NotificationOverlay + app-wide inactivity handling.
+      // App-wide Poppins. Without this there is NO textTheme at all, so any
+      // `Text` without a style — and any raw `TextStyle(...)` — falls back to
+      // Roboto while its `GoogleFonts.poppins` siblings render Poppins.
+      //
+      // `fontFamily` (not `poppinsTextTheme`) on purpose: it changes ONLY the
+      // typeface. A full text theme would also impose its own font SIZES and
+      // colours, which would fight the AppResponsive ladders.
+      //
+      // 'Poppins' is the family declared in pubspec.yaml (assets/fonts/), so
+      // this resolves from the bundled TTFs with no network access.
+      theme: ThemeData(fontFamily: 'Poppins'),
+
+      // Wrap all routes with NotificationOverlay + app-wide inactivity handling + global back exit protection.
       builder: (context, child) {
         return NotificationOverlay(
           service: NotificationService.instance,
           child: _SessionActivityWrapper(
-            child: child ?? const SizedBox.shrink(),
+            child: _GlobalBackProtection(
+              child: child ?? const SizedBox.shrink(),
+            ),
           ),
         );
       },
@@ -376,10 +447,17 @@ class _SessionActivityWrapperState extends State<_SessionActivityWrapper> {
       return;
     }
     RestaurantSession.clearSession(); // clears session + resets the flag
-    navigatorKey.currentState?.pushNamedAndRemoveUntil(
-      RouteNames.restaurantLogin,
-      (route) => false,
-    );
+    if (AppConfig.isRetail) {
+      navigatorKey.currentState?.pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+        (route) => false,
+      );
+    } else {
+      navigatorKey.currentState?.pushNamedAndRemoveUntil(
+        RouteNames.restaurantLogin,
+        (route) => false,
+      );
+    }
   }
 
   @override
@@ -390,6 +468,76 @@ class _SessionActivityWrapperState extends State<_SessionActivityWrapper> {
         if (RestaurantSession.isLoggedIn) {
           RestaurantSession.resetInactivityTimer();
         }
+      },
+      child: widget.child,
+    );
+  }
+}
+
+/// App-wide back-button protection:
+///   • If popping navigates back inside the app (`Navigator.canPop()` is true),
+///     it pops the top screen immediately without showing any message.
+///   • If popping would exit/close the app (`Navigator.canPop()` is false), it
+///     intercepts the back press, shows a floating SnackBar ("Press back again
+///     to exit"), and requires a second back press within 2 seconds to exit.
+class _GlobalBackProtection extends StatefulWidget {
+  final Widget child;
+  const _GlobalBackProtection({required this.child});
+
+  @override
+  State<_GlobalBackProtection> createState() => _GlobalBackProtectionState();
+}
+
+class _GlobalBackProtectionState extends State<_GlobalBackProtection> {
+  DateTime? _lastBackPress;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+
+        // If popping navigates back to a previous screen inside the app, pop normally.
+        final nav = navigatorKey.currentState;
+        if (nav != null && nav.canPop()) {
+          nav.pop();
+          return;
+        }
+
+        // Navigator cannot pop further — popping would exit/close the app.
+        // Prompt for double-press before exiting.
+        final now = DateTime.now();
+        if (_lastBackPress != null &&
+            now.difference(_lastBackPress!) < const Duration(seconds: 2)) {
+          SystemNavigator.pop();
+          return;
+        }
+        _lastBackPress = now;
+
+        rootScaffoldMessengerKey.currentState?.clearSnackBars();
+        rootScaffoldMessengerKey.currentState?.showSnackBar(
+          SnackBar(
+            content: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.exit_to_app_rounded, color: Colors.white, size: 20),
+                const SizedBox(width: 10),
+                Text(
+                  'Press back again to exit',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: AppColors.primary,
+            margin: const EdgeInsets.only(bottom: 24, left: 24, right: 24),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
       },
       child: widget.child,
     );

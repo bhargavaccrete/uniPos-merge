@@ -340,6 +340,15 @@ mixin _$PurchaseOrderStore on _PurchaseOrderStore, Store {
     return _$clearStatusFilterAsyncAction.run(() => super.clearStatusFilter());
   }
 
+  late final _$cancelPurchaseOrderAsyncAction =
+      AsyncAction('_PurchaseOrderStore.cancelPurchaseOrder', context: context);
+
+  @override
+  Future<bool> cancelPurchaseOrder(String poId) {
+    return _$cancelPurchaseOrderAsyncAction
+        .run(() => super.cancelPurchaseOrder(poId));
+  }
+
   late final _$loadGRNsAsyncAction =
       AsyncAction('_PurchaseOrderStore.loadGRNs', context: context);
 

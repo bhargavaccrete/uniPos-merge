@@ -19,7 +19,7 @@ class SaleModelAdapter extends TypeAdapter<SaleModel> {
     return SaleModel(
       saleId: fields[0] as String,
       customerId: fields[1] as String?,
-      totalItems: fields[2] as int,
+      totalItems: fields[2] as double,
       subtotal: fields[3] as double,
       discountAmount: fields[4] as double,
       taxAmount: fields[5] as double,
@@ -42,13 +42,27 @@ class SaleModelAdapter extends TypeAdapter<SaleModel> {
       paidAmount: fields[22] == null ? 0.0 : fields[22] as double?,
       dueAmount: fields[23] == null ? 0.0 : fields[23] as double?,
       status: fields[24] == null ? 'paid' : fields[24] as String?,
+      discountType: fields[25] as String?,
+      discountValue: fields[26] as double?,
+      discountReason: fields[27] as String?,
+      loyaltyPointsUsed: fields[28] as int?,
+      roundOff: fields[29] as double?,
+      isTaxInclusive: fields[30] as bool?,
+      lineDiscountTotal: fields[31] as double?,
+      exchangeGroupId: fields[32] as String?,
+      shiftId: fields[33] as String?,
+      returnReason: fields[34] as String?,
+      returnNote: fields[35] as String?,
+      invoiceNumber: fields[36] as String?,
+      taxEnabled: fields[37] as bool?,
+      storeGstNumber: fields[38] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, SaleModel obj) {
     writer
-      ..writeByte(25)
+      ..writeByte(39)
       ..writeByte(0)
       ..write(obj.saleId)
       ..writeByte(1)
@@ -98,7 +112,35 @@ class SaleModelAdapter extends TypeAdapter<SaleModel> {
       ..writeByte(23)
       ..write(obj.dueAmount)
       ..writeByte(24)
-      ..write(obj.status);
+      ..write(obj.status)
+      ..writeByte(25)
+      ..write(obj.discountType)
+      ..writeByte(26)
+      ..write(obj.discountValue)
+      ..writeByte(27)
+      ..write(obj.discountReason)
+      ..writeByte(28)
+      ..write(obj.loyaltyPointsUsed)
+      ..writeByte(29)
+      ..write(obj.roundOff)
+      ..writeByte(30)
+      ..write(obj.isTaxInclusive)
+      ..writeByte(31)
+      ..write(obj.lineDiscountTotal)
+      ..writeByte(32)
+      ..write(obj.exchangeGroupId)
+      ..writeByte(33)
+      ..write(obj.shiftId)
+      ..writeByte(34)
+      ..write(obj.returnReason)
+      ..writeByte(35)
+      ..write(obj.returnNote)
+      ..writeByte(36)
+      ..write(obj.invoiceNumber)
+      ..writeByte(37)
+      ..write(obj.taxEnabled)
+      ..writeByte(38)
+      ..write(obj.storeGstNumber);
   }
 
   @override

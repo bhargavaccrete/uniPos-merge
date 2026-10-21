@@ -1,12 +1,18 @@
 import 'dart:convert';
 import 'package:country_code_picker/country_code_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:billberrylite/core/config/tax_label_rule.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../../core/di/service_locator.dart';
+import '../../../../../core/config/tax_feature.dart';
+import '../../../../../domain/services/retail/store_settings_service.dart';
+import '../../../../../core/plan/entitlement_keys.dart';
+import '../../../../../core/plan/plan_guard.dart';
+import '../../../../../core/plan/plan_enforcement.dart';
 import '../../../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../../data/models/restaurant/db/pastordermodel_313.dart';
@@ -17,10 +23,11 @@ import '../../../../../domain/services/restaurant/inventory_service.dart';
 import '../../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../../util/common/app_responsive.dart';
 import '../../../../../util/common/currency_helper.dart';
+import '../../../../../util/common/loyalty_points.dart';
 import '../../../../../util/restaurant/staticswitch.dart';
 import '../../../../../util/restaurant/restaurant_session.dart';
 import '../../../../../stores/payment_method_store.dart';
-import '../../../../../data/models/restaurant/db/customer_model_125.dart';
+import '../../../../../data/models/common/customer_model_125.dart';
 import '../../../../widget/componets/common/split_payment_widget.dart';
 import '../../../../widget/componets/restaurant/componets/Button.dart';
 import '../../../../widget/componets/restaurant/componets/filterButton.dart';
@@ -30,7 +37,6 @@ import '../../util/restaurant_print_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
-enum DiscountType { amount, percentage }
 
 class Customerdetails extends StatefulWidget {
   final OrderModel? existingModel;
@@ -59,7 +65,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
   late TextEditingController _emailController = TextEditingController();
 
   // Customer selection
-  RestaurantCustomer? selectedCustomer;
+  Customer? selectedCustomer;
   String? _mobileError;
   bool _usePoints = false;
   final _serviceChargeController = TextEditingController();
@@ -97,7 +103,6 @@ class _CustomerdetailsState extends State<Customerdetails> {
   final List<String> remarkList = [
     'Old Customer',
     'Regular Customer',
-    'police',
     'know (known person)',
     'other'
   ];
@@ -130,11 +135,12 @@ class _CustomerdetailsState extends State<Customerdetails> {
   }
 
   Future<void> _loadExistingCustomer() async {
+    if (!PlanEnforce.allows(EntKeys.customers)) return;
     final phone = widget.existingModel?.customerNumber?.trim() ?? '';
     final name = widget.existingModel?.customerName?.trim() ?? '';
     try {
       if (phone.isNotEmpty) {
-        final results = await restaurantCustomerStore.searchCustomers(phone);
+        final results = await customerStore.searchCustomers(phone);
         final match = results.where((c) => c.phone == phone).firstOrNull;
         if (match != null && mounted) {
           setState(() => selectedCustomer = match);
@@ -142,7 +148,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
         }
       }
       if (name.isNotEmpty) {
-        final results = await restaurantCustomerStore.searchCustomers(name);
+        final results = await customerStore.searchCustomers(name);
         final match = results
             .where((c) => c.name?.toLowerCase() == name.toLowerCase())
             .firstOrNull;
@@ -155,7 +161,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
   }
 
   // Handle customer selection from autocomplete
-  void _onCustomerSelected(RestaurantCustomer customer) {
+  void _onCustomerSelected(Customer customer) {
     setState(() {
       selectedCustomer = customer;
       _nameController.text = customer.name ?? '';
@@ -195,24 +201,39 @@ class _CustomerdetailsState extends State<Customerdetails> {
         servicechargeapply ? _toDouble(_serviceChargeController) : 0.0;
     final bool isDelivery = widget.orderType == 'Delivery';
 
-    // ✅ Step 2: Create the service to do all the math.
-    final calculations = CartCalculationService(
-      items: widget.cartitems ?? widget.existingModel?.items ?? [],
-      discountType: _selectedDiscountType,
-      discountValue: discountInputValue,
-      serviceChargePercentage: isDelivery ? 0.0 : serviceChargeValue,
-      deliveryCharge: isDelivery ? serviceChargeValue : 0.0,
-      isDeliveryOrder: isDelivery,
-      // Use stored tax mode from existing order; fall back to app setting for new orders
-      isTaxInclusive: widget.existingModel?.isTaxInclusive ?? AppSettings.isTaxInclusive,
-    );
+    // ✅ Step 2: Create the service to do all the math. `redemption` folds any
+    // redeemed loyalty points into the taxable base BEFORE GST (like a discount).
+    CartCalculationService buildCalc(double redemption) => CartCalculationService(
+          items: widget.cartitems ?? widget.existingModel?.items ?? [],
+          discountType: _selectedDiscountType,
+          discountValue: discountInputValue,
+          serviceChargePercentage: isDelivery ? 0.0 : serviceChargeValue,
+          deliveryCharge: isDelivery ? serviceChargeValue : 0.0,
+          isDeliveryOrder: isDelivery,
+          // Use stored tax mode from existing order; fall back to app setting.
+          isTaxInclusive:
+              widget.existingModel?.isTaxInclusive ?? AppSettings.isTaxInclusive,
+          loyaltyRedemption: redemption,
+        );
 
-    // ✅ Step 3: Loyalty points discount
+    var calculations = buildCalc(0);
+
+    // ✅ Step 3: Loyalty points — cap to the (pre-redemption) bill, then rebuild
+    // so GST is charged on the post-redemption amount. grandTotal is then net.
     final int availablePoints = selectedCustomer?.loyaltyPoints ?? 0;
     final int pointsDiscount = (_usePoints && availablePoints > 0)
         ? availablePoints.clamp(0, calculations.grandTotal.floor())
         : 0;
-    final double netPayable = calculations.grandTotal - pointsDiscount;
+    if (pointsDiscount > 0) {
+      calculations = buildCalc(pointsDiscount.toDouble());
+    }
+    final double netPayable = calculations.grandTotal;
+    // Balance-due: if this order was already partly settled (e.g. items added
+    // after a prior payment), collect ONLY the outstanding balance — never the
+    // full bill again. alreadyPaid = 0 for a fresh order.
+    final double alreadyPaid = widget.existingModel?.totalPaid ?? 0;
+    final double balanceToCollect =
+        (netPayable - alreadyPaid).clamp(0, double.infinity);
 
     // ✅ Step 4: Build the UI using the final, calculated values.
     final height = MediaQuery.of(context).size.height;
@@ -235,6 +256,8 @@ class _CustomerdetailsState extends State<Customerdetails> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+              // Customer capture only when the plan includes Customers.
+              if (PlanEnforce.allows(EntKeys.customers)) ...[
               // Show selected customer info
               if (selectedCustomer != null)
                 Container(
@@ -367,15 +390,15 @@ class _CustomerdetailsState extends State<Customerdetails> {
               ),
 
               // Autocomplete Name Field
-              Autocomplete<RestaurantCustomer>(
+              Autocomplete<Customer>(
                 optionsBuilder: (TextEditingValue textEditingValue) async {
                   if (textEditingValue.text.isEmpty) {
-                    return const Iterable<RestaurantCustomer>.empty();
+                    return const Iterable<Customer>.empty();
                   }
-                  return await restaurantCustomerStore.searchCustomers(textEditingValue.text);
+                  return await customerStore.searchCustomers(textEditingValue.text);
                 },
-                displayStringForOption: (RestaurantCustomer customer) => customer.name ?? '',
-                onSelected: (RestaurantCustomer customer) {
+                displayStringForOption: (Customer customer) => customer.name ?? '',
+                onSelected: (Customer customer) {
                   _onCustomerSelected(customer);
                 },
                 fieldViewBuilder: (context, controller, focusNode, onEditingComplete) {
@@ -469,15 +492,15 @@ class _CustomerdetailsState extends State<Customerdetails> {
               const SizedBox(height: 14),
 
               // Autocomplete Mobile Field
-              Autocomplete<RestaurantCustomer>(
+              Autocomplete<Customer>(
                 optionsBuilder: (TextEditingValue textEditingValue) async {
                   if (textEditingValue.text.isEmpty) {
-                    return const Iterable<RestaurantCustomer>.empty();
+                    return const Iterable<Customer>.empty();
                   }
-                  return await restaurantCustomerStore.searchCustomers(textEditingValue.text);
+                  return await customerStore.searchCustomers(textEditingValue.text);
                 },
-                displayStringForOption: (RestaurantCustomer customer) => customer.phone ?? '',
-                onSelected: (RestaurantCustomer customer) {
+                displayStringForOption: (Customer customer) => customer.phone ?? '',
+                onSelected: (Customer customer) {
                   _onCustomerSelected(customer);
                 },
                 fieldViewBuilder: (context, controller, focusNode, onEditingComplete) {
@@ -579,6 +602,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
                     ),
                   ),
                 ),
+              ], // end customers-only capture block
 
               SizedBox(height: 10),
 
@@ -867,42 +891,57 @@ class _CustomerdetailsState extends State<Customerdetails> {
                           ),
                         ),
                         SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: remarkList.map((reason) {
-                            final isSelected = SelectedRemark == reason;
-                            return GestureDetector(
-                              onTap: () =>
-                                  setState(() => SelectedRemark = reason),
-                              child: Container(
-                                padding: EdgeInsets.symmetric(
-                                    horizontal: 14, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: isSelected
-                                      ? AppColors.primary
-                                      : Colors.white,
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color: isSelected
-                                        ? AppColors.primary
-                                        : AppColors.divider,
-                                    width: 1.5,
-                                  ),
-                                ),
-                                child: Text(
-                                  reason,
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w500,
-                                    color: isSelected
-                                        ? Colors.white
-                                        : AppColors.textPrimary,
-                                  ),
-                                ),
-                              ),
-                            );
-                          }).toList(),
+                        DropdownButtonFormField<String>(
+                          initialValue: SelectedRemark,
+                          isExpanded: true,
+                          icon: const Icon(Icons.arrow_drop_down_rounded,
+                              color: AppColors.primary),
+                          // Clean white rounded menu instead of the default
+                          // theme-tinted (lavender) square popup.
+                          dropdownColor: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          elevation: 3,
+                          style: GoogleFonts.poppins(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.textPrimary,
+                          ),
+                          decoration: InputDecoration(
+                            filled: true,
+                            fillColor: Colors.white,
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 6),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide:
+                                  const BorderSide(color: AppColors.divider),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide:
+                                  const BorderSide(color: AppColors.divider),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(
+                                  color: AppColors.primary, width: 1.5),
+                            ),
+                          ),
+                          items: remarkList
+                              .map((reason) => DropdownMenuItem(
+                                    value: reason,
+                                    child: Text(
+                                      reason,
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500,
+                                        color: AppColors.textPrimary,
+                                      ),
+                                    ),
+                                  ))
+                              .toList(),
+                          onChanged: (value) =>
+                              setState(() => SelectedRemark = value),
                         ),
                       ],
                       SizedBox(height: 5),
@@ -965,10 +1004,30 @@ class _CustomerdetailsState extends State<Customerdetails> {
                     ],
                   ),
                   children: [
+                    if (alreadyPaid > 0)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('Already Paid',
+                                style: GoogleFonts.poppins(
+                                    fontSize: 13, color: AppColors.textSecondary)),
+                            Text(
+                                '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(alreadyPaid)}',
+                                style: GoogleFonts.poppins(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.textSecondary)),
+                          ],
+                        ),
+                      ),
                     Padding(
                       padding: const EdgeInsets.all(16.0),
                       child: SplitPaymentWidget(
-                        billTotal: netPayable,
+                        // Collect only the outstanding balance (full bill for a
+                        // fresh order; the remaining delta for a re-settle).
+                        billTotal: balanceToCollect,
                         onPaymentChanged: _onPaymentChanged,
                         onValidationChanged: _onValidationChanged,
                       ),
@@ -998,7 +1057,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                onPressed: (_isPaymentValid && !_isProcessing) ? () => _submitOrder(calculations) : null,
+                onPressed: (_isPaymentValid && !_isProcessing) ? () => _submitOrder(calculations, pointsUsed: pointsDiscount) : null,
                 child: _isProcessing
                     ? const SizedBox(
                         height: 22,
@@ -1087,7 +1146,9 @@ class _CustomerdetailsState extends State<Customerdetails> {
           // GST (mode-aware label)
           if (calcs.totalGST > 0.009)
             _buildSummaryRow(
-              isInclusive ? 'GST (Included):' : 'GST:',
+              isInclusive
+                  ? '${TaxLabelRule.name} (Included):'
+                  : '${TaxLabelRule.name}:',
               '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calcs.totalGST)}'
             ),
 
@@ -1119,7 +1180,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
           // Net Payable
           _buildSummaryRow(
               pointsDiscount > 0 ? 'Net Payable:' : 'Grand Total:',
-              '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calcs.grandTotal - pointsDiscount)}',
+              '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(calcs.grandTotal)}',
               isBold: true),
         ],
       ),
@@ -1190,9 +1251,8 @@ class _CustomerdetailsState extends State<Customerdetails> {
 
       return;
     }
-    // Prepare split payment data
+    // Prepare split payment data (this settle's entries; merged with prior below)
     final paymentList = _paymentEntries.map((e) => e.toMap()).toList();
-    final isSplit = _paymentEntries.length > 1;
 
     // Check if new items were added (settle without update)
     final List<CartItem> itemsToSettle = widget.cartitems ?? widget.existingModel!.items;
@@ -1203,12 +1263,14 @@ class _CustomerdetailsState extends State<Customerdetails> {
     // Generate new KOT if items were added without updating order first
     List<int> finalKotNumbers = List<int>.from(widget.existingModel!.kotNumbers);
     List<int> finalKotBoundaries = List<int>.from(widget.existingModel!.kotBoundaries);
+    Map<int, String> finalKotStatuses = Map<int, String>.from(widget.existingModel!.kotStatuses ?? {});
 
     if (hasNewItems) {
       // Generate a new KOT for the newly added items before settling
       final int newKotNumber = await orderStore.getNextKotNumber();
       finalKotNumbers.add(newKotNumber);
       finalKotBoundaries.add(currentItemCount);
+      finalKotStatuses[newKotNumber] = 'Cooking';
 
 
       // Deduct stock for newly added items
@@ -1239,10 +1301,32 @@ class _CustomerdetailsState extends State<Customerdetails> {
     // Get current session ID
     final currentSessionId = await DayManagementService.getCurrentSessionId();
 
+    final String calculatedStatus = hasNewItems ? 'Cooking' : widget.existingModel!.status;
+
+    // Balance-due settlement: ACCUMULATE onto any prior payment instead of
+    // overwriting it, so a re-settle collects only the delta and the full
+    // payment history is preserved. priorPaid = 0 for a first settle.
+    final double priorPaid = widget.existingModel!.totalPaid ?? 0;
+    final List<Map<String, dynamic>> priorPayments =
+        (widget.existingModel!.paymentListJson != null &&
+                widget.existingModel!.paymentListJson!.isNotEmpty)
+            ? List<Map<String, dynamic>>.from(
+                jsonDecode(widget.existingModel!.paymentListJson!))
+            : <Map<String, dynamic>>[];
+    final List<Map<String, dynamic>> mergedPaymentList = [
+      ...priorPayments,
+      ...paymentList,
+    ];
+    final double newTotalPaid = priorPaid + _totalPaid;
+    final double targetTotal = calculations.grandTotal;
+    final bool settledInFull = newTotalPaid >= targetTotal - 0.01;
+    final bool mergedIsSplit = mergedPaymentList.length > 1;
+
     final OrderModel completedOrder = widget.existingModel!.copyWith(
       items: itemsToSettle, // Use updated items if provided
       kotNumbers: finalKotNumbers, // Include new KOT if generated
       kotBoundaries: finalKotBoundaries, // Update boundaries
+      kotStatuses: finalKotStatuses, // Update KOT status map
       itemCountAtLastKot: currentItemCount, // Update item count
       customerName: _nameController.text.trim(),
       customerNumber: _mobileController.text.trim(),
@@ -1250,18 +1334,18 @@ class _CustomerdetailsState extends State<Customerdetails> {
       discount: calculations.discountAmount,
       // serviceCharge: widget.orderType == 'Delivery'?calculations.deliveryCharge: calculations.serviceChargeAmount,
       serviceCharge: calculations.serviceChargeAmount,
-      totalPrice: calculations.grandTotal - pointsUsed, // net payable after points
-      paymentMethod: isSplit ? 'Split Payment' : _paymentEntries.first.method,
+      totalPrice: calculations.grandTotal, // net payable (points folded into GST base)
+      paymentMethod: mergedIsSplit ? 'Split Payment' : _paymentEntries.first.method,
       completedAt: DateTime.now(),
-      status: 'Cooking',
+      status: calculatedStatus,
       tableNo: widget.tableid,
-      isPaid: true,
-      paymentStatus: 'Paid',
+      isPaid: settledInFull,
+      paymentStatus: settledInFull ? 'Paid' : 'Partially Paid',
       customerId: selectedCustomer?.customerId, // Link to customer
-      // Split payment fields
-      paymentListJson: jsonEncode(paymentList),
-      isSplitPayment: isSplit,
-      totalPaid: _totalPaid,
+      // Split payment fields — merged prior + new so history is preserved.
+      paymentListJson: jsonEncode(mergedPaymentList),
+      isSplitPayment: mergedIsSplit,
+      totalPaid: newTotalPaid,
       changeReturn: _changeReturn,
       sessionId: currentSessionId ?? widget.existingModel!.sessionId, // Ensure sessionId is preserved/attached
     );
@@ -1273,6 +1357,35 @@ class _CustomerdetailsState extends State<Customerdetails> {
       final bool alreadyServed = (widget.existingModel!.status == 'Served');
 
       if (isDineIn && !alreadyServed) {
+        // Auto-Serve on Payment (settings flag): a FULLY-paid dine-in table is
+        // served + completed immediately — same disposition as Take-Away
+        // (→ pastOrders as COMPLETED, table freed). Off, or partially paid →
+        // fall through to the current stay-active-until-Served behavior.
+        if (AppSettings.autoServeDineInOnPayment && settledInFull) {
+          final int completedBillNumber =
+              await completeOrder(completedOrder, calculations, pointsUsed: pointsUsed);
+          if (selectedCustomer != null) {
+            if (pointsUsed > 0) {
+              await customerStore.updateCustomerVisit(
+                  customerId: selectedCustomer!.customerId,
+                  orderType: '',
+                  pointsToAdd: -pointsUsed);
+            }
+            final int earned =
+                LoyaltyPoints.earnedFor(calculations.grandTotal);
+            await _updateCustomerStats(selectedCustomer!, 'Dine In',
+                pointsToEarn: earned);
+          }
+          await restaurantCartStore.clearCart();
+          if (widget.tableid != null && widget.tableid!.isNotEmpty) {
+            await tableStore.updateTableStatus(widget.tableid!, 'Available');
+          }
+          NotificationService.instance.showSuccess('Order served & completed');
+          await _showOrderSuccessDialog(completedOrder, calculations,
+              billNumber: completedBillNumber, pointsUsed: pointsUsed);
+          return;
+        }
+
         // Generate a bill number now so the receipt can show "Bill No" immediately
         final int billNumber = await orderStore.getNextBillNumber();
 
@@ -1282,10 +1395,11 @@ class _CustomerdetailsState extends State<Customerdetails> {
         await restaurantCartStore.clearCart();
         if (selectedCustomer != null) {
           if (pointsUsed > 0) {
-            await restaurantCustomerStore.updateCustomerVisit(
+            await customerStore.updateCustomerVisit(
               customerId: selectedCustomer!.customerId, orderType: '', pointsToAdd: -pointsUsed);
           }
-          final int earned = ((calculations.grandTotal - pointsUsed) / 100).floor();
+          final int earned =
+            LoyaltyPoints.earnedFor(calculations.grandTotal);
           await _updateCustomerStats(selectedCustomer!, 'Dine In', pointsToEarn: earned);
         }
 
@@ -1300,10 +1414,11 @@ class _CustomerdetailsState extends State<Customerdetails> {
       // Update customer stats if customer is linked
       if (selectedCustomer != null) {
         if (pointsUsed > 0) {
-          await restaurantCustomerStore.updateCustomerVisit(
+          await customerStore.updateCustomerVisit(
             customerId: selectedCustomer!.customerId, orderType: '', pointsToAdd: -pointsUsed);
         }
-        final int earned = ((calculations.grandTotal - pointsUsed) / 100).floor();
+        final int earned =
+            LoyaltyPoints.earnedFor(calculations.grandTotal);
         await _updateCustomerStats(selectedCustomer!, widget.orderType ?? 'Take Away', pointsToEarn: earned);
       }
 
@@ -1359,6 +1474,10 @@ class _CustomerdetailsState extends State<Customerdetails> {
           activeModel.kotBoundaries, // KOT boundaries for grouping items
       billNumber: billNumber, // Daily bill number (resets every day)
       isTaxInclusive: AppSettings.isTaxInclusive, // Store tax mode at order creation
+      taxEnabled: TaxFeature.enabled,
+      storeGstNumber: await StoreSettingsService().gstNumberSnapshot(),
+      roundOffStep: AppSettings.roundOffStepForRecord,
+      discountOnItems: AppSettings.discountOnItems,
       tableNo: activeModel.tableNo,
       shiftId: RestaurantSession.currentShiftId,
       sessionId: currentSessionId ?? activeModel.sessionId, // Assign to current session to reflect payment
@@ -1410,7 +1529,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
       final pastOrder = PastOrderModel(
         id: newId,
         customerName: _nameController.text.trim(),
-        totalPrice: calculations.grandTotal - pointsUsed, // net payable after points
+        totalPrice: calculations.grandTotal, // net payable (points folded into GST base)
         items: orderItems,
         orderAt: DateTime.now(),
         orderType: widget.orderType ?? 'Take Away',
@@ -1429,6 +1548,10 @@ class _CustomerdetailsState extends State<Customerdetails> {
         totalPaid: _totalPaid,
         changeReturn: _changeReturn,
         isTaxInclusive: AppSettings.isTaxInclusive, // Store tax mode at order creation
+        taxEnabled: TaxFeature.enabled,
+        storeGstNumber: await StoreSettingsService().gstNumberSnapshot(),
+        roundOffStep: AppSettings.roundOffStepForRecord,
+        discountOnItems: AppSettings.discountOnItems,
         tableNo: widget.orderType == 'Dine In' ? widget.tableid : null,
         loyaltyPointsUsed: pointsUsed > 0 ? pointsUsed : null,
         shiftId: RestaurantSession.currentShiftId,
@@ -1449,10 +1572,11 @@ class _CustomerdetailsState extends State<Customerdetails> {
         // Update customer stats if customer is linked
         if (selectedCustomer != null) {
           if (pointsUsed > 0) {
-            await restaurantCustomerStore.updateCustomerVisit(
+            await customerStore.updateCustomerVisit(
               customerId: selectedCustomer!.customerId, orderType: '', pointsToAdd: -pointsUsed);
           }
-          final int earned = ((calculations.grandTotal - pointsUsed) / 100).floor();
+          final int earned =
+            LoyaltyPoints.earnedFor(calculations.grandTotal);
           await _updateCustomerStats(selectedCustomer!, widget.orderType ?? 'Take Away', pointsToEarn: earned);
         }
 
@@ -1647,6 +1771,9 @@ class _CustomerdetailsState extends State<Customerdetails> {
     final sym = CurrencyHelper.currentSymbol;
     final paid = order.totalPaid ?? 0;
     final change = order.changeReturn ?? 0;
+    // Hide the "Paid" row when it equals the Total (fully paid, no change) — it's
+    // just a duplicate of the amount already shown above.
+    final showPaid = paid > 0 && (paid - order.totalPrice).abs() > 0.01;
     final method = (order.isSplitPayment ?? false)
         ? 'Split'
         : (order.paymentMethod ?? '').trim();
@@ -1660,6 +1787,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
         canPop: false,
         child: Dialog(
           insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+          backgroundColor: AppColors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           clipBehavior: Clip.antiAlias,
           child: ConstrainedBox(
@@ -1706,7 +1834,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
-                            'Bill #INV$billNumber',
+                            'Bill No: INV$billNumber',
                             style: GoogleFonts.poppins(
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
@@ -1729,7 +1857,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                         decoration: BoxDecoration(
-                          color: AppColors.surfaceLight,
+                          color: AppColors.white,
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(color: AppColors.divider),
                         ),
@@ -1738,17 +1866,25 @@ class _CustomerdetailsState extends State<Customerdetails> {
                             _summaryRow('Total',
                                 '$sym${DecimalSettings.formatAmount(order.totalPrice)}',
                                 emphasize: true),
-                            if (paid > 0) ...[
-                              const SizedBox(height: 10),
-                              _summaryRow('Paid', '$sym${DecimalSettings.formatAmount(paid)}'),
-                            ],
-                            if (change > 0) ...[
-                              const SizedBox(height: 10),
-                              _summaryRow('Change', '$sym${DecimalSettings.formatAmount(change)}'),
-                            ],
-                            if (method.isNotEmpty) ...[
-                              const SizedBox(height: 10),
-                              _summaryRow('Payment', cap(method)),
+                            // Payment details — only what differs from the Total,
+                            // separated from the headline by a divider.
+                            if (showPaid || change > 0 || method.isNotEmpty) ...[
+                              const SizedBox(height: 12),
+                              Divider(height: 1, color: AppColors.divider),
+                              const SizedBox(height: 12),
+                              if (showPaid)
+                                _summaryRow('Paid',
+                                    '$sym${DecimalSettings.formatAmount(paid)}'),
+                              if (change > 0) ...[
+                                if (showPaid) const SizedBox(height: 10),
+                                _summaryRow('Change',
+                                    '$sym${DecimalSettings.formatAmount(change)}'),
+                              ],
+                              if (method.isNotEmpty) ...[
+                                if (showPaid || change > 0)
+                                  const SizedBox(height: 10),
+                                _summaryRow('Payment', cap(method)),
+                              ],
                             ],
                           ],
                         ),
@@ -1860,11 +1996,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
 
   void _navigateToHome() {
     if (!mounted) return;
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (context) => const Startorder()),
-      (Route<dynamic> route) => false,
-    );
+    returnToStartOrder(context);
   }
 
   Future<void> clearCart() async {
@@ -1885,17 +2017,18 @@ class _CustomerdetailsState extends State<Customerdetails> {
   }
 
   // Update customer statistics (visits, loyalty points, last visit, etc.)
-  Future<void> _updateCustomerStats(RestaurantCustomer customer, String orderType, {int pointsToEarn = 0}) async {
+  Future<void> _updateCustomerStats(Customer customer, String orderType, {int pointsToEarn = 0}) async {
+    if (!PlanEnforce.allows(EntKeys.customers)) return;
     try {
 
-      await restaurantCustomerStore.updateCustomerVisit(
+      await customerStore.updateCustomerVisit(
         customerId: customer.customerId,
         orderType: orderType,
         pointsToAdd: pointsToEarn,
       );
 
       // Verify the update
-      final updatedCustomer = await restaurantCustomerStore.getCustomerById(customer.customerId);
+      final updatedCustomer = await customerStore.getCustomerById(customer.customerId);
       if (updatedCustomer != null) {
       } else {
       }
@@ -1906,6 +2039,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
   /// If the user typed a name or phone but did not select from autocomplete,
   /// find-or-create a customer record and link them to this order.
   Future<void> _autoSaveNewCustomer() async {
+    if (!PlanEnforce.allows(EntKeys.customers)) return; // customers not in plan
     if (selectedCustomer != null) return; // already linked via autocomplete
 
     final name = _nameController.text.trim();
@@ -1915,7 +2049,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
     try {
       // Search by phone first to avoid creating duplicates
       if (phone.isNotEmpty) {
-        final results = await restaurantCustomerStore.searchCustomers(phone);
+        final results = await customerStore.searchCustomers(phone);
         final match = results.where((c) => c.phone == phone).firstOrNull;
         if (match != null) {
           if (mounted) setState(() => selectedCustomer = match);
@@ -1925,7 +2059,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
 
       // Search by name if phone didn't match
       if (name.isNotEmpty) {
-        final results = await restaurantCustomerStore.searchCustomers(name);
+        final results = await customerStore.searchCustomers(name);
         final match = results.where((c) =>
           c.name?.toLowerCase() == name.toLowerCase() &&
           (phone.isEmpty || c.phone == phone)
@@ -1937,12 +2071,12 @@ class _CustomerdetailsState extends State<Customerdetails> {
       }
 
       // No existing customer found — create new
-      final newCustomer = RestaurantCustomer.create(
+      final newCustomer = Customer.create(
         customerId: const Uuid().v4(),
         name: name.isNotEmpty ? name : null,
         phone: phone.isNotEmpty ? phone : null,
       );
-      final saved = await restaurantCustomerStore.addCustomer(newCustomer);
+      final saved = await customerStore.addCustomer(newCustomer);
       if (saved && mounted) {
         setState(() => selectedCustomer = newCustomer);
       }
@@ -1951,17 +2085,42 @@ class _CustomerdetailsState extends State<Customerdetails> {
     }
   }
 
-  Future<void> _submitOrder(CartCalculationService calculations) async {
+  Future<void> _submitOrder(CartCalculationService calculations, {int pointsUsed = 0}) async {
     if (_isProcessing) return;
     setState(() => _isProcessing = true);
     try {
-      await _doSubmitOrder(calculations);
+      await _doSubmitOrder(calculations, pointsUsed: pointsUsed);
     } finally {
       if (mounted) setState(() => _isProcessing = false);
     }
   }
 
-  Future<void> _doSubmitOrder(CartCalculationService calculations) async {
+  Future<void> _doSubmitOrder(CartCalculationService calculations, {int pointsUsed = 0}) async {
+    // Plan gate — billing.invoice.create + per-day bill cap. Checked first, so a
+    // blocked plan can't even open a day it has no right to bill into.
+    if (!PlanGuard.allowedOr(context, EntKeys.billingInvoiceCreate, featureName: 'Billing')) {
+      return;
+    }
+    // Per-day bill cap applies to NEW orders only (existingModel == null).
+    // Settling an already-placed order is an exit — it was counted at placement
+    // via todaysBillLoad (active + past), so blocking it here would trap it.
+    if (widget.existingModel == null) {
+      final billsToday = await pastOrderStore.todaysBillLoad();
+      if (!mounted) return;
+      if (!PlanGuard.withinLimitOr(context, EntKeys.billingInvoicePerDayMax, billsToday, unit: 'bills per day')) {
+        return;
+      }
+    }
+
+    // EOD lockout: block NEW orders, but ALLOW settling an EXISTING active order
+    // (existingModel != null) so the user can clear open tables before completing
+    // EOD — the collected payment then counts toward the End-of-Day totals.
+    final strictlyPending = await DayManagementService.isEodStrictlyPending();
+    if (strictlyPending && widget.existingModel == null) {
+      NotificationService.instance.showError('Day has ended. Complete End of Day to unlock.');
+      return;
+    }
+
     // No active day session yet → start the day (opening balance) right here,
     // then continue. The day begins at the first order/settlement.
     final bool sessionOpen = await DayManagementService.isSessionOpen();
@@ -1986,14 +2145,10 @@ class _CustomerdetailsState extends State<Customerdetails> {
     }
     setState(() => _mobileError = null);
 
-    // Compute points usage
-    final int availablePoints = selectedCustomer?.loyaltyPoints ?? 0;
-    final int pointsUsed = (_usePoints && availablePoints > 0)
-        ? availablePoints.clamp(0, calculations.grandTotal.floor())
-        : 0;
-
-    // Guard: re-check payment validity. Skip when bill is fully covered by loyalty points.
-    final bool fullyCoveredByPoints = (calculations.grandTotal - pointsUsed) <= 0;
+    // Points usage is passed in — already capped on the PRE-redemption bill and
+    // folded into `calculations` so GST reflects the post-redemption amount.
+    // Guard: re-check payment validity. Skip when the bill is fully covered by points.
+    final bool fullyCoveredByPoints = calculations.grandTotal <= 0.009;
     if (!_isPaymentValid && !fullyCoveredByPoints) {
       NotificationService.instance.showError('Please complete payment details before proceeding.');
       return;
@@ -2004,6 +2159,17 @@ class _CustomerdetailsState extends State<Customerdetails> {
 
     if (selectedCustomer != null) {
     } else {
+    }
+
+    // Double-settlement guard: block only when the bill is FULLY paid (no
+    // balance due). A partially-paid order — e.g. items added after a prior
+    // payment — must still be settleable for the outstanding delta, so this
+    // uses the balance (isFullyPaid) rather than the raw isPaid flag.
+    if (widget.existingModel?.isFullyPaid == true) {
+      NotificationService.instance
+          .showError('This bill is already fully paid.');
+      if (mounted) Navigator.of(context).pop();
+      return;
     }
 
     if (widget.isSettle == true) {

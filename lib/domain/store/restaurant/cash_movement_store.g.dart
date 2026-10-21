@@ -89,9 +89,14 @@ mixin _$CashMovementStore on _CashMovementStore, Store {
       {required String type,
       required double amount,
       required String reason,
-      String? note}) {
-    return _$addMovementAsyncAction.run(() => super
-        .addMovement(type: type, amount: amount, reason: reason, note: note));
+      String? note,
+      bool systemClose = false}) {
+    return _$addMovementAsyncAction.run(() => super.addMovement(
+        type: type,
+        amount: amount,
+        reason: reason,
+        note: note,
+        systemClose: systemClose));
   }
 
   late final _$addAdjustmentAsyncAction =

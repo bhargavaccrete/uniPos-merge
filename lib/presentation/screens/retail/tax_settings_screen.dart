@@ -1,0 +1,684 @@
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/common/dialog_dispose_scope.dart';
+import 'package:billberrylite/domain/services/common/notification_service.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:flutter/services.dart' show FilteringTextInputFormatter;
+import 'package:flutter_mobx/flutter_mobx.dart';
+import 'package:uuid/uuid.dart';
+import 'package:billberrylite/domain/services/retail/gst_service.dart';
+import 'package:billberrylite/data/models/common/taxmodel_314.dart';
+import 'package:billberrylite/presentation/screens/retail/apply_tax_to_products_screen.dart';
+
+import '../../../core/di/service_locator.dart';
+import '../../../core/config/tax_feature.dart';
+
+class TaxSettingsScreen extends StatefulWidget {
+  const TaxSettingsScreen({super.key});
+
+  @override
+  State<TaxSettingsScreen> createState() => _TaxSettingsScreenState();
+}
+
+class _TaxSettingsScreenState extends State<TaxSettingsScreen> {
+  bool _taxInclusiveMode = false;
+  double _defaultGstRate = 0;
+  bool _isLoading = true;
+  final GstService _gstService = GstService();
+
+  @override
+  void initState() {
+    super.initState();
+    taxStore.loadTaxes();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    setState(() => _isLoading = true);
+    try {
+      _taxInclusiveMode = await _gstService.isTaxInclusiveMode();
+      _defaultGstRate = await _gstService.getDefaultGstRate();
+    } catch (e) {
+      debugPrint('Error loading GST settings: $e');
+    }
+    setState(() => _isLoading = false);
+  }
+
+  Future<void> _toggleTaxInclusiveMode(bool value) async {
+    // Through the store, not GstService directly: the store holds the copy the
+    // bill is computed from, and writing only the preference left it stale
+    // until the app restarted.
+    await retailCartStore.setTaxMode(value);
+    setState(() => _taxInclusiveMode = value);
+  }
+
+  Future<void> _updateDefaultGstRate(double rate) async {
+    await _gstService.setDefaultGstRate(rate);
+    setState(() => _defaultGstRate = rate);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.surfaceLight,
+      appBar: buildPrimaryAppBar(
+        titleWidget: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Tax Settings',
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontSize: AppResponsive.headingFontSize(context),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            Text(
+              'Rates and defaults applied at billing',
+              style: GoogleFonts.poppins(
+                color: Colors.white.withValues(alpha: 0.9),
+                fontSize: AppResponsive.smallFontSize(context),
+              ),
+            ),
+          ],
+        ),
+      ),
+      body: _isLoading
+          ? const Center(
+              child: CircularProgressIndicator(color: AppColors.primary),
+            )
+          : AppResponsive.constrainedContent(
+              context: context,
+              alignment: Alignment.topCenter,
+              child: SingleChildScrollView(
+                padding: AppResponsive.padding(context),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildSectionTitle('General Settings'),
+                    SizedBox(height: AppResponsive.mediumSpacing(context)),
+                    _buildGeneralSettingsCard(),
+                    SizedBox(height: AppResponsive.extraLargeSpacing(context)),
+
+                    // Note: GST/HSN is set per product (and can be overridden per
+                    // variant) — not per category, since one category can hold
+                    // items with different tax classes.
+                    _buildSectionTitle('Tax Rates'),
+                    SizedBox(height: AppResponsive.mediumSpacing(context)),
+                    _buildTaxRatesCard(),
+                    SizedBox(height: AppResponsive.extraLargeSpacing(context)),
+
+                    // India-only reference: these are Indian GST slabs and the
+                    // thresholds are stated in rupees, so the card is meaningless
+                    // (and misleading) for any other country. The setup wizard's
+                    // tax step gates its presets the same way.
+                    if (_isIndia) ...[
+                      _buildSectionTitle('Common GST Rates (India)'),
+                      SizedBox(height: AppResponsive.mediumSpacing(context)),
+                      _buildGstRateReferenceCard(),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+    );
+  }
+
+  /// Accent bar + title, the section header used across the settings screens.
+  Widget _buildSectionTitle(String title) {
+    return Row(
+      children: [
+        Container(
+          width: 4,
+          height: 18,
+          decoration: BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        SizedBox(width: AppResponsive.smallSpacing(context)),
+        Text(
+          title,
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.subheadingFontSize(context),
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+            letterSpacing: 0.3,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTaxDisabledNotice(String message) {
+    return Container(
+      padding: AppResponsive.cardPadding(context),
+      color: AppColors.warning.withValues(alpha: 0.08),
+      child: Row(
+        children: [
+          Icon(
+            Icons.info_outline,
+            size: AppResponsive.iconSize(context),
+            color: AppColors.warning,
+          ),
+          SizedBox(width: AppResponsive.smallSpacing(context)),
+          Expanded(
+            child: Text(
+              message,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.smallFontSize(context),
+                color: AppColors.warning,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGeneralSettingsCard() {
+    final enabled = TaxFeature.enabled;
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(
+          AppResponsive.smallBorderRadius(context),
+        ),
+        border: Border.all(color: AppColors.divider, width: 0.5),
+      ),
+      child: Column(
+        children: [
+          if (!enabled)
+            _buildTaxDisabledNotice(
+              'Tax is currently disabled because this business is not registered for tax. Turn on Tax Registration in Settings → Store Information.',
+            ),
+          Padding(
+            padding: AppResponsive.cardPadding(context),
+            child: Column(
+              children: [
+                // Tax Inclusive Mode Toggle
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Tax Inclusive Pricing',
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.bodyFontSize(context),
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            'Product prices include tax',
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.captionFontSize(context),
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Switch(
+                      value: _taxInclusiveMode,
+                      onChanged: enabled ? _toggleTaxInclusiveMode : null,
+                      activeColor: AppColors.success,
+                    ),
+                  ],
+                ),
+                const Divider(height: 24),
+
+                // Default GST Rate
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Default Tax Rate',
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.bodyFontSize(context),
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            'Applied when no product/variant tax is set',
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.captionFontSize(context),
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Material(
+                      color: enabled
+                          ? AppColors.primary.withValues(alpha: 0.08)
+                          : AppColors.surfaceLight,
+                      borderRadius: BorderRadius.circular(
+                        AppResponsive.smallBorderRadius(context),
+                      ),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(
+                          AppResponsive.smallBorderRadius(context),
+                        ),
+                        onTap: enabled ? _showDefaultGstRateDialog : null,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 8,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '${_defaultGstRate.toInt()}%',
+                                style: GoogleFonts.poppins(
+                                  fontSize: AppResponsive.subheadingFontSize(
+                                    context,
+                                  ),
+                                  fontWeight: FontWeight.w600,
+                                  color: enabled
+                                      ? AppColors.primary
+                                      : AppColors.textSecondary,
+                                ),
+                              ),
+                              SizedBox(width: 6),
+                              Icon(
+                                Icons.expand_more_rounded,
+                                size: AppResponsive.smallIconSize(context),
+                                color: enabled
+                                    ? AppColors.primary
+                                    : AppColors.textSecondary,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTaxRatesCard() {
+    if (!TaxFeature.enabled) {
+      return Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(
+            AppResponsive.smallBorderRadius(context),
+          ),
+          border: Border.all(color: AppColors.divider, width: 0.5),
+        ),
+        child: _buildTaxDisabledNotice(
+          'Tax rate management is unavailable while tax is disabled for this business.',
+        ),
+      );
+    }
+    return Observer(
+      builder: (_) {
+        final taxes = taxStore.taxes;
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(
+              AppResponsive.smallBorderRadius(context),
+            ),
+            border: Border.all(color: AppColors.divider, width: 0.5),
+          ),
+          child: Column(
+            children: [
+              if (taxes.isEmpty)
+                Padding(
+                  padding: AppResponsive.cardPadding(context),
+                  child: Text(
+                    'No named tax rates yet. Add one to pick it on products/variants.',
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.smallFontSize(context),
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                )
+              else
+                ...taxes.map(
+                  (tax) => Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 4,
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                tax.taxname,
+                                style: GoogleFonts.poppins(
+                                  fontSize: AppResponsive.bodyFontSize(context),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              Text(
+                                '${tax.taxperecentage ?? 0}%',
+                                style: GoogleFonts.poppins(
+                                  fontSize: AppResponsive.captionFontSize(
+                                    context,
+                                  ),
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Apply to products',
+                          onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => RetailApplyTaxScreen(tax: tax),
+                            ),
+                          ),
+                          icon: Icon(
+                            Icons.playlist_add_check_rounded,
+                            size: AppResponsive.iconSize(context),
+                          ),
+                          color: AppColors.primary,
+                        ),
+                        IconButton(
+                          onPressed: () => _showTaxDialog(existingTax: tax),
+                          icon: Icon(
+                            Icons.edit_outlined,
+                            size: AppResponsive.iconSize(context),
+                          ),
+                          color: AppColors.success,
+                        ),
+                        IconButton(
+                          onPressed: () => _confirmDeleteTax(tax),
+                          icon: Icon(
+                            Icons.delete_outline,
+                            size: AppResponsive.iconSize(context),
+                          ),
+                          color: AppColors.danger,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              const Divider(height: 1),
+              Padding(
+                padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: TextButton.icon(
+                    onPressed: () => _showTaxDialog(),
+                    icon: const Icon(Icons.add, color: AppColors.success),
+                    label: Text(
+                      'Add Tax Rate',
+                      style: GoogleFonts.poppins(color: AppColors.success),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _confirmDeleteTax(Tax tax) async {
+    final confirmed = await showAppConfirmDialog(
+      context: context,
+      title: 'Delete Tax Rate?',
+      message:
+          'Delete "${tax.taxname}" (${tax.taxperecentage ?? 0}%)? '
+          'Products already using it keep their stored rate.',
+      confirmLabel: 'Delete',
+      accent: AppColors.danger,
+      icon: Icons.delete_outline_rounded,
+    );
+    if (confirmed) {
+      await taxStore.deleteTax(tax.id);
+    }
+  }
+
+  Future<void> _showTaxDialog({Tax? existingTax}) async {
+    final isEdit = existingTax != null;
+    final nameController = TextEditingController(
+      text: existingTax?.taxname ?? '',
+    );
+    final rateController = TextEditingController(
+      text: existingTax?.taxperecentage != null
+          ? existingTax!.taxperecentage.toString()
+          : '',
+    );
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => DialogDisposeScope(
+        disposables: [nameController, rateController],
+        child: AppDialogShell(
+          title: isEdit ? 'Edit Tax Rate' : 'Add Tax Rate',
+          subtitle: 'Selectable on products and variants',
+          icon: Icons.percent_rounded,
+          accent: AppColors.primary,
+          body: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AppTextField(
+                controller: nameController,
+                autofocus: true,
+                label: 'Tax Name',
+                hint: 'e.g. GST',
+                icon: Icons.label_outline_rounded,
+                textInputAction: TextInputAction.next,
+              ),
+              SizedBox(height: AppResponsive.mediumSpacing(context)),
+              AppTextField(
+                controller: rateController,
+                label: 'Rate %',
+                hint: 'e.g. 18',
+                icon: Icons.percent_rounded,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                ],
+                textInputAction: TextInputAction.done,
+              ),
+            ],
+          ),
+          actions: [
+            appDialogCancelButton(dialogContext),
+            SizedBox(width: AppResponsive.mediumSpacing(context)),
+            appDialogPrimaryButton(
+              label: isEdit ? 'Update' : 'Add',
+              color: AppColors.primary,
+              onPressed: () => Navigator.pop(dialogContext, true),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (saved != true) return;
+
+    final name = nameController.text.trim();
+    final rate = double.tryParse(rateController.text.trim());
+    if (name.isEmpty || rate == null || rate < 0 || rate > 100) {
+      NotificationService.instance.showError(
+        'Enter a valid name and rate (0-100)',
+      );
+      return;
+    }
+
+    if (isEdit) {
+      await taxStore.updateTax(
+        existingTax.copyWith(taxname: name, taxperecentage: rate),
+      );
+    } else {
+      await taxStore.addTax(
+        Tax(id: const Uuid().v4(), taxname: name, taxperecentage: rate),
+      );
+    }
+  }
+
+  /// True when the business is registered in India. Reads the saved
+  /// BusinessDetails — unlike the wizard, this screen runs after setup.
+  bool get _isIndia =>
+      (businessDetailsRepository.get()?.country ?? '').trim().toLowerCase() ==
+      'india';
+
+  Widget _buildGstRateReferenceCard() {
+    final rates = [
+      {'rate': '0%', 'items': 'Essential goods, milk, vegetables, fruits'},
+      {'rate': '5%', 'items': 'Clothing under Rs.1000, footwear under Rs.500'},
+      {'rate': '12%', 'items': 'Clothing Rs.1000+, footwear Rs.500-1000'},
+      {'rate': '18%', 'items': 'Electronics, appliances, services'},
+      {'rate': '28%', 'items': 'Luxury goods, automobiles, cosmetics'},
+    ];
+
+    return Container(
+      padding: AppResponsive.cardPadding(context),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(
+          AppResponsive.smallBorderRadius(context),
+        ),
+        border: Border.all(color: AppColors.divider, width: 0.5),
+      ),
+      child: Column(
+        children: rates.map((rate) {
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: AppResponsive.mediumSpacing(context),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 48,
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.success.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    rate['rate']!,
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.smallFontSize(context),
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.success,
+                    ),
+                  ),
+                ),
+                SizedBox(width: AppResponsive.mediumSpacing(context)),
+                Expanded(
+                  child: Text(
+                    rate['items']!,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.smallFontSize(context),
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Future<void> _showDefaultGstRateDialog() async {
+    final taxes = taxStore.taxes;
+    final rates = taxes.isNotEmpty
+        ? taxes.map((t) => t.taxperecentage ?? 0).toSet().toList()
+        : GstService.commonGstRates;
+
+    final picked = await showDialog<double>(
+      context: context,
+      builder: (dialogContext) => AppDialogShell(
+        title: 'Default Tax Rate',
+        subtitle: 'Applied to a product that has no rate of its own',
+        icon: Icons.percent_rounded,
+        accent: AppColors.primary,
+        body: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: rates.map((rate) {
+            final selected = rate == _defaultGstRate;
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: AppResponsive.smallSpacing(context),
+              ),
+              child: Material(
+                color: selected
+                    ? AppColors.primary.withValues(alpha: 0.08)
+                    : AppColors.surfaceLight,
+                borderRadius: BorderRadius.circular(10),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(10),
+                  onTap: () => Navigator.pop(dialogContext, rate),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          selected
+                              ? Icons.radio_button_checked
+                              : Icons.radio_button_unchecked,
+                          size: AppResponsive.smallIconSize(dialogContext),
+                          color: selected
+                              ? AppColors.primary
+                              : AppColors.textSecondary,
+                        ),
+                        SizedBox(width: AppResponsive.mediumSpacing(context)),
+                        Text(
+                          '${rate.toInt()}%',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.bodyFontSize(dialogContext),
+                            fontWeight: selected
+                                ? FontWeight.w600
+                                : FontWeight.w400,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+        actions: [appDialogCancelButton(dialogContext)],
+      ),
+    );
+
+    if (picked == null || picked == _defaultGstRate) return;
+    await _updateDefaultGstRate(picked);
+  }
+}

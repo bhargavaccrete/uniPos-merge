@@ -1,404 +1,386 @@
+import 'dart:async';
+import 'package:billberrylite/presentation/widget/componets/retail/expiry_date_field.dart';
+import 'package:billberrylite/domain/services/retail/expiry_status.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
-import 'package:billberrylite/util/responsive.dart';
-import 'package:billberrylite/util/common/currency_helper.dart';
-import 'package:billberrylite/util/common/decimal_settings.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/core/constants/image_sizes.dart';
+import 'package:billberrylite/domain/store/retail/product_store.dart';
+import 'package:billberrylite/domain/services/common/notification_service.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/common/list_sort_button.dart';
+import 'package:billberrylite/domain/services/common/list_sort_service.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_empty_state.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
+import 'package:billberrylite/presentation/widget/componets/common/row_action_button.dart';
 
 import 'package:billberrylite/data/models/retail/hive_model/product_model_200.dart';
 import 'package:billberrylite/data/models/retail/hive_model/variante_model_201.dart';
 import 'package:billberrylite/presentation/screens/retail/scanner_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/add_product_screen.dart';
-import 'package:billberrylite/presentation/screens/retail/variant_management_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/product_detail_screen.dart';
+import 'package:billberrylite/core/plan/plan_guard.dart';
+import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
+import 'package:billberrylite/domain/services/retail/stock_adjustment_service.dart';
+import 'package:billberrylite/domain/services/retail/catalog_permission.dart';
+import 'package:billberrylite/presentation/screens/retail/stock_take_list_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/assemble_kit_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/bundles_screen.dart';
 
 class InventoryScreen extends StatefulWidget {
-  const InventoryScreen({super.key});
+  /// True when hosted as a tab of ProductManagementScreen — the host owns the
+  /// AppBar (and its contextual Add action), so this screen drops its own.
+  final bool embedded;
+
+  /// Ticks when the host switches tabs; clears the search box so the other tab
+  /// is never filtered by a query typed on this one.
+  final Listenable? clearSearchSignal;
+
+  const InventoryScreen({
+    super.key,
+    this.embedded = false,
+    this.clearSearchSignal,
+  });
 
   @override
   State<InventoryScreen> createState() => _InventoryScreenState();
 }
 
-class _InventoryScreenState extends State<InventoryScreen> {
+class _InventoryScreenState extends State<InventoryScreen>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  bool _isLoadingData = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+    widget.clearSearchSignal?.addListener(_clearSearch);
+  }
 
   @override
   void dispose() {
+    widget.clearSearchSignal?.removeListener(_clearSearch);
     _searchController.dispose();
     super.dispose();
   }
 
-  Future<void> _addItemToCart(ProductModel product) async {
+  /// Horizontal gutter shared by the search bar, the mobile list, the grid and
+  /// the desktop header.
+  ///
+  /// They MUST agree. The search row used 20 while the list used 16 and the
+  /// desktop header/grid used 32 — and on desktop the row was additionally
+  /// wrapped in `EdgeInsets.all(24)`, putting the field at 44 against cards at
+  /// 32. The Categories tab carried the same mismatch, so both now read this.
+  double get _gutter => AppResponsive.padding(context).left;
 
-    // Get variants for this product
-    final variants = await productStore.getVariantsForProduct(product.productId);
+  void _clearSearch() {
+    if (_searchController.text.isEmpty && _searchQuery.isEmpty) return;
+    _searchController.clear();
+    if (mounted) setState(() => _searchQuery = '');
+  }
 
-    if (variants.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No variants available for this product'),
-          backgroundColor: Colors.red,
-          duration: Duration(seconds: 2),
+  Future<void> _loadData({bool force = false}) async {
+    if (_isLoadingData && !force) return;
+    if (!mounted) return;
+
+    setState(() => _isLoadingData = true);
+
+    try {
+      await Future.wait([
+        categoryStore.loadCategories(),
+        productStore.loadProducts(),
+        productStore.loadVariants(),
+        // Also pre-warms the lazy singleton so no Observer constructs it mid-build.
+        stockAlertStore.loadSettings(),
+      ]).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw TimeoutException('Data loading timed out after 10 seconds');
+        },
+      );
+    } catch (e) {
+      if (mounted) {
+        NotificationService.instance.showError('Error loading inventory: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingData = false);
+      }
+    }
+  }
+
+  /// Products matching the current search, each paired with its derived stock,
+  /// price and status. MUST be called inside an Observer builder: it is what
+  /// registers the MobX dependencies, and the lazy `itemBuilder`s of the grids
+  /// run outside the reaction, where store reads would neither track nor
+  /// memoise.
+  List<_ProductRow> _visibleRows() {
+    final index = productStore.variantsByProduct;
+    // Through the store's resolver so a product whose category was deleted
+    // reads as "Uncategorized" rather than as a blank chip — and is findable
+    // by that word in the search box.
+    String categoryLabel(ProductModel p) =>
+        categoryStore.displayNameFor(p.category);
+
+    final rows = productStore.products
+        .where((product) {
+          if (_searchQuery.isEmpty) return true;
+          final categoryName = categoryLabel(product).toLowerCase();
+          if (product.productName.toLowerCase().contains(_searchQuery) ||
+              categoryName.contains(_searchQuery)) {
+            return true;
+          }
+          // The search hint promises barcodes, and a typed SKU is just as likely —
+          // both live on the variants, not the product.
+          final variants = index[product.productId] ?? const <VarianteModel>[];
+          return variants.any(
+            (v) =>
+                (v.barcode?.toLowerCase().contains(_searchQuery) ?? false) ||
+                (v.sku?.toLowerCase().contains(_searchQuery) ?? false),
+          );
+        })
+        .map((product) {
+          final variants = index[product.productId] ?? const <VarianteModel>[];
+          final totalStock = variants.fold<double>(
+            0.0,
+            (sum, v) => sum + v.stockQty,
+          );
+          return _ProductRow(
+            product: product,
+            variants: variants,
+            categoryName: categoryLabel(product),
+            totalStock: totalStock,
+            status: productStore.stockStatusForQty(totalStock),
+            expiryStatus: productStore.expiryStatusForProduct(
+              product.productId,
+            ),
+            price: productStore.costPriceFor(product.productId),
+          );
+        })
+        .toList();
+
+    // Sorted at the single funnel, so the list and the grid can't disagree.
+    // `createdAt` is an ISO-8601 STRING on ProductModel, not a DateTime —
+    // tryParse returns null for a legacy/unparseable value, which applySort
+    // already sinks to the bottom rather than treating as epoch-zero.
+    return applySort(
+      rows,
+      ListSortService.instance.optionFor(SortableList.retailProducts),
+      nameOf: (row) => row.product.productName,
+      createdAtOf: (row) => DateTime.tryParse(row.product.createdAt),
+    );
+  }
+
+  Future<void> _openProductByBarcode(String barcode) async {
+    final product = await productStore.findByBarcode(barcode);
+    if (!mounted) return;
+    if (product == null) {
+      NotificationService.instance.showWarning(
+        'No product found for that barcode',
+      );
+      return;
+    }
+    _searchController.clear();
+    setState(() => _searchQuery = '');
+    _openProduct(product);
+  }
+
+  // ==================== PRODUCT ACTIONS ====================
+  /// A product has exactly one destination — its own screen. No intermediate
+  /// dialog, and no second route to the variant list.
+  void _openProduct(ProductModel product) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => ProductDetailScreen(product: product)),
+    );
+  }
+
+  /// Edit / Delete for a product, as visible buttons on the row — matching the
+  /// Categories tab and the product form's category picker.
+  Widget _buildProductMenu(ProductModel product) {
+    // A cashier gets the row without its actions rather than actions that
+    // refuse them — the retail house pattern.
+    if (!CatalogPermission.canEdit) return const SizedBox.shrink();
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        RowActionButton(
+          icon: Icons.edit_outlined,
+          color: AppColors.primary,
+          tooltip: 'Edit Product',
+          onTap: () => openEditProductScreen(context, product),
         ),
+        const SizedBox(width: 6),
+        RowActionButton(
+          icon: Icons.delete_outline_rounded,
+          color: AppColors.danger,
+          tooltip: 'Delete Product',
+          onTap: () => _deleteProduct(product),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _deleteProduct(ProductModel product) async {
+    if (!PlanGuard.allowedOr(
+      context,
+      RetailEntKeys.catalogProductsDelete,
+      featureName: 'Delete Products',
+    )) {
+      return;
+    }
+    // A component of someone else's bundle can't go: the bundle would sell
+    // with that item silently skipped. Name them so the owner can fix it.
+    final usedIn = productStore.bundlesUsing(
+      productStore.variantsFor(product.productId).map((v) => v.varianteId),
+    );
+    if (usedIn.isNotEmpty) {
+      await showAppErrorDialog(
+        context: context,
+        title: 'Used in bundles',
+        message: '"${product.productName}" is a component of the bundles '
+            'below. Remove it from them first, then delete it.',
+        errors: usedIn,
+        icon: Icons.widgets_outlined,
       );
       return;
     }
 
-    // If product has multiple variants, show selection dialog
-    if (variants.length > 1 && product.hasVariants) {
-      _showVariantSelectionDialog(product, variants);
-    } else {
-      // Add the only/default variant to cart
-      cartStore.addItem(product, variants.first);
+    // Deleting the product takes its variants with it (productStore.deleteProduct
+    // prunes them), so say so before asking.
+    final variantCount = productStore.variantCountFor(product.productId);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${product.productName} added to cart'),
-          backgroundColor: const Color(0xFF4CAF50),
-          duration: const Duration(seconds: 1),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
+    final confirmed = await showAppConfirmDialog(
+      context: context,
+      title: 'Delete Product?',
+      message: variantCount > 0
+          ? 'Delete "${product.productName}"? Its $variantCount variant'
+                '${variantCount == 1 ? '' : 's'} and all their stock are removed '
+                'with it.'
+          : 'Delete "${product.productName}"?',
+      confirmLabel: 'Delete',
+      accent: AppColors.danger,
+      icon: Icons.delete_outline_rounded,
+    );
+    if (!confirmed || !mounted) return;
+
+    await productStore.deleteProduct(product.productId);
+    if (!mounted) return;
+    NotificationService.instance.showSuccess('${product.productName} deleted');
   }
 
-  void _showVariantSelectionDialog(ProductModel product, List<VarianteModel> variants) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Select ${product.productName}'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: variants.length,
-            itemBuilder: (context, index) {
-              final variant = variants[index];
-              return ListTile(
-                title: Text(_getVariantDisplayName(variant)),
-                subtitle: ValueListenableBuilder<String>(
-                  valueListenable: CurrencyHelper.currencyNotifier,
-                  builder: (context, currencyCode, child) {
-                    return ValueListenableBuilder<int>(
-                      valueListenable: DecimalSettings.precisionNotifier,
-                      builder: (context, precision, child) {
-                        final symbol = CurrencyHelper.currentSymbol;
-                        final price = variant.costPrice?.toStringAsFixed(precision) ?? '0${precision > 0 ? '.${'0' * precision}' : ''}';
-                        return Text('$symbol$price • Stock: ${variant.stockQty}');
-                      },
-                    );
-                  },
-                ),
-                onTap: () {
-                  Navigator.pop(context);
-                  cartStore.addItem(product, variant);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('${product.productName} added to cart'),
-                      backgroundColor: const Color(0xFF4CAF50),
-                      duration: const Duration(seconds: 1),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                },
-              );
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-        ],
+  /// Plain price label — no listener of its own; the [MoneyScope] around the
+  /// body drives it.
+  Widget _buildPriceText(
+    double amount, {
+    required double fontSize,
+    required Color color,
+    String prefix = '',
+    bool bold = true,
+  }) {
+    return Text(
+      '$prefix${formatMoney(amount)}',
+      style: GoogleFonts.poppins(
+        fontSize: fontSize,
+        fontWeight: bold ? FontWeight.w700 : FontWeight.w400,
+        color: color,
       ),
     );
   }
 
-  void _showProductVariantsDialog(ProductModel product, List<VarianteModel> variants) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    product.productName,
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    product.category,
-                    style: const TextStyle(fontSize: 14, color: Colors.grey, fontWeight: FontWeight.normal),
-                  ),
-                ],
-              ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.edit),
-              onPressed: () async {
-                Navigator.pop(context);
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => VariantManagementScreen(product: product),
-                  ),
-                );
-                setState(() {});
-              },
-              tooltip: 'Edit Variants',
-            ),
-          ],
-        ),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Summary Section
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.blue.shade200),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    Column(
-                      children: [
-                        const Icon(Icons.inventory_2, color: Colors.blue, size: 20),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${variants.length}',
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                        ),
-                        const Text(
-                          'Variants',
-                          style: TextStyle(fontSize: 11, color: Colors.grey),
-                        ),
-                      ],
-                    ),
-                    Column(
-                      children: [
-                        const Icon(Icons.storage, color: Colors.green, size: 20),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${variants.fold<int>(0, (sum, v) => sum + v.stockQty)}',
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                        ),
-                        const Text(
-                          'Total Stock',
-                          style: TextStyle(fontSize: 11, color: Colors.grey),
-                        ),
-                      ],
-                    ),
-                    Column(
-                      children: [
-                        const Icon(Icons.attach_money, color: Colors.orange, size: 20),
-                        const SizedBox(height: 4),
-                        ValueListenableBuilder<String>(
-                          valueListenable: CurrencyHelper.currencyNotifier,
-                          builder: (context, currencyCode, child) {
-                            return ValueListenableBuilder<int>(
-                              valueListenable: DecimalSettings.precisionNotifier,
-                              builder: (context, precision, child) {
-                                final symbol = CurrencyHelper.currentSymbol;
-                                final price = variants.isNotEmpty && variants.first.sellingPrice != null
-                                    ? variants.first.sellingPrice!.toStringAsFixed(precision)
-                                    : '0${precision > 0 ? '.${'0' * precision}' : ''}';
-                                return Text(
-                                  '$symbol$price',
-                                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                                );
-                              },
-                            );
-                          },
-                        ),
-                        const Text(
-                          'Price',
-                          style: TextStyle(fontSize: 11, color: Colors.grey),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              // Variants List
-              if (variants.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.all(20),
-                  child: Text(
-                    'No variants found',
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                )
-              else
-                Flexible(
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: variants.length,
-                    itemBuilder: (context, index) {
-                      final variant = variants[index];
-                      final isLowStock = variant.stockQty < (variant.minStock ?? 5);
-
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        child: ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor: isLowStock ? Colors.red.shade100 : Colors.green.shade100,
-                            child: Icon(
-                              Icons.inventory_2,
-                              color: isLowStock ? Colors.red : Colors.green,
-                              size: 20,
-                            ),
-                          ),
-                          title: Text(
-                            _getVariantDisplayName(variant),
-                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  Text(
-                                    'Stock: ${variant.stockQty}',
-                                    style: TextStyle(
-                                      color: isLowStock ? Colors.red : Colors.grey,
-                                      fontWeight: isLowStock ? FontWeight.bold : FontWeight.normal,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                  if (isLowStock) ...[
-                                    const SizedBox(width: 4),
-                                    const Icon(Icons.warning, color: Colors.red, size: 14),
-                                  ],
-                                ],
-                              ),
-                              if (variant.barcode?.isNotEmpty ?? false)
-                                Text(
-                                  'Barcode: ${variant.barcode}',
-                                  style: const TextStyle(fontSize: 11, color: Colors.grey),
-                                ),
-                            ],
-                          ),
-                          trailing: ValueListenableBuilder<String>(
-                            valueListenable: CurrencyHelper.currencyNotifier,
-                            builder: (context, currencyCode, child) {
-                              return ValueListenableBuilder<int>(
-                                valueListenable: DecimalSettings.precisionNotifier,
-                                builder: (context, precision, child) {
-                                  final symbol = CurrencyHelper.currentSymbol;
-                                  final sellingPrice = variant.sellingPrice?.toStringAsFixed(precision) ?? '0${precision > 0 ? '.${'0' * precision}' : ''}';
-                                  final costPrice = variant.costPrice?.toStringAsFixed(precision);
-                                  return Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    crossAxisAlignment: CrossAxisAlignment.end,
-                                    children: [
-                                      Text(
-                                        '$symbol$sellingPrice',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 14,
-                                          color: Colors.green,
-                                        ),
-                                      ),
-                                      if (costPrice != null)
-                                        Text(
-                                          'Cost: $symbol$costPrice',
-                                          style: const TextStyle(fontSize: 11, color: Colors.grey),
-                                        ),
-                                    ],
-                                  );
-                                },
-                              );
-                            },
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-          if (variants.isNotEmpty)
-            ElevatedButton.icon(
-              onPressed: () {
-                Navigator.pop(context);
-                _showVariantSelectionDialog(product, variants);
-              },
-              icon: const Icon(Icons.add_shopping_cart, size: 18),
-              label: const Text('Add to Cart'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF4CAF50),
-              ),
-            ),
-        ],
-      ),
+  /// Bulk counting lives on its own screen rather than inline here: a count is
+  /// a session with a draft lifecycle, not a filter over this list.
+  void _openStockTakes() {
+    if (!PlanGuard.allowedOr(
+      context,
+      RetailEntKeys.inventoryStockTake,
+      featureName: 'Stock Take',
+    )) {
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const StockTakeListScreen()),
     );
   }
 
-  String _getVariantDisplayName(VarianteModel variant) {
-    final parts = <String>[];
+  /// Repack/kit products are replenished by an explicit "Assemble" action
+  /// rather than a PO/GRN — see docs/retail_inventory_system_plan.md §3.2.
+  void _openAssembleKit() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const AssembleKitScreen()),
+    );
+  }
 
-    // Check custom attributes first
-    if (variant.customAttributes != null && variant.customAttributes!.isNotEmpty) {
-      variant.customAttributes!.forEach((key, value) {
-        if (value.toString().isNotEmpty) {
-          parts.add('$key: $value');
-        }
-      });
-    }
-
-    // Fallback to legacy fields
-    if (parts.isEmpty) {
-      if (variant.size != null && variant.size!.isNotEmpty) parts.add('Size: ${variant.size}');
-      if (variant.color != null && variant.color!.isNotEmpty) parts.add('Color: ${variant.color}');
-      if (variant.weight != null && variant.weight!.isNotEmpty) parts.add('Weight: ${variant.weight}');
-    }
-
-    return parts.isEmpty ? 'Default Variant' : parts.join(' • ');
+  /// Card grid over every Bundle/Repack product — see
+  /// docs/retail_inventory_system_plan.md §3.2.
+  void _openBundles() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const BundlesScreen()),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
-      appBar: AppBar(
-        title: const Text('Inventory', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
-        centerTitle: false,
-        elevation: 0,
-        backgroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add, color: Color(0xFF4CAF50)),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const AddProductScreen()),
-              );
-            },
-            tooltip: 'Add New Item',
-          ),
-        ],
-      ),
-      body: Responsive(
-        mobile: _buildMobileLayout(context),
-        tablet: _buildTabletLayout(context),
-        desktop: _buildDesktopLayout(context),
+      backgroundColor: AppColors.surfaceLight,
+      appBar: widget.embedded
+          ? null
+          : buildPrimaryAppBar(
+              title: 'Inventory',
+              actions: [
+                // Admin-only, so a cashier is never shown a control that would
+                // just refuse them.
+                if (StockAdjustmentService.canAdjust)
+                  IconButton(
+                    icon: const Icon(Icons.fact_check_outlined),
+                    onPressed: _openStockTakes,
+                    tooltip: 'Stock Takes',
+                  ),
+                // Assembling a kit and building a bundle both WRITE stock, so
+                // they ride the stock-adjustment gate rather than catalogEdit.
+                if (StockAdjustmentService.canAdjust)
+                  IconButton(
+                    icon: const Icon(Icons.inventory_rounded),
+                    onPressed: _openAssembleKit,
+                    tooltip: 'Assemble Kit',
+                  ),
+                if (StockAdjustmentService.canAdjust)
+                  IconButton(
+                    icon: const Icon(Icons.widgets_outlined),
+                    onPressed: _openBundles,
+                    tooltip: 'Bundles',
+                  ),
+                if (CatalogPermission.canEdit)
+                  IconButton(
+                    icon: const Icon(Icons.add),
+                    onPressed: () => openAddProductScreen(context),
+                    tooltip: 'Add New Item',
+                  ),
+              ],
+            ),
+      body: SafeArea(
+        child: MoneyScope(
+          child: AppResponsive.isDesktop(context)
+              ? _buildDesktopLayout(context)
+              : AppResponsive.isTablet(context)
+              ? _buildTabletLayout(context)
+              : _buildMobileLayout(context),
+        ),
       ),
     );
   }
@@ -407,11 +389,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
   Widget _buildMobileLayout(BuildContext context) {
     return Column(
       children: [
-        _buildHeaderRow(),
-        const Divider(height: 1, thickness: 0.5, color: Color(0xFFE8E8E8)),
-        Expanded(
-          child: _buildProductListWithSearch(),
-        ),
+        _buildSearchBarRow(),
+        const Divider(height: 1, thickness: 0.5, color: AppColors.divider),
+        Expanded(child: _buildProductList()),
       ],
     );
   }
@@ -421,50 +401,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
     return Column(
       children: [
         _buildSearchBarRow(),
-        const Divider(height: 1, thickness: 0.5, color: Color(0xFFE8E8E8)),
-        Expanded(
-          child: Observer(
-            builder: (context) {
-              final allProducts = productStore.products;
-              final filteredProducts = _searchQuery.isEmpty
-                  ? allProducts
-                  : allProducts.where((product) {
-                      return product.productName.toLowerCase().contains(_searchQuery) ||
-                          product.category.toLowerCase().contains(_searchQuery);
-                    }).toList();
-
-              if (filteredProducts.isEmpty) {
-                return const Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.search_off, size: 64, color: Color(0xFFD0D0D0)),
-                      SizedBox(height: 16),
-                      Text(
-                        'No products found',
-                        style: TextStyle(fontSize: 16, color: Color(0xFF6B6B6B)),
-                      ),
-                    ],
-                  ),
-                );
-              }
-
-              return GridView.builder(
-                padding: const EdgeInsets.all(20),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
-                  childAspectRatio: 1.3,
-                ),
-                itemCount: filteredProducts.length,
-                itemBuilder: (context, index) {
-                  return _buildProductGridCard(filteredProducts[index]);
-                },
-              );
-            },
-          ),
-        ),
+        const Divider(height: 1, thickness: 0.5, color: AppColors.divider),
+        Expanded(child: _buildProductGrid(context)),
       ],
     );
   }
@@ -473,482 +411,540 @@ class _InventoryScreenState extends State<InventoryScreen> {
   Widget _buildDesktopLayout(BuildContext context) {
     return Column(
       children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 20),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            border: Border(
-              bottom: BorderSide(color: Color(0xFFE8E8E8), width: 1),
+        // Standalone only. Embedded in the Products hub this band was a
+        // THIRD copy of the same information: the hub's AppBar already says
+        // "Products" and its tab pill already shows the same count.
+        if (!widget.embedded)
+          Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: _gutter,
+              vertical: AppResponsive.largeSpacing(context),
             ),
-          ),
-          child: Row(
-            children: [
-              const Text(
-                'Product Inventory',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF1A1A1A),
-                ),
+            decoration: const BoxDecoration(
+              color: AppColors.white,
+              border: Border(
+                bottom: BorderSide(color: AppColors.divider, width: 1),
               ),
-              const SizedBox(width: 16),
-              Observer(
-                builder: (context) => Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF4CAF50).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Text(
+                  'Product Inventory',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.headingFontSize(context),
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
                   ),
-                  child: Text(
-                    '${productStore.products.length} products',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF4CAF50),
+                ),
+                SizedBox(width: AppResponsive.largeSpacing(context)),
+                Observer(
+                  builder: (context) => Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(
+                        AppResponsive.borderRadius(context),
+                      ),
+                    ),
+                    child: Text(
+                      '${productStore.products.length} products',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.smallFontSize(context),
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary,
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-        Padding(
-          padding: const EdgeInsets.all(24),
-          child: _buildSearchBarRow(),
-        ),
-        Expanded(
-          child: Observer(
-            builder: (context) {
-              final allProducts = productStore.products;
-              final filteredProducts = _searchQuery.isEmpty
-                  ? allProducts
-                  : allProducts.where((product) {
-                      return product.productName.toLowerCase().contains(_searchQuery) ||
-                          product.category.toLowerCase().contains(_searchQuery);
-                    }).toList();
-
-              if (filteredProducts.isEmpty) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.search_off, size: 80, color: Colors.grey[300]),
-                      const SizedBox(height: 20),
-                      const Text(
-                        'No products found',
-                        style: TextStyle(fontSize: 18, color: Color(0xFF6B6B6B)),
-                      ),
-                    ],
-                  ),
-                );
-              }
-
-              return GridView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 8),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  crossAxisSpacing: 24,
-                  mainAxisSpacing: 24,
-                  childAspectRatio: 1.4,
-                ),
-                itemCount: filteredProducts.length,
-                itemBuilder: (context, index) {
-                  return _buildProductGridCard(filteredProducts[index]);
-                },
-              );
-            },
-          ),
-        ),
+        // No wrapping Padding: the row supplies its own gutter, and an extra
+        // 24 here is what pushed the field 12px right of the cards below.
+        // Full-bleed white also matches the header band directly above it.
+        _buildSearchBarRow(),
+        Expanded(child: _buildProductGrid(context)),
       ],
     );
   }
 
-  // ==================== GRID CARD (For Tablet & Desktop) ====================
-  Widget _buildProductGridCard(ProductModel product) {
-    return FutureBuilder<List<VarianteModel>>(
-      future: productStore.getVariantsForProduct(product.productId),
-      builder: (context, snapshot) {
-        final variants = snapshot.data ?? [];
-        final totalStock = variants.fold<int>(0, (sum, v) => sum + v.stockQty);
-        final price = variants.isNotEmpty && variants.first.costPrice != null
-            ? variants.first.costPrice!
-            : 0.0;
+  // ==================== GRID (Tablet & Desktop) ====================
+  Widget _buildProductGrid(BuildContext context) {
+    if (_isLoadingData) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
-        return InkWell(
-          onTap: () => _addItemToCart(product),
-          onLongPress: () => _showProductVariantsDialog(product, variants),
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE8E8E8), width: 1),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.03),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+    // Column counts preserved from the previous hardcoded layouts.
+    final columns = AppResponsive.gridColumns(
+      context,
+      mobile: 1,
+      tablet: 2,
+      desktop: 3,
+    );
+    final spacing = AppResponsive.getValue(
+      context,
+      mobile: 16.0,
+      tablet: 16.0,
+      desktop: 24.0,
+    );
+    // Cell HEIGHT per breakpoint, not derived from width. The card's height
+    // follows its FONT sizes, not the column width — deriving it from width
+    // made a 304px desktop cell 217px tall and the Spacer ate the difference.
+    // Each value is the sum of the AppResponsive steps _buildProductGridCard
+    // uses (cardPadding + 48px menu row + smallSpacing + caption chip +
+    // smallFont stock + mediumSpacing + subheading price) plus ~10px slack.
+    final cellHeight = AppResponsive.getValue(
+      context,
+      mobile: 180.0,
+      tablet: 196.0,
+      desktop: 222.0,
+    );
+    // Same gutter as the search bar above — see _gutter. Bottom clears the
+    // host's FAB and stays static: it is coupled to that button, not a
+    // breakpoint.
+    final padding = EdgeInsets.fromLTRB(
+      _gutter,
+      AppResponsive.mediumSpacing(context),
+      _gutter,
+      88,
+    );
+
+    return ListenableBuilder(
+      listenable: ListSortService.instance,
+      builder: (context, _) => Observer(
+        builder: (context) {
+          final rows = _visibleRows();
+
+          if (rows.isEmpty) return _buildEmptyState();
+
+          return GridView.builder(
+            padding: padding,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: columns,
+              crossAxisSpacing: spacing,
+              mainAxisSpacing: spacing,
+              mainAxisExtent: cellHeight,
             ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Product Name
-                  Text(
-                    product.productName,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF1A1A1A),
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 8),
-                  // Category
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF4CAF50).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      product.category,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: Color(0xFF4CAF50),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                  const Spacer(),
-                  // Stock and Variants Info
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.inventory_2_outlined,
-                        size: 14,
-                        color: totalStock < 10 ? Colors.red : const Color(0xFF9E9E9E),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Stock: $totalStock',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: totalStock < 10 ? Colors.red : const Color(0xFF9E9E9E),
-                          fontWeight: totalStock < 10 ? FontWeight.w600 : FontWeight.normal,
-                        ),
-                      ),
-                      if (product.hasVariants) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.blue.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(3),
-                          ),
-                          child: Text(
-                            '${variants.length} variants',
-                            style: const TextStyle(
-                              fontSize: 10,
-                              color: Colors.blue,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  // Price
-                  ValueListenableBuilder<String>(
-                    valueListenable: CurrencyHelper.currencyNotifier,
-                    builder: (context, currencyCode, child) {
-                      return ValueListenableBuilder<int>(
-                        valueListenable: DecimalSettings.precisionNotifier,
-                        builder: (context, precision, child) {
-                          final symbol = CurrencyHelper.currentSymbol;
-                          final formattedPrice = price.toStringAsFixed(precision);
-                          return Text(
-                            '$symbol$formattedPrice',
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF4CAF50),
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
+            itemCount: rows.length,
+            itemBuilder: (context, index) => _buildProductGridCard(rows[index]),
+          );
+        },
+      ),
     );
   }
 
-  Widget _buildHeaderRow() {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      child: Row(
-        children: const [
-          Expanded(
-            child: Text(
-              'Product Name',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF6B6B6B),
+  Widget _buildProductGridCard(_ProductRow row) {
+    final radius = AppResponsive.borderRadius(context);
+
+    return InkWell(
+      onTap: () => _openProduct(row.product),
+      borderRadius: BorderRadius.circular(radius),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(radius),
+          border: Border.all(color: AppColors.divider, width: 1),
+          // Same soft lift the POS and report cards use.
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x08000000),
+              blurRadius: 8,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: AppResponsive.cardPadding(context),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildThumbnail(
+                    row.product,
+                    AppResponsive.avatarSize(context),
+                  ),
+                  SizedBox(width: AppResponsive.smallSpacing(context)),
+                  Expanded(
+                    child: Text(
+                      row.product.productName,
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.bodyFontSize(context),
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  _buildProductMenu(row.product),
+                ],
               ),
-            ),
+              SizedBox(height: AppResponsive.smallSpacing(context)),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  row.categoryName,
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.captionFontSize(context),
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const Spacer(),
+              Row(
+                children: [
+                  Icon(
+                    Icons.inventory_2_outlined,
+                    size: AppResponsive.smallIconSize(context),
+                    color: _stockColor(row.status),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Stock: ${row.totalStock}',
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.smallFontSize(context),
+                      color: _stockColor(row.status),
+                      fontWeight: _stockWeight(row.status),
+                    ),
+                  ),
+                  if (row.product.hasVariants) ...[
+                    SizedBox(width: AppResponsive.smallSpacing(context)),
+                    _buildVariantCountChip(row.variants.length),
+                  ],
+                ],
+              ),
+              SizedBox(height: AppResponsive.mediumSpacing(context)),
+              _buildPriceText(
+                row.price,
+                fontSize: AppResponsive.subheadingFontSize(context),
+                color: AppColors.primary,
+              ),
+            ],
           ),
-          Text(
-            'Category',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF6B6B6B),
+        ),
+      ),
+    );
+  }
+
+  // ==================== LIST (Mobile) ====================
+  Widget _buildProductList() {
+    if (_isLoadingData) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return ListenableBuilder(
+      listenable: ListSortService.instance,
+      builder: (context, _) => Observer(
+        builder: (context) {
+          final rows = _visibleRows();
+
+          if (rows.isEmpty) return _buildEmptyState();
+
+          return ListView.builder(
+            // Bottom pad clears the host's FAB, matching the Categories tab —
+            // without it the last product card sits under the + button.
+            padding: EdgeInsets.fromLTRB(
+              _gutter,
+              AppResponsive.mediumSpacing(context),
+              _gutter,
+              88,
             ),
+            itemCount: rows.length,
+            itemBuilder: (context, index) => _buildProductCard(rows[index]),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildProductCard(_ProductRow row) {
+    return InkWell(
+      onTap: () => _openProduct(row.product),
+      borderRadius: BorderRadius.circular(
+        AppResponsive.smallBorderRadius(context),
+      ),
+      child: Container(
+        margin: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(
+            AppResponsive.smallBorderRadius(context),
+          ),
+          border: Border.all(color: AppColors.divider, width: 0.5),
+        ),
+        child: Padding(
+          padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
+          child: Row(
+            children: [
+              _buildThumbnail(row.product, AppResponsive.avatarSize(context)),
+              SizedBox(width: AppResponsive.mediumSpacing(context)),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Price shares the name's line instead of taking its own
+                    // column. As a sibling of the text column it competed with
+                    // it for width, and on a phone the detail line below lost —
+                    // category, stock and variant count all ellipsized away.
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            row.product.productName,
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.bodyFontSize(context),
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        SizedBox(width: AppResponsive.smallSpacing(context)),
+                        _buildPriceText(
+                          row.price,
+                          fontSize: AppResponsive.bodyFontSize(context),
+                          color: AppColors.primary,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    // One Text.rich, not a Row of five Texts: only the category
+                    // was Flexible, so a long name plus stock plus the variant
+                    // count overflowed a narrow card. Spans keep the per-part
+                    // colours the Row had while letting the whole line
+                    // ellipsize as one.
+                    Text.rich(
+                      TextSpan(
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.captionFontSize(context),
+                          color: AppColors.textSecondary,
+                        ),
+                        children: [
+                          TextSpan(text: row.categoryName),
+                          const TextSpan(text: ' • '),
+                          TextSpan(
+                            text: 'Stock: ${row.totalStock}',
+                            style: TextStyle(
+                              color: _stockColor(row.status),
+                              fontWeight: _stockWeight(row.status),
+                            ),
+                          ),
+                          if (row.product.hasVariants) ...[
+                            const TextSpan(text: ' • '),
+                            TextSpan(
+                              text: '${row.variants.length} variants',
+                              style: const TextStyle(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      // Two lines, not one: the variant count is the last span,
+                      // so on a narrow screen it was always the part that got
+                      // cut. A single-line detail still occupies one line —
+                      // maxLines only allows a second, it doesn't reserve one.
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    // Renders nothing unless a variant is expiring/expired.
+                    if (row.expiryStatus.isAlerting) ...[
+                      const SizedBox(height: 4),
+                      ExpiryStatusPill(status: row.expiryStatus),
+                    ],
+                  ],
+                ),
+              ),
+              SizedBox(width: AppResponsive.smallSpacing(context)),
+              _buildProductMenu(row.product),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Product photo, or a neutral placeholder so rows stay aligned whether or
+  /// not a photo was set.
+  Widget _buildThumbnail(ProductModel product, double size) {
+    final bytes = product.imageBytes;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(
+        AppResponsive.smallBorderRadius(context),
+      ),
+      child: Container(
+        width: size,
+        height: size,
+        color: AppColors.surfaceMedium,
+        child: bytes == null
+            ? Icon(
+                Icons.inventory_2_outlined,
+                size: size * 0.5,
+                color: AppColors.textSecondary,
+              )
+            : Image.memory(
+                bytes,
+                fit: BoxFit.cover,
+                cacheWidth: ImageDecodeSizes.thumbnail,
+              ),
+      ),
+    );
+  }
+
+  Widget _buildVariantCountChip(int count) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppColors.info.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(3),
+      ),
+      child: Text(
+        '$count variants',
+        style: GoogleFonts.poppins(
+          fontSize: AppResponsive.captionFontSize(context),
+          color: AppColors.info,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
+  }
+
+  // ==================== SHARED CHROME ====================
+  Widget _buildSearchBarRow() {
+    return Container(
+      color: AppColors.white,
+      padding: EdgeInsets.fromLTRB(
+        _gutter,
+        AppResponsive.mediumSpacing(context),
+        _gutter,
+        AppResponsive.largeSpacing(context),
+      ),
+      // IntrinsicHeight + stretch sizes the sort button to match
+      // AppTextField's height without hardcoding it.
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(child: _buildSearchField()),
+            SizedBox(width: AppResponsive.smallSpacing(context)),
+            const ListSortButton(list: SortableList.retailProducts),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchField() {
+    return AppTextField(
+      controller: _searchController,
+      hint: 'Search by name or scan barcode...',
+      icon: Icons.search_rounded,
+      suffixIcon: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Only offered once there is something to clear.
+          if (_searchQuery.isNotEmpty)
+            IconButton(
+              icon: Icon(
+                Icons.close_rounded,
+                color: AppColors.textSecondary,
+                size: AppResponsive.iconSize(context),
+              ),
+              tooltip: 'Clear search',
+              visualDensity: VisualDensity.compact,
+              onPressed: _clearSearch,
+            ),
+          IconButton(
+            icon: Icon(
+              Icons.qr_code_scanner,
+              color: AppColors.primary,
+              size: AppResponsive.iconSize(context),
+            ),
+            tooltip: 'Scan barcode',
+            visualDensity: VisualDensity.compact,
+            onPressed: () async {
+              final String? barcode = await Navigator.push<String>(
+                context,
+                MaterialPageRoute(builder: (context) => const ScannerScreen()),
+              );
+              if (barcode == null || !mounted) return;
+              await _openProductByBarcode(barcode);
+            },
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildProductListWithSearch() {
-    return Observer(
-      builder: (context) {
-        final allProducts = productStore.products;
-
-        final filteredProducts = _searchQuery.isEmpty
-            ? allProducts
-            : allProducts.where((product) {
-                return product.productName.toLowerCase().contains(_searchQuery) ||
-                    product.category.toLowerCase().contains(_searchQuery);
-              }).toList();
-
-        return Column(
-          children: [
-            // Search bar row
-            _buildSearchBarRow(),
-            const Divider(height: 1, thickness: 0.5, color: Color(0xFFE8E8E8)),
-            // Items list below
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                children: [
-                  // Show filtered products
-                  if (filteredProducts.isEmpty)
-                    const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(40),
-                        child: Column(
-                          children: [
-                            Icon(Icons.search_off, size: 48, color: Color(0xFFD0D0D0)),
-                            SizedBox(height: 12),
-                            Text(
-                              'No products found',
-                              style: TextStyle(fontSize: 14, color: Color(0xFF6B6B6B)),
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
-                  else
-                    ...filteredProducts.map((product) {
-                      return _buildProductCard(product);
-                    }).toList(),
-                ],
-              ),
-            ),
-          ],
-        );
+      onChanged: (value) {
+        setState(() => _searchQuery = value.toLowerCase());
+      },
+      onFieldSubmitted: (value) async {
+        if (value.isEmpty) return;
+        await _openProductByBarcode(value);
       },
     );
   }
 
-  Widget _buildSearchBarRow() {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-      child: Container(
-        height: 40,
-        decoration: BoxDecoration(
-          color: const Color(0xFFF5F5F5),
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: const Color(0xFFE8E8E8), width: 0.5),
-        ),
-        child: TextField(
-          controller: _searchController,
-          decoration: InputDecoration(
-            hintText: 'Search by name or scan barcode...',
-            hintStyle: const TextStyle(fontSize: 13, color: Color(0xFFB0B0B0)),
-            prefixIcon: const Icon(Icons.search, color: Color(0xFF6B6B6B), size: 20),
-            border: InputBorder.none,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            suffixIcon: IconButton(
-              icon: const Icon(Icons.qr_code_scanner, color: Color(0xFF4CAF50), size: 20),
-              onPressed: () async {
-                final String? barcode = await Navigator.push<String>(
-                  context,
-                  MaterialPageRoute(builder: (context) => const ScannerScreen()),
-                );
-
-                if (barcode != null && mounted) {
-                  final product = await productStore.findByBarcode(barcode);
-                  if (product != null) {
-                    await _addItemToCart(product);
-                    _searchController.clear();
-                  }
-                }
-              },
-            ),
-          ),
-          onChanged: (value) {
-            setState(() {
-              _searchQuery = value.toLowerCase();
-            });
-          },
-          onSubmitted: (value) async {
-            if (value.isNotEmpty) {
-              final product = await productStore.findByBarcode(value);
-              if (product != null) {
-                await _addItemToCart(product);
-                _searchController.clear();
-                setState(() {
-                  _searchQuery = '';
-                });
-              }
-            }
-          },
-        ),
-      ),
+  /// Two very different "nothing here" cases: a search that matched nothing
+  /// (offer nothing — clearing the box is the fix) versus an empty catalog
+  /// (offer the Add action, since the AppBar `+` is hidden while empty).
+  Widget _buildEmptyState() {
+    if (_searchQuery.isNotEmpty) {
+      return const AppEmptyState(
+        icon: Icons.search_off_rounded,
+        title: 'No products found',
+        message: 'Try a different search term.',
+      );
+    }
+    return const AppEmptyState(
+      icon: Icons.inventory_2_outlined,
+      title: 'No products yet',
+      message: 'Add your first product to start billing.',
     );
   }
 
-  Widget _buildProductCard(ProductModel product) {
-    return FutureBuilder<List<VarianteModel>>(
-      future: productStore.getVariantsForProduct(product.productId),
-      builder: (context, snapshot) {
-        final variants = snapshot.data ?? [];
-        final totalStock = variants.fold<int>(0, (sum, v) => sum + v.stockQty);
-        final price = variants.isNotEmpty && variants.first.costPrice != null
-            ? variants.first.costPrice!
-            : 0.0;
+  // ==================== PRESENTATION MAPPERS ====================
+  Color _stockColor(RetailStockStatus status) =>
+      status == RetailStockStatus.inStock
+      ? AppColors.textSecondary
+      : AppColors.danger;
 
-        return InkWell(
-          onTap: () => _addItemToCart(product),
-          onLongPress: () => _showProductVariantsDialog(product, variants),
-          borderRadius: BorderRadius.circular(8),
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFE8E8E8), width: 0.5),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                children: [
-                  // Item Info
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Product Name
-                        Text(
-                          product.productName,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF1A1A1A),
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        // Category and Stock
-                        Row(
-                          children: [
-                            Text(
-                              product.category,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: Color(0xFF9E9E9E),
-                              ),
-                            ),
-                            const Text(
-                              ' • ',
-                              style: TextStyle(fontSize: 11, color: Color(0xFF9E9E9E)),
-                            ),
-                            Text(
-                              'Stock: $totalStock',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: totalStock < 10 ? Colors.red : const Color(0xFF9E9E9E),
-                                fontWeight: totalStock < 10 ? FontWeight.w600 : FontWeight.normal,
-                              ),
-                            ),
-                            if (product.hasVariants) ...[
-                              const Text(
-                                ' • ',
-                                style: TextStyle(fontSize: 11, color: Color(0xFF9E9E9E)),
-                              ),
-                              Text(
-                                '${variants.length} variants',
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: Color(0xFF4CAF50),
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  // Price
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      ValueListenableBuilder<String>(
-                        valueListenable: CurrencyHelper.currencyNotifier,
-                        builder: (context, currencyCode, child) {
-                          return ValueListenableBuilder<int>(
-                            valueListenable: DecimalSettings.precisionNotifier,
-                            builder: (context, precision, child) {
-                              final symbol = CurrencyHelper.currentSymbol;
-                              final formattedPrice = price.toStringAsFixed(precision);
-                              return Text(
-                                '$symbol$formattedPrice',
-                                style: const TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF4CAF50),
-                                ),
-                              );
-                            },
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
+  FontWeight _stockWeight(RetailStockStatus status) =>
+      status == RetailStockStatus.inStock ? FontWeight.w400 : FontWeight.w600;
+}
+
+/// A product plus everything the cards render, derived once inside the Observer.
+class _ProductRow {
+  final ProductModel product;
+  final List<VarianteModel> variants;
+  final String categoryName;
+  final double totalStock;
+  final RetailStockStatus status;
+
+  /// Most urgent expiry across this product's variants. Derived once here
+  /// rather than per rebuild, matching how [status] is handled.
+  final RetailExpiryStatus expiryStatus;
+  final double price;
+
+  const _ProductRow({
+    required this.product,
+    required this.variants,
+    required this.categoryName,
+    required this.totalStock,
+    required this.status,
+    required this.expiryStatus,
+    required this.price,
+  });
 }

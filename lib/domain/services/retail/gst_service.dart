@@ -1,21 +1,22 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../data/models/retail/hive_model/category_model_215.dart';
+import '../../../util/common/tax_split.dart';
 import '../../../data/models/retail/hive_model/product_model_200.dart';
 import '../../../data/models/retail/hive_model/variante_model_201.dart';
 
 /// GST Calculation Service
-/// Priority: Variant GST > Product GST > Category GST > Default (0%)
+/// Priority: Variant GST > Product GST > Default (0%). GST/HSN live on the
+/// product/variant, not the category — a category can contain items with
+/// different tax classes (e.g. cotton vs synthetic garments).
 class GstService {
   static const String _taxInclusiveKey = 'gst_tax_inclusive';
   static const String _defaultGstRateKey = 'gst_default_rate';
 
   /// Get effective GST rate for a variant
-  /// Priority: Variant > Product > Category > Default (0%)
+  /// Priority: Variant > Product > Default (0%)
   Future<double> getEffectiveGstRate({
     required VarianteModel variant,
     ProductModel? product,
-    CategoryModel? category,
   }) async {
     // 1. Check variant level GST
     if (variant.taxRate != null && variant.taxRate! > 0) {
@@ -27,21 +28,15 @@ class GstService {
       return product.gstRate!;
     }
 
-    // 3. Check category level GST
-    if (category != null && category.gstRate != null && category.gstRate! > 0) {
-      return category.gstRate!;
-    }
-
-    // 4. Return default GST (0%)
+    // 3. Return default GST (0%)
     return await getDefaultGstRate();
   }
 
   /// Get effective HSN code for a variant
-  /// Priority: Variant > Product > Category
+  /// Priority: Variant > Product
   String? getEffectiveHsnCode({
     required VarianteModel variant,
     ProductModel? product,
-    CategoryModel? category,
   }) {
     // 1. Check variant level HSN
     if (variant.hsnCode != null && variant.hsnCode!.isNotEmpty) {
@@ -51,11 +46,6 @@ class GstService {
     // 2. Check product level HSN
     if (product != null && product.hsnCode != null && product.hsnCode!.isNotEmpty) {
       return product.hsnCode;
-    }
-
-    // 3. Check category level HSN
-    if (category != null && category.hsnCode != null && category.hsnCode!.isNotEmpty) {
-      return category.hsnCode;
     }
 
     return null;
@@ -71,8 +61,9 @@ class GstService {
     final grossAmount = _round(unitPrice * quantity);
     final taxableAmount = _round(grossAmount - discountAmount);
     final gstAmount = _round(taxableAmount * (gstRate / 100));
-    final cgstAmount = _round(gstAmount / 2);
-    final sgstAmount = _round(gstAmount / 2);
+    final halves = TaxSplit.halves(gstAmount);
+    final cgstAmount = halves.cgst;
+    final sgstAmount = halves.sgst;
     final totalAmount = _round(taxableAmount + gstAmount);
 
     return GstCalculation(
@@ -151,8 +142,9 @@ class GstService {
     final totalInclusive = inclusivePrice * quantity;
     final taxableAmount = _round((totalInclusive - discountAmount) / (1 + gstRate / 100));
     final gstAmount = _round((totalInclusive - discountAmount) - taxableAmount);
-    final cgstAmount = _round(gstAmount / 2);
-    final sgstAmount = _round(gstAmount / 2);
+    final halves = TaxSplit.halves(gstAmount);
+    final cgstAmount = halves.cgst;
+    final sgstAmount = halves.sgst;
 
     return GstCalculation(
       grossAmount: totalInclusive,

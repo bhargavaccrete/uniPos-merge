@@ -1,4 +1,4 @@
-import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mobx/mobx.dart';
 import 'package:billberrylite/data/models/common/business_type.dart';
@@ -8,9 +8,11 @@ import 'package:billberrylite/data/repositories/business_type_repository.dart';
 import 'package:billberrylite/data/repositories/business_details_repository.dart';
 import 'package:billberrylite/data/repositories/tax_details_repository.dart';
 import 'package:billberrylite/core/config/app_config.dart';
+import 'package:billberrylite/core/constants/retail_store_types.dart';
 import 'package:billberrylite/core/init/hive_init.dart';
 import 'package:billberrylite/core/di/service_locator.dart' as sl;
 import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
+import 'package:billberrylite/domain/services/retail/store_type_attribute_defaults_service.dart';
 import 'package:billberrylite/domain/services/common/device_id_service.dart';
 
 part 'setup_wizard_store.g.dart';
@@ -48,6 +50,12 @@ abstract class _SetupWizardStore with Store {
   @observable
   String? selectedBusinessTypeName;
 
+  /// Retail sub-type: a stable `RetailStoreTypes` key (e.g. 'garment').
+  /// Meaningless for restaurant, so it is cleared whenever the business type
+  /// moves away from retail.
+  @observable
+  String? selectedRetailStoreType;
+
   // Store Details
   @observable
   String storeName = '';
@@ -70,6 +78,11 @@ abstract class _SetupWizardStore with Store {
   @observable
   String pan = '';
 
+  /// Food-business licence number (FSSAI in India). Optional everywhere —
+  /// `FoodLicenseRule` owns the country-specific label and validation.
+  @observable
+  String foodLicenseNo = '';
+
   @observable
   String city = '';
 
@@ -88,11 +101,28 @@ abstract class _SetupWizardStore with Store {
 
   /*-----------------  TAX DETAILS ---------------*///
 
+  // Restaurant path's tax-inclusive/exclusive toggle (retail uses `taxInclusive`
+  // for the same concept). Renamed from the old `taxEnabled` to free that name up
+  // for the unrelated "does this business use tax features" flag below.
   @observable
-  bool taxEnabled = true;
+  bool taxInclusiveRestaurant = true;
 
   @observable
   bool taxInclusive = true;
+
+  // Two distinct concepts, kept as separate fields even though V1 onboarding always
+  // sets them identically (see _onTaxRegistrationStatusChanged in
+  // storeDetailsScreen.dart — the wizard exposes exactly one Yes/No question, no
+  // separate control for either field): `isRegisteredForTax` is legal/business
+  // status, `taxEnabled` is what billing and step-gating logic should actually
+  // read. Keeping them apart now means a future "Tax Settings" screen can let an
+  // advanced user decouple them (e.g. registered but tax intentionally off)
+  // without a schema change — not a V1 feature, just future-proofing the model.
+  @observable
+  bool isRegisteredForTax = true;
+
+  @observable
+  bool taxEnabled = true;
 
   @observable
   double taxRate = 0.0;
@@ -124,11 +154,22 @@ abstract class _SetupWizardStore with Store {
   @computed
   bool get hasStoreDetails => storeName.isNotEmpty && ownerName.isNotEmpty && phone.isNotEmpty;
 
+  /// Retail must also say WHICH kind of retail store — asked on **Store
+  /// Details**, not here, so it sits with the rest of the store's identity and
+  /// with the save that already persists it.
+  @computed
+  bool get needsRetailStoreType => selectedBusinessTypeId == 'retail';
+
+  @computed
+  bool get hasRetailStoreType =>
+      RetailStoreTypes.isKnown(selectedRetailStoreType);
+
   @computed
   bool get canProceedFromBusinessType => hasBusinessType;
 
   @computed
-  bool get canProceedFromStoreDetails => hasStoreDetails;
+  bool get canProceedFromStoreDetails =>
+      hasStoreDetails && (!needsRetailStoreType || hasRetailStoreType);
 
   @computed
   double get progressPercentage => (currentStep + 1) / 10;
@@ -154,9 +195,14 @@ abstract class _SetupWizardStore with Store {
     currentStep = step;
   }
 
+  /// Prefer [setCurrentStep] from the wizard screen, which knows the real step
+  /// count. The step list is DYNAMIC (business type, tax registration, and the
+  /// settings/users entitlements all add or remove steps), so a hardcoded
+  /// ceiling here would disagree with the rendered PageView the moment the list
+  /// changes — leaving Continue doing nothing.
   @action
-  void nextStep() {
-    if (currentStep < 9) {
+  void nextStep({int? maxStep}) {
+    if (maxStep == null || currentStep < maxStep) {
       currentStep++;
     }
   }
@@ -168,10 +214,25 @@ abstract class _SetupWizardStore with Store {
     }
   }
 
+  /// Pick the retail store type. Silently ignores an unknown key so a stale
+  /// caller can never park the wizard on a value `canProceedFromBusinessType`
+  /// will refuse.
+  @action
+  void selectRetailStoreType(String key) {
+    if (!RetailStoreTypes.isKnown(key)) return;
+    selectedRetailStoreType = key;
+  }
+
   @action
   Future<void> selectBusinessType(String id, String name) async {
     selectedBusinessTypeId = id;
     selectedBusinessTypeName = name;
+
+    // A restaurant has no retail store type. Drop any stale pick so it can't
+    // be persisted onto a restaurant business.
+    if (id != 'retail') {
+      selectedRetailStoreType = null;
+    }
 
     // Determine the business mode based on selection
     final mode = id == 'restaurant'
@@ -207,8 +268,12 @@ abstract class _SetupWizardStore with Store {
       // This must be done after Hive boxes are opened
       await _registerBusinessDependencies(mode);
       // ignore: avoid_print
-    } catch (e) {
-      // ignore: avoid_print
+    } catch (e, stack) {
+      // Never swallow this silently: a failure here used to surface much later
+      // as a confusing "not registered inside GetIt" crash on a wizard step.
+      // Flow is unchanged (this runs on back/forward too) — only now it's visible.
+      debugPrint('❌ Setup wizard: box/dependency init failed for $mode: $e');
+      debugPrint('$stack');
     }
   }
 
@@ -268,6 +333,11 @@ abstract class _SetupWizardStore with Store {
   }
 
   @action
+  void setFoodLicenseNo(String value) {
+    foodLicenseNo = value;
+  }
+
+  @action
   void setCity(String value) {
     city = value;
   }
@@ -294,13 +364,23 @@ abstract class _SetupWizardStore with Store {
 
   // Tax Actions
   @action
-  void setTaxEnabled(bool value) {
-    taxEnabled = value;
+  void setTaxInclusiveRestaurant(bool value) {
+    taxInclusiveRestaurant = value;
   }
 
   @action
   void setTaxInclusive(bool value) {
     taxInclusive = value;
+  }
+
+  @action
+  void setIsRegisteredForTax(bool value) {
+    isRegisteredForTax = value;
+  }
+
+  @action
+  void setTaxEnabled(bool value) {
+    taxEnabled = value;
   }
 
   @action
@@ -383,11 +463,19 @@ abstract class _SetupWizardStore with Store {
         address = savedDetails.address ?? '';
         gstin = savedDetails.gstin ?? '';
         pan = savedDetails.pan ?? '';
+        foodLicenseNo = savedDetails.foodLicenseNo ?? '';
         city = savedDetails.city ?? '';
         state = savedDetails.state ?? '';
         country = savedDetails.country ?? '';
         pincode = savedDetails.pincode ?? '';
         logoByte = savedDetails.logo;
+        isRegisteredForTax = savedDetails.isRegisteredForTax;
+        taxEnabled = savedDetails.taxEnabled;
+        // Only restore a key this build still offers, so a retired store type
+        // doesn't leave Continue permanently disabled with nothing highlighted.
+        if (RetailStoreTypes.isKnown(savedDetails.retailStoreType)) {
+          selectedRetailStoreType = savedDetails.retailStoreType;
+        }
         // Use AppConfig as source of truth for setup complete status
         if (!AppConfig.isBusinessModeSet) {
           isSetupComplete = savedDetails.isSetupComplete;
@@ -397,7 +485,7 @@ abstract class _SetupWizardStore with Store {
       // Load tax details if exists
       final savedTax = _taxDetailsRepo.get();
       if (savedTax != null) {
-        taxEnabled = savedTax.isEnabled;
+        taxInclusiveRestaurant = savedTax.isInclusive;
         taxInclusive = savedTax.isInclusive;
         taxRate = savedTax.defaultRate;
         taxName = savedTax.taxName;
@@ -426,6 +514,21 @@ abstract class _SetupWizardStore with Store {
         isSelected: true,
       );
       await _businessTypeRepo.saveSelectedType(businessType);
+
+      // Mirror the retail store type onto BusinessDetails right away, so going
+      // back and changing it after the Store Details step is already saved
+      // doesn't leave the old value on the record until the wizard completes.
+      // Only UPDATES an existing record — it must not create one early, since
+      // splashScreen resumes the wizard off BusinessDetails.storeName.
+      final existingDetails = _businessDetailsRepo.get();
+      if (existingDetails != null) {
+        await _businessDetailsRepo.save(
+          existingDetails.copyWith(
+            retailStoreType: selectedRetailStoreType,
+            clearRetailStoreType: selectedRetailStoreType == null,
+          ),
+        );
+      }
     } catch (e) {
       errorMessage = 'Failed to save business type: $e';
     } finally {
@@ -447,14 +550,19 @@ abstract class _SetupWizardStore with Store {
         address: address,
         gstin: gstin,
         pan: pan,
+        foodLicenseNo: foodLicenseNo,
         city: city,
         state: state,
         country: country,
         pincode: pincode,
+        isRegisteredForTax: isRegisteredForTax,
+        taxEnabled: taxEnabled,
         isSetupComplete: false,
-        logo: logoByte
+        logo: logoByte,
+        retailStoreType: selectedRetailStoreType,
       );
       await _businessDetailsRepo.save(details);
+      await _seedStoreTypeAttributeDefaults();
 
       // Also save to StoreSettingsService for use in receipts
       final storeSettings = StoreSettingsService();
@@ -476,34 +584,42 @@ abstract class _SetupWizardStore with Store {
     }
   }
 
+  /// Create the chosen store type's default product attributes, silently.
+  ///
+  /// Runs the moment the store type is persisted, so the merchant finds the
+  /// defaults already waiting in Settings → Product Attributes. It adds NO step,
+  /// dialog or prompt to the wizard — this is the only action the selection
+  /// performs beyond saving the type itself.
+  ///
+  /// Safe here: `selectBusinessType('retail')` has already run
+  /// `HiveInit.initializeForMode` and `registerBusinessDependencies`, so the
+  /// attribute boxes are open and `attributeStore` is registered. Failure is
+  /// non-fatal and self-healing — the attributes screen and every product form
+  /// call the same idempotent seed on open.
+  Future<void> _seedStoreTypeAttributeDefaults() async {
+    if (selectedBusinessTypeId != 'retail') return;
+    try {
+      await StoreTypeAttributeDefaultsService().ensureStoreTypeDefaults();
+    } catch (e) {
+      debugPrint('Setup wizard: store-type attribute defaults not seeded — $e');
+    }
+  }
+
   @action
   Future<void> saveTaxDetails() async {
     isLoading = true;
     try {
-
-      // Convert taxRates to TaxRateItem list
-      List<TaxRateItem>? rateItems;
-      if (taxRates != null && taxRates!.isNotEmpty) {
-        rateItems = taxRates!.map((tax) {
-          // tax is a TaxItem from UI, convert to TaxRateItem for storage
-          return TaxRateItem(
-            name: tax.name as String,
-            rate: tax.rate as double,
-            isDefault: tax.isDefault as bool,
-          );
-        }).toList();
-      } else {
-      }
-
+      // Named tax rates themselves live in the shared TaxStore (see
+      // taxSetupStep.dart's _saveTaxesToDatabase) — this record only keeps
+      // the wizard step's own UI state so it can be restored on revisit.
       final details = TaxDetails(
         isEnabled: taxEnabled,
-        isInclusive: taxInclusive,
+        isInclusive: AppConfig.isRestaurant ? taxInclusiveRestaurant : taxInclusive,
         defaultRate: taxRate,
         taxName: taxName,
         placeOfSupply: taxPlaceOfSupply,
         applyOnDelivery: taxApplyOnDelivery,
         notes: taxNotes,
-        taxRates: rateItems,
       );
       await _taxDetailsRepo.save(details);
     } catch (e) {
@@ -549,15 +665,19 @@ abstract class _SetupWizardStore with Store {
         address: address,
         gstin: gstin,
         pan: pan,
+        foodLicenseNo: foodLicenseNo,
         city: city,
         state: state,
         country: country,
         pincode: pincode,
+        isRegisteredForTax: isRegisteredForTax,
+        taxEnabled: taxEnabled,
         logo: logoByte,
         isSetupComplete: true,
-
+        retailStoreType: selectedRetailStoreType,
       );
       await _businessDetailsRepo.save(details);
+      await _seedStoreTypeAttributeDefaults();
 
       // 7. Save to StoreSettingsService for use in receipts
       final storeSettings = StoreSettingsService();
@@ -627,15 +747,18 @@ abstract class _SetupWizardStore with Store {
       address = '';
       gstin = '';
       pan = '';
+      foodLicenseNo = '';
       city = '';
       state = '';
       country = '';
       pincode = '';
       logoByte = null;
+      isRegisteredForTax = true;
+      taxEnabled = true;
       isSetupComplete = false;
 
       // Reset tax observables
-      taxEnabled = true;
+      taxInclusiveRestaurant = true;
       taxInclusive = true;
       taxRate = 0.0;
       taxName = 'GST';
@@ -652,6 +775,13 @@ abstract class _SetupWizardStore with Store {
   // ==================== HELPER METHODS ====================
 
   /// Server business-category code. Samples used 3 for restaurant.
+  ///
+  /// TODO(backend): retail's code is UNKNOWN and currently reuses restaurant's 3.
+  /// This now matters — retail goes through self-signup + activation too, so a
+  /// retail shop would be registered under the restaurant category and could be
+  /// served the wrong plan catalog. Confirm the retail value and set it here.
+  /// (Note `LicenseStore.activateLicense` separately defaults `businessCategory`
+  /// to 6, so signup and activation do not agree today — confirm both.)
   int get _businessCategoryCode =>
       selectedBusinessTypeId == 'retail' ? 3 : 3;
 

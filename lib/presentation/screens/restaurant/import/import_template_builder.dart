@@ -13,8 +13,9 @@ import 'package:billberrylite/core/constants/item_units.dart';
 class ImportTemplateBuilder {
   // Seed values — also power the dropdowns so the lists always match the data.
   static const List<String> categories = [
-    'Starters', 'Soups', 'Main Course', 'Breads',
-    'Rice & Biryani', 'Desserts', 'Beverages', 'Pizza',
+    'Starters', 'Soups', 'Salads', 'Main Course', 'Breads',
+    'Rice & Biryani', 'Chinese', 'Tandoori', 'Rolls & Wraps',
+    'Burgers', 'Sandwiches', 'Pizza', 'Desserts', 'Ice Creams', 'Beverages',
   ];
   static const List<String> variantNames = [
     'Half', 'Full', 'Small', 'Medium', 'Large', 'Regular', 'Family Size',
@@ -214,28 +215,56 @@ class ImportTemplateBuilder {
     _setHeaders(s, [
       'ItemName*', 'ItemCode', 'Price*', 'CategoryName*', 'VegType*', 'Description',
       'ImageURL', 'IsSoldByWeight', 'Unit', 'TrackInventory',
-      'StockQuantity', 'AllowOutOfStock', 'TaxRate', 'IsEnabled',
+      'StockQuantity', 'AllowOutOfStock', 'LowStockThreshold', 'LowStockAlertEnabled',
+      'TaxRate', 'IsEnabled', 'IsFavorite',
       'HasVariants', 'Choice1', 'Choice2', 'Choice3', 'Extra1', 'Extra2', 'Extra3',
     ], header);
     _setInstruction(s, [
       'Required: item name', 'Optional: unique 4-5 digit code', 'Required: number only', 'Required: pick a category',
       'Required: Veg / Non-Veg / Egg', 'Optional', 'Optional image URL',
       'Yes/No', 'kg/gm/liter/ml/piece', 'Yes/No', 'Number (0 if not tracked)',
-      'Yes/No', 'Number 0-100', 'Yes/No', 'Yes/No',
+      'Yes/No', 'Low-stock alert level (blank = default)', 'Yes/No',
+      'Number 0-100', 'Yes/No', 'Yes/No (pin to Favorites)',
+      'Yes/No',
       'Pick a choice', 'Pick a choice', 'Pick a choice',
       'Pick an extra', 'Pick an extra', 'Pick an extra',
     ], instr);
 
-    // ItemCode left blank on purpose — the app auto-assigns codes starting at
-    // 1001, so hardcoding 1001-1004 here collided with manually-added items.
-    // Blank ItemCode → importer generates a fresh, non-colliding code.
-    _setRow(s, 3, ['Margherita Pizza', '', 0, 'Pizza', 'Veg', 'Classic tomato & mozzarella', '', 'No', '', 'No', 0, 'Yes', 5, 'Yes', 'Yes', 'Crust Type', 'Spice Level', '', 'Toppings', 'Cheese Options', '']);
-    _setRow(s, 4, ['Paneer Butter Masala', '', 220, 'Main Course', 'Veg', 'Cottage cheese in tomato cream', '', 'No', '', 'No', 0, 'Yes', 5, 'Yes', 'No', '', '', '', '', '', '']);
-    _setRow(s, 5, ['Masala Chai', '', 40, 'Beverages', 'Veg', 'Spiced Indian tea', '', 'No', '', 'No', 0, 'Yes', 0, 'Yes', 'No', '', '', '', '', '', '']);
-    // By-weight example — shows how Unit is used (Yes + kg).
-    _setRow(s, 6, ['Kaju Katli (per kg)', '', 700, 'Desserts', 'Veg', 'Cashew fudge sold by weight', '', 'Yes', 'kg', 'No', 0, 'Yes', 5, 'Yes', 'No', '', '', '', '', '', '']);
+    // ItemCode uses the 2xxx range so the samples never collide with the app's
+    // auto-assigner (which starts at 1001). Codes are passed as strings so Excel
+    // stores them as "2001", not "2001.0" (the importer validates 4-5 digits).
+    // Columns: Name, Code, Price, Category, Veg, Desc, Img, ByWeight, Unit,
+    // Track, Stock, AllowOOS, LowThresh, LowAlert, Tax, Enabled, Fav, HasVar,
+    // Choice1-3, Extra1-3.
+    _setRow(s, 3,  ['Margherita Pizza', '2001', 0, 'Pizza', 'Veg', 'Classic tomato & mozzarella', '', 'No', '', 'No', 0, 'Yes', '', 'No', 5, 'Yes', 'Yes', 'Yes', 'Crust Type', 'Spice Level', '', 'Toppings', 'Cheese Options', '']);
+    _setRow(s, 4,  ['Farmhouse Pizza', '2002', 0, 'Pizza', 'Veg', 'Onion, capsicum, tomato & mushroom', '', 'No', '', 'No', 0, 'Yes', '', 'No', 5, 'Yes', 'No', 'Yes', 'Crust Type', '', '', 'Toppings', 'Cheese Options', '']);
+    _setRow(s, 5,  ['Paneer Butter Masala', '2003', 220, 'Main Course', 'Veg', 'Cottage cheese in tomato cream', '', 'No', '', 'No', 0, 'Yes', '', 'No', 5, 'Yes', 'Yes', 'No', '', '', '', '', '', '']);
+    _setRow(s, 6,  ['Butter Chicken', '2004', 260, 'Main Course', 'Non-Veg', 'Chicken in rich buttery gravy', '', 'No', '', 'No', 0, 'Yes', '', 'No', 5, 'Yes', 'No', 'No', 'Spice Level', '', '', '', '', '']);
+    _setRow(s, 7,  ['Veg Hakka Noodles', '2005', 150, 'Chinese', 'Veg', 'Stir-fried noodles with vegetables', '', 'No', '', 'No', 0, 'Yes', '', 'No', 5, 'Yes', 'No', 'No', 'Spice Level', '', '', '', '', '']);
+    _setRow(s, 8,  ['Chicken Biryani', '2006', 240, 'Rice & Biryani', 'Non-Veg', 'Aromatic basmati rice with chicken', '', 'No', '', 'No', 0, 'Yes', '', 'No', 5, 'Yes', 'Yes', 'No', 'Spice Level', '', '', '', '', '']);
+    _setRow(s, 9,  ['Butter Naan', '2007', 40, 'Breads', 'Veg', 'Soft tandoori bread with butter', '', 'No', '', 'No', 0, 'Yes', '', 'No', 5, 'Yes', 'No', 'No', '', '', '', '', '', '']);
+    _setRow(s, 10, ['Tandoori Chicken', '2008', 0, 'Tandoori', 'Non-Veg', 'Char-grilled marinated chicken', '', 'No', '', 'No', 0, 'Yes', '', 'No', 5, 'Yes', 'No', 'Yes', 'Spice Level', '', '', '', '', '']);
+    _setRow(s, 11, ['Veg Spring Roll', '2009', 120, 'Starters', 'Veg', 'Crispy rolls with veg filling', '', 'No', '', 'No', 0, 'Yes', '', 'No', 5, 'Yes', 'No', 'No', '', '', '', '', '', '']);
+    _setRow(s, 12, ['Masala Chai', '2010', 40, 'Beverages', 'Veg', 'Spiced Indian tea', '', 'No', '', 'No', 0, 'Yes', '', 'No', 0, 'Yes', 'No', 'No', '', '', '', '', '', '']);
+    // Inventory example — tracks stock and fires a low-stock alert at 10 units.
+    _setRow(s, 13, ['Cold Coffee', '2011', 90, 'Beverages', 'Veg', 'Chilled coffee with ice cream', '', 'No', '', 'Yes', 50, 'Yes', 10, 'Yes', 5, 'Yes', 'Yes', 'No', '', '', '', '', '', '']);
+    _setRow(s, 14, ['Gulab Jamun', '2012', 80, 'Desserts', 'Veg', 'Warm milk-solid dumplings in syrup', '', 'No', '', 'No', 0, 'Yes', '', 'No', 5, 'Yes', 'No', 'No', '', '', '', '', '', '']);
+    // By-weight example — shows how Unit is used (Yes + kg) plus low-stock alert.
+    _setRow(s, 15, ['Kaju Katli (per kg)', '2013', 700, 'Desserts', 'Veg', 'Cashew fudge sold by weight', '', 'Yes', 'kg', 'Yes', 5, 'Yes', 1, 'Yes', 5, 'Yes', 'No', 'No', '', '', '', '', '', '']);
 
-    // Single-value dropdowns (columns are 1-based: A=1 … U=21)
+    // ── Inventory test set — each row demonstrates a different stock state ──
+    // Healthy: stock (100) well above the alert threshold (15).
+    _setRow(s, 16, ['Fresh Lime Soda', '2014', 50, 'Beverages', 'Veg', 'Refreshing lime soda', '', 'No', '', 'Yes', 100, 'Yes', 15, 'Yes', 5, 'Yes', 'No', 'No', '', '', '', '', '', '']);
+    // Low stock: on-hand (8) is at/below the threshold (10) → low-stock alert fires.
+    _setRow(s, 17, ['Bottled Water', '2015', 20, 'Beverages', 'Veg', 'Packaged drinking water 1L', '', 'No', '', 'Yes', 8, 'Yes', 10, 'Yes', 0, 'Yes', 'No', 'No', '', '', '', '', '', '']);
+    // Out of stock + AllowOutOfStock No → item is BLOCKED from ordering.
+    _setRow(s, 18, ['Chocolate Brownie', '2016', 110, 'Desserts', 'Veg', 'Rich fudgy brownie', '', 'No', '', 'Yes', 0, 'No', 5, 'Yes', 5, 'Yes', 'No', 'No', '', '', '', '', '', '']);
+    // Out of stock + AllowOutOfStock Yes → still sellable (backorder-style).
+    _setRow(s, 19, ['Mango Lassi', '2017', 70, 'Beverages', 'Veg', 'Sweet yogurt mango drink', '', 'No', '', 'Yes', 0, 'Yes', 5, 'Yes', 5, 'Yes', 'No', 'No', '', '', '', '', '', '']);
+    // Healthy non-veg starter — decrement its stock as you sell to watch it drop.
+    _setRow(s, 20, ['Chicken Wings', '2018', 180, 'Starters', 'Non-Veg', 'Spicy fried chicken wings', '', 'No', '', 'Yes', 25, 'Yes', 8, 'Yes', 5, 'Yes', 'No', 'No', '', '', '', '', '', '']);
+
+    // Single-value dropdowns (columns are 1-based: A=1 … X=24)
     _dropdownFromRange(
       s,
       4,
@@ -248,12 +277,14 @@ class ImportTemplateBuilder {
     _dropdown(s, 9, units, prompt: 'Unit of measure.');
     _dropdown(s, 10, yesNo, prompt: 'Track stock for this item?');
     _dropdown(s, 12, yesNo, prompt: 'Allow selling when out of stock?');
-    _dropdown(s, 14, yesNo, prompt: 'Is this item enabled/visible?');
-    _dropdown(s, 15, yesNo, prompt: 'Does this item have sizes (variants)?');
+    _dropdown(s, 14, yesNo, prompt: 'Alert when stock is low?');
+    _dropdown(s, 16, yesNo, prompt: 'Is this item enabled/visible?');
+    _dropdown(s, 17, yesNo, prompt: 'Pin this item to the Favorites tab?');
+    _dropdown(s, 18, yesNo, prompt: 'Does this item have sizes (variants)?');
 
-    // Choice columns (16-18) read LIVE from the Choices sheet name column.
+    // Choice columns (19-21) read LIVE from the Choices sheet name column.
     // Choices has an instruction row, so its data starts at row 3.
-    for (final col in [16, 17, 18]) {
+    for (final col in [19, 20, 21]) {
       _dropdownFromRange(
         s,
         col,
@@ -262,9 +293,9 @@ class ImportTemplateBuilder {
         addSheet: 'Choices',
       );
     }
-    // Extra columns (19-21) read LIVE from the Extras sheet name column.
+    // Extra columns (22-24) read LIVE from the Extras sheet name column.
     // Extras has NO instruction row, so its data starts at row 2.
-    for (final col in [19, 20, 21]) {
+    for (final col in [22, 23, 24]) {
       _dropdownFromRange(
         s,
         col,
@@ -288,6 +319,11 @@ class ImportTemplateBuilder {
     _setRow(s, 3, ['Margherita Pizza', 'Small', 199, 'No', 0]);
     _setRow(s, 4, ['Margherita Pizza', 'Medium', 299, 'No', 0]);
     _setRow(s, 5, ['Margherita Pizza', 'Large', 399, 'No', 0]);
+    _setRow(s, 6, ['Farmhouse Pizza', 'Small', 249, 'No', 0]);
+    _setRow(s, 7, ['Farmhouse Pizza', 'Medium', 349, 'No', 0]);
+    _setRow(s, 8, ['Farmhouse Pizza', 'Large', 449, 'No', 0]);
+    _setRow(s, 9, ['Tandoori Chicken', 'Half', 180, 'No', 0]);
+    _setRow(s, 10, ['Tandoori Chicken', 'Full', 320, 'No', 0]);
 
     // itemName reads LIVE from the Items sheet (column A, data from row 3).
     _dropdownFromRange(

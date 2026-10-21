@@ -8,7 +8,11 @@ import '../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../domain/services/restaurant/stock_adjust_service.dart';
 import '../../../widget/componets/common/app_text_field.dart';
 import '../../../widget/componets/common/app_dialog.dart';
+import '../../../widget/componets/common/dialog_dispose_scope.dart';
 import '../../../widget/componets/common/primary_app_bar.dart';
+import '../../../../core/constants/item_units.dart';
+import '../../../../data/models/restaurant/db/itemmodel_302.dart';
+import '../../../../util/common/app_responsive.dart';
 
 /// Flat, actionable list of every item/variant that is low or out of stock.
 /// Opened from the inventory alert bell.
@@ -31,80 +35,127 @@ class _LowStockScreenState extends State<LowStockScreen> {
   String _qty(double v) =>
       v % 1 == 0 ? v.toStringAsFixed(0) : v.toStringAsFixed(2);
 
+  String _unitOf(Items item) =>
+      normalizeItemUnit(item.unit) ?? item.unit ?? 'pcs';
+
+  /// Whether [item]'s quantity can be fractional, based on its actual unit —
+  /// only 'piece' (or no unit at all) is a whole-count unit. The unit is the
+  /// authority here, not `isSoldByWeight`: legacy Raw Material/Semi-Finished
+  /// items carry a unit with no flag set.
+  bool _allowsDecimals(Items item) {
+    final normalized = normalizeItemUnit(item.unit);
+    return normalized != null && normalized != 'piece';
+  }
+
   Future<void> _restock(StockAlertEntry e) async {
-    final unit = e.item.unit ?? (e.item.isSoldByWeight ? 'kg' : 'pcs');
+    final unit = _unitOf(e.item);
     final qtyController = TextEditingController();
     String reason = _addReasons.first;
     final noteController = TextEditingController();
+    final qtyFocus = FocusNode();
+    final noteFocus = FocusNode();
 
-    final confirmed = await showDialog<bool>(
+    final result = await showDialog<({String qty, String note})>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setLocal) => AppDialogShell(
-          title: 'Add Stock',
-          subtitle: e.variantName != null
-              ? '${e.item.name} (${e.variantName})'
-              : e.item.name,
-          accent: AppColors.primary,
-          icon: Icons.add_box_rounded,
-          body: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              AppTextField(
-                controller: qtyController,
-                label: 'Quantity to add ($unit)',
-                hint: 'e.g. 10',
-                icon: Icons.add_box_outlined,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                initialValue: reason,
-                isExpanded: true,
-                decoration: InputDecoration(
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      builder: (ctx) => DialogDisposeScope(
+        disposables: [qtyController, noteController, qtyFocus, noteFocus],
+        child: StatefulBuilder(
+          builder: (ctx, setLocal) => AppDialogShell(
+            title: 'Add Stock',
+            subtitle: e.variantName != null
+                ? '${e.item.name} (${e.variantName})'
+                : e.item.name,
+            accent: AppColors.primary,
+            icon: Icons.add_box_rounded,
+            body: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AppTextField(
+                  controller: qtyController,
+                  focusNode: qtyFocus,
+                  autofocus: true,
+                  label: 'Quantity to add ($unit)',
+                  hint: 'e.g. 10',
+                  icon: Icons.add_box_outlined,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  textInputAction: TextInputAction.next,
+                  onFieldSubmitted: (_) => noteFocus.requestFocus(),
                 ),
-                items: _addReasons
-                    .map((r) => DropdownMenuItem(
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: reason,
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                  ),
+                  items: _addReasons
+                      .map(
+                        (r) => DropdownMenuItem(
                           value: r,
-                          child: Text(r, style: GoogleFonts.poppins(fontSize: 14)),
-                        ))
-                    .toList(),
-                onChanged: (v) => setLocal(() => reason = v ?? _addReasons.first),
-              ),
-              const SizedBox(height: 12),
-              AppTextField(
-                controller: noteController,
-                hint: 'Note (optional)',
-                icon: Icons.notes_outlined,
-                maxLines: 2,
-                minLines: 1,
+                          child: Text(
+                            r,
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.bodyFontSize(context),
+                            ),
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (v) =>
+                      setLocal(() => reason = v ?? _addReasons.first),
+                ),
+                const SizedBox(height: 12),
+                AppTextField(
+                  controller: noteController,
+                  focusNode: noteFocus,
+                  hint: 'Note (optional)',
+                  icon: Icons.notes_outlined,
+                  maxLines: 2,
+                  minLines: 1,
+                  textInputAction: TextInputAction.done,
+                  onFieldSubmitted: (_) => Navigator.pop(ctx, (
+                    qty: qtyController.text.trim(),
+                    note: noteController.text.trim(),
+                  )),
+                ),
+              ],
+            ),
+            actions: [
+              appDialogCancelButton(ctx),
+              const SizedBox(width: 12),
+              appDialogPrimaryButton(
+                label: 'Add',
+                onPressed: () => Navigator.pop(ctx, (
+                  qty: qtyController.text.trim(),
+                  note: noteController.text.trim(),
+                )),
               ),
             ],
           ),
-          actions: [
-            appDialogCancelButton(ctx),
-            const SizedBox(width: 12),
-            appDialogPrimaryButton(
-              label: 'Add',
-              onPressed: () => Navigator.pop(ctx, true),
-            ),
-          ],
         ),
       ),
     );
 
-    if (confirmed != true) return;
+    if (result == null) return;
 
-    final qty = double.tryParse(qtyController.text.trim());
+    final qty = double.tryParse(result.qty);
     if (qty == null || qty <= 0) {
       NotificationService.instance.showError('Enter a valid quantity');
       return;
     }
-    if (!e.item.isSoldByWeight && qty % 1 != 0) {
-      NotificationService.instance.showError('Unit-based items must be whole numbers');
+    if (!_allowsDecimals(e.item) && qty % 1 != 0) {
+      NotificationService.instance.showError(
+        'Unit-based items must be whole numbers',
+      );
       return;
     }
 
@@ -113,7 +164,7 @@ class _LowStockScreenState extends State<LowStockScreen> {
       variant: e.variant,
       qty: qty,
       reason: reason,
-      note: noteController.text.trim().isEmpty ? null : noteController.text.trim(),
+      note: result.note.isEmpty ? null : result.note,
     );
 
     if (mounted) {
@@ -141,13 +192,20 @@ class _LowStockScreenState extends State<LowStockScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.check_circle_outline, size: 64, color: AppColors.success),
+                  Icon(
+                    Icons.check_circle_outline,
+                    size: 64,
+                    color: AppColors.success,
+                  ),
                   const SizedBox(height: 16),
-                  Text('All good — nothing low',
-                      style: GoogleFonts.poppins(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.textSecondary)),
+                  Text(
+                    'All good — nothing low',
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.bodyFontSize(context),
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
                 ],
               ),
             );
@@ -157,11 +215,16 @@ class _LowStockScreenState extends State<LowStockScreen> {
             if (a.isOut != b.isOut) return a.isOut ? -1 : 1;
             return a.stock.compareTo(b.stock);
           });
-          return ListView.separated(
-            padding: const EdgeInsets.all(12),
-            itemCount: entries.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
-            itemBuilder: (_, i) => _buildRow(entries[i]),
+          return AppResponsive.constrainedContent(
+            context: context,
+            maxWidth: AppResponsive.maxContentWidth(context),
+            alignment: Alignment.topCenter,
+            child: ListView.separated(
+              padding: const EdgeInsets.all(12),
+              itemCount: entries.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (_, i) => _buildRow(entries[i]),
+            ),
           );
         },
       ),
@@ -169,8 +232,8 @@ class _LowStockScreenState extends State<LowStockScreen> {
   }
 
   Widget _buildRow(StockAlertEntry e) {
-    final unit = e.item.unit ?? (e.item.isSoldByWeight ? 'kg' : 'pcs');
-    final MaterialColor color = e.isOut ? Colors.red : Colors.orange;
+    final unit = _unitOf(e.item);
+    final Color color = e.isOut ? AppColors.danger : AppColors.orange;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -190,20 +253,31 @@ class _LowStockScreenState extends State<LowStockScreen> {
                       child: Text(
                         e.item.name,
                         style: GoogleFonts.poppins(
-                            fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                          fontSize: AppResponsive.bodyFontSize(context),
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
                       ),
                     ),
                     if (e.variantName != null) ...[
                       const SizedBox(width: 6),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 1,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.primary.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(5),
                         ),
-                        child: Text(e.variantName!,
-                            style: GoogleFonts.poppins(
-                                fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.primary)),
+                        child: Text(
+                          e.variantName!,
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.captionFontSize(context),
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.primary,
+                          ),
+                        ),
                       ),
                     ],
                   ],
@@ -212,18 +286,31 @@ class _LowStockScreenState extends State<LowStockScreen> {
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: color.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(6),
                       ),
-                      child: Text(e.isOut ? 'Out' : 'Low',
-                          style: GoogleFonts.poppins(
-                              fontSize: 10, fontWeight: FontWeight.w700, color: color.shade700)),
+                      child: Text(
+                        e.isOut ? 'Out' : 'Low',
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.captionFontSize(context),
+                          fontWeight: FontWeight.w700,
+                          color: color,
+                        ),
+                      ),
                     ),
                     const SizedBox(width: 8),
-                    Text('${_qty(e.stock)} $unit left',
-                        style: GoogleFonts.poppins(fontSize: 12, color: AppColors.textSecondary)),
+                    Text(
+                      '${_qty(e.stock)} $unit left',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.smallFontSize(context),
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -233,13 +320,21 @@ class _LowStockScreenState extends State<LowStockScreen> {
           ElevatedButton.icon(
             onPressed: () => _restock(e),
             icon: const Icon(Icons.add_rounded, size: 18),
-            label: Text('Add', style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w600)),
+            label: Text(
+              'Add',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
               elevation: 0,
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
           ),
         ],

@@ -9,15 +9,20 @@ import '../../../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../../domain/services/restaurant/notification_service.dart';
+import '../../../../../domain/services/restaurant/inventory_service.dart';
 import '../../../../../util/restaurant/order_settings.dart';
+import '../../../../../core/plan/plan_enforcement.dart';
+import '../../../../../core/plan/entitlement_keys.dart';
+import '../../../../../core/plan/plan_guard.dart';
 import '../../tabbar/table.dart';
 import '../startorder.dart';
 import '../../../../../util/common/app_responsive.dart';
+import 'package:billberrylite/util/common/currency_helper.dart';
 
 class CartItemStatus {
   final CartItem item;
   final bool isActive;
-  CartItemStatus(this.item , this.isActive);
+  CartItemStatus(this.item, this.isActive);
 }
 
 class CartScreen extends StatefulWidget {
@@ -39,7 +44,6 @@ class CartScreen extends StatefulWidget {
 
 class _CartScreenState extends State<CartScreen>
     with SingleTickerProviderStateMixin {
-
   bool _isIntalizedLoad = true;
 
   List<CartItem> _activeList = [];
@@ -51,11 +55,9 @@ class _CartScreenState extends State<CartScreen>
   List<int> _currentKotBoundaries = [];
   List<int> _currentKotNumbers = [];
 
-
-  List<CartItemStatus>
-  get _combinedList =>[
-    ..._activeList.map((item)=>CartItemStatus(item, true)),
-    ..._newlyAddedList.map((item)=> CartItemStatus(item,false))
+  List<CartItemStatus> get _combinedList => [
+    ..._activeList.map((item) => CartItemStatus(item, true)),
+    ..._newlyAddedList.map((item) => CartItemStatus(item, false)),
   ];
 
   List<CartItem> cartItems = [];
@@ -77,45 +79,160 @@ class _CartScreenState extends State<CartScreen>
   void _setDefaultOrderType() {
     selectedFilter = "Take Away";
   }
+
   void _navigateAndAddMoreItems() async {
     // Navigate to the menu to add more items
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => Startorder(isForAddingItem: true), // Assuming MenuScreen exists
+        builder: (context) =>
+            Startorder(isForAddingItem: true), // Assuming MenuScreen exists
       ),
     );
 
     // When the user returns, re-initialize the cart to show the new items
     _initializeCart();
   }
+
+  Future<bool> _handleBackPress() async {
+    // Only warn for items added to an ALREADY-PLACED order — those aren't in a
+    // KOT yet and would be lost. A brand-new order's cart just persists, so back
+    // goes through silently (no discard, no dialog).
+    if (isExistingOrder && _newlyAddedList.isNotEmpty) {
+      final result = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AppDialogShell(
+          title: 'Unplaced Items',
+          subtitle: 'Pending changes in order',
+          accent: AppColors.warning,
+          icon: Icons.warning_amber_rounded,
+          body: Text(
+            'You have added new items to the cart but haven\'t placed the order yet.\n\nWhat would you like to do?',
+            style: GoogleFonts.poppins(
+              fontSize: 14,
+              height: 1.5,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          actions: [
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(ctx, 'menu'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: Text(
+                      'Add More Items',
+                      style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  OutlinedButton(
+                    onPressed: () => Navigator.pop(ctx, 'discard'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.danger,
+                      side: BorderSide(
+                        color: AppColors.danger.withValues(alpha: 0.2),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: Text(
+                      'Discard & Go Back',
+                      style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, 'stay'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.textSecondary,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                    ),
+                    child: Text(
+                      'Cancel',
+                      style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.w500,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+
+      if (result == 'discard') {
+        await restaurantCartStore.clearCart();
+        return true;
+      } else if (result == 'menu') {
+        _navigateAndAddMoreItems();
+        return false;
+      }
+      return false;
+    }
+    return true;
+  }
+
   /// ------------------- CART INITIALIZATION ------------------- ///
   Future<void> _initializeCart() async {
     // Priority 1: If widget has existing order — items are already in memory
     if (widget.existingOrder != null) {
+      // Read the LATEST saved order: immediate item-cancels update orderStore
+      // but NOT the immutable widget.existingOrder, so re-init (e.g. returning
+      // from "Add Items") must not revive a cancelled quantity.
+      final baseOrder = orderStore.orders.firstWhere(
+        (o) => o.id == widget.existingOrder!.id,
+        orElse: () => widget.existingOrder!,
+      );
+
       if (_isIntalizedLoad) {
         restaurantCartStore.clearCart(); // fire-and-forget, no need to await
         _isIntalizedLoad = false;
         // Deep copy — mutations to _activeList items must not leak to the Hive-cached order
-        _originalActiveList = widget.existingOrder!.items.map((i) => i.copyWith()).toList();
-        _originalQuantities = {for (final item in _originalActiveList) item.id: item.quantity};
-        _currentKotBoundaries = List.from(widget.existingOrder!.kotBoundaries);
-        _currentKotNumbers = List.from(widget.existingOrder!.kotNumbers);
+        _originalActiveList = baseOrder.items.map((i) => i.copyWith()).toList();
+        _originalQuantities = {
+          for (final item in _originalActiveList) item.id: item.quantity,
+        };
+        _currentKotBoundaries = List.from(baseOrder.kotBoundaries);
+        _currentKotNumbers = List.from(baseOrder.kotNumbers);
       }
 
       // Load any newly added cart items in parallel (non-blocking)
       final cartFuture = restaurantCartStore.loadCartItems();
 
       setState(() {
-        _activeList = widget.existingOrder!.items.map((i) => i.copyWith()).toList();
+        _activeList = baseOrder.items.map((i) => i.copyWith()).toList();
         isExistingOrder = true;
-        selectedFilter = widget.existingOrder!.orderType;
-        tableNo = widget.existingOrder!.tableNo;
+        selectedFilter = baseOrder.orderType;
+        tableNo = baseOrder.tableNo;
       });
 
       await cartFuture;
       if (mounted) {
-        setState(() => _newlyAddedList = restaurantCartStore.cartItems.toList());
+        setState(
+          () => _newlyAddedList = restaurantCartStore.cartItems.toList(),
+        );
       }
       return;
     }
@@ -136,7 +253,10 @@ class _CartScreenState extends State<CartScreen>
   Future<void> loadCartItems() async {
     try {
       await restaurantCartStore.loadCartItems();
-      if (mounted) setState(() => _newlyAddedList = restaurantCartStore.cartItems.toList());
+      if (mounted)
+        setState(
+          () => _newlyAddedList = restaurantCartStore.cartItems.toList(),
+        );
     } catch (e) {
       debugPrint('Error loading cart: $e');
       _showSnackBar('Error loading cart items', isError: true);
@@ -162,7 +282,6 @@ class _CartScreenState extends State<CartScreen>
     } else {
       NotificationService.instance.showInfo(message);
     }
-
 
     // ScaffoldMessenger.of(context).showSnackBar(
     //   SnackBar(
@@ -199,6 +318,7 @@ class _CartScreenState extends State<CartScreen>
       isDineIn: isDineIn,
       isdelivery: isDelivery,
       cartItems: _combinedList,
+      onAddItems: isExistingOrder ? _navigateAndAddMoreItems : null,
       originalActiveItems: _originalActiveList,
       originalQuantities: _originalQuantities,
       currentKotBoundaries: _currentKotBoundaries,
@@ -227,19 +347,27 @@ class _CartScreenState extends State<CartScreen>
         Items? inventoryItem;
         try {
           inventoryItem = itemStore.items.firstWhere(
-                (invItem) => invItem.name.toLowerCase().trim() == item.title.toLowerCase().trim(),
+            (invItem) =>
+                invItem.name.toLowerCase().trim() ==
+                item.title.toLowerCase().trim(),
           );
         } catch (e) {
-          if (mounted) NotificationService.instance.showError('Item not found in inventory database');
+          if (mounted)
+            NotificationService.instance.showError(
+              'Item not found in inventory database',
+            );
           return;
         }
 
-        if (inventoryItem.trackInventory && !inventoryItem.allowOrderWhenOutOfStock) {
+        if (InventoryService.isStockGoverned(inventoryItem) &&
+            !inventoryItem.allowOrderWhenOutOfStock) {
           final requestedQuantity = item.quantity + 1;
-          if (item.variantName != null && inventoryItem.variant != null) {
+          if (!inventoryItem.isRecipeBased &&
+              item.variantName != null &&
+              inventoryItem.variant != null) {
             try {
               final variant = inventoryItem.variant!.firstWhere(
-                    (v) => _getVariantName(v.variantId) == item.variantName,
+                (v) => _getVariantName(v.variantId) == item.variantName,
               );
               final availableStock = variant.stockQuantity ?? 0;
               if (availableStock < requestedQuantity) {
@@ -250,9 +378,13 @@ class _CartScreenState extends State<CartScreen>
               }
             } catch (e) {}
           } else {
-            if (inventoryItem.stockQuantity < requestedQuantity) {
+            final availableStock = InventoryService.effectiveAvailableStock(
+              inventoryItem,
+            );
+            if (availableStock.isFinite && availableStock < requestedQuantity) {
               NotificationService.instance.showError(
-                  'Only ${inventoryItem.stockQuantity.toInt()} ${item.title} available in stock');
+                'Only ${availableStock.toInt()} ${item.title} available in stock',
+              );
               return;
             }
           }
@@ -280,6 +412,7 @@ class _CartScreenState extends State<CartScreen>
         }
         await loadCartItems();
       },
+      onCommitCancel: _commitActiveCancel,
       onSetQty: (item, newQty) async {
         if (newQty < 1) return;
         // The field only edits non-active items; active items stay staged via +/−.
@@ -298,25 +431,85 @@ class _CartScreenState extends State<CartScreen>
         Items? inv;
         try {
           inv = itemStore.items.firstWhere(
-                (i) => i.name.toLowerCase().trim() == item.title.toLowerCase().trim(),
+            (i) =>
+                i.name.toLowerCase().trim() == item.title.toLowerCase().trim(),
           );
         } catch (_) {
           return null;
         }
-        if (!inv.trackInventory || inv.allowOrderWhenOutOfStock) return null;
-        if (item.variantName != null && inv.variant != null) {
+        if (!InventoryService.isStockGoverned(inv) ||
+            inv.allowOrderWhenOutOfStock) {
+          return null;
+        }
+        if (!inv.isRecipeBased &&
+            item.variantName != null &&
+            inv.variant != null) {
           try {
             final v = inv.variant!.firstWhere(
-                  (vv) => _getVariantName(vv.variantId) == item.variantName,
+              (vv) => _getVariantName(vv.variantId) == item.variantName,
             );
             return (v.stockQuantity ?? 0).toInt();
           } catch (_) {
             return null;
           }
         }
-        return inv.stockQuantity.toInt();
+        final availableStock = InventoryService.effectiveAvailableStock(inv);
+        // Infinite = a Recipe-Based item nothing constrains; "unlimited" is
+        // exactly what null means to this callback.
+        return availableStock.isFinite ? availableStock.toInt() : null;
       },
     );
+  }
+
+  /// Sync after an active item's cancellation was committed IMMEDIATELY (in
+  /// takeaway). Drops/reduces it in the working list AND the diff baseline
+  /// (_originalActiveList/_originalQuantities) so a later "Place Order" for any
+  /// pending new items won't try to cancel this item again.
+  void _commitActiveCancel(CartItem item, int qty) {
+    setState(() {
+      // Working list — boundary-aware, mirrors _removeActiveItem on full removal.
+      final wIdx = _activeList.indexWhere((i) => i.id == item.id);
+      if (wIdx != -1) {
+        final remaining = _activeList[wIdx].quantity - qty;
+        if (remaining > 0) {
+          _activeList[wIdx].quantity = remaining;
+        } else {
+          int kotIndex = _currentKotBoundaries.length - 1;
+          for (int i = 0; i < _currentKotBoundaries.length; i++) {
+            if (wIdx < _currentKotBoundaries[i]) {
+              kotIndex = i;
+              break;
+            }
+          }
+          _activeList.removeAt(wIdx);
+          for (int i = kotIndex; i < _currentKotBoundaries.length; i++) {
+            _currentKotBoundaries[i]--;
+          }
+          if (_currentKotBoundaries.isNotEmpty &&
+              kotIndex < _currentKotBoundaries.length) {
+            final prevBoundary = kotIndex == 0
+                ? 0
+                : _currentKotBoundaries[kotIndex - 1];
+            if (_currentKotBoundaries[kotIndex] == prevBoundary) {
+              _currentKotNumbers.removeAt(kotIndex);
+              _currentKotBoundaries.removeAt(kotIndex);
+            }
+          }
+        }
+      }
+      // Diff baseline — so the committed cancellation isn't re-detected.
+      final oIdx = _originalActiveList.indexWhere((i) => i.id == item.id);
+      if (oIdx != -1) {
+        final remaining = _originalActiveList[oIdx].quantity - qty;
+        if (remaining > 0) {
+          _originalActiveList[oIdx].quantity = remaining;
+          _originalQuantities[item.id] = remaining;
+        } else {
+          _originalActiveList.removeAt(oIdx);
+          _originalQuantities.remove(item.id);
+        }
+      }
+    });
   }
 
   /// Stage a quantity change for a KOT'd item — committed on "Place Order".
@@ -333,7 +526,10 @@ class _CartScreenState extends State<CartScreen>
 
     int kotIndex = _currentKotBoundaries.length - 1;
     for (int i = 0; i < _currentKotBoundaries.length; i++) {
-      if (idx < _currentKotBoundaries[i]) { kotIndex = i; break; }
+      if (idx < _currentKotBoundaries[i]) {
+        kotIndex = i;
+        break;
+      }
     }
 
     setState(() {
@@ -342,7 +538,9 @@ class _CartScreenState extends State<CartScreen>
         _currentKotBoundaries[i]--;
       }
       if (_currentKotBoundaries.isNotEmpty) {
-        final prevBoundary = kotIndex == 0 ? 0 : _currentKotBoundaries[kotIndex - 1];
+        final prevBoundary = kotIndex == 0
+            ? 0
+            : _currentKotBoundaries[kotIndex - 1];
         if (_currentKotBoundaries[kotIndex] == prevBoundary) {
           _currentKotNumbers.removeAt(kotIndex);
           _currentKotBoundaries.removeAt(kotIndex);
@@ -357,7 +555,14 @@ class _CartScreenState extends State<CartScreen>
         return _buildTakeaway(isDineIn: false, isDelivery: false);
       case "Dine In":
         return _buildTakeaway(
-            isDineIn: true, isDelivery: false, tableNo: tableNo ?? _selectedTableNoForUI ?? widget.existingOrder?.tableNo ?? '');
+          isDineIn: true,
+          isDelivery: false,
+          tableNo:
+              tableNo ??
+              _selectedTableNoForUI ??
+              widget.existingOrder?.tableNo ??
+              '',
+        );
       case "Delivery":
         return _buildTakeaway(isDineIn: false, isDelivery: true);
       default:
@@ -369,177 +574,303 @@ class _CartScreenState extends State<CartScreen>
   @override
   Widget build(BuildContext context) {
     final isTablet = !AppResponsive.isMobile(context);
-    return Scaffold(
-      backgroundColor: AppColors.surfaceLight,
-      appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        elevation: 0,
-        systemOverlayStyle: SystemUiOverlayStyle.light,
-        title: Text(
-          isExistingOrder ? 'Update Order' : 'Cart (${_combinedList.length} ${_combinedList.length == 1 ? 'item' : 'items'})',
-          style: GoogleFonts.poppins(
-            color: Colors.white,
-            fontSize: AppResponsive.getValue(context, mobile: 17, tablet: 19),
-            fontWeight: FontWeight.w500,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final shouldPop = await _handleBackPress();
+        if (shouldPop && mounted) {
+          Navigator.pop(context);
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.surfaceLight,
+        appBar: AppBar(
+          backgroundColor: AppColors.primary,
+          elevation: 0,
+          systemOverlayStyle: SystemUiOverlayStyle.light,
+          title: Text(
+            isExistingOrder
+                ? 'Update Order'
+                : 'Cart (${_combinedList.length} ${_combinedList.length == 1 ? 'item' : 'items'})',
+            style: GoogleFonts.poppins(
+              color: Colors.white,
+              fontSize: AppResponsive.getValue(context, mobile: 17, tablet: 19),
+              fontWeight: FontWeight.w500,
+            ),
           ),
-        ),
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 18),
-          onPressed: () => Navigator.pop(context),
-        ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.delete_outline, color: Colors.white, size: 22),
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 18),
             onPressed: () async {
-              final confirmed = await showAppConfirmDialog(
-                context: context,
-                title: 'Clear Cart',
-                message: 'Remove all items from cart?',
-                confirmLabel: 'Clear',
-                accent: AppColors.danger,
-                icon: Icons.remove_shopping_cart_outlined,
-              );
-              if (confirmed) clearCart();
+              final shouldPop = await _handleBackPress();
+              if (shouldPop && mounted) {
+                Navigator.pop(context);
+              }
             },
           ),
-          SizedBox(width: 4),
-        ],
-      ),
+          actions: [
+            IconButton(
+              icon: Icon(Icons.delete_outline, color: Colors.white, size: 22),
+              onPressed: () async {
+                final confirmed = await showAppConfirmDialog(
+                  context: context,
+                  title: 'Clear Cart',
+                  message: 'Remove all items from cart?',
+                  confirmLabel: 'Clear',
+                  accent: AppColors.danger,
+                  icon: Icons.remove_shopping_cart_outlined,
+                );
+                if (confirmed) clearCart();
+              },
+            ),
+            SizedBox(width: 4),
+          ],
+        ),
 
-      body: _combinedList.isEmpty
-          ? _buildEmptyCart()
-          : Stack(
-          children: [
-            Column(
-              children: [
-                // Order type tabs
-                Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.white,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  padding: EdgeInsets.symmetric(horizontal: isTablet ? 16 : 12, vertical: isTablet ? 10 : 8),
-                  child: Row(
+        body: _combinedList.isEmpty
+            ? _buildEmptyCart()
+            : Stack(
+                children: [
+                  Column(
                     children: [
-                      _buildTabChip('Take Away', Icons.shopping_bag_outlined, selectedFilter == "Take Away",
-                        () => setState(() => selectedFilter = "Take Away")),
-                      if (OrderSettings.enableDineIn)
-                        _buildTabChip('Dine In', Icons.restaurant, selectedFilter == "Dine In",
-                          () async {
-                            final result = await Navigator.push(context,
-                              MaterialPageRoute(builder: (_) => const TableScreen(isfromcart: true)));
-                            if (result is String) setState(() { selectedFilter = "Dine In"; _selectedTableNoForUI = result; });
-                          }),
-                      if (OrderSettings.enableDelivery)
-                        _buildTabChip('Delivery', Icons.delivery_dining, selectedFilter == "Delivery",
-                          () => setState(() => selectedFilter = "Delivery")),
-                    ],
-                  ),
-                ),
-                // Existing order info (KOT + table)
-                if (isExistingOrder && widget.existingOrder != null)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-                    child: Row(
-                      children: [
-                        Icon(Icons.receipt_long, color: AppColors.textSecondary, size: 14),
-                        SizedBox(width: 4),
-                        Expanded(
-                          child: Wrap(
-                            spacing: 4,
-                            runSpacing: 4,
-                            children: (widget.existingOrder!.kotNumbers ??
-                                (widget.existingOrder!.kotNumber != null ? [widget.existingOrder!.kotNumber!] : []))
-                                .map((kotNum) => Container(
-                                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.primary.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(4),
+                      // Order type tabs
+                      Container(
+                        decoration: BoxDecoration(
+                          color: AppColors.white,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.04),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isTablet ? 16 : 12,
+                          vertical: isTablet ? 10 : 8,
+                        ),
+                        child: Row(
+                          children: [
+                            _buildTabChip(
+                              'Take Away',
+                              Icons.shopping_bag_outlined,
+                              selectedFilter == "Take Away",
+                              () =>
+                                  setState(() => selectedFilter = "Take Away"),
+                            ),
+                            if (OrderSettings.enableDineIn &&
+                                PlanEnforce.allows(EntKeys.billingTables))
+                              _buildTabChip(
+                                'Dine In',
+                                Icons.restaurant,
+                                selectedFilter == "Dine In",
+                                () async {
+                                  final result = await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const TableScreen(isfromcart: true),
+                                    ),
+                                  );
+                                  if (result is String)
+                                    setState(() {
+                                      selectedFilter = "Dine In";
+                                      _selectedTableNoForUI = result;
+                                    });
+                                },
+                              ),
+                            if (OrderSettings.enableDelivery)
+                              _buildTabChip(
+                                'Delivery',
+                                Icons.delivery_dining,
+                                selectedFilter == "Delivery",
+                                () =>
+                                    setState(() => selectedFilter = "Delivery"),
+                              ),
+                          ],
+                        ),
+                      ),
+                      // Existing order info (KOT + table)
+                      if (isExistingOrder && widget.existingOrder != null)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 2,
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.receipt_long,
+                                color: AppColors.textSecondary,
+                                size: 14,
+                              ),
+                              SizedBox(width: 4),
+                              Expanded(
+                                child: Wrap(
+                                  spacing: 4,
+                                  runSpacing: 4,
+                                  children:
+                                      (widget.existingOrder!.kotNumbers ??
+                                              (widget
+                                                          .existingOrder!
+                                                          .kotNumber !=
+                                                      null
+                                                  ? [
+                                                      widget
+                                                          .existingOrder!
+                                                          .kotNumber!,
+                                                    ]
+                                                  : []))
+                                          .map(
+                                            (kotNum) => Container(
+                                              padding: EdgeInsets.symmetric(
+                                                horizontal: 6,
+                                                vertical: 2,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: AppColors.primary
+                                                    .withOpacity(0.1),
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                              ),
+                                              child: Text(
+                                                '#$kotNum',
+                                                style: GoogleFonts.poppins(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w500,
+                                                  color: AppColors.primary,
+                                                ),
+                                              ),
+                                            ),
+                                          )
+                                          .toList(),
+                                ),
+                              ),
+                              if (widget.existingOrder!.orderType ==
+                                      'Dine In' &&
+                                  widget.existingOrder!.tableNo != null &&
+                                  widget
+                                      .existingOrder!
+                                      .tableNo!
+                                      .isNotEmpty) ...[
+                                Container(
+                                  height: 16,
+                                  width: 1,
+                                  color: AppColors.divider,
+                                  margin: EdgeInsets.symmetric(horizontal: 8),
+                                ),
+                                Text(
+                                  tableNo ?? widget.existingOrder!.tableNo!,
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
                                   ),
-                                  child: Text('#$kotNum', style: GoogleFonts.poppins(fontSize: 10, fontWeight: FontWeight.w500, color: AppColors.primary)),
-                                )).toList(),
+                                ),
+                                SizedBox(width: 6),
+                                InkWell(
+                                  onTap: () async {
+                                    // Plan gate — transfer table (optional feature).
+                                    if (!PlanGuard.allowedOr(
+                                      context,
+                                      EntKeys.billingTablesTransfer,
+                                      featureName: 'Transfer table',
+                                    ))
+                                      return;
+                                    final result = await Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            const TableScreen(isfromcart: true),
+                                      ),
+                                    );
+                                    if (result is String &&
+                                        result !=
+                                            widget.existingOrder!.tableNo) {
+                                      try {
+                                        final oldTableNo =
+                                            widget.existingOrder!.tableNo;
+                                        final updatedOrder = widget
+                                            .existingOrder!
+                                            .copyWith(tableNo: result);
+                                        // Order write is source of truth — crash here leaves state consistent.
+                                        await orderStore.updateOrder(
+                                          updatedOrder,
+                                        );
+                                        // Batch both table updates into one yield point to halve the crash window.
+                                        await Future.wait([
+                                          tableStore.updateTableStatus(
+                                            result,
+                                            'Cooking',
+                                            total: updatedOrder.totalPrice,
+                                            orderId: updatedOrder.id,
+                                            orderTime: updatedOrder.timeStamp,
+                                          ),
+                                          if (oldTableNo != null &&
+                                              oldTableNo.isNotEmpty)
+                                            tableStore.updateTableStatus(
+                                              oldTableNo,
+                                              'Available',
+                                            ),
+                                        ]);
+                                        setState(() {
+                                          _selectedTableNoForUI = result;
+                                          tableNo = result;
+                                        });
+                                        NotificationService.instance.showInfo(
+                                          'Table changed to $result',
+                                        );
+                                      } catch (e) {
+                                        NotificationService.instance.showError(
+                                          'Failed to change table',
+                                        );
+                                      }
+                                    }
+                                  },
+                                  child: Icon(
+                                    Icons.swap_horiz,
+                                    size: 20,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                                SizedBox(width: 4),
+                                InkWell(
+                                  onTap: () => _showMergeTableDialog(),
+                                  child: Icon(
+                                    Icons.merge_type,
+                                    size: 20,
+                                    color: Colors.orange.shade700,
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                         ),
-                        if (widget.existingOrder!.orderType == 'Dine In' && widget.existingOrder!.tableNo != null && widget.existingOrder!.tableNo!.isNotEmpty) ...[
-                          Container(height: 16, width: 1, color: AppColors.divider, margin: EdgeInsets.symmetric(horizontal: 8)),
-                          Text(tableNo ?? widget.existingOrder!.tableNo!, style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500)),
-                          SizedBox(width: 6),
-                          InkWell(
-                            onTap: () async {
-                              final result = await Navigator.push(context, MaterialPageRoute(builder: (_) => const TableScreen(isfromcart: true)));
-                              if (result is String && result != widget.existingOrder!.tableNo) {
-                                try {
-                                  final oldTableNo = widget.existingOrder!.tableNo;
-                                  final updatedOrder = widget.existingOrder!.copyWith(tableNo: result);
-                                  // Order write is source of truth — crash here leaves state consistent.
-                                  await orderStore.updateOrder(updatedOrder);
-                                  // Batch both table updates into one yield point to halve the crash window.
-                                  await Future.wait([
-                                    tableStore.updateTableStatus(result, 'Cooking', total: updatedOrder.totalPrice, orderId: updatedOrder.id, orderTime: updatedOrder.timeStamp),
-                                    if (oldTableNo != null && oldTableNo.isNotEmpty)
-                                      tableStore.updateTableStatus(oldTableNo, 'Available'),
-                                  ]);
-                                  setState(() { _selectedTableNoForUI = result; tableNo = result; });
-                                  NotificationService.instance.showInfo('Table changed to $result');
-                                } catch (e) {
-                                  NotificationService.instance.showError('Failed to change table');
-                                }
-                              }
-                            },
-                            child: Icon(Icons.swap_horiz, size: 20, color: AppColors.primary),
-                          ),
-                          SizedBox(width: 4),
-                          InkWell(
-                            onTap: () => _showMergeTableDialog(),
-                            child: Icon(Icons.merge_type, size: 20, color: Colors.orange.shade700),
-                          ),
-                        ],
-                      ],
-                    ),
+                      Expanded(child: _getBody()),
+                    ],
                   ),
-                Expanded(child: _getBody()),
-              ],
-            ),
-
-            // Show Add Items button when viewing existing order with no new items
-            if (_activeList.isNotEmpty && _newlyAddedList.isEmpty)
-              Positioned(
-                bottom: 140,
-                left: 0,
-                right: 0,
-                child: Center(
-                  child: ElevatedButton.icon(
-                    onPressed: _navigateAndAddMoreItems,
-                    icon: Icon(Icons.add, size: 18),
-                    label: Text('Add Items', style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      elevation: 1,
-                      padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                  ),
-                ),
+                  // NOTE: the "Add Items" FAB now lives inside Takeaway, floating
+                  // just above its (variable-height) summary bar, so it can never
+                  // overlap the Total / action buttons like the old fixed-offset one.
+                ],
               ),
-          ],
       ),
     );
   }
 
-  Widget _buildTabChip(String title, IconData icon, bool isSelected, VoidCallback onTap) {
+  Widget _buildTabChip(
+    String title,
+    IconData icon,
+    bool isSelected,
+    VoidCallback onTap,
+  ) {
     return Expanded(
       child: GestureDetector(
         onTap: onTap,
         child: Container(
           margin: EdgeInsets.symmetric(horizontal: 3),
-          padding: EdgeInsets.symmetric(vertical: AppResponsive.getValue(context, mobile: 10, tablet: 12)),
+          padding: EdgeInsets.symmetric(
+            vertical: AppResponsive.getValue(context, mobile: 10, tablet: 12),
+          ),
           decoration: BoxDecoration(
             color: isSelected ? AppColors.primary : AppColors.surfaceMedium,
             borderRadius: BorderRadius.circular(10),
@@ -547,12 +878,24 @@ class _CartScreenState extends State<CartScreen>
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: AppResponsive.getValue(context, mobile: 16, tablet: 18), color: isSelected ? Colors.white : AppColors.textSecondary),
-              SizedBox(width: 6),
-              Text(title, style: GoogleFonts.poppins(
-                fontSize: AppResponsive.getValue(context, mobile: 12, tablet: 14), fontWeight: FontWeight.w500,
+              Icon(
+                icon,
+                size: AppResponsive.getValue(context, mobile: 16, tablet: 18),
                 color: isSelected ? Colors.white : AppColors.textSecondary,
-              )),
+              ),
+              SizedBox(width: 6),
+              Text(
+                title,
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.getValue(
+                    context,
+                    mobile: 12,
+                    tablet: 14,
+                  ),
+                  fontWeight: FontWeight.w500,
+                  color: isSelected ? Colors.white : AppColors.textSecondary,
+                ),
+              ),
             ],
           ),
         ),
@@ -565,9 +908,19 @@ class _CartScreenState extends State<CartScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.shopping_cart_outlined, size: 56, color: AppColors.divider),
+          Icon(
+            Icons.shopping_cart_outlined,
+            size: 56,
+            color: AppColors.divider,
+          ),
           const SizedBox(height: 12),
-          Text('Your cart is empty', style: GoogleFonts.poppins(fontSize: 15, color: AppColors.textSecondary)),
+          Text(
+            'Your cart is empty',
+            style: GoogleFonts.poppins(
+              fontSize: 15,
+              color: AppColors.textSecondary,
+            ),
+          ),
         ],
       ),
     );
@@ -576,23 +929,38 @@ class _CartScreenState extends State<CartScreen>
   /// ------------------- MERGE TABLE FUNCTIONALITY ------------------- ///
   Future<void> _showMergeTableDialog() async {
     if (widget.existingOrder == null) return;
+    // Plan gate — merge table (optional feature).
+    if (!PlanGuard.allowedOr(
+      context,
+      EntKeys.billingTablesMerge,
+      featureName: 'Merge table',
+    ))
+      return;
 
     // Get all active orders with their table numbers
     await orderStore.loadOrders();
     final allOrders = orderStore.orders;
-    final activeOrders = allOrders.where((order) =>
-    (order.status == 'Cooking' || order.status == 'Processing') &&
-        (order.isPaid == null || order.isPaid == false) && // Exclude paid orders
-        (order.paymentStatus == null || order.paymentStatus != 'Paid') // Double-check payment status
-    ).toList();
+    final activeOrders = allOrders
+        .where(
+          (order) =>
+              (order.status == 'Cooking' || order.status == 'Processing') &&
+              // Only merge orders with NO payment yet — exclude fully- AND
+              // partially-paid orders so payment histories are never combined.
+              !order.isFullyPaid &&
+              ((order.totalPaid ?? 0) <= 0),
+        )
+        .toList();
 
     // Filter out the current table
-    final otherTables = activeOrders.where((order) =>
-    order.tableNo != widget.existingOrder!.tableNo &&
-        order.orderType == 'Dine In' &&
-        order.tableNo != null &&
-        order.tableNo!.isNotEmpty
-    ).toList();
+    final otherTables = activeOrders
+        .where(
+          (order) =>
+              order.tableNo != widget.existingOrder!.tableNo &&
+              order.orderType == 'Dine In' &&
+              order.tableNo != null &&
+              order.tableNo!.isNotEmpty,
+        )
+        .toList();
 
     if (otherTables.isEmpty) {
       NotificationService.instance.showInfo(
@@ -603,7 +971,10 @@ class _CartScreenState extends State<CartScreen>
 
     // Show dialog to select table to merge
     final hInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        ? ((AppResponsive.screenWidth(context) -
+                      AppResponsive.dialogWidth(context)) /
+                  2)
+              .clamp(40.0, double.infinity)
         : 24.0;
     showDialog(
       context: context,
@@ -635,6 +1006,11 @@ class _CartScreenState extends State<CartScreen>
                     itemBuilder: (context, index) {
                       final order = otherTables[index];
                       return Card(
+                        // Explicit white + no surface tint — see
+                        // partial_refund_dialog: an untinted Card picks up
+                        // M3's default lavender at elevation.
+                        color: AppColors.white,
+                        surfaceTintColor: Colors.transparent,
                         margin: EdgeInsets.only(bottom: 8),
                         child: ListTile(
                           leading: Container(
@@ -659,7 +1035,7 @@ class _CartScreenState extends State<CartScreen>
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                '${order.items.length} items • ₹${order.totalPrice.toStringAsFixed(2)}',
+                                '${order.items.length} items • ${CurrencyHelper.currentSymbol}${order.totalPrice.toStringAsFixed(2)}',
                                 style: GoogleFonts.poppins(fontSize: 12),
                               ),
                               Text(
@@ -671,7 +1047,10 @@ class _CartScreenState extends State<CartScreen>
                               ),
                             ],
                           ),
-                          trailing: Icon(Icons.arrow_forward, color: AppColors.primary),
+                          trailing: Icon(
+                            Icons.arrow_forward,
+                            color: AppColors.primary,
+                          ),
                           onTap: () {
                             Navigator.pop(context);
                             _confirmMerge(order);
@@ -698,17 +1077,23 @@ class _CartScreenState extends State<CartScreen>
   Future<void> _confirmMerge(OrderModel sourceOrder) async {
     // Show confirmation dialog
     final mergeHInset = !AppResponsive.isMobile(context)
-        ? ((AppResponsive.screenWidth(context) - AppResponsive.dialogWidth(context)) / 2).clamp(40.0, 200.0)
+        ? ((AppResponsive.screenWidth(context) -
+                      AppResponsive.dialogWidth(context)) /
+                  2)
+              .clamp(40.0, double.infinity)
         : 24.0;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) {
         return Dialog(
-          insetPadding:
-              EdgeInsets.symmetric(horizontal: mergeHInset, vertical: 24),
+          insetPadding: EdgeInsets.symmetric(
+            horizontal: mergeHInset,
+            vertical: 24,
+          ),
           backgroundColor: AppColors.white,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -719,8 +1104,9 @@ class _CartScreenState extends State<CartScreen>
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
                 decoration: BoxDecoration(
                   color: AppColors.warning.withValues(alpha: 0.08),
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(16)),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(16),
+                  ),
                 ),
                 child: Row(
                   children: [
@@ -730,8 +1116,11 @@ class _CartScreenState extends State<CartScreen>
                         color: AppColors.warning.withValues(alpha: 0.15),
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(Icons.call_merge_rounded,
-                          color: AppColors.warning, size: 24),
+                      child: Icon(
+                        Icons.call_merge_rounded,
+                        color: AppColors.warning,
+                        size: 24,
+                      ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -756,9 +1145,10 @@ class _CartScreenState extends State<CartScreen>
                     Text(
                       'Merge ${sourceOrder.tableNo} into ${widget.existingOrder!.tableNo}?',
                       style: GoogleFonts.poppins(
-                          fontSize: 14,
-                          color: AppColors.textSecondary,
-                          height: 1.5),
+                        fontSize: 14,
+                        color: AppColors.textSecondary,
+                        height: 1.5,
+                      ),
                     ),
                     const SizedBox(height: 14),
                     Container(
@@ -768,24 +1158,32 @@ class _CartScreenState extends State<CartScreen>
                         color: AppColors.warning.withValues(alpha: 0.06),
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                            color: AppColors.warning.withValues(alpha: 0.25)),
+                          color: AppColors.warning.withValues(alpha: 0.25),
+                        ),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('This will:',
-                              style: GoogleFonts.poppins(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.textPrimary)),
+                          Text(
+                            'This will:',
+                            style: GoogleFonts.poppins(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
                           const SizedBox(height: 8),
                           _buildMergeInfoRow(
-                              'Combine all items from both tables'),
+                            'Combine all items from both tables',
+                          ),
                           _buildMergeInfoRow('Merge KOT numbers for tracking'),
                           _buildMergeInfoRow('Add up the totals'),
-                          _buildMergeInfoRow('Free ${sourceOrder.tableNo} table'),
                           _buildMergeInfoRow(
-                              'Keep everything under ${widget.existingOrder!.tableNo}'),
+                            'Free ${sourceOrder.tableNo} table',
+                          ),
+                          _buildMergeInfoRow(
+                            'Keep everything under ${widget.existingOrder!.tableNo}',
+                          ),
                         ],
                       ),
                     ),
@@ -807,11 +1205,15 @@ class _CartScreenState extends State<CartScreen>
                             side: BorderSide(color: AppColors.divider),
                             padding: const EdgeInsets.symmetric(vertical: 13),
                             shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10)),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                           ),
-                          child: Text('Cancel',
-                              style: GoogleFonts.poppins(
-                                  fontWeight: FontWeight.w600)),
+                          child: Text(
+                            'Cancel',
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -824,12 +1226,16 @@ class _CartScreenState extends State<CartScreen>
                             elevation: 0,
                             padding: const EdgeInsets.symmetric(vertical: 13),
                             shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10)),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                           ),
-                          child: Text('Merge Tables',
-                              style: GoogleFonts.poppins(
-                                  fontWeight: FontWeight.w600),
-                              textAlign: TextAlign.center),
+                          child: Text(
+                            'Merge Tables',
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.w600,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
                         ),
                       ),
                     ],
@@ -867,7 +1273,9 @@ class _CartScreenState extends State<CartScreen>
             child: Text(
               text,
               style: GoogleFonts.poppins(
-                  fontSize: 12, color: AppColors.textSecondary),
+                fontSize: 12,
+                color: AppColors.textSecondary,
+              ),
             ),
           ),
         ],
@@ -877,7 +1285,6 @@ class _CartScreenState extends State<CartScreen>
 
   Future<void> _mergeTables(OrderModel sourceOrder) async {
     try {
-
       // 1. Combine items from both orders
       final combinedItems = [
         ...widget.existingOrder!.items,
@@ -893,13 +1300,14 @@ class _CartScreenState extends State<CartScreen>
       // 3. Calculate boundaries for merged KOTs
       final combinedBoundaries = [
         ...widget.existingOrder!.kotBoundaries,
-        ...sourceOrder.kotBoundaries.map((boundary) =>
-        boundary + widget.existingOrder!.items.length
+        ...sourceOrder.kotBoundaries.map(
+          (boundary) => boundary + widget.existingOrder!.items.length,
         ),
       ];
 
       // 4. Calculate new total
-      final newTotal = widget.existingOrder!.totalPrice + sourceOrder.totalPrice;
+      final newTotal =
+          widget.existingOrder!.totalPrice + sourceOrder.totalPrice;
 
       // 5. Create merged order
       final mergedOrder = widget.existingOrder!.copyWith(
@@ -933,12 +1341,10 @@ class _CartScreenState extends State<CartScreen>
         _activeList = List.from(combinedItems);
       });
 
-
       // Show success message
       NotificationService.instance.showSuccess(
         'Tables merged successfully! ${sourceOrder.tableNo} → ${widget.existingOrder!.tableNo}',
       );
-
     } catch (e, stackTrace) {
       NotificationService.instance.showError(
         'Failed to merge tables. Please try again.',

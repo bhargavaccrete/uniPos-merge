@@ -42,6 +42,38 @@ class CurrencyHelper {
     'SGD': CurrencyInfo(code: 'SGD', symbol: 'S\$', name: 'Singapore Dollar'),
   };
 
+  /// Country display name (lowercased) -> currency code, for the countries this
+  /// app targets and whose currency [currencies] actually carries.
+  ///
+  /// Keys are the exact names in the bundled `country.json`
+  /// (`CountryStateCityData`) — there are no ISO codes to key on. Exact-match
+  /// only: that dataset also holds "United States Minor Outlying Islands",
+  /// which a substring test would wrongly resolve to USD.
+  ///
+  /// Deliberately partial. A country that is absent (or whose currency is not
+  /// in [currencies]) resolves to null, and the caller keeps the current
+  /// selection rather than guessing.
+  static const Map<String, String> _countryCurrency = {
+    'india': 'INR',
+    'united kingdom': 'GBP',
+    'united states': 'USD',
+    'canada': 'CAD',
+    'australia': 'AUD',
+    'singapore': 'SGD',
+    'united arab emirates': 'AED',
+    'saudi arabia': 'SAR',
+    'south africa': 'ZAR',
+    'brazil': 'BRL',
+    'mexico': 'MXN',
+    'japan': 'JPY',
+    'china': 'CNY',
+    'switzerland': 'CHF',
+  };
+
+  /// Currency code for [country], or null when unknown — never a guess.
+  static String? currencyCodeForCountry(String? country) =>
+      _countryCurrency[(country ?? '').trim().toLowerCase()];
+
   /// Get the currently selected currency code (default: INR)
   static Future<String> getCurrencyCode() async {
     final prefs = await SharedPreferences.getInstance();

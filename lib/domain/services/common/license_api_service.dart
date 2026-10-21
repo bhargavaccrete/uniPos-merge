@@ -56,6 +56,60 @@ class LicenseApiService {
     });
   }
 
+  // ── Sync (startup check + entitlement change detection) ────────────────────
+
+  /// Returns the `data` block whether the server verdict is valid or not (a
+  /// revoked/expired key comes back as a fail envelope but still carries the
+  /// `reason` in `data`, which the store needs). Throws only on transport
+  /// errors so the caller can apply offline grace and keep the cached manifest.
+  Future<Map<String, dynamic>> sync({
+    required String licenseKey,
+    required String deviceId,
+    required int entitlementVersion,
+  }) async {
+    final requestBody = {
+      'licensekey': licenseKey,
+      'deviceid': deviceId,
+      'entitlementversion': entitlementVersion,
+    };
+
+    if (kDebugMode) {
+      const pretty = JsonEncoder.withIndent('  ');
+      debugPrint('── LICENSE API REQUEST ─────────────────────────');
+      debugPrint('POST ${ApiConstants.baseUrl}${ApiConstants.licenseSyncPath}');
+      debugPrint(pretty.convert(requestBody));
+      debugPrint('────────────────────────────────────────────────');
+    }
+
+    try {
+      final response = await http
+          .post(
+            Uri.parse('${ApiConstants.baseUrl}${ApiConstants.licenseSyncPath}'),
+            headers: ApiConstants.headers,
+            body: jsonEncode(requestBody),
+          )
+          .timeout(_timeout);
+
+      if (kDebugMode) {
+        debugPrint('── LICENSE API RESPONSE ────────────────────────');
+        debugPrint('Status: ${response.statusCode}');
+        debugPrint(response.body);
+        debugPrint('────────────────────────────────────────────────');
+      }
+
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return (body['data'] as Map<String, dynamic>?) ?? const {};
+    } on TimeoutException {
+      throw const LicenseApiException('Connection timed out.');
+    } on http.ClientException catch (e) {
+      if (kDebugMode) debugPrint('── LICENSE SYNC NETWORK ERROR ── $e');
+      throw const LicenseApiException('Could not reach the server.');
+    } on SocketException catch (e) {
+      if (kDebugMode) debugPrint('── LICENSE SYNC SOCKET ERROR ── $e');
+      throw const LicenseApiException('Could not reach the server.');
+    }
+  }
+
   // ── Heartbeat ─────────────────────────────────────────────────────────────
 
   /// Returns true = server accepted, false = server rejected.

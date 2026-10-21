@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/domain/services/restaurant/comprehensive_data_generator.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
@@ -7,10 +9,12 @@ class PerformanceStatisticsReport extends StatefulWidget {
   const PerformanceStatisticsReport({super.key});
 
   @override
-  State<PerformanceStatisticsReport> createState() => _PerformanceStatisticsReportState();
+  State<PerformanceStatisticsReport> createState() =>
+      _PerformanceStatisticsReportState();
 }
 
-class _PerformanceStatisticsReportState extends State<PerformanceStatisticsReport> {
+class _PerformanceStatisticsReportState
+    extends State<PerformanceStatisticsReport> {
   bool _isLoadingStats = false;
   Map<String, int> _stats = {};
   Map<String, String> _fileSizes = {};
@@ -30,30 +34,26 @@ class _PerformanceStatisticsReportState extends State<PerformanceStatisticsRepor
         _stats = stats;
         _fileSizes = sizes;
       });
-    } catch (e) {
-      _showSnackBar('Error loading stats: $e', isError: true);
+    } catch (e, stackTrace) {
+      debugPrint('Error loading performance stats: $e\n$stackTrace');
+      NotificationService.instance.showError(
+        'Could not load statistics. Please try again.',
+      );
     } finally {
       setState(() => _isLoadingStats = false);
     }
   }
 
-  void _showSnackBar(String message, {required bool isError}) {
-    if (isError) {
-      NotificationService.instance.showError(message);
-    } else {
-      NotificationService.instance.showSuccess(message);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    final totalOrders = (_stats['activeOrders'] ?? 0) + (_stats['pastOrders'] ?? 0);
+    final totalOrders =
+        (_stats['activeOrders'] ?? 0) + (_stats['pastOrders'] ?? 0);
     final totalRecords = _stats.values.fold(0, (sum, count) => sum + count);
 
     return Scaffold(
       appBar: buildPrimaryAppBar(
         title: 'Performance Statistics',
-        titleFontSize: 18,
+        titleFontSize: AppResponsive.subheadingFontSize(context),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -62,30 +62,35 @@ class _PerformanceStatisticsReportState extends State<PerformanceStatisticsRepor
           ),
         ],
       ),
-      body: _isLoadingStats
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _buildHeaderCard(totalRecords),
-            const SizedBox(height: 16),
-            _buildDataSummaryCard(totalOrders),
-            const SizedBox(height: 16),
-            _buildInventoryCard(),
-            const SizedBox(height: 16),
-            _buildOperationsCard(),
-            const SizedBox(height: 16),
-            _buildPerformanceInsightsCard(totalRecords),
-            const SizedBox(height: 16),
-            _buildStorageCard(),
-            if ((_stats['pastOrders'] ?? 0) > 0) ...[
-              const SizedBox(height: 16),
-              _buildTestResultsCard(),
-            ],
-          ],
-        ),
+      body: AppResponsive.constrainedContent(
+        context: context,
+        maxWidth: AppResponsive.maxContentWidth(context),
+        alignment: Alignment.topCenter,
+        child: _isLoadingStats
+            ? const Center(child: CircularProgressIndicator())
+            : SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildHeaderCard(totalRecords),
+                    const SizedBox(height: 16),
+                    _buildDataSummaryCard(totalOrders),
+                    const SizedBox(height: 16),
+                    _buildInventoryCard(),
+                    const SizedBox(height: 16),
+                    _buildOperationsCard(),
+                    const SizedBox(height: 16),
+                    _buildPerformanceInsightsCard(totalRecords),
+                    const SizedBox(height: 16),
+                    _buildStorageCard(),
+                    if ((_stats['pastOrders'] ?? 0) > 0) ...[
+                      const SizedBox(height: 16),
+                      _buildTestResultsCard(),
+                    ],
+                  ],
+                ),
+              ),
       ),
     );
   }
@@ -102,8 +107,13 @@ class _PerformanceStatisticsReportState extends State<PerformanceStatisticsRepor
             const SizedBox(height: 12),
             Text(
               'Database Performance Report',
-              style: TextStyle(
-                fontSize: 24,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.getValue(
+                  context,
+                  mobile: 24.0,
+                  tablet: 26.0,
+                  desktop: 28.0,
+                ),
                 fontWeight: FontWeight.bold,
                 color: Colors.purple.shade700,
               ),
@@ -112,8 +122,8 @@ class _PerformanceStatisticsReportState extends State<PerformanceStatisticsRepor
             const SizedBox(height: 8),
             Text(
               'Generated: ${DateTime.now().toString().split('.')[0]}',
-              style: TextStyle(
-                fontSize: 14,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
                 color: Colors.grey.shade600,
               ),
             ),
@@ -126,8 +136,8 @@ class _PerformanceStatisticsReportState extends State<PerformanceStatisticsRepor
               ),
               child: Text(
                 '$totalRecords Total Records',
-                style: const TextStyle(
-                  fontSize: 20,
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.headingFontSize(context),
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                 ),
@@ -292,9 +302,17 @@ class _PerformanceStatisticsReportState extends State<PerformanceStatisticsRepor
             ),
             _buildInsightRow(
               'Performance Status',
-              totalRecords > 10000 ? 'Excellent' : totalRecords > 1000 ? 'Good' : 'Light',
+              totalRecords > 10000
+                  ? 'Excellent'
+                  : totalRecords > 1000
+                  ? 'Good'
+                  : 'Light',
               Icons.analytics,
-              totalRecords > 10000 ? Colors.green : totalRecords > 1000 ? Colors.blue : Colors.grey,
+              totalRecords > 10000
+                  ? Colors.green
+                  : totalRecords > 1000
+                  ? Colors.blue
+                  : Colors.grey,
             ),
           ],
         ),
@@ -316,7 +334,11 @@ class _PerformanceStatisticsReportState extends State<PerformanceStatisticsRepor
               return _buildStorageRow(entry.key, entry.value);
             }),
             const Divider(height: 24, thickness: 2),
-            _buildStorageRow('Total Storage Used', _getTotalStorageUsed(), isTotal: true),
+            _buildStorageRow(
+              'Total Storage Used',
+              _getTotalStorageUsed(),
+              isTotal: true,
+            ),
           ],
         ),
       ),
@@ -335,13 +357,17 @@ class _PerformanceStatisticsReportState extends State<PerformanceStatisticsRepor
           children: [
             Row(
               children: [
-                Icon(Icons.verified_user, size: 32, color: Colors.green.shade700),
+                Icon(
+                  Icons.verified_user,
+                  size: 32,
+                  color: Colors.green.shade700,
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     'Performance Test Results',
-                    style: TextStyle(
-                      fontSize: 20,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.headingFontSize(context),
                       fontWeight: FontWeight.bold,
                       color: Colors.green.shade700,
                     ),
@@ -350,7 +376,10 @@ class _PerformanceStatisticsReportState extends State<PerformanceStatisticsRepor
               ],
             ),
             const SizedBox(height: 20),
-            _buildTestResultRow('✓ Past orders generated', _formatNumber(pastOrders)),
+            _buildTestResultRow(
+              '✓ Past orders generated',
+              _formatNumber(pastOrders),
+            ),
             _buildTestResultRow('✓ Data persistence', 'Verified'),
             _buildTestResultRow('✓ No corruption detected', 'Passed'),
             _buildTestResultRow('✓ Query performance', 'Operational'),
@@ -371,8 +400,8 @@ class _PerformanceStatisticsReportState extends State<PerformanceStatisticsRepor
                   Expanded(
                     child: Text(
                       'All ${_formatNumber(pastOrders)} records are accessible and queryable.',
-                      style: TextStyle(
-                        fontSize: 14,
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.bodyFontSize(context),
                         fontWeight: FontWeight.bold,
                         color: Colors.green.shade800,
                       ),
@@ -394,8 +423,8 @@ class _PerformanceStatisticsReportState extends State<PerformanceStatisticsRepor
         const SizedBox(width: 8),
         Text(
           title,
-          style: const TextStyle(
-            fontSize: 18,
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.subheadingFontSize(context),
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -403,7 +432,12 @@ class _PerformanceStatisticsReportState extends State<PerformanceStatisticsRepor
     );
   }
 
-  Widget _buildStatTile(String label, String value, IconData icon, Color color) {
+  Widget _buildStatTile(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
@@ -426,13 +460,16 @@ class _PerformanceStatisticsReportState extends State<PerformanceStatisticsRepor
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
           Text(
             value,
-            style: TextStyle(
-              fontSize: 18,
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.subheadingFontSize(context),
               fontWeight: FontWeight.bold,
               color: color,
             ),
@@ -442,7 +479,12 @@ class _PerformanceStatisticsReportState extends State<PerformanceStatisticsRepor
     );
   }
 
-  Widget _buildInsightRow(String label, String value, IconData icon, Color color) {
+  Widget _buildInsightRow(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
@@ -458,7 +500,10 @@ class _PerformanceStatisticsReportState extends State<PerformanceStatisticsRepor
           Expanded(
             child: Text(
               label,
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
           Container(
@@ -469,8 +514,8 @@ class _PerformanceStatisticsReportState extends State<PerformanceStatisticsRepor
             ),
             child: Text(
               value,
-              style: const TextStyle(
-                fontSize: 14,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
               ),
@@ -482,7 +527,9 @@ class _PerformanceStatisticsReportState extends State<PerformanceStatisticsRepor
   }
 
   Widget _buildStorageRow(String boxName, String size, {bool isTotal = false}) {
-    final displayName = isTotal ? boxName : boxName[0].toUpperCase() + boxName.substring(1);
+    final displayName = isTotal
+        ? boxName
+        : boxName[0].toUpperCase() + boxName.substring(1);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
@@ -490,15 +537,22 @@ class _PerformanceStatisticsReportState extends State<PerformanceStatisticsRepor
         children: [
           Text(
             displayName,
-            style: TextStyle(
-              fontSize: isTotal ? 16 : 14,
+            style: GoogleFonts.poppins(
+              fontSize: isTotal
+                  ? AppResponsive.subheadingFontSize(context)
+                  : AppResponsive.bodyFontSize(context),
               fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
             ),
           ),
           Text(
             size,
+            // Deliberately monospace, not Poppins: these are byte sizes that
+            // should column-align. GoogleFonts.poppins() takes no fontFamily,
+            // so this stays a plain TextStyle.
             style: TextStyle(
-              fontSize: isTotal ? 16 : 14,
+              fontSize: isTotal
+                  ? AppResponsive.subheadingFontSize(context)
+                  : AppResponsive.bodyFontSize(context),
               fontWeight: FontWeight.bold,
               fontFamily: 'monospace',
               color: isTotal ? Colors.blue : null,
@@ -517,11 +571,16 @@ class _PerformanceStatisticsReportState extends State<PerformanceStatisticsRepor
         children: [
           Text(
             label,
-            style: const TextStyle(fontSize: 15),
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.bodyFontSize(context),
+            ),
           ),
           Text(
             value,
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.bodyFontSize(context),
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ],
       ),
@@ -546,8 +605,11 @@ class _PerformanceStatisticsReportState extends State<PerformanceStatisticsRepor
         } else if (size.endsWith('MB')) {
           totalBytes += double.parse(size.replaceAll(' MB', '')) * 1024 * 1024;
         } else if (size.endsWith('GB')) {
-          totalBytes += double.parse(size.replaceAll(' GB', '')) * 1024 * 1024 * 1024;
-        } else if (size.endsWith('B') && !size.contains('K') && !size.contains('M')) {
+          totalBytes +=
+              double.parse(size.replaceAll(' GB', '')) * 1024 * 1024 * 1024;
+        } else if (size.endsWith('B') &&
+            !size.contains('K') &&
+            !size.contains('M')) {
           totalBytes += double.parse(size.replaceAll(' B', ''));
         }
       } catch (e) {

@@ -1,17 +1,36 @@
+import 'package:billberrylite/util/restaurant/restaurant_session.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import '../../../core/di/service_locator.dart';
+import 'package:billberrylite/data/models/retail/hive_model/supplier_model_205.dart';
+import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/domain/services/retail/grn_receiving_service.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/common/row_action_button.dart';
+import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_empty_state.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/data/models/retail/hive_model/purchase_order_model_211.dart';
-import 'package:billberrylite/data/models/retail/hive_model/grn_model_213.dart';
-import 'package:billberrylite/data/models/retail/hive_model/grn_item_model_214.dart';
 import 'package:billberrylite/presentation/screens/retail/add_purchase_order_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/material_receiving_screen.dart';
+import 'package:billberrylite/presentation/widget/componets/retail/purchase_order_detail_sheet.dart';
 
 class PurchaseOrderListScreen extends StatefulWidget {
-  const PurchaseOrderListScreen({super.key});
+  /// Opens with the supplier filter already applied — used when arriving from
+  /// a supplier's Purchases tab, where landing on every supplier's orders
+  /// would throw away the context the user came from. The filter chip still
+  /// shows, so it can be cleared to see everything.
+  final SupplierModel? initialSupplier;
+
+  const PurchaseOrderListScreen({super.key, this.initialSupplier});
 
   @override
-  State<PurchaseOrderListScreen> createState() => _PurchaseOrderListScreenState();
+  State<PurchaseOrderListScreen> createState() =>
+      _PurchaseOrderListScreenState();
 }
 
 class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
@@ -19,12 +38,47 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
 
+  /// Tab order — index maps straight onto this list, so a null entry means
+  /// "All" rather than a status.
+  static const List<POStatus?> _tabStatuses = [
+    null, // All
+    POStatus.draft,
+    POStatus.sent,
+    POStatus.partiallyCompleted,
+    POStatus.fullyCompleted,
+    POStatus.cancelled,
+    POStatus.closed,
+  ];
+
+  static const List<String> _tabLabels = [
+    'All',
+    'Draft',
+    'Sent',
+    'Partial',
+    'Completed',
+    'Cancelled',
+    'Closed',
+  ];
+
+  SupplierModel? _supplierFilter;
+  DateTimeRange? _dateFilter;
+
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: _tabStatuses.length, vsync: this);
+    _supplierFilter = widget.initialSupplier;
+    // Finish any receipt a crash interrupted, then show the orders it updated.
+    GrnReceivingService.resumeInterrupted().then((n) {
+      if (n > 0 && mounted) purchaseOrderStore.loadPurchaseOrders();
+    });
     purchaseOrderStore.loadPurchaseOrders();
+    // The filter dropdown and the detail sheet's WhatsApp share both read
+    // supplierStore, which nothing on this route was hydrating.
+    supplierStore.loadSuppliers();
   }
+
+  bool get _hasExtraFilters => _supplierFilter != null || _dateFilter != null;
 
   @override
   void dispose() {
@@ -63,386 +117,288 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
     }
   }
 
-  String _formatDate(String isoDate) {
-    final date = DateTime.parse(isoDate);
-    return '${date.day}/${date.month}/${date.year}';
+  /// Status tab + supplier + date, applied together. Each status now has its
+  /// own tab — previously "Done" merged fullyCompleted with cancelled, which
+  /// hid cancellations among genuinely completed orders.
+  List<PurchaseOrderModel> _applyFilters(
+    List<PurchaseOrderModel> pos,
+    int tabIndex,
+  ) {
+    final status = _tabStatuses[tabIndex];
+
+    return pos.where((po) {
+      if (status != null && po.statusEnum != status) return false;
+
+      if (_supplierFilter != null &&
+          po.supplierId != _supplierFilter!.supplierId) {
+        return false;
+      }
+
+      if (_dateFilter != null) {
+        final created = DateTime.tryParse(po.createdAt);
+        if (created == null) return false;
+        // Compare on calendar days so an order created late in the day still
+        // falls inside a range that ends that day.
+        final day = DateTime(created.year, created.month, created.day);
+        final start = DateTime(
+          _dateFilter!.start.year,
+          _dateFilter!.start.month,
+          _dateFilter!.start.day,
+        );
+        final end = DateTime(
+          _dateFilter!.end.year,
+          _dateFilter!.end.month,
+          _dateFilter!.end.day,
+        );
+        if (day.isBefore(start) || day.isAfter(end)) return false;
+      }
+
+      return true;
+    }).toList();
   }
 
-  Color _getStatusColor(POStatus status) {
-    switch (status) {
-      case POStatus.draft:
-        return const Color(0xFF9E9E9E);
-      case POStatus.sent:
-        return const Color(0xFF2196F3);
-      case POStatus.partiallyCompleted:
-        return const Color(0xFFFF9800);
-      case POStatus.fullyCompleted:
-        return const Color(0xFF4CAF50);
-      case POStatus.cancelled:
-        return const Color(0xFFF44336);
-    }
-  }
+  Future<void> _pickSupplierFilter() async {
+    // Returns a supplierId; '' means "All suppliers". Popping a SupplierModel?
+    // directly would make "All" and a swipe-dismiss indistinguishable, so a
+    // dismissed sheet (null) leaves the current filter alone.
+    const allSuppliers = '';
 
-  String _getStatusLabel(POStatus status) {
-    switch (status) {
-      case POStatus.draft:
-        return 'Draft';
-      case POStatus.sent:
-        return 'Sent';
-      case POStatus.partiallyCompleted:
-        return 'Partial';
-      case POStatus.fullyCompleted:
-        return 'Completed';
-      case POStatus.cancelled:
-        return 'Cancelled';
-    }
-  }
-
-  void _showPODetails(PurchaseOrderModel po) async {
-    await purchaseOrderStore.selectPO(po);
-
-    if (!mounted) return;
-
-    showModalBottomSheet(
+    final result = await showDialog<String>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => _buildPODetailsSheet(po),
-    );
-  }
-
-  Widget _buildPODetailsSheet(PurchaseOrderModel po) {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.75,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: Color(0xFFE8E8E8))),
+      builder: (dialogContext) => AppDialogShell(
+        title: 'Filter by Supplier',
+        subtitle: 'Show purchase orders from one supplier',
+        accent: AppColors.primary,
+        icon: Icons.filter_alt_outlined,
+        // Plain Column, not a ListView — AppDialogShell already wraps the body
+        // in a SingleChildScrollView, and nesting two scrollables makes them
+        // fight over the drag.
+        body: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _supplierFilterTile(
+              dialogContext,
+              icon: Icons.clear_all_rounded,
+              label: 'All suppliers',
+              selected: _supplierFilter == null,
+              value: allSuppliers,
             ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        po.poNumber,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        po.supplierName ?? 'Unknown Supplier',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Color(0xFF6B6B6B),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: _getStatusColor(po.statusEnum).withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Text(
-                    _getStatusLabel(po.statusEnum),
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: _getStatusColor(po.statusEnum),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: Observer(
-              builder: (context) {
-                final items = purchaseOrderStore.currentPOItems;
-                final grns = purchaseOrderStore.currentPOGRNs;
-
-                return SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildInfoRow('Expected Delivery', _formatDate(po.expectedDeliveryDate)),
-                      _buildInfoRow('Created', _formatDate(po.createdAt)),
-                      _buildInfoRow('Total Items', '${po.totalItems}'),
-                      if (po.estimatedTotal > 0)
-                        _buildInfoRow('Estimated Total', '₹${po.estimatedTotal.toStringAsFixed(2)}'),
-                      if (po.notes != null && po.notes!.isNotEmpty)
-                        _buildInfoRow('Notes', po.notes!),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Order Items',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      ...items.map((item) => Container(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF5F5F5),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        item.productName ?? 'Unknown Product',
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                      if (item.variantInfo != null)
-                                        Text(
-                                          item.variantInfo!,
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            color: Color(0xFF6B6B6B),
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Text(
-                                      'Qty: ${item.orderedQty}',
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                    if (item.estimatedPrice != null)
-                                      Text(
-                                        '₹${item.estimatedTotal?.toStringAsFixed(2) ?? '0.00'}',
-                                        style: const TextStyle(
-                                          fontSize: 12,
-                                          color: Color(0xFF4CAF50),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          )),
-                      // GRN History Section
-                      if (grns.isNotEmpty) ...[
-                        const SizedBox(height: 24),
-                        const Text(
-                          'Receiving History',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        ...grns.map((grn) => _buildGRNSummaryCard(grn)),
-                      ],
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: const BoxDecoration(
-              border: Border(top: BorderSide(color: Color(0xFFE8E8E8))),
-            ),
-            child: Row(
-              children: [
-                if (po.canEdit) ...[
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        _navigateToAddPO(po: po);
-                      },
-                      icon: const Icon(Icons.edit),
-                      label: const Text('Edit'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () async {
-                        await purchaseOrderStore.updatePOStatus(po.poId, POStatus.sent);
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('PO marked as sent'),
-                            backgroundColor: Color(0xFF4CAF50),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.send),
-                      label: const Text('Mark Sent'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2196F3),
-                        foregroundColor: Colors.white,
-                      ),
-                    ),
-                  ),
-                ] else if (po.canReceive) ...[
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        _navigateToReceiving(po);
-                      },
-                      icon: const Icon(Icons.local_shipping),
-                      label: const Text('Receive Items'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF4CAF50),
-                        foregroundColor: Colors.white,
-                      ),
-                    ),
-                  ),
-                ] else ...[
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Close'),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 130,
-            child: Text(
-              label,
-              style: const TextStyle(
-                fontSize: 14,
-                color: Color(0xFF6B6B6B),
+            if (supplierStore.suppliers.isNotEmpty)
+              const Divider(height: 1, color: AppColors.divider),
+            for (final s in supplierStore.suppliers)
+              _supplierFilterTile(
+                dialogContext,
+                icon: Icons.storefront_outlined,
+                label: s.name,
+                selected: _supplierFilter?.supplierId == s.supplierId,
+                value: s.supplierId,
               ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
+        actions: [appDialogCancelButton(dialogContext, label: 'Close')],
       ),
+    );
+
+    if (result == null || !mounted) return;
+
+    setState(() {
+      _supplierFilter = result == allSuppliers
+          ? null
+          : supplierStore.suppliers
+                .where((s) => s.supplierId == result)
+                .firstOrNull;
+    });
+  }
+
+  /// One row of the supplier-filter dialog. Pops the supplier id so the caller
+  /// can tell "All" (empty string) apart from a dismiss (null).
+  Widget _supplierFilterTile(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required bool selected,
+    required String value,
+  }) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      dense: AppResponsive.isMobile(context),
+      leading: Icon(
+        icon,
+        size: AppResponsive.iconSize(context),
+        color: selected ? AppColors.primary : AppColors.textSecondary,
+      ),
+      title: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: GoogleFonts.poppins(
+          fontSize: AppResponsive.bodyFontSize(context),
+          fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+          color: selected ? AppColors.primary : AppColors.textPrimary,
+        ),
+      ),
+      trailing: selected
+          ? Icon(
+              Icons.check_circle_rounded,
+              size: AppResponsive.smallIconSize(context),
+              color: AppColors.primary,
+            )
+          : null,
+      onTap: () => Navigator.pop(context, value),
     );
   }
 
-  List<PurchaseOrderModel> _filterPOsByTab(List<PurchaseOrderModel> pos, int tabIndex) {
-    switch (tabIndex) {
-      case 0: // All
-        return pos;
-      case 1: // Draft
-        return pos.where((po) => po.statusEnum == POStatus.draft).toList();
-      case 2: // Sent/Pending
-        return pos.where((po) => po.canReceive).toList();
-      case 3: // Completed
-        return pos.where((po) => po.isCompleted).toList();
-      default:
-        return pos;
+  Future<void> _pickDateFilter() async {
+    final range = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      initialDateRange: _dateFilter,
+    );
+    if (range != null && mounted) {
+      setState(() => _dateFilter = range);
     }
+  }
+
+  void _clearExtraFilters() {
+    setState(() {
+      _supplierFilter = null;
+      _dateFilter = null;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
-      appBar: AppBar(
-        title: const Text('Purchase Orders',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500)),
-        centerTitle: true,
-        elevation: 0,
-        backgroundColor: Colors.white,
+      backgroundColor: AppColors.surfaceLight,
+      appBar: buildPrimaryAppBar(
+        title: 'Purchase Orders',
+        actions: [
+          // A tinted icon would vanish against the primary AppBar, so an active
+          // filter is flagged with a filled icon instead of a colour change.
+          IconButton(
+            icon: Icon(
+              _supplierFilter != null
+                  ? Icons.filter_alt
+                  : Icons.filter_alt_outlined,
+            ),
+            tooltip: 'Filter by supplier',
+            onPressed: _pickSupplierFilter,
+          ),
+          IconButton(
+            icon: Icon(
+              _dateFilter != null
+                  ? Icons.event_available
+                  : Icons.date_range_outlined,
+            ),
+            tooltip: 'Filter by date',
+            onPressed: _pickDateFilter,
+          ),
+          const SizedBox(width: 4),
+        ],
         bottom: TabBar(
           controller: _tabController,
-          labelColor: const Color(0xFF1A1A1A),
-          unselectedLabelColor: const Color(0xFF6B6B6B),
-          indicatorColor: const Color(0xFF4CAF50),
-          tabs: const [
-            Tab(text: 'All'),
-            Tab(text: 'Draft'),
-            Tab(text: 'Pending'),
-            Tab(text: 'Done'),
+          // Phones can't fit six labels, so they scroll. From tablet up there
+          // is room to divide the width evenly, which also kills the dead space
+          // that left-packed scrollable tabs leave on a wide screen.
+          isScrollable: AppResponsive.isMobile(context),
+          tabAlignment: AppResponsive.isMobile(context)
+              ? TabAlignment.start
+              : TabAlignment.fill,
+          labelColor: AppColors.white,
+          unselectedLabelColor: AppColors.white.withValues(alpha: 0.7),
+          indicatorColor: AppColors.white,
+          indicatorWeight: 3,
+          // Underline hugs the word rather than the whole tab cell — with
+          // scrollable tabs the cell is wider than its label, so a full-width
+          // indicator reads as misaligned.
+          indicatorSize: TabBarIndicatorSize.label,
+          // Scrolling: a wide gutter so six labels aren't packed together.
+          // Filling: a narrow one, because each tab is already an equal slice
+          // and a big gutter would squeeze "Completed" into an ellipsis on the
+          // smallest tablet.
+          labelPadding: EdgeInsets.symmetric(
+            horizontal: AppResponsive.isMobile(context)
+                ? AppResponsive.largeSpacing(context)
+                : AppResponsive.smallSpacing(context),
+          ),
+          labelStyle: GoogleFonts.poppins(
+            fontSize: AppResponsive.bodyFontSize(context),
+            fontWeight: FontWeight.w600,
+          ),
+          unselectedLabelStyle: GoogleFonts.poppins(
+            fontSize: AppResponsive.bodyFontSize(context),
+            fontWeight: FontWeight.w500,
+          ),
+          tabs: [
+            for (final label in _tabLabels)
+              Tab(
+                height: AppResponsive.getValue(
+                  context,
+                  mobile: 44.0,
+                  tablet: 48.0,
+                  desktop: 52.0,
+                ),
+                text: label,
+              ),
           ],
         ),
       ),
-      body: Column(
-        children: [
-          _buildSearchBar(),
-          _buildSummaryCard(),
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildPOList(0),
-                _buildPOList(1),
-                _buildPOList(2),
-                _buildPOList(3),
-              ],
+      body: MoneyScope(
+        child: Column(
+          children: [
+            _buildSearchBar(),
+            _buildActiveFilterBar(),
+            _buildSummaryCard(),
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  for (var i = 0; i < _tabStatuses.length; i++) _buildPOList(i),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _navigateToAddPO(),
-        backgroundColor: const Color(0xFF4CAF50),
-        child: const Icon(Icons.add, color: Colors.white),
+        backgroundColor: AppColors.primary,
+        child: const Icon(Icons.add, color: AppColors.white),
       ),
     );
   }
 
   Widget _buildSearchBar() {
+    final side = AppResponsive.padding(context).left;
+
     return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-      child: TextField(
-        controller: _searchController,
-        decoration: InputDecoration(
-          hintText: 'Search by PO number or supplier...',
-          hintStyle: const TextStyle(fontSize: 14, color: Color(0xFFB0B0B0)),
-          prefixIcon: const Icon(Icons.search, color: Color(0xFF6B6B6B)),
+      color: AppColors.white,
+      padding: EdgeInsets.fromLTRB(
+        side,
+        AppResponsive.mediumSpacing(context),
+        side,
+        12,
+      ),
+      child: AppResponsive.constrainedContent(
+        context: context,
+        alignment: Alignment.topCenter,
+        maxWidth: AppResponsive.maxContentWidth(context),
+        child: AppTextField(
+          controller: _searchController,
+          hint: 'Search by PO number or supplier...',
+          icon: Icons.search_rounded,
+          onChanged: (value) {
+            _onSearchChanged(value);
+            setState(() {});
+          },
           suffixIcon: _searchController.text.isNotEmpty
               ? IconButton(
-                  icon: const Icon(Icons.clear, color: Color(0xFF6B6B6B)),
+                  icon: Icon(
+                    Icons.clear,
+                    size: AppResponsive.smallIconSize(context),
+                  ),
                   onPressed: () {
                     _searchController.clear();
                     _onSearchChanged('');
@@ -450,26 +406,7 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
                   },
                 )
               : null,
-          filled: true,
-          fillColor: const Color(0xFFF5F5F5),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: Color(0xFFE8E8E8), width: 0.5),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: Color(0xFFE8E8E8), width: 0.5),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: Color(0xFF4CAF50), width: 1.5),
-          ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         ),
-        onChanged: (value) {
-          _onSearchChanged(value);
-          setState(() {});
-        },
       ),
     );
   }
@@ -477,68 +414,90 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
   Widget _buildSummaryCard() {
     return Observer(
       builder: (context) {
+        final side = AppResponsive.padding(context).left;
+        final gap = AppResponsive.mediumSpacing(context);
+
         return Container(
-          color: Colors.white,
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-          child: Row(
-            children: [
-              Expanded(
-                child: _buildStatItem(
-                  'Draft',
-                  purchaseOrderStore.draftPOCount.toString(),
-                  Icons.edit_note,
-                  const Color(0xFF9E9E9E),
+          color: AppColors.white,
+          padding: EdgeInsets.fromLTRB(
+            side,
+            AppResponsive.smallSpacing(context),
+            side,
+            gap,
+          ),
+          child: AppResponsive.constrainedContent(
+            context: context,
+            alignment: Alignment.topCenter,
+            maxWidth: AppResponsive.maxContentWidth(context),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _buildStatItem(
+                    'Draft',
+                    purchaseOrderStore.draftPOCount.toString(),
+                    Icons.edit_note,
+                    AppColors.textSecondary,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildStatItem(
-                  'Pending',
-                  purchaseOrderStore.pendingReceivingCount.toString(),
-                  Icons.local_shipping,
-                  const Color(0xFF2196F3),
+                SizedBox(width: gap),
+                Expanded(
+                  child: _buildStatItem(
+                    'Pending',
+                    purchaseOrderStore.pendingReceivingCount.toString(),
+                    Icons.local_shipping,
+                    AppColors.info,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildStatItem(
-                  'Total',
-                  purchaseOrderStore.poCount.toString(),
-                  Icons.list_alt,
-                  const Color(0xFF4CAF50),
+                SizedBox(width: gap),
+                Expanded(
+                  child: _buildStatItem(
+                    'Total',
+                    purchaseOrderStore.poCount.toString(),
+                    Icons.list_alt,
+                    AppColors.primary,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },
     );
   }
 
-  Widget _buildStatItem(String label, String value, IconData icon, Color color) {
+  Widget _buildStatItem(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.smallBorderRadius(context),
+        ),
       ),
       child: Column(
         children: [
-          Icon(icon, size: 20, color: color),
+          Icon(icon, size: AppResponsive.iconSize(context), color: color),
           const SizedBox(height: 6),
           Text(
             value,
-            style: TextStyle(
-              fontSize: 18,
+            maxLines: 1,
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.subheadingFontSize(context),
               fontWeight: FontWeight.w600,
               color: color,
             ),
           ),
           Text(
             label,
-            style: const TextStyle(
-              fontSize: 11,
-              color: Color(0xFF6B6B6B),
+            maxLines: 1,
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.captionFontSize(context),
+              color: AppColors.textSecondary,
             ),
           ),
         ],
@@ -553,84 +512,129 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
             ? purchaseOrderStore.purchaseOrders.toList()
             : purchaseOrderStore.searchResults.toList();
 
-        final filteredPOs = _filterPOsByTab(allPOs, tabIndex);
+        final filteredPOs = _applyFilters(allPOs, tabIndex);
 
         if (filteredPOs.isEmpty) {
           return _buildEmptyState(tabIndex);
         }
 
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: filteredPOs.length,
-          itemBuilder: (context, index) {
-            return _buildPOCard(filteredPOs[index]);
-          },
+        return AppResponsive.constrainedContent(
+          context: context,
+          alignment: Alignment.topCenter,
+          maxWidth: AppResponsive.maxContentWidth(context),
+          child: ListView.builder(
+            padding: AppResponsive.padding(context),
+            itemCount: filteredPOs.length,
+            itemBuilder: (context, index) {
+              return _buildPOCard(filteredPOs[index]);
+            },
+          ),
         );
       },
     );
   }
 
-  Widget _buildEmptyState(int tabIndex) {
-    String message;
-    switch (tabIndex) {
-      case 1:
-        message = 'No draft purchase orders';
-        break;
-      case 2:
-        message = 'No pending orders to receive';
-        break;
-      case 3:
-        message = 'No completed orders';
-        break;
-      default:
-        message = 'No purchase orders yet';
-    }
+  /// Shows which non-status filters are narrowing the list, with a one-tap
+  /// clear — otherwise an empty tab looks like missing data rather than an
+  /// active filter.
+  Widget _buildActiveFilterBar() {
+    if (!_hasExtraFilters) return const SizedBox.shrink();
 
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.assignment_outlined,
-            size: 80,
-            color: Colors.grey[300],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            message,
-            style: const TextStyle(
-              fontSize: 16,
-              color: Color(0xFF6B6B6B),
+    final parts = <String>[
+      if (_supplierFilter != null) _supplierFilter!.name,
+      if (_dateFilter != null)
+        '${poFormatDate(_dateFilter!.start.toIso8601String())} – ${poFormatDate(_dateFilter!.end.toIso8601String())}',
+    ];
+
+    return Container(
+      width: double.infinity,
+      color: AppColors.info.withValues(alpha: 0.08),
+      padding: EdgeInsets.symmetric(
+        horizontal: AppResponsive.padding(context).left,
+        vertical: AppResponsive.smallSpacing(context),
+      ),
+      child: AppResponsive.constrainedContent(
+        context: context,
+        alignment: Alignment.topCenter,
+        maxWidth: AppResponsive.maxContentWidth(context),
+        child: Row(
+          children: [
+            Icon(
+              Icons.filter_alt,
+              size: AppResponsive.smallIconSize(context),
+              color: AppColors.info,
             ),
-          ),
-          if (tabIndex == 0) ...[
-            const SizedBox(height: 8),
-            const Text(
-              'Create your first PO using the + button',
-              style: TextStyle(
-                fontSize: 14,
-                color: Color(0xFFB0B0B0),
+            SizedBox(width: AppResponsive.smallSpacing(context)),
+            Expanded(
+              child: Text(
+                parts.join('  •  '),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.smallFontSize(context),
+                  color: AppColors.info,
+                ),
+              ),
+            ),
+            InkWell(
+              onTap: _clearExtraFilters,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Text(
+                  'Clear',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.smallFontSize(context),
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.info,
+                  ),
+                ),
               ),
             ),
           ],
-        ],
+        ),
       ),
     );
   }
 
+  Widget _buildEmptyState(int tabIndex) {
+    final status = _tabStatuses[tabIndex];
+    String message;
+    if (_hasExtraFilters) {
+      message = 'No orders match these filters';
+    } else if (status == null) {
+      message = 'No purchase orders yet';
+    } else {
+      message = 'No ${_tabLabels[tabIndex].toLowerCase()} purchase orders';
+    }
+
+    return AppEmptyState(
+      icon: Icons.assignment_outlined,
+      title: message,
+      message: tabIndex == 0 ? 'Create your first PO using the + button' : null,
+    );
+  }
+
   Widget _buildPOCard(PurchaseOrderModel po) {
+    final radius = AppResponsive.smallBorderRadius(context);
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE8E8E8), width: 0.5),
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(radius),
+        border: Border.all(color: AppColors.divider, width: 0.5),
       ),
       child: InkWell(
-        onTap: () => _showPODetails(po),
-        borderRadius: BorderRadius.circular(8),
+        onTap: () => showPurchaseOrderDetailSheet(
+          context: context,
+          po: po,
+          onChanged: () {
+            if (mounted) setState(() {});
+          },
+        ),
+        borderRadius: BorderRadius.circular(radius),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: AppResponsive.cardPadding(context),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -639,82 +643,124 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
                   Expanded(
                     child: Text(
                       po.poNumber,
-                      style: const TextStyle(
-                        fontSize: 15,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.bodyFontSize(context),
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF1A1A1A),
+                        color: AppColors.textPrimary,
                       ),
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
-                      color: _getStatusColor(po.statusEnum).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
+                      color: poStatusColor(
+                        po.statusEnum,
+                      ).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(
+                        AppResponsive.borderRadius(context),
+                      ),
                     ),
                     child: Text(
-                      _getStatusLabel(po.statusEnum),
-                      style: TextStyle(
-                        fontSize: 11,
+                      poStatusLabel(po.statusEnum),
+                      maxLines: 1,
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.captionFontSize(context),
                         fontWeight: FontWeight.w600,
-                        color: _getStatusColor(po.statusEnum),
+                        color: poStatusColor(po.statusEnum),
                       ),
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                po.supplierName ?? 'Unknown Supplier',
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF6B6B6B),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  const Icon(Icons.calendar_today, size: 14, color: Color(0xFF6B6B6B)),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Delivery: ${_formatDate(po.expectedDeliveryDate)}',
-                    style: const TextStyle(fontSize: 12, color: Color(0xFF6B6B6B)),
-                  ),
-                  const SizedBox(width: 16),
-                  const Icon(Icons.inventory_2, size: 14, color: Color(0xFF2196F3)),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${po.totalItems} items',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF2196F3),
-                      fontWeight: FontWeight.w500,
+                  // Cancel/Delete are draft-only, so the buttons only exist
+                  // then — same guard the menu had. Also Manager-only: the
+                  // whole screen is behind 'purchase', so this is defence in
+                  // depth for anything that reaches the list another way.
+                  if (po.statusEnum == POStatus.draft &&
+                      RestaurantSession.canAccess('purchase')) ...[
+                    const SizedBox(width: 6),
+                    RowActionButton(
+                      icon: Icons.block,
+                      color: AppColors.warning,
+                      tooltip: 'Cancel PO',
+                      onTap: () => _cancelPO(po),
                     ),
-                  ),
-                  if (po.estimatedTotal > 0) ...[
-                    const Spacer(),
-                    Text(
-                      '₹${po.estimatedTotal.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF4CAF50),
-                        fontWeight: FontWeight.w600,
-                      ),
+                    const SizedBox(width: 6),
+                    RowActionButton(
+                      icon: Icons.delete_outline_rounded,
+                      color: AppColors.danger,
+                      tooltip: 'Delete PO',
+                      onTap: () => _deletePO(po),
                     ),
                   ],
                 ],
               ),
+              SizedBox(height: AppResponsive.smallSpacing(context)),
+              Text(
+                po.supplierName ?? 'Unknown Supplier',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.bodyFontSize(context),
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              _buildCardProgress(po),
+              SizedBox(height: AppResponsive.mediumSpacing(context)),
+              // Wrap, not Row: date + item count + amount need ~265px of fixed
+              // content, which overflows a 320px phone once the card and list
+              // padding are taken out. A Spacer can't shrink below zero.
+              Wrap(
+                spacing: AppResponsive.mediumSpacing(context),
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  _poMetaItem(
+                    Icons.calendar_today,
+                    'Delivery: ${poFormatDate(po.expectedDeliveryDate)}',
+                    AppColors.textSecondary,
+                  ),
+                  _poMetaItem(
+                    Icons.inventory_2,
+                    '${po.totalItems} items',
+                    AppColors.info,
+                    bold: true,
+                  ),
+                  if (po.estimatedTotal > 0)
+                    Text(
+                      formatMoney(po.estimatedTotal),
+                      maxLines: 1,
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.smallFontSize(context),
+                        color: AppColors.success,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                ],
+              ),
               if (po.canReceive) ...[
-                const SizedBox(height: 12),
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
                 SizedBox(
                   width: double.infinity,
+                  height: AppResponsive.buttonHeight(context),
                   child: OutlinedButton.icon(
                     onPressed: () => _navigateToReceiving(po),
-                    icon: const Icon(Icons.local_shipping, size: 18),
-                    label: const Text('Receive Items'),
+                    icon: Icon(
+                      Icons.local_shipping,
+                      size: AppResponsive.smallIconSize(context),
+                    ),
+                    label: Text(
+                      'Receive Items',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.bodyFontSize(context),
+                      ),
+                    ),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF4CAF50),
-                      side: const BorderSide(color: Color(0xFF4CAF50)),
+                      foregroundColor: AppColors.primary,
+                      side: const BorderSide(color: AppColors.primary),
                     ),
                   ),
                 ),
@@ -726,130 +772,60 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
     );
   }
 
-  Widget _buildGRNSummaryCard(GRNModel grn) {
-    return FutureBuilder<List<GRNItemModel>>(
-      future: purchaseOrderStore.getGRNItemsForGRN(grn.grnId),
-      builder: (context, snapshot) {
-        final grnItems = snapshot.data ?? [];
-        final totalAccepted = grnItems.fold<int>(0, (sum, item) => sum + item.acceptedQty);
-        final totalDamaged = grnItems.fold<int>(0, (sum, item) => sum + (item.damagedQty ?? 0));
-        final damagedAmount = grnItems.fold<double>(0.0, (sum, item) => sum + (item.damagedAmount ?? 0));
-
-        // Group damaged items by handling method
-        final returnToSupplier = grnItems.where((i) => i.damagedHandlingEnum == DamagedHandling.returnToSupplier).toList();
-        final keepForClaim = grnItems.where((i) => i.damagedHandlingEnum == DamagedHandling.keepForClaim).toList();
-        final writeOff = grnItems.where((i) => i.damagedHandlingEnum == DamagedHandling.writeOff).toList();
-
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFFE8E8E8)),
+  /// One icon+label pair of the PO card's meta line. Sized to its content so it
+  /// can sit in a Wrap and drop to the next row instead of overflowing.
+  Widget _poMetaItem(
+    IconData icon,
+    String label,
+    Color color, {
+    bool bold = false,
+  }) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: AppResponsive.smallIconSize(context), color: color),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          maxLines: 1,
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.smallFontSize(context),
+            color: color,
+            fontWeight: bold ? FontWeight.w500 : FontWeight.normal,
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        ),
+      ],
+    );
+  }
+
+  /// "12/50 received · 4,800 accepted" — reads the store's synchronous
+  /// progress helper so every card can render without its own FutureBuilder.
+  Widget _buildCardProgress(PurchaseOrderModel po) {
+    return Observer(
+      builder: (context) {
+        final progress = purchaseOrderStore.progressFor(po);
+        if (!progress.hasReceipts) return const SizedBox.shrink();
+
+        final complete = progress.remaining == 0;
+        return Padding(
+          padding: EdgeInsets.only(top: AppResponsive.smallSpacing(context)),
+          child: Wrap(
+            spacing: AppResponsive.mediumSpacing(context),
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              // GRN Header
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF5F5F5),
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(7)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.receipt_long, size: 16, color: Color(0xFF4CAF50)),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        grn.grnNumber,
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                    Text(
-                      _formatDate(grn.receivedDate),
-                      style: const TextStyle(fontSize: 12, color: Color(0xFF6B6B6B)),
-                    ),
-                  ],
-                ),
+              _poMetaItem(
+                complete ? Icons.check_circle : Icons.local_shipping_outlined,
+                '${progress.received}/${progress.ordered} received',
+                complete ? AppColors.success : AppColors.warning,
+                bold: true,
               ),
-              // GRN Summary
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        _buildGRNStat('Received', grn.totalReceivedQty.toString(), const Color(0xFF4CAF50)),
-                        const SizedBox(width: 16),
-                        _buildGRNStat('To Stock', totalAccepted.toString(), const Color(0xFF2196F3)),
-                        if (totalDamaged > 0) ...[
-                          const SizedBox(width: 16),
-                          _buildGRNStat('Damaged', totalDamaged.toString(), const Color(0xFFF44336)),
-                        ],
-                        const Spacer(),
-                        Text(
-                          '₹${grn.totalAmount?.toStringAsFixed(0) ?? '0'}',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF4CAF50),
-                          ),
-                        ),
-                      ],
-                    ),
-                    // Damaged items breakdown
-                    if (totalDamaged > 0) ...[
-                      const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFFF3E0),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                const Icon(Icons.warning_amber, size: 14, color: Color(0xFFFF9800)),
-                                const SizedBox(width: 6),
-                                Text(
-                                  '$totalDamaged damaged (₹${damagedAmount.toStringAsFixed(0)})',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFFE65100),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            if (returnToSupplier.isNotEmpty)
-                              _buildDamagedRow(
-                                'Return to Supplier',
-                                returnToSupplier.fold<int>(0, (s, i) => s + (i.damagedQty ?? 0)),
-                                const Color(0xFFFF9800),
-                              ),
-                            if (keepForClaim.isNotEmpty)
-                              _buildDamagedRow(
-                                'Keep for Claim',
-                                keepForClaim.fold<int>(0, (s, i) => s + (i.damagedQty ?? 0)),
-                                const Color(0xFF2196F3),
-                              ),
-                            if (writeOff.isNotEmpty)
-                              _buildDamagedRow(
-                                'Write Off',
-                                writeOff.fold<int>(0, (s, i) => s + (i.damagedQty ?? 0)),
-                                const Color(0xFF6B6B6B),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ],
+              Text(
+                '${formatMoney(progress.billedAmount)} billed',
+                maxLines: 1,
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.smallFontSize(context),
+                  color: AppColors.textSecondary,
                 ),
               ),
             ],
@@ -859,25 +835,61 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen>
     );
   }
 
-  Widget _buildGRNStat(String label, String value, Color color) {
-    return Row(
-      children: [
-        Text('$label: ', style: const TextStyle(fontSize: 12, color: Color(0xFF6B6B6B))),
-        Text(value, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color)),
-      ],
+  // ==================== CANCEL / DELETE ====================
+
+  Future<void> _cancelPO(PurchaseOrderModel po) async {
+    final confirmed = await showAppConfirmDialog(
+      context: context,
+      title: 'Cancel ${po.poNumber}?',
+      message:
+          'The order stays on record as Cancelled. Only draft orders can be cancelled.',
+      confirmLabel: 'Cancel PO',
+      cancelLabel: 'Keep',
+      accent: AppColors.warning,
+      icon: Icons.block,
     );
+    if (!confirmed || !mounted) return;
+
+    final ok = await purchaseOrderStore.cancelPurchaseOrder(po.poId);
+    if (!mounted) return;
+
+    if (ok) {
+      NotificationService.instance.showSuccess('${po.poNumber} cancelled');
+    } else {
+      NotificationService.instance.showError(
+        'Only draft purchase orders can be cancelled',
+      );
+    }
   }
 
-  Widget _buildDamagedRow(String label, int qty, Color color) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 2),
-      child: Row(
-        children: [
-          Icon(Icons.circle, size: 6, color: color),
-          const SizedBox(width: 6),
-          Text('$qty x $label', style: TextStyle(fontSize: 11, color: color)),
-        ],
-      ),
+  Future<void> _deletePO(PurchaseOrderModel po) async {
+    // Draft-only AND nothing received — a GRN stores poId and would be
+    // orphaned along with the stock it already moved.
+    final canDelete = await purchaseOrderStore.canDeletePurchaseOrder(po.poId);
+    if (!mounted) return;
+
+    if (!canDelete) {
+      await showAppErrorDialog(
+        context: context,
+        title: 'Can\'t delete ${po.poNumber}',
+        message:
+            'Only draft orders with no goods received can be deleted. Cancel it instead to keep the record.',
+      );
+      return;
+    }
+
+    final confirmed = await showAppConfirmDialog(
+      context: context,
+      title: 'Delete ${po.poNumber}?',
+      message: 'The order and its items are removed permanently.',
+      confirmLabel: 'Delete',
+      accent: AppColors.danger,
+      icon: Icons.delete_outline,
     );
+    if (!confirmed || !mounted) return;
+
+    await purchaseOrderStore.deletePurchaseOrder(po.poId);
+    if (!mounted) return;
+    NotificationService.instance.showSuccess('${po.poNumber} deleted');
   }
 }

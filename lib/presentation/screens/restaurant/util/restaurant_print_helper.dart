@@ -1,23 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/core/config/tax_feature.dart';
 import 'package:billberrylite/data/models/restaurant/db/cartmodel_308.dart';
 import 'package:billberrylite/data/models/restaurant/db/ordermodel_309.dart';
 import 'package:billberrylite/data/models/restaurant/db/pastordermodel_313.dart';
-import 'package:billberrylite/data/models/retail/hive_model/customer_model_208.dart';
+import 'package:billberrylite/data/models/common/customer_model_125.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_item_model_204.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
 import 'package:billberrylite/domain/services/retail/print_service.dart';
 import 'package:billberrylite/domain/services/retail/receipt_pdf_service.dart';
 import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
+import 'package:billberrylite/core/config/tax_id_rule.dart';
 import 'package:billberrylite/domain/services/restaurant/cart_calculation_service.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/core/config/app_config.dart';
-import 'package:billberrylite/presentation/screens/restaurant/start%20order/cart/customerdetails.dart'; // Import for DiscountType
+import 'package:billberrylite/core/plan/entitlement_keys.dart';
+import 'package:billberrylite/core/plan/plan_enforcement.dart';
 import 'package:billberrylite/util/restaurant/staticswitch.dart'; // Import for AppSettings
 import 'package:billberrylite/util/restaurant/print_settings.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/domain/services/restaurant/esc_pos_receipt_builder.dart';
+import 'package:billberrylite/domain/services/restaurant/esc_pos_image.dart';
 
 class RestaurantPrintHelper {
 
@@ -30,6 +34,10 @@ class RestaurantPrintHelper {
     bool autoPrint = false,
     String? cancelReference,
   }) async {
+    // Plan gate — KOT generation (on/off). When off, no ticket prints anywhere
+    // (UI + server/captain handlers). Order still keeps its KOT numbers for
+    // structure; only the printed ticket is suppressed.
+    if (!PlanEnforce.allows(EntKeys.billingKot)) return;
     try {
       final storeSettings = StoreSettingsService();
 
@@ -113,7 +121,7 @@ class RestaurantPrintHelper {
           size: item.variantName,
           weight: additionalInfo,
           price: 0, // Price set to 0 for KOT - kitchen doesn't need pricing
-          qty: item.quantity,
+          qty: item.quantity.toDouble(),
           discountAmount: 0,
           gstRate: 0, // No tax info needed for KOT
         );
@@ -124,7 +132,7 @@ class RestaurantPrintHelper {
       final saleModel = SaleModel.createWithGst(
         saleId: kotId,
         customerId: null,
-        totalItems: kotItems.length,
+        totalItems: kotItems.length.toDouble(),
         subtotal: 0, // Not needed for KOT
         discountAmount: 0,
         totalTaxableAmount: 0,
@@ -167,10 +175,15 @@ class RestaurantPrintHelper {
       //    falls back to a thermal PDF (never A4) when no KOT printer exists.
       final kotPrinter = printerStore.defaultKotPrinter;
       if (kotPrinter != null && autoPrint) {
-        final bytes = EscPosReceiptBuilder.buildKotTicket(
-          receiptData: receiptData,
-          paperWidth: kotPrinter.paperSize,
-        );
+        // Rasterize the SAME KOT PDF so the direct print matches the PDF exactly;
+        // fall back to the plain text KOT builder only if rasterization fails.
+        final raster = await locator<PrintService>()
+            .rasterizeThermalReceipt(receiptData, paperWidth: kotPrinter.paperSize);
+        final bytes = raster ??
+            EscPosReceiptBuilder.buildKotTicket(
+              receiptData: receiptData,
+              paperWidth: kotPrinter.paperSize,
+            );
         final success = await printerStore.sendBytes(bytes, kotPrinter);
         if (context.mounted) {
           if (success) {
@@ -191,6 +204,7 @@ class RestaurantPrintHelper {
       // 8. EXISTING PDF PATH — fallback when no thermal printer is saved,
       //    or when thermal print fails, or when autoPrint is false (preview).
       final printService = locator<PrintService>();
+      final int paperWidth = kotPrinter?.paperSize ?? 80;
 
       if (autoPrint) {
         // Auto-print via system print dialog (PDF)
@@ -211,6 +225,7 @@ class RestaurantPrintHelper {
           orderNo: orderNo,
           isAddonKot: isAddonKot,
           kotRemark: order.remark,
+          paperWidth: paperWidth,
         );
         if (context.mounted) {
           NotificationService.instance.showSuccess(
@@ -236,6 +251,7 @@ class RestaurantPrintHelper {
           orderNo: orderNo,
           isAddonKot: isAddonKot,
           kotRemark: order.remark,
+          paperWidth: paperWidth,
         );
       }
 
@@ -253,6 +269,8 @@ class RestaurantPrintHelper {
     required CartCalculationService calculations,
     int? billNumber, // Bill number for completed orders (from pastOrderModel)
     int loyaltyPointsDiscount = 0, // Points redeemed (reduces grand total)
+    bool? taxEnabled, // Stamp from a saved bill; null = live flag (open orders)
+    String? storeGstNumber, // Stamp from a saved bill; null = live GSTIN
   }) async {
     try {
       final storeSettings = StoreSettingsService();
@@ -262,7 +280,10 @@ class RestaurantPrintHelper {
       final storeAddress = await storeSettings.getFormattedAddress();
       final storePhone = await storeSettings.getStorePhone();
       final storeEmail = await storeSettings.getStoreEmail();
-      final storeGst = await storeSettings.getGSTNumber();
+      final storeGst = TaxIdRule.numberForRecord(
+        storeGstNumber,
+        await storeSettings.getGSTNumber(),
+      );
 
       // 2. Group identical items together (same product, variant, extras, choices)
       Map<String, CartItem> groupedItems = {};
@@ -303,7 +324,11 @@ class RestaurantPrintHelper {
         // In tax-inclusive mode: item.price already includes tax (show as-is)
         // In tax-exclusive mode: item.price includes tax, extract base for display
         double displayPrice = item.price;
-        if (!AppSettings.isTaxInclusive && item.taxRate != null && item.taxRate! > 0) {
+        // The order's own stored mode, so a reprint after the setting changes
+        // still shows the prices the bill was made with.
+        final bool orderInclusive =
+            order.isTaxInclusive ?? AppSettings.isTaxInclusive;
+        if (!orderInclusive && item.taxRate != null && item.taxRate! > 0) {
           // Tax Exclusive: Extract base price from gross price for display
           displayPrice = item.price / (1 + item.taxRate!);
         }
@@ -382,9 +407,10 @@ class RestaurantPrintHelper {
           size: variantDisplayName, // Use formatted variant name with price
           weight: additionalInfo, // Use weight field to store extras and choices info
           price: displayPrice, // ✅ Use adjusted price based on tax mode
-          qty: item.quantity,
+          qty: item.quantity.toDouble(),
           discountAmount: 0, // Item level discount not typically stored in restaurant cart
           gstRate: itemTaxRate,
+          isTaxInclusive: order.isTaxInclusive,
           // Note: total field in create() is calculated
         );
       }).toList();
@@ -427,12 +453,13 @@ class RestaurantPrintHelper {
       var saleModel = SaleModel.createWithGst(
         saleId: invoiceId,
         customerId: order.customerName.isNotEmpty ? 'GUEST' : null,
-        totalItems: order.items.length,
+        totalItems: order.items.length.toDouble(),
         subtotal: calculations.subtotal,  // Base price (without tax)
         discountAmount: calculations.discountAmount, // regular discount only (points shown separately)
         totalTaxableAmount: calculations.subtotal - calculations.discountAmount,
         totalGstAmount: calculations.totalGST,
-        grandTotal: calculations.grandTotal - loyaltyPointsDiscount, // net payable after points
+        grandTotal: calculations.grandTotal, // net (points folded into the calc's GST base)
+        taxEnabled: TaxFeature.forRecord(taxEnabled),
         paymentType: paymentType,
         isReturn: false,
       );
@@ -452,26 +479,38 @@ class RestaurantPrintHelper {
         );
       }
 
-      // 4. Create Customer Model (Adapter)
+      // 4. Resolve the customer for the receipt.
       // Quick Settle orders are anonymous walk-ins — "Quick Settle" is just a
       // label, not a real customer, so skip the customer block (and its loyalty
       // points lines) on the bill.
       final bool isAnonymous = order.customerName.trim().isEmpty ||
           order.customerName.trim().toLowerCase() == 'quick settle';
-      CustomerModel? customerModel;
+      Customer? customerModel;
       if (!isAnonymous) {
-        customerModel = CustomerModel(
-          customerId: 'GUEST',
-          name: order.customerName,
-          phone: order.customerNumber,
-          email: order.customerEmail,
-          address: '',
-          totalPurchaseAmount: 0, // Fixed: totalSales -> totalPurchaseAmount
-          pointsBalance: 0,
-          // creditBalance: 0, // Removed: Not in constructor or named parameter default is 0.0
-          createdAt: DateTime.now().toIso8601String(),
-          updatedAt: DateTime.now().toIso8601String(),
-        );
+        // Prefer the real saved customer record (accurate loyalty balance via
+        // its actual `loyaltyPoints`); match by linked customerId first, else
+        // by phone number. Fall back to a display-only placeholder for ad-hoc
+        // orders that were never saved as a customer.
+        Customer? matched;
+        for (final c in customerStore.customers) {
+          final byId = (order.customerId?.isNotEmpty ?? false) &&
+              c.customerId == order.customerId;
+          final byPhone =
+              order.customerNumber.isNotEmpty && c.phone == order.customerNumber;
+          if (byId || byPhone) {
+            matched = c;
+            break;
+          }
+        }
+        customerModel = matched ??
+            Customer(
+              customerId: 'GUEST',
+              name: order.customerName,
+              phone: order.customerNumber,
+              email: order.customerEmail,
+              createdAt: DateTime.now().toIso8601String(),
+              updatedAt: DateTime.now().toIso8601String(),
+            );
       }
 
       // 5. Create ReceiptData (Internal use for validation/debugging if needed,
@@ -485,6 +524,7 @@ class RestaurantPrintHelper {
         storePhone: storePhone,
         storeEmail: storeEmail,
         gstNumber: storeGst,
+        taxEnabled: TaxFeature.forRecord(taxEnabled),
         // Restaurant-specific fields
         orderType: order.orderType,
         tableNo: order.tableNo,
@@ -499,6 +539,8 @@ class RestaurantPrintHelper {
 
       // 6. Route the bill by the user's Bill Format choice (always forced).
       final printService = locator<PrintService>();
+      final billingPrinter = printerStore.defaultReceiptPrinter;
+      final int paperWidth = billingPrinter?.paperSize ?? 80;
 
       Future<void> printPdf(ReceiptFormat fmt) => printService.showPrintPreview(
             context: context,
@@ -521,6 +563,7 @@ class RestaurantPrintHelper {
             isDeliveryOrder: order.orderType.toLowerCase().contains('delivery'),
             isTaxInclusive: order.isTaxInclusive,
             roundOff: calculations.roundOffAmount,
+            paperWidth: paperWidth,
           );
 
       // A4 → always print an A4 invoice, ignoring any thermal billing printer.
@@ -529,21 +572,80 @@ class RestaurantPrintHelper {
         return;
       }
 
+      // Windows PDF/document printer → send the RENDERED receipt through the
+      // Windows printing API. ESC/POS never goes here: a PDF writer discards
+      // control codes while every layer reports success, so a RAW send would
+      // silently lose the bill. Same receipt, same paper width — only the last
+      // hop differs. Falls through to the preview if the queue rejects it.
+      if (billingPrinter != null && billingPrinter.isWindowsPdf) {
+        final sent = await printService.printThermalPdfToWindowsQueue(
+          data: receiptData,
+          queueName: billingPrinter.address,
+          paperWidth: billingPrinter.paperSize,
+          jobName: 'Receipt_${saleModel.displayNumber}',
+        );
+        if (sent) {
+          NotificationService.instance
+              .showSuccess('Bill sent to ${billingPrinter.name}');
+          return;
+        }
+        NotificationService.instance
+            .showWarning('Could not print to ${billingPrinter.name}');
+        await printPdf(ReceiptFormat.thermal);
+        return;
+      }
+
       // Thermal → print directly to the billing printer when one is configured.
-      final billingPrinter = printerStore.defaultReceiptPrinter;
       if (billingPrinter != null) {
-        final bytes = EscPosReceiptBuilder.buildReceiptTicket(
-          receiptData: receiptData,
+        // Primary path: render the SAME thermal PDF (logo + QR + Poppins font)
+        // to a raster image so the DIRECT print looks identical to the PDF.
+        List<int>? bytes = await printService.buildThermalRasterTicket(
+          sale: saleModel,
+          items: saleItems,
+          customer: customerModel,
+          storeName: storeName,
+          storeAddress: storeAddress,
+          storePhone: storePhone,
+          storeEmail: storeEmail,
+          gstNumber: storeGst,
+          orderType: order.orderType,
+          tableNo: order.tableNo,
+          kotNumbers: order.kotNumbers,
+          billNumber: billNumber,
+          itemTotal: calculations.itemTotal,
+          paymentBreakdown: paymentBreakdown,
+          loyaltyPointsDiscount: loyaltyPointsDiscount,
+          serviceCharge: calculations.serviceChargeAmount,
+          isDeliveryOrder: order.orderType.toLowerCase().contains('delivery'),
+          isTaxInclusive: order.isTaxInclusive,
+          roundOff: calculations.roundOffAmount,
           paperWidth: billingPrinter.paperSize,
         );
+
+        // Fallback: plain text ESC/POS (printer font) + logo raster header, used
+        // only if the PDF rasterization above fails for any reason.
+        if (bytes == null) {
+          List<int>? logoRaster;
+          if (PrintSettings.showRestaurantLogo) {
+            final logoBytes = await StoreSettingsService().getStoreLogo();
+            if (logoBytes != null) {
+              logoRaster = await EscPosImage.toRaster(logoBytes,
+                  targetWidth: billingPrinter.paperSize <= 58 ? 240 : 360);
+            }
+          }
+          bytes = EscPosReceiptBuilder.buildReceiptTicket(
+            receiptData: receiptData,
+            paperWidth: billingPrinter.paperSize,
+            logoRaster: logoRaster,
+          );
+        }
         final ok = await printerStore.sendBytes(bytes, billingPrinter);
         if (ok) {
           NotificationService.instance
               .showSuccess('Bill printed to ${billingPrinter.name}');
           return;
         }
-        NotificationService.instance.showError(
-            'Thermal print failed: ${printerStore.errorMessage ?? "Unknown error"}. Showing PDF...');
+        NotificationService.instance.showWarning('Printer not available');
         // fall through to thermal PDF
       }
 
@@ -657,6 +759,12 @@ class RestaurantPrintHelper {
         isDeliveryOrder: true,
         deliveryCharge: pastOrder.serviceCharge ?? 0,
         isTaxInclusive: pastOrder.isTaxInclusive,
+        taxEnabled: pastOrder.taxEnabled,
+        discountOnItems: pastOrder.discountOnItems,
+        roundOffStep: pastOrder.roundOffStep,
+        // Fold redeemed points back into the taxable base so the reprint's GST
+        // matches the original bill (post-redemption).
+        loyaltyRedemption: (pastOrder.loyaltyPointsUsed ?? 0).toDouble(),
       );
 
       await printOrderReceipt(
@@ -665,6 +773,8 @@ class RestaurantPrintHelper {
         calculations: calculations,
         billNumber: pastOrder.billNumber,
         loyaltyPointsDiscount: pastOrder.loyaltyPointsUsed ?? 0,
+        taxEnabled: pastOrder.taxEnabled,
+        storeGstNumber: pastOrder.storeGstNumber,
       );
     } catch (e) {
       debugPrint('Error reprinting past order: $e');

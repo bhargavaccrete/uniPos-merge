@@ -46,7 +46,9 @@ class PlanGate {
   /// G4 — export (Excel / PDF / CSV) allowed when the 'export' feature is on.
   static bool get canExport => allows('export');
 
-  /// G5 — show the "Powered by Bill Berry Lite" watermark unless 'removeWatermark' is on.
+  /// G5 — legacy tier helper. The printed "Powered by" footer is now controlled
+  /// directly by the admin via the `billing.invoice.print` manifest entitlement,
+  /// not this getter.
   static bool get showWatermark => !allows('removeWatermark');
 
   /// Plan label for UI: 'Trial' | 'Premium' | 'Free'.

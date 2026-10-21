@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/util/retail/cash_drawer_ledger.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
 import 'package:billberrylite/domain/services/restaurant/day_management_service.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
-import 'package:billberrylite/util/common/decimal_settings.dart';
+import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/common/dialog_dispose_scope.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 
 /// Retail Cash Drawer.
@@ -18,7 +22,7 @@ import 'package:billberrylite/presentation/widget/componets/common/primary_app_b
 /// cash-movement engine (CashMovementStore) and Cash In/Out dialog, but sources
 /// sales from the retail [saleStore] and drops restaurant-only concepts
 /// (shifts, cash handover). The estimated drawer balance is:
-///   Opening + Cash Sales + Cash In − Cash Out − Cash Expenses
+///   Opening + Cash Sales + Cash In − Cash Out − Cash Expenses − Cash Refunds
 /// — the exact formula retail EOD uses, so the two always agree.
 
 class _LogEntry {
@@ -36,7 +40,7 @@ class _LogEntry {
   });
 }
 
-enum _LogType { opening, sale, expense, movement }
+enum _LogType { opening, sale, refund, expense, movement }
 
 class CashDrawerScreen extends StatefulWidget {
   const CashDrawerScreen({super.key});
@@ -51,6 +55,13 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
   double _openingBalance = 0.0;
   double _cashSales = 0.0;
   double _cashExpenses = 0.0;
+  double _cashRefunds = 0.0;
+
+  /// Net collected per payment method (sales minus returns), for the Sales
+  /// Summary card. Informational only — the drawer balance stays cash-only,
+  /// because card/UPI never enter the till.
+  final Map<String, double> _netByMethod = {};
+
   DateTime? _dayStart;
   List<_LogEntry> _log = [];
 
@@ -91,10 +102,43 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
 
       // Retail cash sales for the day
       final sales = await saleStore.getSalesByDateRange(dayStart, now);
+      _netByMethod.clear();
       final saleEntries = <_LogEntry>[];
+      final refundEntries = <_LogEntry>[];
       double cashSales = 0.0;
+      double cashRefunds = 0.0;
       for (final s in sales) {
-        if (s.isReturn == true) continue;
+        // A cash refund physically empties the till, so it belongs here.
+        // Derived from the return sale rather than from the audit movement
+        // ReturnService writes — that movement carries a distinct 'refund'
+        // type and is skipped below, which is what prevents double counting.
+        // Deriving also corrects refunds taken before the audit trail existed.
+        if (s.isReturn == true) {
+          // Returns carry a negative totalAmount, so adding them nets the
+          // method down automatically — including card/UPI refunds, which
+          // belong in the summary even though they never touch the drawer.
+          _addToMethod(s.paymentType, s.totalAmount);
+          // The SHARED rule, not a local one. This used to read
+          // `s.paymentType == 'cash' ? s.totalAmount.abs() : 0`, which ignored
+          // the stored payment legs: an exchange return booked the whole value
+          // of the goods handed back as cash out, when only the difference
+          // left the till, and a split refund headed 'card' with a cash leg
+          // was skipped entirely. The Cash Drawer History report already used
+          // `cashRefundOf`, so the two screens disagreed on real money.
+          final refunded = CashDrawerLedger.cashRefundOf(s);
+          if (refunded <= 0) continue;
+          cashRefunds += refunded;
+          refundEntries.add(
+            _LogEntry(
+              time: DateTime.tryParse(s.date) ?? dayStart,
+              description: 'Cash Refund',
+              signedAmount: -refunded,
+              type: _LogType.refund,
+            ),
+          );
+          continue;
+        }
+        _accumulateMethods(s);
         final cash = _cashComponentOf(s);
         if (cash <= 0) continue;
         cashSales += cash;
@@ -110,6 +154,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
         );
       }
       _cashSales = cashSales;
+      _cashRefunds = cashRefunds;
 
       // Cash expenses for the day
       await expenseStore.loadExpenses();
@@ -134,7 +179,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
           )
           .toList();
 
-      _buildLog(dayStart, saleEntries, expenseEntries);
+      _buildLog(dayStart, saleEntries, refundEntries, expenseEntries);
     } catch (e) {
       // Never leave the screen stuck on the spinner — show whatever loaded.
       debugPrint('Cash Drawer load failed: $e');
@@ -146,23 +191,47 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
   /// Net cash component of a sale. For split payments, only the cash slice
   /// counts; for single payment, the whole total if it was cash. Mirrors the
   /// EOD service so the drawer and EOD never disagree.
-  double _cashComponentOf(SaleModel s) {
-    if (s.isSplitPayment == true &&
-        s.paymentListJson != null &&
-        s.paymentListJson!.isNotEmpty) {
-      return s.paymentList
-          .where((p) => (p['method'] as String? ?? '').toLowerCase() == 'cash')
-          .fold(0.0, (a, p) => a + ((p['amount'] as num?)?.toDouble() ?? 0.0));
-    }
-    if (s.paymentType.toLowerCase().trim() == 'cash') {
-      return s.totalAmount;
-    }
-    return 0.0;
+  /// Shared with the Cash Drawer History report — see [CashDrawerLedger].
+  double _cashComponentOf(SaleModel s) => CashDrawerLedger.cashComponentOf(s);
+
+  void _addToMethod(String? method, double amount) {
+    final key = (method ?? '').toLowerCase().trim();
+    if (key.isEmpty) return;
+    _netByMethod[key] = (_netByMethod[key] ?? 0) + amount;
   }
+
+  /// Splits a sale across its payment methods — the SHARED decomposition, the
+  /// same one [_cashComponentOf] reads, so the summary and the drawer balance
+  /// can never disagree about the cash slice.
+  ///
+  /// This used to consult the legs only when `isSplitPayment` was true and fall
+  /// back to `paymentType + totalAmount` otherwise. A partly-paid single-method
+  /// bill takes that fallback, so ₹50 tendered against a ₹200 bill was counted
+  /// as ₹200 collected.
+  void _accumulateMethods(SaleModel s) {
+    CashDrawerLedger.settledLegsOf(s).forEach(_addToMethod);
+  }
+
+  double _method(String key) => _netByMethod[key] ?? 0.0;
+
+  /// Anything that isn't one of the named methods, so a new payment type still
+  /// appears rather than silently vanishing from the summary.
+  double get _otherCollected {
+    const named = {'cash', 'card', 'upi', 'credit'};
+    return _netByMethod.entries
+        .where((e) => !named.contains(e.key))
+        .fold(0.0, (sum, e) => sum + e.value);
+  }
+
+  /// Money actually taken this session. Credit is excluded — it's billed, not
+  /// collected, so folding it in would overstate what came in.
+  double get _collectedRevenue =>
+      _method('cash') + _method('card') + _method('upi') + _otherCollected;
 
   void _buildLog(
     DateTime dayStart,
     List<_LogEntry> sales,
+    List<_LogEntry> refunds,
     List<_LogEntry> expenses,
   ) {
     final entries = <_LogEntry>[
@@ -173,12 +242,18 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
         type: _LogType.opening,
       ),
       ...sales,
+      ...refunds,
       ...expenses,
     ];
 
     // Manual movements (skip 'opening' — already shown by synthetic entry above)
     for (final m in cashMovementStore.movements) {
-      if (m.type == 'opening' || m.type == 'adjustment') continue;
+      // 'refund' rows are audit-only; the derived Cash Refund entries above
+      // already account for them.
+      // Same rule the history report applies.
+      if (!CashDrawerLedger.isLedgerMovement(m)) {
+        continue;
+      }
       entries.add(
         _LogEntry(
           time: m.timestamp,
@@ -199,13 +274,15 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
     _log = entries;
   }
 
-  /// Live balance: Opening + Cash Sales + Cash In − Cash Out − Cash Expenses
+  /// Live balance:
+  /// Opening + Cash Sales + Cash In − Cash Out − Cash Expenses − Cash Refunds
   double get _balance =>
       _openingBalance +
       _cashSales +
       cashMovementStore.totalCashIn -
       cashMovementStore.totalCashOut -
-      _cashExpenses;
+      _cashExpenses -
+      _cashRefunds;
 
   // ── Cash In / Cash Out dialog ────────────────────────────────────────────
 
@@ -229,229 +306,188 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
     final reasons = isCashIn ? cashInReasons : cashOutReasons;
     String selectedReason = reasons.first;
 
+    final accent = isCashIn ? AppColors.success : AppColors.danger;
+
     await showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDs) => AlertDialog(
-          insetPadding: const EdgeInsets.symmetric(
-            horizontal: 24,
-            vertical: 24,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          contentPadding: EdgeInsets.zero,
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: (isCashIn ? Colors.green : Colors.red).withValues(
-                    alpha: 0.08,
+      // Scope disposes both controllers when the route pops — they were
+      // previously created and never disposed.
+      builder: (ctx) => DialogDisposeScope(
+        disposables: [amountCtrl, noteCtrl],
+        child: StatefulBuilder(
+          builder: (ctx, setDs) => AppDialogShell(
+            title: isCashIn ? 'Cash In' : 'Cash Out',
+            subtitle: isCashIn
+                ? 'Money added to the drawer'
+                : 'Money taken out of the drawer',
+            accent: accent,
+            icon: isCashIn
+                ? Icons.add_circle_outline
+                : Icons.remove_circle_outline,
+            body: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                AppTextField(
+                  controller: amountCtrl,
+                  label: 'Amount',
+                  hint: '0.00',
+                  required: true,
+                  autofocus: true,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
                   ),
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(16),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      isCashIn
-                          ? Icons.add_circle_outline
-                          : Icons.remove_circle_outline,
-                      color: isCashIn ? Colors.green : Colors.red,
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      isCashIn ? 'Cash In' : 'Cash Out',
-                      style: GoogleFonts.poppins(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(
+                      RegExp(r'^\d+\.?\d{0,2}'),
                     ),
                   ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    AppTextField(
-                      controller: amountCtrl,
-                      label: 'Amount',
-                      hint: '0.00',
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(
-                          RegExp(r'^\d+\.?\d{0,2}'),
-                        ),
-                      ],
-                      prefixWidget: Padding(
-                        padding: const EdgeInsets.only(left: 14, right: 8),
-                        child: Text(
-                          CurrencyHelper.currentSymbol,
-                          style: GoogleFonts.poppins(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.primary,
-                          ),
-                        ),
+                  prefixWidget: Padding(
+                    padding: EdgeInsets.only(
+                      left: AppResponsive.mediumSpacing(context),
+                      right: AppResponsive.smallSpacing(context),
+                    ),
+                    child: Text(
+                      CurrencyHelper.currentSymbol,
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.bodyFontSize(context),
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary,
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    DropdownButtonFormField<String>(
-                      value: selectedReason,
-                      style: GoogleFonts.poppins(
-                        fontSize: 14,
-                        color: AppColors.textPrimary,
+                  ),
+                ),
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
+                // Styled to match AppTextField rather than a bare
+                // OutlineInputBorder, so the three fields read as one form.
+                DropdownButtonFormField<String>(
+                  initialValue: selectedReason,
+                  isExpanded: true,
+                  // M3 tints dropdown menu surfaces by default, which renders
+                  // the open list grey-lavender instead of white. Same override
+                  // the supplier popup menu uses.
+                  dropdownColor: AppColors.white,
+                  borderRadius: BorderRadius.circular(
+                    AppResponsive.borderRadius(context),
+                  ),
+                  icon: Icon(
+                    Icons.arrow_drop_down_rounded,
+                    color: AppColors.textSecondary,
+                  ),
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.bodyFontSize(context),
+                    color: AppColors.textPrimary,
+                  ),
+                  decoration: InputDecoration(
+                    labelText: 'Reason',
+                    labelStyle: GoogleFonts.poppins(
+                      fontSize: AppResponsive.smallFontSize(context),
+                      color: AppColors.textSecondary,
+                    ),
+                    filled: true,
+                    fillColor: AppColors.surfaceLight,
+                    prefixIcon: Icon(
+                      Icons.list_alt_rounded,
+                      color: AppColors.primary,
+                      size: AppResponsive.iconSize(context),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(
+                        AppResponsive.borderRadius(context),
                       ),
-                      decoration: InputDecoration(
-                        labelText: 'Reason',
-                        prefixIcon: const Icon(
-                          Icons.list_alt_rounded,
-                          color: AppColors.primary,
-                          size: 20,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                      borderSide: const BorderSide(color: AppColors.divider),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(
+                        AppResponsive.borderRadius(context),
                       ),
-                      items: reasons
-                          .map(
-                            (r) => DropdownMenuItem(
-                              value: r,
-                              child: Text(
-                                r,
-                                style: GoogleFonts.poppins(fontSize: 14),
-                              ),
+                      borderSide: const BorderSide(color: AppColors.divider),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(
+                        AppResponsive.borderRadius(context),
+                      ),
+                      borderSide: const BorderSide(
+                        color: AppColors.primary,
+                        width: 1.5,
+                      ),
+                    ),
+                  ),
+                  items: reasons
+                      .map(
+                        (r) => DropdownMenuItem(
+                          value: r,
+                          child: Text(
+                            r,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.bodyFontSize(context),
                             ),
-                          )
-                          .toList(),
-                      onChanged: (v) =>
-                          setDs(() => selectedReason = v ?? reasons.first),
-                    ),
-                    const SizedBox(height: 16),
-                    AppTextField(
-                      controller: noteCtrl,
-                      label: 'Note',
-                      hint: 'Add extra details... (optional)',
-                      icon: Icons.notes_rounded,
-                    ),
-                  ],
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (v) =>
+                      setDs(() => selectedReason = v ?? reasons.first),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.pop(ctx),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        child: Text(
-                          'Cancel',
-                          style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () async {
-                          final amount =
-                              double.tryParse(amountCtrl.text.trim()) ?? 0;
-                          if (amount <= 0) {
-                            ScaffoldMessenger.of(ctx).showSnackBar(
-                              const SnackBar(
-                                content: Text('Enter a valid amount'),
-                              ),
-                            );
-                            return;
-                          }
-                          // Warn if Cash Out would drive the drawer negative.
-                          if (type == 'out' && amount > _balance) {
-                            final proceed = await showDialog<bool>(
-                              context: ctx,
-                              builder: (warnCtx) => AlertDialog(
-                                title: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.warning_amber_rounded,
-                                      color: Colors.orange.shade700,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    const Text('Balance Warning'),
-                                  ],
-                                ),
-                                content: Text(
-                                  'This withdrawal (${CurrencyHelper.currentSymbol}${amount.toStringAsFixed(DecimalSettings.precision)}) '
-                                  'exceeds the estimated drawer balance '
-                                  '(${CurrencyHelper.currentSymbol}${_balance.toStringAsFixed(DecimalSettings.precision)}). '
-                                  'Proceed only if you have physically verified the cash.',
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () =>
-                                        Navigator.pop(warnCtx, false),
-                                    child: const Text('Cancel'),
-                                  ),
-                                  ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.orange.shade700,
-                                    ),
-                                    onPressed: () =>
-                                        Navigator.pop(warnCtx, true),
-                                    child: const Text(
-                                      'Proceed Anyway',
-                                      style: TextStyle(color: Colors.white),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                            if (proceed != true) return;
-                          }
-                          Navigator.pop(ctx);
-                          final ok = await cashMovementStore.addMovement(
-                            type: type,
-                            amount: amount,
-                            reason: selectedReason,
-                            note: noteCtrl.text.trim().isEmpty
-                                ? null
-                                : noteCtrl.text.trim(),
-                          );
-                          if (ok) await _loadAll();
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: isCashIn ? Colors.green : Colors.red,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        child: Text(
-                          isCashIn ? 'Add Cash In' : 'Add Cash Out',
-                          style: GoogleFonts.poppins(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
+                AppTextField(
+                  controller: noteCtrl,
+                  label: 'Note',
+                  hint: 'Add extra details... (optional)',
+                  icon: Icons.notes_rounded,
                 ),
+              ],
+            ),
+            actions: [
+              appDialogCancelButton(ctx),
+              SizedBox(width: AppResponsive.mediumSpacing(context)),
+              appDialogPrimaryButton(
+                label: isCashIn ? 'Add Cash In' : 'Add Cash Out',
+                color: accent,
+                onPressed: () async {
+                  final amount = double.tryParse(amountCtrl.text.trim()) ?? 0;
+                  if (amount <= 0) {
+                    NotificationService.instance.showError(
+                      'Enter a valid amount',
+                    );
+                    return;
+                  }
+                  // Warn if Cash Out would drive the drawer negative.
+                  if (type == 'out' && amount > _balance) {
+                    final proceed = await showAppConfirmDialog(
+                      context: ctx,
+                      title: 'Balance Warning',
+                      message:
+                          'This withdrawal (${formatMoney(amount)}) '
+                          'exceeds the estimated drawer balance '
+                          '(${formatMoney(_balance)}). '
+                          'Proceed only if you have physically verified the cash.',
+                      confirmLabel: 'Proceed Anyway',
+                      accent: AppColors.warning,
+                      icon: Icons.warning_amber_rounded,
+                    );
+                    if (!proceed) return;
+                  }
+                  // The warning dialog above is an await, so this dialog may
+                  // already be gone by the time we pop it.
+                  if (!ctx.mounted) return;
+                  Navigator.pop(ctx);
+                  final ok = await cashMovementStore.addMovement(
+                    type: type,
+                    amount: amount,
+                    reason: selectedReason,
+                    note: noteCtrl.text.trim().isEmpty
+                        ? null
+                        : noteCtrl.text.trim(),
+                  );
+                  if (ok) await _loadAll();
+                },
               ),
             ],
           ),
@@ -464,37 +500,41 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
 
   @override
   Widget build(BuildContext context) {
-    final currency = CurrencyHelper.currentSymbol;
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      appBar: buildPrimaryAppBar(
-        title: 'Cash Drawer',
-        actions: [
-          IconButton(onPressed: _loadAll, icon: const Icon(Icons.refresh)),
-        ],
-      ),
+      appBar: buildPrimaryAppBar(title: 'Cash Drawer'),
+      // MoneyScope so every figure re-renders when the store's currency or
+      // decimal precision changes in Settings — the same subscription the
+      // other 45 retail screens use.
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Observer(builder: (_) => _buildBody(context, currency)),
+          : MoneyScope(child: Observer(builder: (_) => _buildBody(context))),
     );
   }
 
-  Widget _buildBody(BuildContext context, String currency) {
-    return ListView(
-      padding: EdgeInsets.all(AppResponsive.largeSpacing(context)),
-      children: [
-        _buildBalanceCard(context, currency),
-        SizedBox(height: AppResponsive.largeSpacing(context)),
-        _buildActionButtons(context),
-        SizedBox(height: AppResponsive.largeSpacing(context)),
-        _buildBreakdownRow(context, currency),
-        SizedBox(height: AppResponsive.largeSpacing(context)),
-        _buildActivityLog(context, currency),
-      ],
+  Widget _buildBody(BuildContext context) {
+    return AppResponsive.constrainedContent(
+      context: context,
+      alignment: Alignment.topCenter,
+      maxWidth: AppResponsive.maxContentWidth(context),
+      child: ListView(
+        padding: EdgeInsets.all(AppResponsive.largeSpacing(context)),
+        children: [
+          _buildBalanceCard(context),
+          SizedBox(height: AppResponsive.largeSpacing(context)),
+          _buildActionButtons(context),
+          SizedBox(height: AppResponsive.largeSpacing(context)),
+          _buildBreakdownRow(context),
+          SizedBox(height: AppResponsive.largeSpacing(context)),
+          _buildSalesSummaryCard(context),
+          SizedBox(height: AppResponsive.largeSpacing(context)),
+          _buildActivityLog(context),
+        ],
+      ),
     );
   }
 
-  Widget _buildBalanceCard(BuildContext context, String currency) {
+  Widget _buildBalanceCard(BuildContext context) {
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(AppResponsive.largeSpacing(context)),
@@ -516,7 +556,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
           ),
           SizedBox(height: AppResponsive.smallSpacing(context)),
           Text(
-            '$currency ${_balance.toStringAsFixed(DecimalSettings.precision)}',
+            formatMoney(_balance),
             style: GoogleFonts.poppins(
               fontSize: AppResponsive.getValue<double>(
                 context,
@@ -524,7 +564,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
                 tablet: 38,
                 desktop: 44,
               ),
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
               color: Colors.white,
             ),
           ),
@@ -534,7 +574,8 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
             '+ Sales ${_cashSales.toStringAsFixed(0)}  '
             '+ In ${cashMovementStore.totalCashIn.toStringAsFixed(0)}  '
             '− Out ${cashMovementStore.totalCashOut.toStringAsFixed(0)}  '
-            '− Exp ${_cashExpenses.toStringAsFixed(0)}',
+            '− Exp ${_cashExpenses.toStringAsFixed(0)}'
+            '${_cashRefunds > 0 ? '  − Refunds ${_cashRefunds.toStringAsFixed(0)}' : ''}',
             style: GoogleFonts.poppins(
               fontSize: AppResponsive.captionFontSize(context),
               color: Colors.white.withValues(alpha: 0.7),
@@ -601,7 +642,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
     );
   }
 
-  Widget _buildBreakdownRow(BuildContext context, String currency) {
+  Widget _buildBreakdownRow(BuildContext context) {
     return Container(
       padding: EdgeInsets.all(AppResponsive.largeSpacing(context)),
       decoration: BoxDecoration(
@@ -617,23 +658,14 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
             context,
             'Opening Balance',
             _openingBalance,
-            currency,
             Colors.blue,
             true,
           ),
-          _breakdownLine(
-            context,
-            'Cash Sales',
-            _cashSales,
-            currency,
-            Colors.green,
-            true,
-          ),
+          _breakdownLine(context, 'Cash Sales', _cashSales, Colors.green, true),
           _breakdownLine(
             context,
             'Cash In',
             cashMovementStore.totalCashIn,
-            currency,
             Colors.teal,
             true,
           ),
@@ -641,7 +673,6 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
             context,
             'Cash Out',
             cashMovementStore.totalCashOut,
-            currency,
             Colors.orange,
             false,
           ),
@@ -649,11 +680,18 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
             context,
             'Cash Expenses',
             _cashExpenses,
-            currency,
             Colors.red,
             false,
           ),
-          const Padding(
+          if (_cashRefunds > 0)
+            _breakdownLine(
+              context,
+              'Cash Refunds',
+              _cashRefunds,
+              AppColors.danger,
+              false,
+            ),
+          Padding(
             padding: EdgeInsets.symmetric(vertical: 8),
             child: Divider(height: 1),
           ),
@@ -669,7 +707,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
                 ),
               ),
               Text(
-                '$currency ${_balance.toStringAsFixed(DecimalSettings.precision)}',
+                formatMoney(_balance),
                 style: GoogleFonts.poppins(
                   fontWeight: FontWeight.w700,
                   fontSize: AppResponsive.bodyFontSize(context),
@@ -687,7 +725,6 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
     BuildContext context,
     String label,
     double amount,
-    String currency,
     Color color,
     bool isPositive,
   ) {
@@ -696,28 +733,38 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            children: [
-              Container(
-                width: 3,
-                height: 14,
-                decoration: BoxDecoration(
-                  color: color,
-                  borderRadius: BorderRadius.circular(2),
+          // Expanded label / Flexible amount — neither was bounded, so a long
+          // reason plus a five-figure amount overflowed a narrow card.
+          Expanded(
+            child: Row(
+              children: [
+                Container(
+                  width: 3,
+                  height: 14,
+                  decoration: BoxDecoration(
+                    color: color,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: GoogleFonts.poppins(
-                  fontSize: AppResponsive.smallFontSize(context),
-                  color: AppColors.textSecondary,
+                SizedBox(width: AppResponsive.smallSpacing(context)),
+                Expanded(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.smallFontSize(context),
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
+          SizedBox(width: AppResponsive.smallSpacing(context)),
           Text(
-            '${isPositive ? '+' : '−'} $currency ${amount.toStringAsFixed(DecimalSettings.precision)}',
+            '${isPositive ? '+' : '−'} ${formatMoney(amount)}',
+            maxLines: 1,
             style: GoogleFonts.poppins(
               fontSize: AppResponsive.smallFontSize(context),
               fontWeight: FontWeight.w600,
@@ -729,7 +776,104 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
     );
   }
 
-  Widget _buildActivityLog(BuildContext context, String currency) {
+  // ── Sales summary (all payment methods) ──────────────────────────────────
+
+  /// Collections by payment method, in the same visual language as the drawer
+  /// breakdown above — coloured rule, label, amount, then a divider before the
+  /// total.
+  ///
+  /// Sits OUTSIDE the drawer balance on purpose: a cash drawer holds cash, so
+  /// card and UPI must never move that number. The restaurant drawer makes the
+  /// same split (balance card + "Shift Sales Summary"); this is its retail
+  /// counterpart. Net of refunds — a card refund reduces the Card line without
+  /// touching the till.
+  Widget _buildSalesSummaryCard(BuildContext context) {
+    final credit = _method('credit');
+    final other = _otherCollected;
+
+    return Container(
+      padding: EdgeInsets.all(AppResponsive.largeSpacing(context)),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.account_balance_wallet_rounded,
+                size: AppResponsive.smallIconSize(context),
+                color: AppColors.primary,
+              ),
+              SizedBox(width: AppResponsive.smallSpacing(context)),
+              Text(
+                'Sales Summary',
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.bodyFontSize(context),
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: AppResponsive.smallSpacing(context)),
+
+          _breakdownLine(context, 'Cash', _method('cash'), Colors.green, true),
+          _breakdownLine(context, 'Card', _method('card'), Colors.blue, true),
+          _breakdownLine(context, 'UPI', _method('upi'), Colors.purple, true),
+          if (other != 0)
+            _breakdownLine(context, 'Other', other, Colors.teal, true),
+
+          Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Divider(height: 1),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Collected Today',
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.bodyFontSize(context),
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              Text(
+                formatMoney(_collectedRevenue),
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.bodyFontSize(context),
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primary,
+                ),
+              ),
+            ],
+          ),
+
+          // Credit is billed, not collected. Kept under the total so it can
+          // never be read as money in hand — retail has pay-later, which the
+          // restaurant drawer never has to account for.
+          if (credit != 0) ...[
+            SizedBox(height: AppResponsive.smallSpacing(context)),
+            _breakdownLine(
+              context,
+              'Credit (unpaid)',
+              credit,
+              AppColors.warning,
+              true,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActivityLog(BuildContext context) {
     if (_log.isEmpty) {
       return Center(
         child: Padding(
@@ -767,14 +911,14 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
             itemCount: _log.length,
             separatorBuilder: (_, __) =>
                 Divider(height: 1, color: AppColors.divider),
-            itemBuilder: (_, i) => _buildLogRow(context, _log[i], currency),
+            itemBuilder: (_, i) => _buildLogRow(context, _log[i]),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildLogRow(BuildContext context, _LogEntry entry, String currency) {
+  Widget _buildLogRow(BuildContext context, _LogEntry entry) {
     final Color dotColor;
     final IconData dotIcon;
     switch (entry.type) {
@@ -785,6 +929,10 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
       case _LogType.sale:
         dotColor = Colors.green;
         dotIcon = Icons.shopping_bag_outlined;
+        break;
+      case _LogType.refund:
+        dotColor = AppColors.danger;
+        dotIcon = Icons.assignment_return_outlined;
         break;
       case _LogType.expense:
         dotColor = Colors.red;
@@ -809,10 +957,12 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(6),
+            padding: EdgeInsets.all(6),
             decoration: BoxDecoration(
               color: dotColor.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(
+                AppResponsive.smallBorderRadius(context),
+              ),
             ),
             child: Icon(
               dotIcon,
@@ -827,6 +977,8 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
               children: [
                 Text(
                   entry.description,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.poppins(
                     fontSize: AppResponsive.smallFontSize(context),
                     fontWeight: FontWeight.w600,
@@ -835,6 +987,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
                 ),
                 Text(
                   timeStr,
+                  maxLines: 1,
                   style: GoogleFonts.poppins(
                     fontSize: AppResponsive.captionFontSize(context),
                     color: AppColors.textSecondary,
@@ -843,11 +996,13 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
               ],
             ),
           ),
+          SizedBox(width: AppResponsive.smallSpacing(context)),
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                '${isPositive ? '+' : ''}$currency ${entry.signedAmount.abs().toStringAsFixed(DecimalSettings.precision)}',
+                '${isPositive ? '+' : ''}${formatMoney(entry.signedAmount.abs())}',
+                maxLines: 1,
                 style: GoogleFonts.poppins(
                   fontWeight: FontWeight.w700,
                   fontSize: AppResponsive.smallFontSize(context),
@@ -857,7 +1012,8 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
                 ),
               ),
               Text(
-                'Bal: $currency ${entry.runningBalance.toStringAsFixed(DecimalSettings.precision)}',
+                'Bal: ${formatMoney(entry.runningBalance)}',
+                maxLines: 1,
                 style: GoogleFonts.poppins(
                   fontSize: AppResponsive.captionFontSize(context),
                   color: AppColors.textSecondary,

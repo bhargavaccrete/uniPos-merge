@@ -43,10 +43,10 @@ class GRNModel extends HiveObject {
   final String receivedDate; // Date when goods were received
 
   @HiveField(7)
-  final int totalOrderedQty; // Total quantity that was ordered in PO
+  final double totalOrderedQty; // Total quantity that was ordered in PO
 
   @HiveField(8)
-  final int totalReceivedQty; // Total quantity actually received
+  final double totalReceivedQty; // Total quantity actually received
 
   @HiveField(9)
   final double? totalAmount; // Total cost of received items
@@ -91,8 +91,8 @@ class GRNModel extends HiveObject {
     required String supplierId,
     String? supplierName,
     required String receivedDate,
-    int totalOrderedQty = 0,
-    int totalReceivedQty = 0,
+    double totalOrderedQty = 0,
+    double totalReceivedQty = 0,
     double? totalAmount,
     GRNStatus status = GRNStatus.draft,
     String? notes,
@@ -141,7 +141,7 @@ class GRNModel extends HiveObject {
       totalReceivedQty > 0 && totalReceivedQty < totalOrderedQty;
 
   /// Shortage quantity
-  int get shortageQty => totalOrderedQty - totalReceivedQty;
+  double get shortageQty => totalOrderedQty - totalReceivedQty;
 
   Map<String, dynamic> toMap() {
     return {
@@ -172,8 +172,8 @@ class GRNModel extends HiveObject {
       supplierId: map['supplierId'] as String,
       supplierName: map['supplierName'] as String?,
       receivedDate: map['receivedDate'] as String,
-      totalOrderedQty: (map['totalOrderedQty'] as num).toInt(),
-      totalReceivedQty: (map['totalReceivedQty'] as num).toInt(),
+      totalOrderedQty: (map['totalOrderedQty'] as num).toDouble(),
+      totalReceivedQty: (map['totalReceivedQty'] as num).toDouble(),
       totalAmount: (map['totalAmount'] as num?)?.toDouble(),
       status: map['status'] as String,
       notes: map['notes'] as String?,
@@ -191,8 +191,8 @@ class GRNModel extends HiveObject {
     String? supplierId,
     String? supplierName,
     String? receivedDate,
-    int? totalOrderedQty,
-    int? totalReceivedQty,
+    double? totalOrderedQty,
+    double? totalReceivedQty,
     double? totalAmount,
     String? status,
     String? notes,

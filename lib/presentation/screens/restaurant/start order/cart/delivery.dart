@@ -5,6 +5,7 @@ import '../../../../../constants/restaurant/color.dart';
 import '../../../../widget/componets/restaurant/componets/Button.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/util/common/currency_helper.dart';
 class Delivery extends StatelessWidget {
   const Delivery({super.key});
 
@@ -114,7 +115,7 @@ class Delivery extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text('Total:',style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 20.0, tablet: 21.0, desktop: 22.0),fontWeight: FontWeight.bold),),
-                        Text('Rs.149.00',style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 20.0, tablet: 21.0, desktop: 22.0),fontWeight: FontWeight.bold),)
+                        Text('${CurrencyHelper.currentSymbol}149.00',style: GoogleFonts.poppins(fontSize: AppResponsive.getValue(context, mobile: 20.0, tablet: 21.0, desktop: 22.0),fontWeight: FontWeight.bold),)
                       ],
                     ),
                     SizedBox(height: 25,),

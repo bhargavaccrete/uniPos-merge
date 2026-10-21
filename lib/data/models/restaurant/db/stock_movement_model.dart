@@ -62,6 +62,14 @@ class StockMovementModel extends HiveObject {
   @HiveField(12)
   final String? sessionId;
 
+  /// Cost per unit at the moment this movement was recorded (from the
+  /// item's `lastPurchaseCost`), so historical reports can price a period
+  /// using the cost that was actually in effect then rather than today's
+  /// live cost. Null for movements logged before this field existed, or
+  /// where no purchase cost was known. See `RecipeReportService.foodCostReport`.
+  @HiveField(13)
+  final double? unitCost;
+
   StockMovementModel({
     required this.id,
     required this.timestamp,
@@ -76,6 +84,7 @@ class StockMovementModel extends HiveObject {
     required this.unit,
     required this.staffName,
     this.sessionId,
+    this.unitCost,
   });
 
   /// True if this movement added stock.
@@ -98,6 +107,7 @@ class StockMovementModel extends HiveObject {
         'unit': unit,
         'staffName': staffName,
         'sessionId': sessionId,
+        'unitCost': unitCost,
       };
 
   factory StockMovementModel.fromMap(Map<String, dynamic> map) =>
@@ -115,5 +125,6 @@ class StockMovementModel extends HiveObject {
         unit: map['unit'] ?? '',
         staffName: map['staffName'] ?? '',
         sessionId: map['sessionId'] as String?,
+        unitCost: (map['unitCost'] as num?)?.toDouble(),
       );
 }

@@ -1,17 +1,31 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:billberrylite/util/common/quantity_format.dart';
+import 'package:billberrylite/util/common/short_ref.dart';
+import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_item_model_204.dart';
+import 'package:billberrylite/data/models/retail/hive_model/variante_model_201.dart';
+import 'package:billberrylite/presentation/widget/componets/retail/cart_quantity_field.dart';
 import '../../../core/di/service_locator.dart';
+import '../../../core/plan/plan_enforcement.dart';
+import '../../../core/plan/retail_entitlement_keys.dart';
+import '../../../domain/services/retail/return_math.dart';
 import '../../../domain/services/retail/return_service.dart';
+import '../../../domain/services/retail/sale_return_reason.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/util/restaurant/staticswitch.dart';
 
 class SaleReturnScreen extends StatefulWidget {
   final String saleId;
 
-  const SaleReturnScreen({
-    super.key,
-    required this.saleId,
-  });
+  const SaleReturnScreen({super.key, required this.saleId});
 
   @override
   State<SaleReturnScreen> createState() => _SaleReturnScreenState();
@@ -22,14 +36,25 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
 
   SaleModel? _sale;
   List<SaleItemModel> _saleItems = [];
+
+  /// Units of each variant that may STILL be returned, after any earlier
+  /// returns. Every quantity control on this screen is capped by it.
+  Map<String, double> _remaining = {};
+
   bool _isLoading = true;
   bool _isProcessing = false;
 
   // For partial return
-  final Map<String, int> _selectedItems = {}; // variantId -> quantity to return
+  final Map<String, double> _selectedItems =
+      {}; // variantId -> quantity to return
 
   String _refundMethod = 'cash';
   String _returnType = 'full'; // full or partial
+
+  /// Why the goods are coming back. Required — the Sales Refund report is only
+  /// worth pulling if every row can answer it, so there is no sensible default.
+  SaleReturnReason? _returnReason;
+  final TextEditingController _returnNoteController = TextEditingController();
 
   @override
   void initState() {
@@ -37,56 +62,183 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
     _loadSaleData();
   }
 
+  @override
+  void dispose() {
+    _returnNoteController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadSaleData() async {
     setState(() => _isLoading = true);
 
     try {
       final sale = await saleStore.getSaleById(widget.saleId);
-      final items = await saleItemRepository.getItemsBySaleId(widget.saleId);
+      final items = await saleStore.getItemsForSale(widget.saleId);
+      final remaining = await _returnService.remainingReturnable(widget.saleId);
 
       setState(() {
         _sale = sale;
         _saleItems = items;
+        _remaining = remaining;
         _isLoading = false;
       });
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading sale: $e'), backgroundColor: Colors.red),
-        );
+        NotificationService.instance.showError('Error loading sale: $e');
       }
     }
+  }
+
+  double _remainingFor(SaleItemModel item) => _remaining[item.varianteId] ?? 0;
+
+  /// The catalogue variant behind a sale line, looked up synchronously for
+  /// build-time decisions.
+  VarianteModel? _variantFor(String variantId) {
+    for (final v in productStore.variants) {
+      if (v.varianteId == variantId) return v;
+    }
+    return null;
+  }
+
+  bool _isDecimalLine(SaleItemModel item) =>
+      _variantFor(item.varianteId)?.isDecimalQuantity ?? false;
+
+  /// The quantity a line starts at when it is ticked.
+  ///
+  /// Loose goods default to the WHOLE remaining amount: 1.75 L of milk was one
+  /// purchase, so "1 of 1.75" is not a quantity anyone meant — and a whole-unit
+  /// stepper could never reach 1.75 anyway. A piece line starts at 1, except
+  /// when less than one unit is left (only reachable on a decimal line).
+  double _defaultQtyFor(SaleItemModel item) {
+    final remaining = _remainingFor(item);
+    if (_isDecimalLine(item)) return remaining;
+    return remaining < 1 ? remaining : 1;
+  }
+
+  /// Lines that still have something left to give back.
+  List<SaleItemModel> get _returnableItems =>
+      _saleItems.where((i) => _remainingFor(i) > 0).toList();
+
+  /// True once an earlier return already took some of this sale.
+  bool get _hasEarlierReturn => _saleItems.any((i) => _remainingFor(i) < i.qty);
+
+  /// What the current selection actually returns.
+  ///
+  /// A full return means everything STILL outstanding — not the original
+  /// quantities, which would refund earlier returns a second time.
+  Map<String, double> get _effectiveSelection {
+    if (_returnType == 'full') {
+      return {
+        for (final item in _saleItems)
+          if (_remainingFor(item) > 0) item.varianteId: _remainingFor(item),
+      };
+    }
+    return _selectedItems;
+  }
+
+  /// The refund, computed by the SAME pure helper the service uses when it
+  /// writes. Calling it here rather than repeating the arithmetic is what stops
+  /// the figure shown to the cashier drifting from the figure actually paid.
+  ReturnFigures get _figures {
+    final sale = _sale;
+    if (sale == null) return ReturnFigures.empty;
+    return RetailReturnMath.compute(
+      sale: sale,
+      soldLines: _saleItems,
+      returnQtyByVariantId: _effectiveSelection,
+    );
+  }
+
+  /// How the refund splits when the original invoice is still unpaid: the due
+  /// is written down first and only the excess leaves the till.
+  ({double appliedToDue, double refunded}) get _split {
+    final total = _figures.totalAmount;
+    final due = _sale?.dueAmount ?? 0;
+    if (due <= 0) return (appliedToDue: 0, refunded: total);
+    final applied = total < due ? total : due;
+    return (appliedToDue: applied, refunded: total - applied);
   }
 
   Future<void> _processReturn() async {
     if (_sale == null) return;
 
-    // Confirm return
-    final confirmed = await showDialog<bool>(
+    // Plan gate — returns/refunds must be included in the plan (mirrors
+    // restaurant `billing.returns`). No-op until a retail manifest is present.
+    if (!PlanEnforce.allows(RetailEntKeys.billingReturns)) {
+      NotificationService.instance.showError(
+        'Returns aren’t included in your current plan.',
+      );
+      return;
+    }
+
+    final isFull = _returnType == 'full';
+
+    if (_effectiveSelection.isEmpty) {
+      NotificationService.instance.showError(
+        isFull
+            ? 'This sale has already been fully returned.'
+            : 'Select at least one item to return.',
+      );
+      return;
+    }
+
+    if (_returnReason == null) {
+      NotificationService.instance.showError('Select a return reason.');
+      return;
+    }
+
+    if (_returnReason!.requiresNote &&
+        _returnNoteController.text.trim().isEmpty) {
+      NotificationService.instance.showError(
+        'A note is required for that reason.',
+      );
+      return;
+    }
+
+    if (!AppSettings.refundsEnabled) {
+      NotificationService.instance.showError(
+        'Refunds are disabled in Settings',
+      );
+      return;
+    }
+
+    final windowMinutes = AppSettings.refundWindowMinutes;
+    if (_sale != null && windowMinutes > 0) {
+      final saleDate = DateTime.tryParse(_sale!.date);
+      if (saleDate != null) {
+        final elapsed = DateTime.now().difference(saleDate).inMinutes;
+        if (elapsed > windowMinutes) {
+          NotificationService.instance.showError(
+            'Refund window has passed for this sale',
+          );
+          return;
+        }
+      }
+    }
+
+    final split = _split;
+
+    // Spell out the credit offset. The cashier must not expect to hand over
+    // cash that is being written off a debt instead.
+    final message = split.appliedToDue > 0
+        ? '${formatMoney(split.appliedToDue)} comes off the outstanding due'
+              '${split.refunded > 0 ? ', and ${formatMoney(split.refunded)} is refunded via ${_refundMethod.toUpperCase()}' : ' — nothing is paid out'}. '
+              'Stock goes back in. This cannot be undone.'
+        : 'Refund ${formatMoney(split.refunded)} via '
+              '${_refundMethod.toUpperCase()}. Stock goes back in. '
+              'This cannot be undone.';
+
+    final confirmed = await showAppConfirmDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirm Return'),
-        content: Text(
-          _returnType == 'full'
-              ? 'Process full return of ₹${_sale!.totalAmount.toStringAsFixed(2)}?'
-              : 'Process partial return of ₹${_calculatePartialReturnAmount().toStringAsFixed(2)}?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Confirm Return'),
-          ),
-        ],
-      ),
+      title: isFull ? 'Return whole sale?' : 'Return selected items?',
+      message: message,
+      confirmLabel: 'Confirm Return',
+      accent: AppColors.danger,
+      icon: Icons.assignment_return_rounded,
     );
 
-    if (confirmed != true) return;
+    if (!confirmed || !mounted) return;
 
     setState(() => _isProcessing = true);
 
@@ -97,6 +249,8 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
         returnSaleId = await _returnService.processFullReturn(
           originalSaleId: widget.saleId,
           refundMethod: _refundMethod,
+          returnReason: _returnReason!.code,
+          returnNote: _returnNote,
         );
       } else {
         if (_selectedItems.isEmpty) {
@@ -107,72 +261,54 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
           originalSaleId: widget.saleId,
           itemsToReturn: _selectedItems,
           refundMethod: _refundMethod,
+          returnReason: _returnReason!.code,
+          returnNote: _returnNote,
         );
       }
 
       if (mounted) {
         Navigator.pop(context, true); // Return to previous screen
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Return processed successfully!\nReturn ID: ${returnSaleId.substring(0, 13)}'),
-            backgroundColor: const Color(0xFF4CAF50),
-            duration: const Duration(seconds: 4),
-          ),
+        NotificationService.instance.showSuccess(
+          'Return processed • ${saleRef(returnSaleId)}',
         );
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() => _isProcessing = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error processing return: $e'), backgroundColor: Colors.red),
-        );
-      }
+      NotificationService.instance.showError('Error processing return: $e');
     }
-  }
-
-  double _calculatePartialReturnAmount() {
-    double total = 0;
-    for (var entry in _selectedItems.entries) {
-      final variantId = entry.key;
-      final returnQty = entry.value;
-
-      final item = _saleItems.firstWhere((i) => i.varianteId == variantId);
-      final itemSubtotal = item.price * returnQty;
-      final itemDiscount = (item.discountAmount ?? 0) * (returnQty / item.qty);
-      final itemTax = (item.taxAmount ?? 0) * (returnQty / item.qty);
-
-      total += (itemSubtotal - itemDiscount + itemTax);
-    }
-    return total;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
-      appBar: AppBar(
-        title: const Text('Process Return', style: TextStyle(fontSize: 18)),
-        centerTitle: true,
-        elevation: 0,
-        backgroundColor: Colors.red,
-        foregroundColor: Colors.white,
+      backgroundColor: AppColors.surfaceLight,
+      appBar: buildPrimaryAppBar(
+        title: 'Process Return',
+        titleFontSize: AppResponsive.subheadingFontSize(context),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _sale == null
-              ? _buildErrorView()
-              : SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      _buildOriginalSaleCard(),
-                      _buildReturnTypeSelector(),
-                      _buildRefundMethodSelector(),
-                      if (_returnType == 'partial') _buildItemsList(),
-                      _buildSummaryCard(),
-                      const SizedBox(height: 100),
-                    ],
-                  ),
+          ? _buildErrorView()
+          : SingleChildScrollView(
+              child: AppResponsive.constrainedContent(
+                context: context,
+                alignment: Alignment.topCenter,
+                maxWidth: AppResponsive.maxCardWidth(context),
+                child: Column(
+                  children: [
+                    _buildOriginalSaleCard(),
+                    _buildReturnTypeSelector(),
+                    _buildRefundMethodSelector(),
+                    _buildReturnReasonSelector(),
+                    if (_returnType == 'partial') _buildItemsList(),
+                    _buildSummaryCard(),
+                    SizedBox(height: AppResponsive.largeSpacing(context)),
+                  ],
                 ),
+              ),
+            ),
       bottomNavigationBar: _sale != null && !_isLoading
           ? _buildProcessButton()
           : null,
@@ -180,38 +316,61 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
   }
 
   Widget _buildErrorView() {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.error_outline, size: 64, color: Colors.red),
-          SizedBox(height: 16),
-          Text('Sale not found or cannot be returned'),
-        ],
+    return Center(
+      child: Padding(
+        padding: AppResponsive.padding(context),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.error_outline,
+              size: AppResponsive.getValue(
+                context,
+                mobile: 64.0,
+                tablet: 76.0,
+                desktop: 88.0,
+              ),
+              color: Colors.red,
+            ),
+            SizedBox(height: AppResponsive.largeSpacing(context)),
+            Text(
+              'Sale not found or cannot be returned',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildOriginalSaleCard() {
     return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(16),
+      margin: AppResponsive.padding(context),
+      padding: AppResponsive.padding(context),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE8E8E8)),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
+        border: Border.all(color: AppColors.divider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Original Sale',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.subheadingFontSize(context),
+              fontWeight: FontWeight.w600,
+            ),
           ),
-          const SizedBox(height: 12),
-          _buildInfoRow('Sale ID', _sale!.saleId.substring(0, 13).toUpperCase()),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
+          _buildInfoRow('Invoice', _sale!.displayNumber),
           _buildInfoRow('Total Items', '${_sale!.totalItems}'),
-          _buildInfoRow('Total Amount', '₹${_sale!.totalAmount.toStringAsFixed(2)}'),
+          _buildInfoRow('Total Amount', formatMoney(_sale!.totalAmount)),
           _buildInfoRow('Payment Type', _sale!.paymentType.toUpperCase()),
         ],
       ),
@@ -220,12 +379,30 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
 
   Widget _buildInfoRow(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: Color(0xFF6B6B6B))),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              color: AppColors.textSecondary,
+              fontSize: AppResponsive.bodyFontSize(context),
+            ),
+          ),
+          SizedBox(width: AppResponsive.smallSpacing(context)),
+          Flexible(
+            child: Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.right,
+              style: GoogleFonts.poppins(
+                fontWeight: FontWeight.w600,
+                fontSize: AppResponsive.bodyFontSize(context),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -233,44 +410,50 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
 
   Widget _buildReturnTypeSelector() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(16),
+      margin: EdgeInsets.symmetric(
+        horizontal: AppResponsive.padding(context).left,
+      ),
+      padding: AppResponsive.padding(context),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE8E8E8)),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
+        border: Border.all(color: AppColors.divider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Return Type',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.bodyFontSize(context),
+              fontWeight: FontWeight.w600,
+            ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
+          // Selectable tiles rather than RadioListTile — Flutter deprecated
+          // Radio's groupValue/onChanged in favour of a RadioGroup ancestor,
+          // and these match the tiles used in Material Receiving.
           Row(
             children: [
               Expanded(
-                child: RadioListTile<String>(
-                  title: const Text('Full Return'),
-                  subtitle: const Text('Return all items'),
+                child: _returnTypeTile(
                   value: 'full',
-                  groupValue: _returnType,
-                  onChanged: (value) => setState(() {
-                    _returnType = value!;
-                    _selectedItems.clear();
-                  }),
-                  contentPadding: EdgeInsets.zero,
+                  label: 'Full Return',
+                  // After an earlier return, "full" means everything still
+                  // outstanding — say so rather than implying all items.
+                  caption: _hasEarlierReturn
+                      ? 'Return what is left'
+                      : 'Return all items',
                 ),
               ),
+              SizedBox(width: AppResponsive.smallSpacing(context)),
               Expanded(
-                child: RadioListTile<String>(
-                  title: const Text('Partial Return'),
-                  subtitle: const Text('Select items'),
+                child: _returnTypeTile(
                   value: 'partial',
-                  groupValue: _returnType,
-                  onChanged: (value) => setState(() => _returnType = value!),
-                  contentPadding: EdgeInsets.zero,
+                  label: 'Partial Return',
+                  caption: 'Select items',
                 ),
               ),
             ],
@@ -280,38 +463,132 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
     );
   }
 
+  Widget _returnTypeTile({
+    required String value,
+    required String label,
+    required String caption,
+  }) {
+    final selected = _returnType == value;
+
+    return InkWell(
+      onTap: () => setState(() {
+        _returnType = value;
+        // Switching back to a full return clears any partial picks, so the
+        // refund total can't be computed from a stale selection.
+        if (value == 'full') _selectedItems.clear();
+      }),
+      borderRadius: BorderRadius.circular(
+        AppResponsive.smallBorderRadius(context),
+      ),
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: AppResponsive.mediumSpacing(context),
+          vertical: AppResponsive.smallSpacing(context),
+        ),
+        decoration: BoxDecoration(
+          color: selected
+              ? AppColors.primary.withValues(alpha: 0.07)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(
+            AppResponsive.smallBorderRadius(context),
+          ),
+          border: Border.all(
+            color: selected ? AppColors.primary : AppColors.divider,
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              selected
+                  ? Icons.radio_button_checked_rounded
+                  : Icons.radio_button_unchecked_rounded,
+              size: AppResponsive.smallIconSize(context),
+              color: selected ? AppColors.primary : AppColors.textSecondary,
+            ),
+            SizedBox(width: AppResponsive.smallSpacing(context)),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.bodyFontSize(context),
+                      fontWeight: FontWeight.w600,
+                      color: selected
+                          ? AppColors.primary
+                          : AppColors.textPrimary,
+                    ),
+                  ),
+                  Text(
+                    caption,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.captionFontSize(context),
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildRefundMethodSelector() {
     return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(16),
+      margin: AppResponsive.padding(context),
+      padding: AppResponsive.padding(context),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE8E8E8)),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
+        border: Border.all(color: AppColors.divider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Refund Method',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.bodyFontSize(context),
+              fontWeight: FontWeight.w600,
+            ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
           Wrap(
             spacing: 8,
             children: [
               ChoiceChip(
                 label: const Text('💵 Cash'),
+                labelStyle: GoogleFonts.poppins(
+                  fontSize: AppResponsive.bodyFontSize(context),
+                ),
                 selected: _refundMethod == 'cash',
-                onSelected: (selected) => setState(() => _refundMethod = 'cash'),
+                onSelected: (selected) =>
+                    setState(() => _refundMethod = 'cash'),
               ),
               ChoiceChip(
                 label: const Text('💳 Card'),
+                labelStyle: GoogleFonts.poppins(
+                  fontSize: AppResponsive.bodyFontSize(context),
+                ),
                 selected: _refundMethod == 'card',
-                onSelected: (selected) => setState(() => _refundMethod = 'card'),
+                onSelected: (selected) =>
+                    setState(() => _refundMethod = 'card'),
               ),
               ChoiceChip(
                 label: const Text('📱 UPI'),
+                labelStyle: GoogleFonts.poppins(
+                  fontSize: AppResponsive.bodyFontSize(context),
+                ),
                 selected: _refundMethod == 'upi',
                 onSelected: (selected) => setState(() => _refundMethod = 'upi'),
               ),
@@ -322,24 +599,91 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
     );
   }
 
-  Widget _buildItemsList() {
+  /// Trimmed note, or null when blank — an empty string in Hive reads as
+  /// "a note was given" everywhere downstream.
+  String? get _returnNote {
+    final text = _returnNoteController.text.trim();
+    return text.isEmpty ? null : text;
+  }
+
+  Widget _buildReturnReasonSelector() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(16),
+      margin: AppResponsive.padding(context),
+      padding: AppResponsive.padding(context),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE8E8E8)),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
+        border: Border.all(color: AppColors.divider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Select Items to Return',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          Text(
+            'Return Reason',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.bodyFontSize(context),
+              fontWeight: FontWeight.w600,
+            ),
           ),
-          const SizedBox(height: 12),
-          ..._saleItems.map((item) => _buildItemTile(item)),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final reason in SaleReturnReason.all)
+                ChoiceChip(
+                  label: Text(reason.label),
+                  labelStyle: GoogleFonts.poppins(
+                    fontSize: AppResponsive.bodyFontSize(context),
+                  ),
+                  selected: _returnReason?.code == reason.code,
+                  onSelected: (_) => setState(() => _returnReason = reason),
+                ),
+            ],
+          ),
+          if (_returnReason?.requiresNote ?? false) ...[
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
+            AppTextField(
+              controller: _returnNoteController,
+              label: 'Note',
+              hint: 'Why is this coming back?',
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildItemsList() {
+    return Container(
+      margin: EdgeInsets.symmetric(
+        horizontal: AppResponsive.padding(context).left,
+      ),
+      padding: AppResponsive.padding(context),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Select Items to Return',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.bodyFontSize(context),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
+          // Fully-returned lines are dropped rather than shown disabled: there
+          // is nothing left to pick, and the "already returned" caption on the
+          // remaining lines carries the history.
+          ..._returnableItems.map((item) => _buildItemTile(item)),
         ],
       ),
     );
@@ -347,16 +691,30 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
 
   Widget _buildItemTile(SaleItemModel item) {
     final isSelected = _selectedItems.containsKey(item.varianteId);
-    final returnQty = _selectedItems[item.varianteId] ?? 1;
+    final remaining = _remainingFor(item);
+    final alreadyReturned = item.qty - remaining;
+    final isDecimal = _isDecimalLine(item);
+    // Cap at what is left, never at the originally sold quantity — that is the
+    // guard that stops the same units being refunded twice.
+    //
+    // NOT `.clamp(1, remaining)`: `num.clamp` throws when the lower limit
+    // exceeds the upper one, so a part-returned loose line with 0.75 left
+    // crashed this screen on build. Only an upper cap is needed.
+    final storedQty = _selectedItems[item.varianteId] ?? _defaultQtyFor(item);
+    final returnQty = storedQty > remaining ? remaining : storedQty;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
+      margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
+      padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
-        color: isSelected ? const Color(0xFFFFF3E0) : const Color(0xFFF5F5F5),
-        borderRadius: BorderRadius.circular(8),
+        color: isSelected
+            ? AppColors.warning.withValues(alpha: 0.1)
+            : AppColors.surfaceMedium,
+        borderRadius: BorderRadius.circular(
+          AppResponsive.smallBorderRadius(context),
+        ),
         border: Border.all(
-          color: isSelected ? Colors.orange : const Color(0xFFE8E8E8),
+          color: isSelected ? Colors.orange : AppColors.divider,
           width: isSelected ? 2 : 1,
         ),
       ),
@@ -370,7 +728,7 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
                 onChanged: (value) {
                   setState(() {
                     if (value == true) {
-                      _selectedItems[item.varianteId] = 1;
+                      _selectedItems[item.varianteId] = _defaultQtyFor(item);
                     } else {
                       _selectedItems.remove(item.varianteId);
                     }
@@ -383,19 +741,58 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
                   children: [
                     Text(
                       item.productName ?? 'Unknown',
-                      style: const TextStyle(fontWeight: FontWeight.w600),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.bodyFontSize(context),
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                    if (item.size != null || item.color != null)
+                    if (attributeStore
+                        .describeAttributes(
+                          item.attributes,
+                          size: item.size,
+                          color: item.color,
+                          labelled: false,
+                        )
+                        .isNotEmpty)
                       Text(
-                        '${item.size ?? ''} ${item.color ?? ''}'.trim(),
-                        style: const TextStyle(fontSize: 12, color: Color(0xFF6B6B6B)),
+                        attributeStore.describeAttributes(
+                          item.attributes,
+                          size: item.size,
+                          color: item.color,
+                          labelled: false,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.smallFontSize(context),
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    // Say what is left, so a part-returned line explains itself
+                    // rather than just refusing at a lower number.
+                    if (alreadyReturned > 0)
+                      Text(
+                        '${formatQty(alreadyReturned)} of '
+                        '${formatQty(item.qty)} already returned',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.captionFontSize(context),
+                          color: AppColors.warning,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                   ],
                 ),
               ),
               Text(
-                '₹${item.total.toStringAsFixed(2)}',
-                style: const TextStyle(fontWeight: FontWeight.w600),
+                formatMoney(item.total),
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.bodyFontSize(context),
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ],
           ),
@@ -403,27 +800,86 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
             const Divider(height: 16),
             Row(
               children: [
-                const Text('Quantity: '),
-                IconButton(
-                  icon: const Icon(Icons.remove_circle_outline),
-                  onPressed: returnQty > 1
-                      ? () => setState(() => _selectedItems[item.varianteId] = returnQty - 1)
-                      : null,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                ),
                 Text(
-                  '$returnQty / ${item.qty}',
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+                  'Quantity: ',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.bodyFontSize(context),
+                  ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.add_circle_outline),
-                  onPressed: returnQty < item.qty
-                      ? () => setState(() => _selectedItems[item.varianteId] = returnQty + 1)
-                      : null,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                ),
+                if (isDecimal) ...[
+                  // Typed, not stepped — a stepper cannot reach 1.75. Keyed by
+                  // variant so a controller is never carried from one line onto
+                  // another when the returnable list changes.
+                  CartQuantityField(
+                    key: ValueKey(item.varianteId),
+                    qty: returnQty,
+                    allowDecimal: true,
+                    onSubmitted: (qty) async {
+                      if (qty <= 0) {
+                        // Zero means "not returning this line" — untick it
+                        // rather than sending a zero-quantity return.
+                        setState(() => _selectedItems.remove(item.varianteId));
+                        return true;
+                      }
+                      if (qty > remaining) {
+                        // Rejected: returning false snaps the field back to the
+                        // truth instead of leaving an impossible figure on it.
+                        NotificationService.instance.showWarning(
+                          'Only ${formatQty(remaining)} left to return',
+                        );
+                        return false;
+                      }
+                      setState(() => _selectedItems[item.varianteId] = qty);
+                      return true;
+                    },
+                  ),
+                  SizedBox(width: AppResponsive.smallSpacing(context)),
+                  Text(
+                    'of ${formatQty(remaining)}',
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.bodyFontSize(context),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ] else ...[
+                  IconButton(
+                    icon: const Icon(Icons.remove_circle_outline),
+                    onPressed: returnQty > 1
+                        ? () => setState(
+                            () =>
+                                _selectedItems[item.varianteId] = returnQty - 1,
+                          )
+                        : null,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 32,
+                      minHeight: 32,
+                    ),
+                  ),
+                  Text(
+                    '${formatQty(returnQty)} / ${formatQty(remaining)}',
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.bodyFontSize(context),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.add_circle_outline),
+                    // Compares the RESULT against the cap — `returnQty <
+                    // remaining` let a line with 1.75 left step from 1 to 2.
+                    onPressed: returnQty + 1 <= remaining
+                        ? () => setState(
+                            () =>
+                                _selectedItems[item.varianteId] = returnQty + 1,
+                          )
+                        : null,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 32,
+                      minHeight: 32,
+                    ),
+                  ),
+                ],
               ],
             ),
           ],
@@ -433,41 +889,73 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
   }
 
   Widget _buildSummaryCard() {
-    final returnAmount = _returnType == 'full'
-        ? _sale!.totalAmount
-        : _calculatePartialReturnAmount();
+    final split = _split;
+    // Headline the figure that actually leaves the till. On an unpaid invoice
+    // most or all of the return writes down the debt instead.
+    final returnAmount = split.refunded;
 
     return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(16),
+      margin: AppResponsive.padding(context),
+      padding: AppResponsive.padding(context),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Colors.red, Color(0xFFD32F2F)],
+          colors: [Colors.red, AppColors.danger],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
       ),
       child: Column(
         children: [
-          const Text(
-            'Refund Amount',
-            style: TextStyle(color: Colors.white70, fontSize: 14),
-          ),
-          const SizedBox(height: 8),
           Text(
-            '₹${returnAmount.toStringAsFixed(2)}',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 32,
-              fontWeight: FontWeight.w700,
+            split.appliedToDue > 0 ? 'Cash Back to Customer' : 'Refund Amount',
+            style: GoogleFonts.poppins(
+              color: Colors.white70,
+              fontSize: AppResponsive.bodyFontSize(context),
             ),
           ),
-          if (_returnType == 'partial') ...[
-            const SizedBox(height: 8),
+          SizedBox(height: AppResponsive.smallSpacing(context)),
+          // scaleDown so a large refund keeps one line at the display size.
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              formatMoney(returnAmount),
+              maxLines: 1,
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontSize: AppResponsive.getValue(
+                  context,
+                  mobile: 32.0,
+                  tablet: 36.0,
+                  desktop: 40.0,
+                ),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          if (split.appliedToDue > 0) ...[
+            SizedBox(height: AppResponsive.smallSpacing(context)),
             Text(
-              '${_selectedItems.values.fold(0, (sum, qty) => sum + qty)} items selected',
-              style: const TextStyle(color: Colors.white70, fontSize: 12),
+              '${formatMoney(_figures.totalAmount)} returned · '
+              '${formatMoney(split.appliedToDue)} off the outstanding due',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.poppins(
+                color: Colors.white70,
+                fontSize: AppResponsive.smallFontSize(context),
+              ),
+            ),
+          ],
+          if (_returnType == 'partial') ...[
+            SizedBox(height: AppResponsive.smallSpacing(context)),
+            Text(
+              '${formatQty(_effectiveSelection.values.fold(0.0, (sum, qty) => sum + qty))} items selected',
+              maxLines: 1,
+              style: GoogleFonts.poppins(
+                color: Colors.white70,
+                fontSize: AppResponsive.smallFontSize(context),
+              ),
             ),
           ],
         ],
@@ -477,35 +965,52 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
 
   Widget _buildProcessButton() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: AppResponsive.padding(context),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, -2),
           ),
         ],
       ),
-      child: ElevatedButton(
-        onPressed: _isProcessing ? null : _processReturn,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.red,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          minimumSize: const Size(double.infinity, 50),
+      child: AppResponsive.constrainedContent(
+        heightFactor: 1,
+        context: context,
+        alignment: Alignment.topCenter,
+        maxWidth: AppResponsive.maxCardWidth(context),
+        child: ElevatedButton(
+          onPressed: _isProcessing ? null : _processReturn,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.red,
+            foregroundColor: Colors.white,
+            padding: EdgeInsets.symmetric(
+              vertical: AppResponsive.largeSpacing(context),
+            ),
+            minimumSize: Size(
+              double.infinity,
+              AppResponsive.buttonHeight(context) + 2,
+            ),
+          ),
+          child: _isProcessing
+              ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2,
+                  ),
+                )
+              : Text(
+                  'Process Return',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.subheadingFontSize(context),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
         ),
-        child: _isProcessing
-            ? const SizedBox(
-                height: 20,
-                width: 20,
-                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-              )
-            : const Text(
-                'Process Return',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-              ),
       ),
     );
   }

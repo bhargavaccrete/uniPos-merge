@@ -316,13 +316,13 @@ mixin _$AddProductFormStore on _AddProductFormStore, Store {
       Atom(name: '_AddProductFormStore.stockQuantity', context: context);
 
   @override
-  int get stockQuantity {
+  double get stockQuantity {
     _$stockQuantityAtom.reportRead();
     return super.stockQuantity;
   }
 
   @override
-  set stockQuantity(int value) {
+  set stockQuantity(double value) {
     _$stockQuantityAtom.reportWrite(value, super.stockQuantity, () {
       super.stockQuantity = value;
     });
@@ -332,15 +332,63 @@ mixin _$AddProductFormStore on _AddProductFormStore, Store {
       Atom(name: '_AddProductFormStore.minStock', context: context);
 
   @override
-  int get minStock {
+  double get minStock {
     _$minStockAtom.reportRead();
     return super.minStock;
   }
 
   @override
-  set minStock(int value) {
+  set minStock(double value) {
     _$minStockAtom.reportWrite(value, super.minStock, () {
       super.minStock = value;
+    });
+  }
+
+  late final _$selectedTaxIdAtom =
+      Atom(name: '_AddProductFormStore.selectedTaxId', context: context);
+
+  @override
+  String? get selectedTaxId {
+    _$selectedTaxIdAtom.reportRead();
+    return super.selectedTaxId;
+  }
+
+  @override
+  set selectedTaxId(String? value) {
+    _$selectedTaxIdAtom.reportWrite(value, super.selectedTaxId, () {
+      super.selectedTaxId = value;
+    });
+  }
+
+  late final _$isDecimalQuantityAtom =
+      Atom(name: '_AddProductFormStore.isDecimalQuantity', context: context);
+
+  @override
+  bool get isDecimalQuantity {
+    _$isDecimalQuantityAtom.reportRead();
+    return super.isDecimalQuantity;
+  }
+
+  @override
+  set isDecimalQuantity(bool value) {
+    _$isDecimalQuantityAtom.reportWrite(value, super.isDecimalQuantity, () {
+      super.isDecimalQuantity = value;
+    });
+  }
+
+  late final _$expiryDateAtom =
+      Atom(name: '_AddProductFormStore.expiryDate', context: context);
+
+  @override
+  DateTime? get expiryDate {
+    _$expiryDateAtom.reportRead();
+    return super.expiryDate;
+  }
+
+  @override
+  set expiryDate(DateTime? value) {
+    _$expiryDateAtom.reportWrite(value, super.expiryDate, () {
+      super.expiryDate = value;
     });
   }
 
@@ -407,6 +455,22 @@ mixin _$AddProductFormStore on _AddProductFormStore, Store {
   set retailVariants(ObservableList<VariantFormData> value) {
     _$retailVariantsAtom.reportWrite(value, super.retailVariants, () {
       super.retailVariants = value;
+    });
+  }
+
+  late final _$simpleFieldValuesAtom =
+      Atom(name: '_AddProductFormStore.simpleFieldValues', context: context);
+
+  @override
+  ObservableMap<String, String> get simpleFieldValues {
+    _$simpleFieldValuesAtom.reportRead();
+    return super.simpleFieldValues;
+  }
+
+  @override
+  set simpleFieldValues(ObservableMap<String, String> value) {
+    _$simpleFieldValuesAtom.reportWrite(value, super.simpleFieldValues, () {
+      super.simpleFieldValues = value;
     });
   }
 
@@ -813,7 +877,7 @@ mixin _$AddProductFormStore on _AddProductFormStore, Store {
   }
 
   @override
-  void setStockQuantity(int value) {
+  void setStockQuantity(double value) {
     final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
         name: '_AddProductFormStore.setStockQuantity');
     try {
@@ -824,7 +888,7 @@ mixin _$AddProductFormStore on _AddProductFormStore, Store {
   }
 
   @override
-  void setMinStock(int value) {
+  void setMinStock(double value) {
     final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
         name: '_AddProductFormStore.setMinStock');
     try {
@@ -840,6 +904,17 @@ mixin _$AddProductFormStore on _AddProductFormStore, Store {
         name: '_AddProductFormStore.setProductType');
     try {
       return super.setProductType(value);
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setSimpleFieldValue(String attributeName, String value) {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.setSimpleFieldValue');
+    try {
+      return super.setSimpleFieldValue(attributeName, value);
     } finally {
       _$_AddProductFormStoreActionController.endAction(_$actionInfo);
     }
@@ -907,6 +982,39 @@ mixin _$AddProductFormStore on _AddProductFormStore, Store {
         name: '_AddProductFormStore.removeRetailVariant');
     try {
       return super.removeRetailVariant(index);
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setSelectedTaxId(String? value) {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.setSelectedTaxId');
+    try {
+      return super.setSelectedTaxId(value);
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setIsDecimalQuantity(bool value) {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.setIsDecimalQuantity');
+    try {
+      return super.setIsDecimalQuantity(value);
+    } finally {
+      _$_AddProductFormStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
+  void setExpiryDate(DateTime? value) {
+    final _$actionInfo = _$_AddProductFormStoreActionController.startAction(
+        name: '_AddProductFormStore.setExpiryDate');
+    try {
+      return super.setExpiryDate(value);
     } finally {
       _$_AddProductFormStoreActionController.endAction(_$actionInfo);
     }
@@ -1086,10 +1194,14 @@ sku: ${sku},
 barcode: ${barcode},
 stockQuantity: ${stockQuantity},
 minStock: ${minStock},
+selectedTaxId: ${selectedTaxId},
+isDecimalQuantity: ${isDecimalQuantity},
+expiryDate: ${expiryDate},
 productType: ${productType},
 selectedAttributeIds: ${selectedAttributeIds},
 selectedAttributeValues: ${selectedAttributeValues},
 retailVariants: ${retailVariants},
+simpleFieldValues: ${simpleFieldValues},
 isVeg: ${isVeg},
 unit: ${unit},
 trackInventory: ${trackInventory},

@@ -1,9 +1,22 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_mobx/flutter_mobx.dart';
+import 'package:billberrylite/util/common/quantity_format.dart';
+import 'package:flutter/services.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/presentation/widget/componets/common/dialog_dispose_scope.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
 import '../../../core/di/service_locator.dart';
 import 'package:billberrylite/data/models/retail/hive_model/purchase_order_model_211.dart';
 import 'package:billberrylite/data/models/retail/hive_model/grn_model_213.dart';
 import 'package:billberrylite/data/models/retail/hive_model/grn_item_model_214.dart';
+import 'package:billberrylite/domain/services/retail/grn_receiving_service.dart';
+import 'package:billberrylite/core/plan/plan_guard.dart';
+import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
 
 class MaterialReceivingScreen extends StatefulWidget {
   final PurchaseOrderModel purchaseOrder;
@@ -11,25 +24,47 @@ class MaterialReceivingScreen extends StatefulWidget {
   const MaterialReceivingScreen({super.key, required this.purchaseOrder});
 
   @override
-  State<MaterialReceivingScreen> createState() => _MaterialReceivingScreenState();
+  State<MaterialReceivingScreen> createState() =>
+      _MaterialReceivingScreenState();
 }
 
 class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
-  late String _grnNumber;
+  // Empty until reserved — see _loadPOItems. Generation writes a Hive counter,
+  // so it can't run synchronously in initState.
+  String _grnNumber = '';
   DateTime _receivedDate = DateTime.now();
   final TextEditingController _invoiceController = TextEditingController();
   final TextEditingController _notesController = TextEditingController();
+  // Owned here because the Scrollbar and the ListView must share one controller
+  // for the thumb to be measurable.
+  final ScrollController _itemsScrollController = ScrollController();
   final List<ReceivingItemData> _receivingItems = [];
   bool _isLoading = true;
+  bool _saving = false;
 
   @override
   void initState() {
     super.initState();
-    _grnNumber = purchaseOrderStore.generateGRNNumber();
     _loadPOItems();
   }
 
+  @override
+  void dispose() {
+    _invoiceController.dispose();
+    _notesController.dispose();
+    _itemsScrollController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadPOItems() async {
+    // An interrupted receipt must land before "remaining" is computed, or its
+    // quantity would show as still outstanding and be received twice.
+    await GrnReceivingService.resumeInterrupted();
+
+    // Reserved alongside the item load — the screen already shows a spinner
+    // until this finishes, so the number is in place before anything reads it.
+    _grnNumber = await purchaseOrderStore.generateGRNNumber();
+
     await purchaseOrderStore.loadPOItems(widget.purchaseOrder.poId);
 
     // Prepare receiving items from PO items, accounting for already received qty
@@ -38,22 +73,26 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
       final variant = await productStore.getVariantById(poItem.variantId);
 
       // Get already received quantity for this PO item
-      final alreadyReceived = await purchaseOrderStore.getReceivedQtyForPOItem(poItem.poItemId);
+      final alreadyReceived = await purchaseOrderStore.getReceivedQtyForPOItem(
+        poItem.poItemId,
+      );
       final remainingQty = poItem.orderedQty - alreadyReceived;
 
       // Only add items that still have remaining quantity to receive
       if (remainingQty > 0) {
-        items.add(ReceivingItemData(
-          poItemId: poItem.poItemId,
-          variantId: poItem.variantId,
-          productId: poItem.productId,
-          productName: poItem.productName ?? 'Unknown Product',
-          variantInfo: poItem.variantInfo,
-          orderedQty: remainingQty, // Show only remaining quantity
-          receivedQty: remainingQty, // Default to full receipt of remaining
-          damagedQty: 0,
-          costPrice: poItem.estimatedPrice ?? variant?.costPrice ?? 0,
-        ));
+        items.add(
+          ReceivingItemData(
+            poItemId: poItem.poItemId,
+            variantId: poItem.variantId,
+            productId: poItem.productId,
+            productName: poItem.productName ?? 'Unknown Product',
+            variantInfo: poItem.variantInfo,
+            orderedQty: remainingQty, // Show only remaining quantity
+            receivedQty: remainingQty, // Default to full receipt of remaining
+            damagedQty: 0,
+            costPrice: poItem.estimatedPrice ?? variant?.costPrice ?? 0,
+          ),
+        );
       }
     }
 
@@ -78,277 +117,494 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
     }
   }
 
-  void _updateReceivedQty(int index, int qty) {
-    setState(() {
-      _receivingItems[index] = _receivingItems[index].copyWith(receivedQty: qty);
-    });
-  }
-
-  void _updateDamagedQty(int index, int qty) {
-    setState(() {
-      _receivingItems[index] = _receivingItems[index].copyWith(damagedQty: qty);
-    });
-  }
-
-  void _updateCostPrice(int index, double price) {
-    setState(() {
-      _receivingItems[index] = _receivingItems[index].copyWith(costPrice: price);
-    });
-  }
-
   void _showEditItemDialog(int index) {
     final item = _receivingItems[index];
-    final receivedController = TextEditingController(text: item.receivedQty.toString());
-    final damagedController = TextEditingController(text: item.damagedQty.toString());
-    final priceController = TextEditingController(text: item.costPrice.toStringAsFixed(2));
+    // The PO line's own variant decides whether fractions may be received.
+    final allowDecimal =
+        productStore.variants
+            .where((v) => v.varianteId == item.variantId)
+            .firstOrNull
+            ?.isDecimalQuantity ??
+        false;
+    final receivedController = TextEditingController(
+      text: formatQty(item.receivedQty),
+    );
+    final damagedController = TextEditingController(
+      text: formatQty(item.damagedQty),
+    );
+    final priceController = TextEditingController(
+      text: item.costPrice.toStringAsFixed(2),
+    );
     DamagedHandling selectedHandling = item.damagedHandling;
 
-    showDialog(
+    showDialog<void>(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          final damaged = int.tryParse(damagedController.text) ?? 0;
-          final received = int.tryParse(receivedController.text) ?? 0;
-          final accepted = received - damaged;
-          final price = double.tryParse(priceController.text) ?? 0;
+      builder: (dialogContext) => DialogDisposeScope(
+        disposables: [receivedController, damagedController, priceController],
+        child: MoneyScope(
+          child: StatefulBuilder(
+            builder: (context, setDialogState) {
+              final received =
+                  (allowDecimal
+                      ? double.tryParse(receivedController.text)
+                      : int.tryParse(receivedController.text)?.toDouble()) ??
+                  0;
+              final damaged =
+                  (allowDecimal
+                      ? double.tryParse(damagedController.text)
+                      : int.tryParse(damagedController.text)?.toDouble()) ??
+                  0;
+              final accepted = received - damaged;
+              final price = double.tryParse(priceController.text) ?? 0;
+              final overDamaged = damaged > received;
 
-          return AlertDialog(
-            title: Text(item.productName),
-            content: SingleChildScrollView(
+              return AppDialogShell(
+                title: item.productName,
+                subtitle: item.variantInfo?.isNotEmpty == true
+                    ? '${item.variantInfo} • Ordered ${formatQty(item.orderedQty)}'
+                    : 'Ordered ${formatQty(item.orderedQty)}',
+                accent: AppColors.primary,
+                icon: Icons.inventory_2_outlined,
+                body: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    AppTextField(
+                      controller: receivedController,
+                      label: 'Received Quantity',
+                      hint: 'Total physically received',
+                      icon: Icons.local_shipping_outlined,
+                      keyboardType: allowDecimal
+                          ? const TextInputType.numberWithOptions(decimal: true)
+                          : TextInputType.number,
+                      inputFormatters: [
+                        if (allowDecimal)
+                          FilteringTextInputFormatter.allow(
+                            RegExp(r'^\d*\.?\d{0,2}'),
+                          )
+                        else
+                          FilteringTextInputFormatter.digitsOnly,
+                      ],
+                      onChanged: (_) => setDialogState(() {}),
+                    ),
+                    SizedBox(height: AppResponsive.mediumSpacing(context)),
+                    AppTextField(
+                      controller: damagedController,
+                      label: 'Damaged Quantity',
+                      hint: 'Received but unusable',
+                      icon: Icons.report_gmailerrorred_outlined,
+                      keyboardType: allowDecimal
+                          ? const TextInputType.numberWithOptions(decimal: true)
+                          : TextInputType.number,
+                      inputFormatters: [
+                        if (allowDecimal)
+                          FilteringTextInputFormatter.allow(
+                            RegExp(r'^\d*\.?\d{0,2}'),
+                          )
+                        else
+                          FilteringTextInputFormatter.digitsOnly,
+                      ],
+                      onChanged: (_) => setDialogState(() {}),
+                      // Surfaced inline as well as on save — the summary below
+                      // would otherwise show a negative accepted count.
+                      validator: (_) => overDamaged
+                          ? 'Cannot exceed received quantity'
+                          : null,
+                    ),
+                    if (damaged > 0) ...[
+                      SizedBox(height: AppResponsive.mediumSpacing(context)),
+                      Text(
+                        'WHAT HAPPENS TO THE DAMAGED UNITS',
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.captionFontSize(context),
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.6,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      SizedBox(height: AppResponsive.smallSpacing(context)),
+                      // Radio-style tiles instead of a dropdown: each option
+                      // creates a different document, so the consequence is
+                      // worth spelling out rather than hiding in a menu.
+                      _handlingTile(
+                        handling: DamagedHandling.returnToSupplier,
+                        selected: selectedHandling,
+                        label: 'Return to Supplier',
+                        caption: 'Raises a purchase return',
+                        color: AppColors.info,
+                        onTap: (v) =>
+                            setDialogState(() => selectedHandling = v),
+                      ),
+                      const SizedBox(height: 6),
+                      _handlingTile(
+                        handling: DamagedHandling.keepForClaim,
+                        selected: selectedHandling,
+                        label: 'Keep for Claim',
+                        caption: 'Opens a supplier claim',
+                        color: AppColors.warning,
+                        onTap: (v) =>
+                            setDialogState(() => selectedHandling = v),
+                      ),
+                      const SizedBox(height: 6),
+                      _handlingTile(
+                        handling: DamagedHandling.writeOff,
+                        selected: selectedHandling,
+                        label: 'Write Off as Loss',
+                        caption: 'Records an inventory loss',
+                        color: AppColors.danger,
+                        onTap: (v) =>
+                            setDialogState(() => selectedHandling = v),
+                      ),
+                    ],
+                    SizedBox(height: AppResponsive.mediumSpacing(context)),
+                    AppTextField(
+                      controller: priceController,
+                      label: 'Cost Price per Unit',
+                      icon: Icons.sell_outlined,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(
+                          RegExp(r'^\d*\.?\d{0,2}'),
+                        ),
+                      ],
+                      onChanged: (_) => setDialogState(() {}),
+                    ),
+                    SizedBox(height: AppResponsive.largeSpacing(context)),
+                    _editSummary(
+                      accepted: accepted,
+                      damaged: damaged,
+                      price: price,
+                      overDamaged: overDamaged,
+                    ),
+                  ],
+                ),
+                actions: [
+                  appDialogCancelButton(dialogContext),
+                  SizedBox(width: AppResponsive.mediumSpacing(context)),
+                  appDialogPrimaryButton(
+                    label: 'Save',
+                    onPressed: () async {
+                      if (damaged > received) {
+                        NotificationService.instance.showError(
+                          'Damaged quantity cannot exceed received quantity',
+                        );
+                        return;
+                      }
+
+                      // Over-receipt stays allowed — suppliers do ship extra,
+                      // and the PO treats a surplus as satisfying its line —
+                      // but never silently: a typo of 100 for 10 used to add
+                      // 100 to stock and bill the supplier for all of it.
+                      // `orderedQty` here is what is still DUE on the line.
+                      if (received > item.orderedQty + 1e-9) {
+                        final extra = received - item.orderedQty;
+                        final ok = await showAppConfirmDialog(
+                          context: dialogContext,
+                          title: 'More than ordered?',
+                          message:
+                              'Only ${formatQty(item.orderedQty)} of '
+                              '${item.productName} are still due on '
+                              '${widget.purchaseOrder.poNumber}. Receive '
+                              '${formatQty(received)} — ${formatQty(extra)} '
+                              'more than ordered? The supplier is billed for '
+                              'all ${formatQty(received)}.',
+                          confirmLabel: 'Receive ${formatQty(received)}',
+                          cancelLabel: 'Fix quantity',
+                          accent: AppColors.warning,
+                          icon: Icons.warning_amber_rounded,
+                        );
+                        if (!ok || !dialogContext.mounted || !mounted) return;
+                      }
+
+                      setState(() {
+                        _receivingItems[index] = item.copyWith(
+                          receivedQty: received,
+                          damagedQty: damaged,
+                          damagedHandling: damaged > 0
+                              ? selectedHandling
+                              : DamagedHandling.none,
+                          costPrice: price,
+                        );
+                      });
+                      if (dialogContext.mounted) Navigator.pop(dialogContext);
+                    },
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// One damaged-handling choice. Selecting it is what decides whether a
+  /// purchase return, a supplier claim or an inventory loss gets created when
+  /// the GRN is confirmed.
+  Widget _handlingTile({
+    required DamagedHandling handling,
+    required DamagedHandling selected,
+    required String label,
+    required String caption,
+    required Color color,
+    required ValueChanged<DamagedHandling> onTap,
+  }) {
+    final isSelected = selected == handling;
+
+    return InkWell(
+      onTap: () => onTap(handling),
+      borderRadius: BorderRadius.circular(
+        AppResponsive.smallBorderRadius(context),
+      ),
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: AppResponsive.mediumSpacing(context),
+          vertical: AppResponsive.smallSpacing(context),
+        ),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? color.withValues(alpha: 0.07)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(
+            AppResponsive.smallBorderRadius(context),
+          ),
+          border: Border.all(
+            color: isSelected ? color : AppColors.divider,
+            width: isSelected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              isSelected
+                  ? Icons.radio_button_checked_rounded
+                  : Icons.radio_button_unchecked_rounded,
+              size: AppResponsive.iconSize(context),
+              color: isSelected ? color : AppColors.textSecondary,
+            ),
+            SizedBox(width: AppResponsive.smallSpacing(context)),
+            Expanded(
               child: Column(
-                mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Ordered: ${item.orderedQty}',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF6B6B6B),
+                    label,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.smallFontSize(context),
+                      fontWeight: FontWeight.w600,
+                      color: isSelected ? color : AppColors.textPrimary,
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: receivedController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'Received Quantity',
-                      border: OutlineInputBorder(),
-                      helperText: 'Total items physically received',
-                    ),
-                    onChanged: (_) => setDialogState(() {}),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: damagedController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'Damaged Quantity',
-                      border: OutlineInputBorder(),
-                      helperText: 'Items received but damaged',
-                    ),
-                    onChanged: (_) => setDialogState(() {}),
-                  ),
-                  if (damaged > 0) ...[
-                    const SizedBox(height: 16),
-                    DropdownButtonFormField<DamagedHandling>(
-                      value: selectedHandling == DamagedHandling.none ? DamagedHandling.keepForClaim : selectedHandling,
-                      decoration: const InputDecoration(
-                        labelText: 'Damaged Item Handling',
-                        border: OutlineInputBorder(),
-                      ),
-                      items: const [
-                        DropdownMenuItem(
-                          value: DamagedHandling.keepForClaim,
-                          child: Text('Keep for Claim'),
-                        ),
-                        DropdownMenuItem(
-                          value: DamagedHandling.returnToSupplier,
-                          child: Text('Return to Supplier'),
-                        ),
-                        DropdownMenuItem(
-                          value: DamagedHandling.writeOff,
-                          child: Text('Write Off as Loss'),
-                        ),
-                      ],
-                      onChanged: (value) {
-                        setDialogState(() {
-                          selectedHandling = value ?? DamagedHandling.keepForClaim;
-                        });
-                      },
-                    ),
-                  ],
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: priceController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(
-                      labelText: 'Cost Price per Unit',
-                      border: OutlineInputBorder(),
-                      prefixText: '₹ ',
-                    ),
-                    onChanged: (_) => setDialogState(() {}),
-                  ),
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF5F5F5),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Summary',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text('Accepted (to stock):', style: TextStyle(fontSize: 13)),
-                            Text(
-                              '$accepted items',
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF4CAF50),
-                              ),
-                            ),
-                          ],
-                        ),
-                        if (damaged > 0) ...[
-                          const SizedBox(height: 4),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text('Damaged:', style: TextStyle(fontSize: 13)),
-                              Text(
-                                '$damaged items (₹${(damaged * price).toStringAsFixed(2)})',
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFFF44336),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                        const SizedBox(height: 4),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text('Stock Value:', style: TextStyle(fontSize: 13)),
-                            Text(
-                              '₹${(accepted * price).toStringAsFixed(2)}',
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF2196F3),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+                  Text(
+                    caption,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.captionFontSize(context),
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ],
               ),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  final received = int.tryParse(receivedController.text) ?? 0;
-                  final damaged = int.tryParse(damagedController.text) ?? 0;
-                  final price = double.tryParse(priceController.text) ?? 0;
+          ],
+        ),
+      ),
+    );
+  }
 
-                  // Validate damaged <= received
-                  if (damaged > received) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Damaged quantity cannot exceed received quantity'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                    return;
-                  }
+  Widget _editSummary({
+    required double accepted,
+    required double damaged,
+    required double price,
+    required bool overDamaged,
+  }) {
+    return Container(
+      padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
+      decoration: BoxDecoration(
+        color: overDamaged
+            ? AppColors.danger.withValues(alpha: 0.06)
+            : AppColors.surfaceMedium,
+        borderRadius: BorderRadius.circular(
+          AppResponsive.smallBorderRadius(context),
+        ),
+        border: overDamaged
+            ? Border.all(color: AppColors.danger.withValues(alpha: 0.4))
+            : null,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            overDamaged ? 'Check the quantities' : 'Summary',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.smallFontSize(context),
+              fontWeight: FontWeight.w600,
+              color: overDamaged ? AppColors.danger : AppColors.textPrimary,
+            ),
+          ),
+          SizedBox(height: AppResponsive.smallSpacing(context)),
+          _summaryLine(
+            'Accepted (to stock)',
+            '${formatQty(accepted)} items',
+            overDamaged ? AppColors.danger : AppColors.success,
+          ),
+          if (damaged > 0)
+            _summaryLine(
+              'Damaged',
+              '${formatQty(damaged)} items (${formatMoney(damaged * price)})',
+              AppColors.danger,
+            ),
+          _summaryLine(
+            'Stock Value',
+            formatMoney((accepted < 0 ? 0 : accepted) * price),
+            AppColors.info,
+          ),
+        ],
+      ),
+    );
+  }
 
-                  setState(() {
-                    _receivingItems[index] = item.copyWith(
-                      receivedQty: received,
-                      damagedQty: damaged,
-                      damagedHandling: damaged > 0 ? selectedHandling : DamagedHandling.none,
-                      costPrice: price,
-                    );
-                  });
-                  Navigator.pop(context);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF4CAF50),
-                  foregroundColor: Colors.white,
-                ),
-                child: const Text('Save'),
+  Widget _summaryLine(String label, String value, Color color) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Flexible(
+            child: Text(
+              label,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.smallFontSize(context),
+                color: AppColors.textSecondary,
               ),
-            ],
-          );
-        },
+            ),
+          ),
+          SizedBox(width: AppResponsive.smallSpacing(context)),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.smallFontSize(context),
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Future<void> _saveAndConfirmGRN() async {
+    if (_saving) return;
+    if (!PlanGuard.allowedOr(
+      context,
+      RetailEntKeys.purchaseReceive,
+      featureName: 'Goods Receipt',
+    )) {
+      return;
+    }
     // Validation
-    final hasReceivedItems = _receivingItems.any((item) => item.receivedQty > 0);
+    final hasReceivedItems = _receivingItems.any(
+      (item) => item.receivedQty > 0,
+    );
     if (!hasReceivedItems) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter received quantities for at least one item'),
-          backgroundColor: Colors.red,
-        ),
+      NotificationService.instance.showError(
+        'Please enter received quantities for at least one item',
       );
       return;
     }
 
     // Check if damaged handling is selected for items with damage
-    final itemsWithUnhandledDamage = _receivingItems.where(
-      (item) => item.damagedQty > 0 && item.damagedHandling == DamagedHandling.none,
-    ).toList();
+    final itemsWithUnhandledDamage = _receivingItems
+        .where(
+          (item) =>
+              item.damagedQty > 0 &&
+              item.damagedHandling == DamagedHandling.none,
+        )
+        .toList();
 
     if (itemsWithUnhandledDamage.isNotEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select handling method for damaged items'),
-          backgroundColor: Colors.red,
-        ),
+      NotificationService.instance.showError(
+        'Please select handling method for damaged items',
+      );
+      return;
+    }
+
+    // A cost price is required on anything actually received.
+    //
+    // `costPrice` seeds from `estimatedPrice ?? variant.costPrice ?? 0` and the
+    // price field parses `tryParse(text) ?? 0`, so a blank silently became ₹0 —
+    // and ₹0 then valued the line, this receipt, the supplier accrual and any
+    // return or claim raised from it at nothing, indistinguishably from goods
+    // that really were free. Blocking here is the only point at which the
+    // figure can still be asked for; afterwards no report can recover it.
+    final itemsWithoutCost = _receivingItems
+        .where((item) => item.receivedQty > 0 && item.costPrice <= 0)
+        .toList();
+
+    if (itemsWithoutCost.isNotEmpty) {
+      final names = itemsWithoutCost.map((i) => i.productName).join(', ');
+      NotificationService.instance.showError(
+        itemsWithoutCost.length == 1
+            ? 'Enter a cost price for $names before receiving it'
+            : 'Enter a cost price for these items before receiving: $names',
       );
       return;
     }
 
     // Calculate totals
-    final totalOrdered = _receivingItems.fold<int>(0, (sum, item) => sum + item.orderedQty);
-    final totalReceived = _receivingItems.fold<int>(0, (sum, item) => sum + item.receivedQty);
-    final totalAccepted = _receivingItems.fold<int>(0, (sum, item) => sum + item.acceptedQty);
-    final totalDamaged = _receivingItems.fold<int>(0, (sum, item) => sum + item.damagedQty);
-    final totalAcceptedAmount = _receivingItems.fold<double>(0.0, (sum, item) => sum + item.acceptedAmount);
-    final totalDamagedAmount = _receivingItems.fold<double>(0.0, (sum, item) => sum + item.damagedAmount);
+    final totalOrdered = _receivingItems.fold<double>(
+      0,
+      (sum, item) => sum + item.orderedQty,
+    );
+    final totalReceived = _receivingItems.fold<double>(
+      0,
+      (sum, item) => sum + item.receivedQty,
+    );
+    final totalAccepted = _receivingItems.fold<double>(
+      0.0,
+      (sum, item) => sum + item.acceptedQty,
+    );
+    final totalDamaged = _receivingItems.fold<double>(
+      0.0,
+      (sum, item) => sum + item.damagedQty,
+    );
+    final totalAcceptedAmount = _receivingItems.fold<double>(
+      0.0,
+      (sum, item) => sum + item.acceptedAmount,
+    );
+    // What the supplier is owed for this receipt. Accrued in full so the GRN
+    // matches their invoice; damaged units come back later as a credit note or
+    // a settled claim, if at all.
+    final totalBillableAmount = _receivingItems.fold<double>(
+      0.0,
+      (sum, item) => sum + item.billableAmount,
+    );
+    final totalDamagedAmount = _receivingItems.fold<double>(
+      0.0,
+      (sum, item) => sum + item.damagedAmount,
+    );
+
+    // Lines received beyond what was still due — shown in the confirmation.
+    final overReceived = _receivingItems
+        .where((item) => item.receivedQty > item.orderedQty + 1e-9)
+        .toList();
 
     // Count items by handling method
-    final returnToSupplierItems = _receivingItems.where(
-      (item) => item.damagedHandling == DamagedHandling.returnToSupplier
-    ).toList();
-    final keepForClaimItems = _receivingItems.where(
-      (item) => item.damagedHandling == DamagedHandling.keepForClaim
-    ).toList();
-    final writeOffItems = _receivingItems.where(
-      (item) => item.damagedHandling == DamagedHandling.writeOff
-    ).toList();
+    final returnToSupplierItems = _receivingItems
+        .where(
+          (item) => item.damagedHandling == DamagedHandling.returnToSupplier,
+        )
+        .toList();
+    final keepForClaimItems = _receivingItems
+        .where((item) => item.damagedHandling == DamagedHandling.keepForClaim)
+        .toList();
+    final writeOffItems = _receivingItems
+        .where((item) => item.damagedHandling == DamagedHandling.writeOff)
+        .toList();
 
     // Create GRN
     final grn = GRNModel.create(
@@ -360,168 +616,336 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
       receivedDate: _receivedDate.toIso8601String(),
       totalOrderedQty: totalOrdered,
       totalReceivedQty: totalReceived,
-      totalAmount: totalAcceptedAmount, // Only accepted amount goes to stock value
-      invoiceNumber: _invoiceController.text.isEmpty ? null : _invoiceController.text.trim(),
-      notes: _notesController.text.isEmpty ? null : _notesController.text.trim(),
+      // The supplier's invoice value, not the stock value — damaged units are
+      // billed too.
+      totalAmount: totalBillableAmount,
+      invoiceNumber: _invoiceController.text.isEmpty
+          ? null
+          : _invoiceController.text.trim(),
+      notes: _notesController.text.isEmpty
+          ? null
+          : _notesController.text.trim(),
     );
 
     // Create GRN Items with acceptedQty and damagedHandling
     final grnItems = _receivingItems
         .where((item) => item.receivedQty > 0)
-        .map((item) => GRNItemModel.create(
-              grnId: grn.grnId,
-              poItemId: item.poItemId,
-              variantId: item.variantId,
-              productId: item.productId,
-              productName: item.productName,
-              variantInfo: item.variantInfo,
-              orderedQty: item.orderedQty,
-              receivedQty: item.receivedQty,
-              acceptedQty: item.acceptedQty, // Only good items
-              damagedQty: item.damagedQty > 0 ? item.damagedQty : null,
-              damagedHandling: item.damagedQty > 0 ? item.damagedHandling : null,
-              costPrice: item.costPrice,
-            ))
+        .map(
+          (item) => GRNItemModel.create(
+            grnId: grn.grnId,
+            poItemId: item.poItemId,
+            variantId: item.variantId,
+            productId: item.productId,
+            productName: item.productName,
+            variantInfo: item.variantInfo,
+            orderedQty: item.orderedQty,
+            receivedQty: item.receivedQty,
+            acceptedQty: item.acceptedQty, // Only good items
+            damagedQty: item.damagedQty > 0 ? item.damagedQty : null,
+            damagedHandling: item.damagedQty > 0 ? item.damagedHandling : null,
+            costPrice: item.costPrice,
+          ),
+        )
         .toList();
 
     // Show confirmation dialog with detailed breakdown
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirm Receipt'),
-        content: SingleChildScrollView(
-          child: Column(
+      builder: (dialogContext) => MoneyScope(
+        child: AppDialogShell(
+          title: 'Confirm Receipt',
+          subtitle: '$_grnNumber • ${widget.purchaseOrder.poNumber}',
+          accent: AppColors.primary,
+          icon: Icons.fact_check_outlined,
+          body: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Stock Update:', style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              _buildConfirmItem('Add $totalAccepted items to inventory'),
-              _buildConfirmItem('Stock value: ₹${totalAcceptedAmount.toStringAsFixed(2)}'),
-              if (totalDamaged > 0) ...[
-                const SizedBox(height: 12),
-                const Text('Damaged Items:', style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFFF44336))),
-                const SizedBox(height: 8),
+              // Header facts first: everything typed on the screen that gets
+              // written to the GRN is repeated here, so the last thing seen
+              // before an irreversible save is what will actually be saved.
+              _confirmMetaCard([
+                _metaLine(
+                  'Supplier',
+                  widget.purchaseOrder.supplierName ?? 'Unknown Supplier',
+                ),
+                _metaLine('Received on', _formatDate(_receivedDate)),
+                _metaLine(
+                  'Supplier invoice',
+                  _invoiceController.text.trim().isEmpty
+                      ? 'Not entered'
+                      : _invoiceController.text.trim(),
+                  muted: _invoiceController.text.trim().isEmpty,
+                ),
+                _metaLine(
+                  'Items',
+                  grnItems.length == _receivingItems.length
+                      ? '${grnItems.length} line${grnItems.length == 1 ? '' : 's'}'
+                      : '${grnItems.length} of ${_receivingItems.length} lines '
+                            '• ${_receivingItems.length - grnItems.length} not received at all',
+                ),
+                if (_notesController.text.trim().isNotEmpty)
+                  _metaLine('Notes', _notesController.text.trim()),
+              ]),
+              SizedBox(height: AppResponsive.largeSpacing(context)),
+              _confirmSection(
+                'Goes into stock',
+                Icons.inventory_2_rounded,
+                AppColors.success,
+              ),
+              _buildConfirmItem(
+                '${formatQty(totalAccepted)} items added to inventory',
+              ),
+              _buildConfirmItem(
+                'Stock value ${formatMoney(totalAcceptedAmount)}',
+              ),
+
+              SizedBox(height: AppResponsive.mediumSpacing(context)),
+              _confirmSection(
+                'Supplier is billed',
+                Icons.request_quote_outlined,
+                AppColors.primary,
+              ),
+              _buildConfirmItem(
+                '${formatMoney(totalBillableAmount)} for all ${formatQty(totalReceived)} items received',
+              ),
+              if (totalDamaged > 0)
                 _buildConfirmItem(
-                  '$totalDamaged damaged (₹${totalDamagedAmount.toStringAsFixed(2)})',
-                  color: const Color(0xFFF44336),
+                  'Damaged units are billed too — this matches the supplier invoice',
+                  color: AppColors.textSecondary,
+                ),
+
+              if (totalDamaged > 0) ...[
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
+                _confirmSection(
+                  'Damaged — never enters stock',
+                  Icons.report_gmailerrorred_rounded,
+                  AppColors.danger,
+                ),
+                _buildConfirmItem(
+                  '${formatQty(totalDamaged)} damaged, worth ${formatMoney(totalDamagedAmount)}',
+                  color: AppColors.danger,
                 ),
                 if (returnToSupplierItems.isNotEmpty)
                   _buildConfirmItem(
-                    '${returnToSupplierItems.fold<int>(0, (s, i) => s + i.damagedQty)} to return to supplier',
-                    color: const Color(0xFFFF9800),
+                    '${formatQty(returnToSupplierItems.fold<double>(0.0, (s, i) => s + i.damagedQty))} → purchase return raised, credited when the credit note arrives',
+                    color: AppColors.info,
                   ),
                 if (keepForClaimItems.isNotEmpty)
                   _buildConfirmItem(
-                    '${keepForClaimItems.fold<int>(0, (s, i) => s + i.damagedQty)} kept for claim',
-                    color: const Color(0xFF2196F3),
+                    '${formatQty(keepForClaimItems.fold<double>(0.0, (s, i) => s + i.damagedQty))} → supplier claim opened, credited only if it is settled',
+                    color: AppColors.warning,
                   ),
                 if (writeOffItems.isNotEmpty)
                   _buildConfirmItem(
-                    '${writeOffItems.fold<int>(0, (s, i) => s + i.damagedQty)} written off as loss',
-                    color: const Color(0xFF6B6B6B),
+                    '${formatQty(writeOffItems.fold<double>(0.0, (s, i) => s + i.damagedQty))} → written off, a cost the business absorbs',
+                    color: AppColors.textSecondary,
                   ),
               ],
+
+              // Per line, not from the totals: one line over and another short
+              // can net to "exactly as ordered" and hide both.
+              if (overReceived.isNotEmpty) ...[
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
+                _confirmSection(
+                  'More than ordered',
+                  Icons.warning_amber_rounded,
+                  AppColors.warning,
+                ),
+                for (final i in overReceived)
+                  _buildConfirmItem(
+                    '${i.productName}: ${formatQty(i.receivedQty)} received, '
+                    '${formatQty(i.orderedQty)} due '
+                    '(+${formatQty(i.receivedQty - i.orderedQty)}) — billed in full',
+                    color: AppColors.warning,
+                  ),
+              ],
+
               if (totalReceived < totalOrdered) ...[
-                const SizedBox(height: 12),
+                SizedBox(height: AppResponsive.mediumSpacing(context)),
+                _confirmSection(
+                  'Still outstanding',
+                  Icons.hourglass_top_rounded,
+                  AppColors.warning,
+                ),
                 _buildConfirmItem(
-                  'Shortage: ${totalOrdered - totalReceived} items not received',
-                  color: Colors.orange,
+                  '${formatQty(totalOrdered - totalReceived)} items not received — the order stays open',
+                  color: AppColors.warning,
                 ),
               ],
-              const SizedBox(height: 16),
-              const Text(
-                'This action cannot be undone.',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Color(0xFFB0B0B0),
+
+              SizedBox(height: AppResponsive.largeSpacing(context)),
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
+                decoration: BoxDecoration(
+                  color: AppColors.warning.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(
+                    AppResponsive.smallBorderRadius(context),
+                  ),
+                ),
+                child: Text(
+                  'Confirming moves stock and updates the supplier balance. This cannot be undone.',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.captionFontSize(context),
+                    height: 1.4,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ),
             ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF4CAF50),
-              foregroundColor: Colors.white,
+          actions: [
+            appDialogCancelButton(dialogContext),
+            SizedBox(width: AppResponsive.mediumSpacing(context)),
+            appDialogPrimaryButton(
+              // Short label on purpose: the actions row splits the dialog in
+              // half, and the old "Confirm & Update Stock" wrapped to three
+              // cramped lines on a phone. What it updates is spelled out in
+              // the body above.
+              label: 'Confirm',
+              onPressed: () => Navigator.pop(dialogContext, true),
             ),
-            child: const Text('Confirm & Update Stock'),
-          ),
-        ],
+          ],
+        ),
       ),
     );
 
-    if (confirmed != true) return;
+    if (confirmed != true || _saving) return;
 
-    // Save GRN
-    await purchaseOrderStore.createGRN(grn, grnItems);
+    // Stock, cost, supplier accrual, damaged documents and confirmation, in a
+    // crash-resumable order — see GrnReceivingService.
+    setState(() => _saving = true);
+    final result = await GrnReceivingService.receive(grn, grnItems);
+    if (mounted) setState(() => _saving = false);
 
-    // Confirm GRN (this updates PO status)
-    final confirmedItems = await purchaseOrderStore.confirmGRN(grn.grnId);
-
-    // Update stock for each item - ONLY acceptedQty goes to stock
-    // Use goodQty as fallback for backward compatibility with old data
-    for (var item in confirmedItems) {
-      final qtyToAdd = item.acceptedQty > 0 ? item.acceptedQty : item.goodQty;
-      if (qtyToAdd > 0) {
-        final variant = await productStore.getVariantById(item.variantId);
-        if (variant != null) {
-          final newStock = variant.stockQty + qtyToAdd;
-          await productStore.updateVariantStock(item.variantId, newStock);
-
-          // Also update cost price if provided
-          if (item.costPrice != null && item.costPrice! > 0) {
-            await productStore.updateVariantCostPrice(item.variantId, item.costPrice!);
-          }
-        }
-      }
+    if (!result.success) {
+      NotificationService.instance.showError(result.errorMessage!);
+      return;
     }
-
-    // Update supplier balance - only for accepted items value
-    await supplierStore.updateSupplierBalance(
-      widget.purchaseOrder.supplierId,
-      totalAcceptedAmount,
-    );
+    final damagedOutcome = result.damaged;
 
     if (mounted) {
       Navigator.pop(context, true);
 
-      String message = 'Added $totalAccepted items to stock';
+      String message = 'Added ${formatQty(totalAccepted)} items to stock';
       if (totalDamaged > 0) {
-        message += ' ($totalDamaged damaged)';
+        message += ' (${formatQty(totalDamaged)} damaged)';
+      }
+      if (!damagedOutcome.isEmpty) {
+        message += ' • ${damagedOutcome.summary}';
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: const Color(0xFF4CAF50),
-        ),
-      );
+      NotificationService.instance.showSuccess(message);
     }
+  }
+
+  /// Grey card at the top of the confirmation dialog holding the header facts
+  /// (supplier, date, invoice, line count, notes) — the fields typed on the
+  /// screen that are about to be written to the GRN.
+  Widget _confirmMetaCard(List<Widget> lines) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(
+        horizontal: AppResponsive.mediumSpacing(context),
+        vertical: AppResponsive.smallSpacing(context),
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceMedium,
+        borderRadius: BorderRadius.circular(
+          AppResponsive.smallBorderRadius(context),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: lines,
+      ),
+    );
+  }
+
+  Widget _metaLine(String label, String value, {bool muted = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Proportional, not a fixed 108: on a narrow phone that label column
+          // was a fixed share of a shrinking row, squeezing the value beside it.
+          Expanded(
+            flex: 2,
+            child: Text(
+              label,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.smallFontSize(context),
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          Expanded(
+            flex: 3,
+            child: Text(
+              value,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.smallFontSize(context),
+                fontWeight: muted ? FontWeight.w400 : FontWeight.w600,
+                fontStyle: muted ? FontStyle.italic : FontStyle.normal,
+                color: muted ? AppColors.textSecondary : AppColors.textPrimary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Heading above a group of confirmation lines.
+  Widget _confirmSection(String label, IconData icon, Color color) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
+      child: Row(
+        children: [
+          Icon(icon, size: AppResponsive.smallIconSize(context), color: color),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              label,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.smallFontSize(context),
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildConfirmItem(String text, {Color? color}) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.only(bottom: 5, left: 22),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            Icons.check_circle,
-            size: 16,
-            color: color ?? const Color(0xFF4CAF50),
+          Container(
+            margin: const EdgeInsets.only(top: 6),
+            width: 5,
+            height: 5,
+            decoration: BoxDecoration(
+              color: color ?? AppColors.textSecondary,
+              shape: BoxShape.circle,
+            ),
           ),
-          const SizedBox(width: 8),
-          Text(
-            text,
-            style: TextStyle(
-              fontSize: 14,
-              color: color ?? const Color(0xFF1A1A1A),
+          SizedBox(width: AppResponsive.smallSpacing(context)),
+          Expanded(
+            child: Text(
+              text,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.smallFontSize(context),
+                height: 1.35,
+                color: color ?? AppColors.textPrimary,
+              ),
             ),
           ),
         ],
@@ -535,281 +959,483 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final totalOrdered = _receivingItems.fold<int>(0, (sum, item) => sum + item.orderedQty);
-    final totalReceived = _receivingItems.fold<int>(0, (sum, item) => sum + item.receivedQty);
-    final totalAccepted = _receivingItems.fold<int>(0, (sum, item) => sum + item.acceptedQty);
-    final totalDamaged = _receivingItems.fold<int>(0, (sum, item) => sum + item.damagedQty);
-    final totalAcceptedAmount = _receivingItems.fold<double>(0.0, (sum, item) => sum + item.acceptedAmount);
+    final totalOrdered = _receivingItems.fold<double>(
+      0,
+      (sum, item) => sum + item.orderedQty,
+    );
+    final totalReceived = _receivingItems.fold<double>(
+      0,
+      (sum, item) => sum + item.receivedQty,
+    );
+    final totalAccepted = _receivingItems.fold<double>(
+      0.0,
+      (sum, item) => sum + item.acceptedQty,
+    );
+    final totalDamaged = _receivingItems.fold<double>(
+      0.0,
+      (sum, item) => sum + item.damagedQty,
+    );
+    final totalAcceptedAmount = _receivingItems.fold<double>(
+      0.0,
+      (sum, item) => sum + item.acceptedAmount,
+    );
     final shortage = totalOrdered - totalReceived;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFAFAFA),
-      appBar: AppBar(
-        title: const Text('Material Receiving'),
-        centerTitle: true,
+      backgroundColor: AppColors.surfaceLight,
+      appBar: buildPrimaryAppBar(
+        titleWidget: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Material Receiving',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.subheadingFontSize(context),
+                fontWeight: FontWeight.w600,
+                color: AppColors.white,
+              ),
+            ),
+            Text(
+              _grnNumber.isEmpty
+                  ? widget.purchaseOrder.poNumber
+                  : '$_grnNumber  •  ${widget.purchaseOrder.poNumber}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.smallFontSize(context),
+                fontWeight: FontWeight.w500,
+                color: AppColors.white.withValues(alpha: 0.75),
+              ),
+            ),
+          ],
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _receivingItems.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.check_circle, size: 80, color: Colors.green[300]),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'All items received!',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+          ? Center(
+              child: Padding(
+                padding: AppResponsive.padding(context),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.check_circle,
+                      size: AppResponsive.getValue(
+                        context,
+                        mobile: 80.0,
+                        tablet: 92.0,
+                        desktop: 104.0,
                       ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'No pending items to receive for this PO',
-                        style: TextStyle(fontSize: 14, color: Color(0xFF6B6B6B)),
+                      color: Colors.green[300],
+                    ),
+                    SizedBox(height: AppResponsive.largeSpacing(context)),
+                    Text(
+                      'All items received!',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.subheadingFontSize(context),
+                        fontWeight: FontWeight.w600,
                       ),
-                      const SizedBox(height: 24),
-                      ElevatedButton(
+                    ),
+                    SizedBox(height: AppResponsive.smallSpacing(context)),
+                    Text(
+                      'No pending items to receive for this PO',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.bodyFontSize(context),
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    SizedBox(height: AppResponsive.extraLargeSpacing(context)),
+                    SizedBox(
+                      height: AppResponsive.buttonHeight(context),
+                      child: ElevatedButton(
                         onPressed: () => Navigator.pop(context),
                         child: const Text('Go Back'),
                       ),
-                    ],
-                  ),
-                )
-              : Column(
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : Column(
               children: [
                 // Header Info
                 Container(
                   color: Colors.white,
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  _grnNumber,
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'PO: ${widget.purchaseOrder.poNumber}',
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    color: Color(0xFF6B6B6B),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          InkWell(
-                            onTap: _selectReceivedDate,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              decoration: BoxDecoration(
-                                border: Border.all(color: const Color(0xFFE8E8E8)),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Row(
+                  padding: AppResponsive.padding(context),
+                  child: AppResponsive.constrainedContent(
+                    context: context,
+                    alignment: Alignment.topCenter,
+                    maxWidth: AppResponsive.maxContentWidth(context),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Icon(Icons.calendar_today, size: 16, color: Color(0xFF6B6B6B)),
-                                  const SizedBox(width: 8),
                                   Text(
-                                    _formatDate(_receivedDate),
-                                    style: const TextStyle(fontSize: 13),
+                                    _grnNumber,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: GoogleFonts.poppins(
+                                      fontSize:
+                                          AppResponsive.subheadingFontSize(
+                                            context,
+                                          ),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'PO: ${widget.purchaseOrder.poNumber}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: GoogleFonts.poppins(
+                                      fontSize: AppResponsive.smallFontSize(
+                                        context,
+                                      ),
+                                      color: AppColors.textSecondary,
+                                    ),
                                   ),
                                 ],
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          const Icon(Icons.storefront, size: 16, color: Color(0xFF6B6B6B)),
-                          const SizedBox(width: 8),
-                          Text(
-                            widget.purchaseOrder.supplierName ?? 'Unknown Supplier',
-                            style: const TextStyle(fontSize: 14),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _invoiceController,
-                        decoration: const InputDecoration(
-                          labelText: 'Supplier Invoice Number (Optional)',
-                          border: OutlineInputBorder(),
-                          isDense: true,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                            SizedBox(
+                              width: AppResponsive.smallSpacing(context),
+                            ),
+                            InkWell(
+                              onTap: _selectReceivedDate,
+                              child: Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: AppResponsive.mediumSpacing(
+                                    context,
+                                  ),
+                                  vertical: AppResponsive.smallSpacing(context),
+                                ),
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: AppColors.divider),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.calendar_today,
+                                      size: AppResponsive.smallIconSize(
+                                        context,
+                                      ),
+                                      color: AppColors.textSecondary,
+                                    ),
+                                    SizedBox(
+                                      width: AppResponsive.smallSpacing(
+                                        context,
+                                      ),
+                                    ),
+                                    Text(
+                                      _formatDate(_receivedDate),
+                                      maxLines: 1,
+                                      style: GoogleFonts.poppins(
+                                        fontSize: AppResponsive.smallFontSize(
+                                          context,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                    ],
+                        SizedBox(height: AppResponsive.mediumSpacing(context)),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.storefront,
+                              size: AppResponsive.smallIconSize(context),
+                              color: AppColors.textSecondary,
+                            ),
+                            SizedBox(
+                              width: AppResponsive.smallSpacing(context),
+                            ),
+                            Expanded(
+                              child: Text(
+                                widget.purchaseOrder.supplierName ??
+                                    'Unknown Supplier',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.poppins(
+                                  fontSize: AppResponsive.bodyFontSize(context),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: AppResponsive.mediumSpacing(context)),
+                        AppTextField(
+                          controller: _invoiceController,
+                          label: 'Supplier Invoice Number (Optional)',
+                          icon: Icons.receipt_long_outlined,
+                          textCapitalization: TextCapitalization.characters,
+                          textInputAction: TextInputAction.next,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
 
                 // Summary
                 Container(
                   color: Colors.white,
-                  margin: const EdgeInsets.only(top: 8),
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildSummaryItem('Ordered', totalOrdered.toString(), const Color(0xFF6B6B6B)),
-                          ),
-                          Expanded(
-                            child: _buildSummaryItem('Received', totalReceived.toString(), const Color(0xFF4CAF50)),
-                          ),
-                          Expanded(
-                            child: _buildSummaryItem(
-                              'To Stock',
-                              totalAccepted.toString(),
-                              const Color(0xFF2196F3),
-                            ),
-                          ),
-                          Expanded(
-                            child: _buildSummaryItem(
-                              'Damaged',
-                              totalDamaged.toString(),
-                              totalDamaged > 0 ? const Color(0xFFF44336) : const Color(0xFF6B6B6B),
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (totalDamaged > 0 || shortage > 0) ...[
-                        const SizedBox(height: 12),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFFF3E0),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.info_outline, size: 16, color: Color(0xFFFF9800)),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  totalDamaged > 0 && shortage > 0
-                                      ? '$totalDamaged damaged, ${shortage} not received'
-                                      : totalDamaged > 0
-                                          ? '$totalDamaged items damaged'
-                                          : '${shortage} items not received',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: Color(0xFFE65100),
-                                  ),
-                                ),
-                              ),
-                              Text(
-                                '₹${totalAcceptedAmount.toStringAsFixed(0)}',
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF2196F3),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                      if (totalDamaged == 0 && shortage == 0) ...[
-                        const SizedBox(height: 8),
+                  margin: EdgeInsets.only(
+                    top: AppResponsive.smallSpacing(context),
+                  ),
+                  padding: AppResponsive.padding(context),
+                  child: AppResponsive.constrainedContent(
+                    context: context,
+                    alignment: Alignment.topCenter,
+                    maxWidth: AppResponsive.maxContentWidth(context),
+                    child: Column(
+                      children: [
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
                           children: [
-                            Text(
-                              'Stock Value: ₹${totalAcceptedAmount.toStringAsFixed(0)}',
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF2196F3),
+                            Expanded(
+                              child: _buildSummaryItem(
+                                'Ordered',
+                                formatQty(totalOrdered),
+                                AppColors.textSecondary,
+                              ),
+                            ),
+                            Expanded(
+                              child: _buildSummaryItem(
+                                'Received',
+                                formatQty(totalReceived),
+                                AppColors.success,
+                              ),
+                            ),
+                            Expanded(
+                              child: _buildSummaryItem(
+                                'To Stock',
+                                formatQty(totalAccepted),
+                                AppColors.info,
+                              ),
+                            ),
+                            Expanded(
+                              child: _buildSummaryItem(
+                                'Damaged',
+                                formatQty(totalDamaged),
+                                totalDamaged > 0
+                                    ? AppColors.danger
+                                    : AppColors.textSecondary,
                               ),
                             ),
                           ],
                         ),
+                        if (totalDamaged > 0 || shortage > 0) ...[
+                          SizedBox(
+                            height: AppResponsive.mediumSpacing(context),
+                          ),
+                          Container(
+                            padding: EdgeInsets.all(
+                              AppResponsive.mediumSpacing(context),
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.warning.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(
+                                AppResponsive.smallBorderRadius(context),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.info_outline,
+                                  size: AppResponsive.smallIconSize(context),
+                                  color: AppColors.warning,
+                                ),
+                                SizedBox(
+                                  width: AppResponsive.smallSpacing(context),
+                                ),
+                                Expanded(
+                                  child: Text(
+                                    totalDamaged > 0 && shortage > 0
+                                        ? '${formatQty(totalDamaged)} damaged, ${formatQty(shortage)} not received'
+                                        : totalDamaged > 0
+                                        ? '${formatQty(totalDamaged)} items damaged'
+                                        : '${formatQty(shortage)} items not received',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: AppResponsive.smallFontSize(
+                                        context,
+                                      ),
+                                      color: AppColors.orange,
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(
+                                  width: AppResponsive.smallSpacing(context),
+                                ),
+                                Text(
+                                  formatMoney(totalAcceptedAmount),
+                                  maxLines: 1,
+                                  style: GoogleFonts.poppins(
+                                    fontSize: AppResponsive.bodyFontSize(
+                                      context,
+                                    ),
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.info,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                        if (totalDamaged == 0 && shortage == 0) ...[
+                          SizedBox(height: AppResponsive.smallSpacing(context)),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  'Stock Value: ${formatMoney(totalAcceptedAmount)}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: GoogleFonts.poppins(
+                                    fontSize: AppResponsive.bodyFontSize(
+                                      context,
+                                    ),
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.info,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
                 ),
 
                 // Items Header
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Row(
-                    children: [
-                      const Text(
-                        'Items',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: AppResponsive.padding(context).left,
+                    vertical: AppResponsive.mediumSpacing(context),
+                  ),
+                  child: AppResponsive.constrainedContent(
+                    context: context,
+                    alignment: Alignment.topCenter,
+                    maxWidth: AppResponsive.maxContentWidth(context),
+                    child: Row(
+                      children: [
+                        Text(
+                          'Items',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.subheadingFontSize(context),
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        'Tap item to edit',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[500],
+                        const Spacer(),
+                        Text(
+                          'Tap item to edit',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.smallFontSize(context),
+                            color: Colors.grey[500],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
 
-                // Items List
+                // Items List — always-visible scrollbar so a long PO reads as
+                // scrollable at a glance (the list is squeezed between the
+                // summary and the notes/action block, so a cut-off card is the
+                // only other hint there is more below).
                 Expanded(
-                  child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: _receivingItems.length,
-                    itemBuilder: (context, index) {
-                      return _buildReceivingItemCard(index);
-                    },
+                  child: AppResponsive.constrainedContent(
+                    context: context,
+                    alignment: Alignment.topCenter,
+                    maxWidth: AppResponsive.maxContentWidth(context),
+                    child: Scrollbar(
+                      controller: _itemsScrollController,
+                      thumbVisibility: true,
+                      thickness: 5,
+                      radius: const Radius.circular(3),
+                      child: ListView.builder(
+                        controller: _itemsScrollController,
+                        padding: EdgeInsets.only(
+                          left: AppResponsive.padding(context).left,
+                          // Extra right inset keeps the thumb off the cards.
+                          right: AppResponsive.padding(context).left + 6,
+                        ),
+                        itemCount: _receivingItems.length,
+                        itemBuilder: (context, index) {
+                          return _buildReceivingItemCard(index);
+                        },
+                      ),
+                    ),
                   ),
                 ),
 
                 // Notes
                 Container(
                   color: Colors.white,
-                  padding: const EdgeInsets.all(16),
-                  child: TextField(
-                    controller: _notesController,
-                    decoration: const InputDecoration(
-                      labelText: 'Notes (Optional)',
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                      hintText: 'e.g., 5 shirts damaged during shipping',
+                  padding: AppResponsive.padding(context),
+                  child: AppResponsive.constrainedContent(
+                    context: context,
+                    alignment: Alignment.topCenter,
+                    maxWidth: AppResponsive.maxContentWidth(context),
+                    child: AppTextField(
+                      controller: _notesController,
+                      label: 'Notes (Optional)',
+                      hint: 'e.g., 5 shirts damaged during shipping',
+                      icon: Icons.notes_rounded,
+                      maxLines: 2,
+                      minLines: 2,
                     ),
-                    maxLines: 2,
                   ),
                 ),
 
                 // Action Button
                 Container(
                   color: Colors.white,
-                  padding: const EdgeInsets.all(16),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: _saveAndConfirmGRN,
-                      icon: const Icon(Icons.check_circle),
-                      label: const Text('Confirm Receipt & Update Stock'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF4CAF50),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        textStyle: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
+                  padding: AppResponsive.padding(context),
+                  child: AppResponsive.constrainedContent(
+                    context: context,
+                    alignment: Alignment.topCenter,
+                    maxWidth: AppResponsive.maxContentWidth(context),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _saving ? null : _saveAndConfirmGRN,
+                        icon: Icon(
+                          Icons.check_circle,
+                          size: AppResponsive.iconSize(context),
+                        ),
+                        label: const Text('Confirm Receipt & Update Stock'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: EdgeInsets.symmetric(
+                            vertical: AppResponsive.largeSpacing(context),
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(
+                              AppResponsive.smallBorderRadius(context),
+                            ),
+                          ),
+                          textStyle: GoogleFonts.poppins(
+                            fontSize: AppResponsive.subheadingFontSize(context),
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ),
@@ -825,17 +1451,19 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
       children: [
         Text(
           value,
-          style: TextStyle(
-            fontSize: 18,
+          maxLines: 1,
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.subheadingFontSize(context),
             fontWeight: FontWeight.w600,
             color: color,
           ),
         ),
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 11,
-            color: Color(0xFF6B6B6B),
+          maxLines: 1,
+          style: GoogleFonts.poppins(
+            fontSize: AppResponsive.captionFontSize(context),
+            color: AppColors.textSecondary,
           ),
         ),
       ],
@@ -847,21 +1475,25 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
     final isShortage = item.receivedQty < item.orderedQty;
     final hasDamage = item.damagedQty > 0;
 
+    final radius = AppResponsive.smallBorderRadius(context);
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(radius),
         border: Border.all(
-          color: isShortage || hasDamage ? const Color(0xFFFF9800) : const Color(0xFFE8E8E8),
+          color: isShortage || hasDamage
+              ? AppColors.warning
+              : AppColors.divider,
           width: isShortage || hasDamage ? 1.5 : 0.5,
         ),
       ),
       child: InkWell(
         onTap: () => _showEditItemDialog(index),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(radius),
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -873,67 +1505,94 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
                       children: [
                         Text(
                           item.productName,
-                          style: const TextStyle(
-                            fontSize: 14,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.bodyFontSize(context),
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                         if (item.variantInfo != null)
                           Text(
                             item.variantInfo!,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF6B6B6B),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.smallFontSize(context),
+                              color: AppColors.textSecondary,
                             ),
                           ),
                       ],
                     ),
                   ),
-                  const Icon(Icons.edit, size: 18, color: Color(0xFFB0B0B0)),
+                  SizedBox(width: AppResponsive.smallSpacing(context)),
+                  Icon(
+                    Icons.edit,
+                    size: AppResponsive.smallIconSize(context),
+                    color: AppColors.textSecondary,
+                  ),
                 ],
               ),
-              const SizedBox(height: 12),
-              Row(
+              SizedBox(height: AppResponsive.mediumSpacing(context)),
+              // Wrap, not Row+Spacer: three chips plus the amount need ~285px,
+              // which overflows a 320px phone once padding is taken out. A
+              // Spacer contributes zero when there's no slack, so it can't save
+              // the row — the amount just ran off the edge.
+              Wrap(
+                spacing: AppResponsive.smallSpacing(context),
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  _buildQtyChip('Ordered', item.orderedQty, const Color(0xFF6B6B6B)),
-                  const SizedBox(width: 8),
-                  _buildQtyChip('Received', item.receivedQty, const Color(0xFF4CAF50)),
-                  if (hasDamage) ...[
-                    const SizedBox(width: 8),
-                    _buildQtyChip('Damaged', item.damagedQty, const Color(0xFFF44336)),
-                  ],
-                  const Spacer(),
+                  _buildQtyChip(
+                    'Ordered',
+                    item.orderedQty,
+                    AppColors.textSecondary,
+                  ),
+                  _buildQtyChip(
+                    'Received',
+                    item.receivedQty,
+                    AppColors.success,
+                  ),
+                  if (hasDamage)
+                    _buildQtyChip('Damaged', item.damagedQty, AppColors.danger),
                   Text(
-                    '₹${(item.receivedQty * item.costPrice).toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontSize: 14,
+                    formatMoney(item.receivedQty * item.costPrice),
+                    maxLines: 1,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.bodyFontSize(context),
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF4CAF50),
+                      color: AppColors.success,
                     ),
                   ),
                 ],
               ),
               if (isShortage || hasDamage)
                 Padding(
-                  padding: const EdgeInsets.only(top: 8),
+                  padding: EdgeInsets.only(
+                    top: AppResponsive.smallSpacing(context),
+                  ),
                   child: Wrap(
-                    spacing: 8,
+                    spacing: AppResponsive.smallSpacing(context),
+                    runSpacing: 4,
                     children: [
                       if (isShortage)
                         Text(
-                          'Shortage: ${item.orderedQty - item.receivedQty}',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFFFF9800),
+                          'Shortage: ${formatQty(item.orderedQty - item.receivedQty)}',
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.smallFontSize(context),
+                            color: AppColors.warning,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
-                      if (hasDamage && item.damagedHandling != DamagedHandling.none)
+                      if (hasDamage &&
+                          item.damagedHandling != DamagedHandling.none)
                         Text(
                           _getDamagedHandlingText(item.damagedHandling),
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: _getDamagedHandlingColor(item.damagedHandling),
+                          style: GoogleFonts.poppins(
+                            fontSize: AppResponsive.smallFontSize(context),
+                            color: _getDamagedHandlingColor(
+                              item.damagedHandling,
+                            ),
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -947,17 +1606,21 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
     );
   }
 
-  Widget _buildQtyChip(String label, int qty, Color color) {
+  Widget _buildQtyChip(String label, double qty, Color color) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: EdgeInsets.symmetric(
+        horizontal: AppResponsive.smallSpacing(context),
+        vertical: 4,
+      ),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
-        '$label: $qty',
-        style: TextStyle(
-          fontSize: 11,
+        '$label: ${formatQty(qty)}',
+        maxLines: 1,
+        style: GoogleFonts.poppins(
+          fontSize: AppResponsive.captionFontSize(context),
           fontWeight: FontWeight.w500,
           color: color,
         ),
@@ -981,13 +1644,13 @@ class _MaterialReceivingScreenState extends State<MaterialReceivingScreen> {
   Color _getDamagedHandlingColor(DamagedHandling handling) {
     switch (handling) {
       case DamagedHandling.keepForClaim:
-        return const Color(0xFF2196F3);
+        return AppColors.info;
       case DamagedHandling.returnToSupplier:
-        return const Color(0xFFFF9800);
+        return AppColors.warning;
       case DamagedHandling.writeOff:
-        return const Color(0xFF6B6B6B);
+        return AppColors.textSecondary;
       default:
-        return const Color(0xFF6B6B6B);
+        return AppColors.textSecondary;
     }
   }
 }
@@ -999,9 +1662,9 @@ class ReceivingItemData {
   final String productId;
   final String productName;
   final String? variantInfo;
-  final int orderedQty;
-  final int receivedQty;
-  final int damagedQty;
+  final double orderedQty;
+  final double receivedQty;
+  final double damagedQty;
   final DamagedHandling damagedHandling;
   final double costPrice;
 
@@ -1019,10 +1682,16 @@ class ReceivingItemData {
   });
 
   /// Accepted quantity = received - damaged (only good items go to stock)
-  int get acceptedQty => receivedQty - damagedQty;
+  double get acceptedQty => receivedQty - damagedQty;
 
-  /// Amount for accepted items only
+  /// Amount for accepted items only — this is inventory value, NOT what the
+  /// supplier is owed. See [billableAmount].
   double get acceptedAmount => acceptedQty * costPrice;
+
+  /// What the supplier invoices for this line: everything delivered, damaged
+  /// included. Damaged units are recovered later through a return credit note
+  /// or a settled claim, never by shrinking the original bill.
+  double get billableAmount => receivedQty * costPrice;
 
   /// Amount for damaged items (for claims/returns)
   double get damagedAmount => damagedQty * costPrice;
@@ -1033,9 +1702,9 @@ class ReceivingItemData {
     String? productId,
     String? productName,
     String? variantInfo,
-    int? orderedQty,
-    int? receivedQty,
-    int? damagedQty,
+    double? orderedQty,
+    double? receivedQty,
+    double? damagedQty,
     DamagedHandling? damagedHandling,
     double? costPrice,
   }) {

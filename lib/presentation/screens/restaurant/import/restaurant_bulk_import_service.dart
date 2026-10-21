@@ -6,7 +6,8 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 import 'package:billberrylite/core/di/service_locator.dart';
-import 'package:billberrylite/data/models/restaurant/db/categorymodel_300.dart';
+import 'package:billberrylite/core/config/tax_feature.dart';
+import 'package:billberrylite/data/models/common/categorymodel_300.dart';
 import 'package:billberrylite/data/models/restaurant/db/choicemodel_306.dart';
 import 'package:billberrylite/data/models/restaurant/db/choiceoptionmodel_307.dart';
 import 'package:billberrylite/data/models/restaurant/db/extramodel_303.dart';
@@ -14,9 +15,11 @@ import 'package:billberrylite/data/models/restaurant/db/itemmodel_302.dart';
 import 'package:billberrylite/data/models/restaurant/db/itemvariantemodel_312.dart';
 import 'package:billberrylite/data/models/restaurant/db/toppingmodel_304.dart';
 import 'package:billberrylite/data/models/restaurant/db/variantmodel_305.dart';
-import 'package:billberrylite/data/models/restaurant/db/taxmodel_314.dart';
+import 'package:billberrylite/data/models/common/taxmodel_314.dart';
 import 'package:uuid/uuid.dart';
 import 'package:billberrylite/core/constants/item_units.dart';
+import 'package:billberrylite/core/plan/plan_enforcement.dart';
+import 'package:billberrylite/core/plan/entitlement_keys.dart';
 import 'import_template_builder.dart';
 
 /// Restaurant bulk import service.
@@ -58,7 +61,7 @@ class RestaurantBulkImportService {
   Future<String> downloadTemplate() async {
     try {
       final bytes = ImportTemplateBuilder().build();
-      return await _saveBytes(bytes, 'billberrylite_restaurant_import_template_v4.xlsx');
+      return await _saveBytes(bytes, 'billberrylite_restaurant_import_template_v5.xlsx');
     } catch (e) {
       return 'Error downloading template: $e';
     }
@@ -170,6 +173,11 @@ class RestaurantBulkImportService {
   /// 🚀 Main import with Phase 1 improvements
   Future<ImportResult> importData(Map<String, List<List<dynamic>>> allSheets) async {
     ImportResult result = ImportResult();
+
+    if (!TaxFeature.enabled) {
+      result.warnings.add(
+          'Tax data in the imported file was ignored because tax is currently disabled for this business.');
+    }
 
     try {
 
@@ -343,7 +351,10 @@ class RestaurantBulkImportService {
     if (isSoldByWeight && unit.isEmpty) {
       errors.add('Row $rowNumber: Unit required when IsSoldByWeight is YES');
     }
-    if (unit.isNotEmpty && normalizeItemUnit(unit) == null) {
+    if (isPoundUnit(unit)) {
+      // Relabelling lb as kg would book the quantity 2.2× too high.
+      errors.add('Row $rowNumber: Pounds aren\'t supported — convert to kg first (1 lb = 0.4536 kg)');
+    } else if (unit.isNotEmpty && normalizeItemUnit(unit) == null) {
       errors.add('Row $rowNumber: Unrecognized Unit "$unit" (use kg, gm, liter, ml or piece)');
     }
 
@@ -1023,11 +1034,13 @@ class RestaurantBulkImportService {
           result: result,
         );
 
-        // Step 6: Auto-create tax if tax rate is specified
+        // Step 6: Auto-create tax if tax rate is specified — entirely skipped
+        // when tax is disabled for this business (no tax rate applied, no Tax
+        // entity auto-created from file data).
         final rawTaxRate = _getDoubleFromValue(rowData['TaxRate']);
-        final taxRateValue = _normalizeTaxRate(rawTaxRate);
+        final taxRateValue = TaxFeature.enabled ? _normalizeTaxRate(rawTaxRate) : 0.0;
         String? taxId;
-        if (rawTaxRate != null && rawTaxRate > 0) {
+        if (TaxFeature.enabled && rawTaxRate != null && rawTaxRate > 0) {
           // Use raw value (5) for Tax creation, normalized value (0.05) for Item
           taxId = await _getOrCreateTax(rawTaxRate, result);
         }
@@ -1035,6 +1048,14 @@ class RestaurantBulkImportService {
         // Step 7: Create item
         final hasVariants = _parseBool(rowData['HasVariants']?.toString() ?? '', false);
         final soldByWeight = _parseBool(rowData['IsSoldByWeight']?.toString() ?? '', false);
+
+        // Low-stock threshold: blank keeps the existing value (or null → global
+        // default). A provided number overrides it.
+        final lowThreshRaw = rowData['LowStockThreshold']?.toString().trim() ?? '';
+        final double? lowStockThreshold = lowThreshRaw.isEmpty
+            ? existingItem?.lowStockThreshold
+            : (double.tryParse(lowThreshRaw.replaceAll(RegExp(r'[^0-9.]'), '')) ??
+                existingItem?.lowStockThreshold);
 
         Items item = Items(
           id: existingItem?.id ?? const Uuid().v4(),
@@ -1052,6 +1073,11 @@ class RestaurantBulkImportService {
           allowOrderWhenOutOfStock: _parseBool(rowData['AllowOutOfStock']?.toString() ?? '', true),
           taxRate: taxRateValue,
           isEnabled: _parseBool(rowData['IsEnabled']?.toString() ?? '', true),
+          isFavorite: _parseBool(
+              rowData['IsFavorite']?.toString() ?? '', existingItem?.isFavorite ?? false),
+          lowStockThreshold: lowStockThreshold,
+          lowStockAlertEnabled: _parseBool(rowData['LowStockAlertEnabled']?.toString() ?? '',
+              existingItem?.lowStockAlertEnabled ?? false),
           // Preserve existing variants; the variant pass overrides them when the
           // import file actually carries variant rows for this item.
           variant: existingItem?.variant ?? [],
@@ -1065,17 +1091,35 @@ class RestaurantBulkImportService {
           editCount: existingItem?.editCount ?? 0,
         );
 
-        final success = existingItem != null
-            ? await itemStore.updateItem(item)
-            : await itemStore.addItem(item);
+        final bool isNewItem = existingItem == null;
+        // Plan item cap — once the limit is hit, skip remaining NEW items and
+        // count them distinctly, so the summary can say "only N added, the rest
+        // were skipped" instead of burying the reason in the row-error list.
+        // (Updating an existing item doesn't grow the count, so it's exempt.)
+        if (isNewItem &&
+            !PlanEnforce.withinLimit(
+                EntKeys.manageMenuItemsMax, itemStore.items.length)) {
+          result.itemsSkippedByLimit++;
+          result.itemLimitMax = PlanEnforce.limit(EntKeys.manageMenuItemsMax) ?? 0;
+          continue;
+        }
+        final success = isNewItem
+            ? await itemStore.addItem(item)
+            : await itemStore.updateItem(item);
         if (success) {
-          if (existingItem != null) {
+          if (!isNewItem) {
             result.warnings.add(
                 'Row ${i + 1}: Item "${item.name}" already existed — updated from import');
           }
           result.itemsImported++;
           // Keep cache fresh so later rows in this batch see the latest version
           _itemByNameCache[item.name.toLowerCase().trim()] = item;
+        } else {
+          // addItem/updateItem refused without throwing (plan limit hit, or the
+          // add/edit action isn't allowed on this plan). Surface the reason so
+          // these rows aren't silently dropped from the import.
+          result.errors.add(
+              'Row ${i + 1}: "${item.name}" skipped — ${itemStore.errorMessage ?? 'not allowed on your current plan'}');
         }
 
         // Progress update
@@ -1105,7 +1149,7 @@ class RestaurantBulkImportService {
       variantGroups[itemName]!.add(row);
     }
 
-    await itemStore.loadItems();
+    // Items were loaded in _loadAllCaches and imported through ItemStore.
     final allItems = itemStore.items;
 
     for (var itemName in variantGroups.keys) {
@@ -1242,6 +1286,8 @@ class ImportResult {
   int choicesImported = 0;
   int choiceOptionsImported = 0;
   int itemsImported = 0;
+  int itemsSkippedByLimit = 0; // NEW items rejected because the plan item cap was hit
+  int itemLimitMax = 0; // the plan's item cap (for the skip message)
   int itemVariantsImported = 0;
   int imagesDownloaded = 0;
 
@@ -1251,6 +1297,10 @@ class ImportResult {
     sb.writeln(success ? '✅ Import completed successfully!' : '❌ Import completed with errors');
     sb.writeln('\n📊 Import Statistics:');
     sb.writeln('  Total Items: $itemsImported');
+    if (itemsSkippedByLimit > 0) {
+      sb.writeln(
+          '  ⚠️ Skipped (plan item limit $itemLimitMax): $itemsSkippedByLimit');
+    }
     sb.writeln('  Categories: $categoriesImported (+ $categoriesAutoCreated auto-created)');
     sb.writeln('  Taxes: $taxesAutoCreated auto-created');
     sb.writeln('  Variants: $variantsImported');

@@ -30,25 +30,28 @@ class _orderSettingsState extends State<Ordersettings>
 
   @override
   Widget build(BuildContext context) {
-    final isTablet = !AppResponsive.isMobile(context);
-
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(
         title: 'Order Settings',
-        titleFontSize: isTablet ? 22 : 20,
+        titleFontSize: AppResponsive.headingFontSize(context),
         actions: [
           Padding(
             padding: EdgeInsets.symmetric(
-                horizontal: isTablet ? 16 : 12, vertical: 8),
+              horizontal: AppResponsive.mediumSpacing(context),
+              vertical: 8,
+            ),
             child: Container(
-              padding: EdgeInsets.all(isTablet ? 10 : 8),
+              padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
               decoration: BoxDecoration(
                 color: AppColors.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(Icons.person_rounded,
-                  size: isTablet ? 22 : 20, color: AppColors.primary),
+              child: Icon(
+                Icons.person_rounded,
+                size: AppResponsive.iconSize(context),
+                color: AppColors.primary,
+              ),
             ),
           ),
         ],
@@ -59,23 +62,38 @@ class _orderSettingsState extends State<Ordersettings>
           indicatorColor: Colors.white,
           indicatorWeight: 3,
           labelStyle: GoogleFonts.poppins(
-              fontWeight: FontWeight.w600, fontSize: isTablet ? 14 : 13),
+            fontWeight: FontWeight.w600,
+            fontSize: AppResponsive.bodyFontSize(context),
+          ),
           unselectedLabelStyle: GoogleFonts.poppins(
-              fontWeight: FontWeight.w500, fontSize: isTablet ? 14 : 13),
+            fontWeight: FontWeight.w500,
+            fontSize: AppResponsive.bodyFontSize(context),
+          ),
           tabs: const [
-            Tab(icon: Icon(Icons.takeout_dining_rounded, size: 20), text: 'Take Away'),
-            Tab(icon: Icon(Icons.restaurant_rounded, size: 20), text: 'Dine In'),
-            Tab(icon: Icon(Icons.delivery_dining_rounded, size: 20), text: 'Delivery'),
+            Tab(
+              icon: Icon(Icons.takeout_dining_rounded, size: 20),
+              text: 'Take Away',
+            ),
+            Tab(
+              icon: Icon(Icons.restaurant_rounded, size: 20),
+              text: 'Dine In',
+            ),
+            Tab(
+              icon: Icon(Icons.delivery_dining_rounded, size: 20),
+              text: 'Delivery',
+            ),
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _takeAwayTab(),
-          _dineInTab(),
-          _homeDeliveryTab(),
-        ],
+      // AppBar and TabBar stay full-bleed; capping here covers all three tabs.
+      body: AppResponsive.constrainedContent(
+        context: context,
+        maxWidth: AppResponsive.maxContentWidth(context),
+        alignment: Alignment.topCenter,
+        child: TabBarView(
+          controller: _tabController,
+          children: [_takeAwayTab(), _dineInTab(), _homeDeliveryTab()],
+        ),
       ),
     );
   }
@@ -96,21 +114,23 @@ class _orderSettingsState extends State<Ordersettings>
         value: val,
         onChanged: onSave,
         activeColor: AppColors.primary,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         title: Text(
           title,
           style: GoogleFonts.poppins(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary),
+            fontSize: AppResponsive.bodyFontSize(context),
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
+          ),
         ),
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 2),
           child: Text(
             subtitle,
             style: GoogleFonts.poppins(
-                fontSize: 12, color: AppColors.textSecondary),
+              fontSize: AppResponsive.smallFontSize(context),
+              color: AppColors.textSecondary,
+            ),
           ),
         ),
         secondary: Container(
@@ -147,8 +167,7 @@ class _orderSettingsState extends State<Ordersettings>
     );
   }
 
-  Widget _divider() =>
-      Divider(height: 1, indent: 56, color: AppColors.divider);
+  Widget _divider() => Divider(height: 1, indent: 56, color: AppColors.divider);
 
   // ── Tab bodies ───────────────────────────────────────────────────────────
 
@@ -160,7 +179,7 @@ class _orderSettingsState extends State<Ordersettings>
           child: Text(
             'Take Away is always enabled',
             style: GoogleFonts.poppins(
-              fontSize: 14,
+              fontSize: AppResponsive.bodyFontSize(context),
               color: AppColors.textSecondary,
             ),
           ),

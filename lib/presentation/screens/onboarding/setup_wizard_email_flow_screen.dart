@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
@@ -16,7 +17,6 @@ import 'package:billberrylite/presentation/screens/restaurant/auth/setup_add_ite
 
 import '../../../util/color.dart';
 import '../../../util/common/app_responsive.dart';
-import '../../../util/responsive.dart';
 import '../../../core/config/app_config.dart';
 // Reuse the original wizard's public pieces unchanged (no edits to that file):
 // WelcomeStep, ReviewStep, SetupStep (metadata holder), SidebarPatternPainter.
@@ -58,55 +58,65 @@ class _SetupWizardEmailFlowScreenState extends State<SetupWizardEmailFlowScreen>
   // Demo step metadata: the real steps + a License step after Store Details.
   static final List<SetupStep> _demoSteps = [
     const SetupStep(
-        title: 'Welcome',
-        icon: Icons.waving_hand,
-        description: "Let's get your store up and running",
-        estimatedTime: '30s'),
+      title: 'Welcome',
+      icon: Icons.waving_hand,
+      description: "Let's get your store up and running",
+      estimatedTime: '30s',
+    ),
     const SetupStep(
-        title: 'Business Type',
-        icon: Icons.business,
-        description: 'Choose the type that best describes your business',
-        estimatedTime: '1 min'),
+      title: 'Business Type',
+      icon: Icons.business,
+      description: 'Choose the type that best describes your business',
+      estimatedTime: '1 min',
+    ),
     const SetupStep(
-        title: 'Store Details',
-        icon: Icons.store,
-        description: 'Basic details about your store',
-        estimatedTime: '2 min'),
+      title: 'Store Details',
+      icon: Icons.store,
+      description: 'Basic details about your store',
+      estimatedTime: '2 min',
+    ),
     const SetupStep(
-        title: 'License',
-        icon: Icons.mark_email_read_rounded,
-        description: 'Get your license key by email',
-        estimatedTime: '1 min'),
+      title: 'License',
+      icon: Icons.mark_email_read_rounded,
+      description: 'Get your license key by email',
+      estimatedTime: '1 min',
+    ),
     const SetupStep(
-        title: 'Tax Setup',
-        icon: Icons.receipt,
-        description: 'Configure tax settings for your region',
-        estimatedTime: '1 min'),
+      title: 'Tax Setup',
+      icon: Icons.receipt,
+      description: 'Configure tax settings for your region',
+      estimatedTime: '1 min',
+    ),
     const SetupStep(
-        title: 'Product Setup',
-        icon: Icons.production_quantity_limits_outlined,
-        description: 'Add your products and categories',
-        estimatedTime: '3 min'),
+      title: 'Product Setup',
+      icon: Icons.production_quantity_limits_outlined,
+      description: 'Add your products and categories',
+      estimatedTime: '3 min',
+    ),
     const SetupStep(
-        title: 'Payment Methods',
-        icon: Icons.payment,
-        description: 'Setup payment acceptance methods',
-        estimatedTime: '1 min'),
+      title: 'Payment Methods',
+      icon: Icons.payment,
+      description: 'Setup payment acceptance methods',
+      estimatedTime: '1 min',
+    ),
     const SetupStep(
-        title: 'Staff Setup',
-        icon: Icons.people,
-        description: 'Add staff members and permissions',
-        estimatedTime: '1 min'),
+      title: 'Staff Setup',
+      icon: Icons.people,
+      description: 'Add staff members and permissions',
+      estimatedTime: '1 min',
+    ),
     const SetupStep(
-        title: 'Security',
-        icon: Icons.security_rounded,
-        description: 'Set your admin PIN and backup password',
-        estimatedTime: '1 min'),
+      title: 'Security',
+      icon: Icons.security_rounded,
+      description: 'Set your admin PIN and backup password',
+      estimatedTime: '1 min',
+    ),
     const SetupStep(
-        title: 'Review',
-        icon: Icons.check_circle,
-        description: 'Review your configuration',
-        estimatedTime: '30s'),
+      title: 'Review',
+      icon: Icons.check_circle,
+      description: 'Review your configuration',
+      estimatedTime: '30s',
+    ),
   ];
 
   int get _totalSteps => _demoSteps.length;
@@ -114,18 +124,26 @@ class _SetupWizardEmailFlowScreenState extends State<SetupWizardEmailFlowScreen>
   @override
   void initState() {
     super.initState();
-    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.dark,
-    ));
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+      ),
+    );
     _animationController = AnimationController(
-        duration: const Duration(milliseconds: 600), vsync: this);
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-        CurvedAnimation(parent: _animationController, curve: Curves.easeIn));
-    _slideAnimation = Tween<Offset>(
-            begin: const Offset(0.1, 0), end: Offset.zero)
-        .animate(CurvedAnimation(
-            parent: _animationController, curve: Curves.easeOutCubic));
+      CurvedAnimation(parent: _animationController, curve: Curves.easeIn),
+    );
+    _slideAnimation =
+        Tween<Offset>(begin: const Offset(0.1, 0), end: Offset.zero).animate(
+          CurvedAnimation(
+            parent: _animationController,
+            curve: Curves.easeOutCubic,
+          ),
+        );
     _animationController.forward();
     _store.loadExistingData();
   }
@@ -142,7 +160,9 @@ class _SetupWizardEmailFlowScreenState extends State<SetupWizardEmailFlowScreen>
     if (_currentStep < _totalSteps - 1) {
       setState(() => _currentStep++);
       _pageController.nextPage(
-          duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
       _animationController.reset();
       _animationController.forward();
     }
@@ -153,21 +173,27 @@ class _SetupWizardEmailFlowScreenState extends State<SetupWizardEmailFlowScreen>
     if (_currentStep > 0) {
       setState(() => _currentStep--);
       _pageController.previousPage(
-          duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
     }
   }
 
   void _jumpToStep(int step) {
     FocusScope.of(context).unfocus();
     setState(() => _currentStep = step);
-    _pageController.animateToPage(step,
-        duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+    _pageController.animateToPage(
+      step,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
   }
 
   // Non-destructive demo finish: no completeSetup, no session change.
   void _demoComplete() {
-    NotificationService.instance
-        .showSuccess('Demo flow complete — nothing was saved.');
+    NotificationService.instance.showSuccess(
+      'Demo flow complete — nothing was saved.',
+    );
     if (Navigator.canPop(context)) Navigator.pop(context);
   }
 
@@ -176,11 +202,15 @@ class _SetupWizardEmailFlowScreenState extends State<SetupWizardEmailFlowScreen>
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
       body: SafeArea(
-        child: Responsive(
-          mobile: _buildMobileLayout(),
-          tablet: _buildTabletLayout(),
-          desktop: _buildDesktopLayout(),
-        ),
+        // AppResponsive (600/1024), not the legacy Responsive widget
+        // (850/1100): the steps inside size themselves off AppResponsive, so a
+        // different set of breakpoints out here left 600–849 showing the mobile
+        // tree with tablet-sized contents.
+        child: AppResponsive.isDesktop(context)
+            ? _buildDesktopLayout()
+            : AppResponsive.isTablet(context)
+            ? _buildTabletLayout()
+            : _buildMobileLayout(),
       ),
     );
   }
@@ -211,7 +241,9 @@ class _SetupWizardEmailFlowScreenState extends State<SetupWizardEmailFlowScreen>
         Expanded(
           child: Center(
             child: Container(
-              constraints: const BoxConstraints(maxWidth: 600),
+              constraints: BoxConstraints(
+                maxWidth: AppResponsive.maxFormWidth(context),
+              ),
               child: PageView(
                 controller: _pageController,
                 physics: const NeverScrollableScrollPhysics(),
@@ -242,7 +274,8 @@ class _SetupWizardEmailFlowScreenState extends State<SetupWizardEmailFlowScreen>
                 child: Center(
                   child: Container(
                     constraints: BoxConstraints(
-                        maxWidth: AppResponsive.maxFormWidth(context)),
+                      maxWidth: AppResponsive.maxFormWidth(context),
+                    ),
                     child: PageView(
                       controller: _pageController,
                       physics: const NeverScrollableScrollPhysics(),
@@ -263,36 +296,47 @@ class _SetupWizardEmailFlowScreenState extends State<SetupWizardEmailFlowScreen>
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: AppResponsive.mediumSpacing(context),
-        vertical: AppResponsive.getValue(context,
-            mobile: 8.0, tablet: 12.0, desktop: 16.0),
+        vertical: AppResponsive.getValue(
+          context,
+          mobile: 8.0,
+          tablet: 12.0,
+          desktop: 16.0,
+        ),
       ),
       child: Row(
         children: [
           if (_currentStep > 0)
             IconButton(
-                icon: Icon(Icons.arrow_back, color: AppColors.darkNeutral),
-                onPressed: _previousStep)
+              icon: Icon(Icons.arrow_back, color: AppColors.darkNeutral),
+              onPressed: _previousStep,
+            )
           else
             const SizedBox(width: 48),
           Expanded(
             child: Column(
               children: [
-                Text('Setup Wizard',
-                    style: TextStyle(
-                        fontSize: AppResponsive.headingFontSize(context),
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.darkNeutral)),
                 Text(
-                    'Step ${_currentStep + 1} of $_totalSteps · ~${currentStepInfo.estimatedTime}',
-                    style: TextStyle(
-                        fontSize: AppResponsive.smallFontSize(context),
-                        color: Colors.grey[600])),
+                  'Setup Wizard',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.headingFontSize(context),
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.darkNeutral,
+                  ),
+                ),
+                Text(
+                  'Step ${_currentStep + 1} of $_totalSteps · ~${currentStepInfo.estimatedTime}',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.smallFontSize(context),
+                    color: Colors.grey[600],
+                  ),
+                ),
               ],
             ),
           ),
           IconButton(
-              icon: Icon(Icons.close, color: AppColors.darkNeutral),
-              onPressed: () => Navigator.maybePop(context)),
+            icon: Icon(Icons.close, color: AppColors.darkNeutral),
+            onPressed: () => Navigator.maybePop(context),
+          ),
         ],
       ),
     );
@@ -301,20 +345,23 @@ class _SetupWizardEmailFlowScreenState extends State<SetupWizardEmailFlowScreen>
   Widget _buildProgressBar() {
     return Container(
       height: 5,
-      margin:
-          EdgeInsets.symmetric(horizontal: AppResponsive.mediumSpacing(context)),
+      margin: EdgeInsets.symmetric(
+        horizontal: AppResponsive.mediumSpacing(context),
+      ),
       decoration: BoxDecoration(
-          color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+        color: Colors.grey[300],
+        borderRadius: BorderRadius.circular(2),
+      ),
       child: LayoutBuilder(
         builder: (context, constraints) => Stack(
           children: [
             AnimatedContainer(
               duration: const Duration(milliseconds: 300),
-              width: constraints.maxWidth *
-                  ((_currentStep + 1) / _totalSteps),
+              width: constraints.maxWidth * ((_currentStep + 1) / _totalSteps),
               decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(2)),
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
           ],
         ),
@@ -325,8 +372,12 @@ class _SetupWizardEmailFlowScreenState extends State<SetupWizardEmailFlowScreen>
   Widget _demoBanner() {
     return Container(
       width: double.infinity,
-      margin: EdgeInsets.fromLTRB(AppResponsive.mediumSpacing(context),
-          AppResponsive.smallSpacing(context), AppResponsive.mediumSpacing(context), 0),
+      margin: EdgeInsets.fromLTRB(
+        AppResponsive.mediumSpacing(context),
+        AppResponsive.smallSpacing(context),
+        AppResponsive.mediumSpacing(context),
+        0,
+      ),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: AppColors.warning.withValues(alpha: 0.12),
@@ -340,10 +391,11 @@ class _SetupWizardEmailFlowScreenState extends State<SetupWizardEmailFlowScreen>
           Expanded(
             child: Text(
               'Demo flow — email licensing preview. Nothing is saved on finish.',
-              style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.warning),
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.smallFontSize(context),
+                fontWeight: FontWeight.w600,
+                color: AppColors.warning,
+              ),
             ),
           ),
         ],
@@ -353,49 +405,82 @@ class _SetupWizardEmailFlowScreenState extends State<SetupWizardEmailFlowScreen>
 
   List<Widget> _buildSteps() {
     Widget anim(Widget child) => SlideTransition(
-          position: _slideAnimation,
-          child: FadeTransition(opacity: _fadeAnimation, child: child),
-        );
+      position: _slideAnimation,
+      child: FadeTransition(opacity: _fadeAnimation, child: child),
+    );
 
     return [
       // 0 Welcome
       anim(WelcomeStep(onNext: _nextStep)),
       // 1 Business Type
-      anim(BusinessTypeStep(
-          store: _store, onNext: _nextStep, onPrevious: _previousStep)),
+      anim(
+        BusinessTypeStep(
+          store: _store,
+          onNext: _nextStep,
+          onPrevious: _previousStep,
+        ),
+      ),
       // 2 Store Details (captures email)
-      anim(StoreDetailsStep(
-          store: _store, onNext: _nextStep, onPrevious: _previousStep)),
+      anim(
+        StoreDetailsStep(
+          store: _store,
+          onNext: _nextStep,
+          onPrevious: _previousStep,
+        ),
+      ),
       // 3 License via Email — the automation step (prefills the captured email)
-      anim(LicenseEmailStep(
-          store: _store, onNext: _nextStep, onPrevious: _previousStep)),
+      anim(
+        LicenseEmailStep(
+          store: _store,
+          onNext: _nextStep,
+          onPrevious: _previousStep,
+        ),
+      ),
       // 4 Tax Setup
-      anim(TaxSetupStep(
-          store: _store, onNext: _nextStep, onPrevious: _previousStep)),
+      anim(
+        TaxSetupStep(
+          store: _store,
+          onNext: _nextStep,
+          onPrevious: _previousStep,
+        ),
+      ),
       // 5 Product Setup (restaurant or retail)
-      anim(Observer(
-        builder: (_) => AppConfig.isRestaurant
-            ? SetupAddItemScreen(onNext: _nextStep, onPrevious: _previousStep)
-            : AddProductScreen(onNext: _nextStep, onPrevious: _previousStep),
-      )),
+      anim(
+        Observer(
+          builder: (_) => AppConfig.isRestaurant
+              ? SetupAddItemScreen(onNext: _nextStep, onPrevious: _previousStep)
+              : AddProductScreen(onNext: _nextStep, onPrevious: _previousStep),
+        ),
+      ),
       // 6 Payment Methods
       anim(PaymentSetupStep(onNext: _nextStep, onPrevious: _previousStep)),
       // 7 Staff Setup
-      anim(StaffSetupStep(
-          store: _store, onNext: _nextStep, onPrevious: _previousStep)),
-      // 8 Security
-      anim(SecuritySetupStep(
-          store: _store, onNext: _nextStep, onPrevious: _previousStep)),
-      // 9 Review
-      anim(Observer(
-        builder: (_) => ReviewStep(
-          selectedBusinessType: _store.selectedBusinessTypeName,
-          storeName: _store.storeName,
-          ownerName: _store.ownerName,
-          phone: _store.phone,
-          onComplete: _demoComplete,
+      anim(
+        StaffSetupStep(
+          store: _store,
+          onNext: _nextStep,
+          onPrevious: _previousStep,
         ),
-      )),
+      ),
+      // 8 Security
+      anim(
+        SecuritySetupStep(
+          store: _store,
+          onNext: _nextStep,
+          onPrevious: _previousStep,
+        ),
+      ),
+      // 9 Review
+      anim(
+        Observer(
+          builder: (_) => ReviewStep(
+            storeName: _store.storeName,
+            ownerName: _store.ownerName,
+            phone: _store.phone,
+            onComplete: _demoComplete,
+          ),
+        ),
+      ),
     ];
   }
 }
@@ -418,12 +503,16 @@ class _DemoSidebar extends StatelessWidget {
   Widget build(BuildContext context) {
     final totalSteps = steps.length;
     return Container(
-      width: 320,
+      // Mirrors SetupSidebar in setupWizardScreen.dart — keep the two in step.
+      width: (AppResponsive.screenWidth(context) * 0.26).clamp(260.0, 320.0),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [AppColors.primary.withValues(alpha: 0.95), AppColors.primary],
+          colors: [
+            AppColors.primary.withValues(alpha: 0.95),
+            AppColors.primary,
+          ],
         ),
       ),
       child: Stack(
@@ -434,15 +523,21 @@ class _DemoSidebar extends StatelessWidget {
               const SizedBox(height: 30),
               Icon(Icons.store, size: 40, color: Colors.white),
               const SizedBox(height: 10),
-              Text('Bill Berry Lite Setup — Demo',
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold)),
-              Text('${currentStep + 1} of $totalSteps Steps',
-                  style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.85),
-                      fontSize: 12)),
+              Text(
+                'Bill Berry Lite Setup — Demo',
+                style: GoogleFonts.poppins(
+                  color: Colors.white,
+                  fontSize: AppResponsive.subheadingFontSize(context),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                '${currentStep + 1} of $totalSteps Steps',
+                style: GoogleFonts.poppins(
+                  color: Colors.white.withValues(alpha: 0.85),
+                  fontSize: AppResponsive.smallFontSize(context),
+                ),
+              ),
               const SizedBox(height: 20),
               Expanded(
                 child: ListView.builder(
@@ -461,13 +556,15 @@ class _DemoSidebar extends StatelessWidget {
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 15, vertical: 12),
+                            horizontal: 15,
+                            vertical: 12,
+                          ),
                           decoration: BoxDecoration(
                             color: isActive
                                 ? Colors.white.withValues(alpha: 0.2)
                                 : isCompleted
-                                    ? Colors.white.withValues(alpha: 0.1)
-                                    : Colors.transparent,
+                                ? Colors.white.withValues(alpha: 0.1)
+                                : Colors.transparent,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
                               color: isActive
@@ -490,37 +587,47 @@ class _DemoSidebar extends StatelessWidget {
                                     color: isCompleted
                                         ? AppColors.success
                                         : isActive
-                                            ? Colors.white
-                                            : Colors.white
-                                                .withValues(alpha: 0.3),
+                                        ? Colors.white
+                                        : Colors.white.withValues(alpha: 0.3),
                                     width: 2,
                                   ),
                                 ),
                                 child: Center(
                                   child: isCompleted
-                                      ? const Icon(Icons.check,
-                                          color: AppColors.success, size: 18)
-                                      : Icon(step.icon,
+                                      ? const Icon(
+                                          Icons.check,
+                                          color: AppColors.success,
+                                          size: 18,
+                                        )
+                                      : Icon(
+                                          step.icon,
                                           color: isActive
                                               ? Colors.white
-                                              : Colors.white
-                                                  .withValues(alpha: 0.7),
-                                          size: 18),
+                                              : Colors.white.withValues(
+                                                  alpha: 0.7,
+                                                ),
+                                          size: 18,
+                                        ),
                                 ),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
-                                child: Text(step.title,
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: isActive
-                                          ? FontWeight.w600
-                                          : FontWeight.w500,
-                                      color: isActive
-                                          ? Colors.white
-                                          : Colors.white.withValues(
-                                              alpha: isUpcoming ? 0.5 : 0.8),
-                                    )),
+                                child: Text(
+                                  step.title,
+                                  style: GoogleFonts.poppins(
+                                    fontSize: AppResponsive.bodyFontSize(
+                                      context,
+                                    ),
+                                    fontWeight: isActive
+                                        ? FontWeight.w600
+                                        : FontWeight.w500,
+                                    color: isActive
+                                        ? Colors.white
+                                        : Colors.white.withValues(
+                                            alpha: isUpcoming ? 0.5 : 0.8,
+                                          ),
+                                  ),
+                                ),
                               ),
                             ],
                           ),

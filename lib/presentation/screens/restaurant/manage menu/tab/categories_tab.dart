@@ -1,16 +1,19 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/core/plan/entitlement_keys.dart';
+import 'package:billberrylite/core/plan/plan_guard.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/add_category_dialog.dart';
+import 'package:billberrylite/presentation/widget/componets/common/list_sort_button.dart';
+import 'package:billberrylite/domain/services/common/list_sort_service.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/util/images.dart';
-import '../../../../../data/models/restaurant/db/categorymodel_300.dart';
+import '../../../../../data/models/common/categorymodel_300.dart';
 import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../../util/restaurant/audit_trail_helper.dart';
 import '../../../../../util/restaurant/restaurant_session.dart';
@@ -22,13 +25,15 @@ class CategoryTab extends StatefulWidget {
   State<CategoryTab> createState() => _CategoryTabState();
 }
 
-class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClientMixin {
+class _CategoryTabState extends State<CategoryTab>
+    with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
   final TextEditingController _searchController = TextEditingController();
 
   /// Only admin and manager can add, edit, or delete categories.
-  bool get _canEdit => RestaurantSession.isAdmin || RestaurantSession.staffRole == 'Manager';
+  bool get _canEdit =>
+      RestaurantSession.isAdmin || RestaurantSession.staffRole == 'Manager';
   String query = '';
 
   @override
@@ -48,21 +53,20 @@ class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClient
   }
 
   void _deleteCategoryhive(dynamic id) async {
-    // Cascade-delete all items belonging to this category first
-    final itemsToDelete = itemStore.items
-        .where((item) => item.categoryOfItem == id)
-        .map((item) => item.id)
-        .toList();
-    for (final itemId in itemsToDelete) {
-      await itemStore.deleteItem(itemId);
-    }
+    // No cascade. Items in this category are re-parented to Uncategorized by
+    // the repository — deleting a category must never destroy the dishes in it.
     await categoryStore.deleteCategory(id);
   }
 
   Future<void> _showAddCategoryBottomSheet() async {
+    if (!PlanGuard.allowedOr(
+      context,
+      EntKeys.manageMenuCategoriesAdd,
+      featureName: 'Add Categories',
+    ))
+      return;
     await AddCategoryDialog.show(context);
   }
-
 
   @override
   @override
@@ -73,34 +77,56 @@ class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClient
 
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      body: Column(
-        children: [
-          // Modern Search Bar
-          Padding(
-            padding: AppResponsive.padding(context),
-            child: AppTextField(
-              controller: _searchController,
-              hint: 'Search categories…',
-              icon: Icons.search_rounded,
-              suffixIcon: query.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear, color: Colors.grey, size: 20),
-                      onPressed: () {
-                        _searchController.clear();
-                      },
-                    )
-                  : null,
+      body: ListenableBuilder(
+        listenable: ListSortService.instance,
+        builder: (context, _) => Column(
+          children: [
+            // Modern Search Bar
+            Padding(
+              padding: AppResponsive.padding(context),
+              // IntrinsicHeight + stretch sizes the sort button to match
+              // AppTextField's height without hardcoding it.
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: AppTextField(
+                        controller: _searchController,
+                        hint: 'Search categories…',
+                        icon: Icons.search_rounded,
+                        suffixIcon: query.isNotEmpty
+                            ? IconButton(
+                                icon: Icon(
+                                  Icons.clear,
+                                  color: Colors.grey,
+                                  size: AppResponsive.iconSize(context),
+                                ),
+                                onPressed: () {
+                                  _searchController.clear();
+                                },
+                              )
+                            : null,
+                      ),
+                    ),
+                    SizedBox(width: AppResponsive.smallSpacing(context)),
+                    const ListSortButton(list: SortableList.categories),
+                  ],
+                ),
+              ),
             ),
-          ),
 
-          // Categories List
-          Expanded(
-            child: isTablet ? _buildTabletLayout(size) : _buildMobileLayout(size),
-          ),
+            // Categories List
+            Expanded(
+              child: isTablet
+                  ? _buildTabletLayout(size)
+                  : _buildMobileLayout(size),
+            ),
 
-          // Add Category Button — only shown to Admin/Manager
-          if (_canEdit) _buildAddButton(),
-        ],
+            // Add Category Button — admin/manager (plan enforced on tap).
+            if (_canEdit) _buildAddButton(),
+          ],
+        ),
       ),
     );
   }
@@ -145,11 +171,27 @@ class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClient
         return GridView.builder(
           padding: AppResponsive.padding(context),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: AppResponsive.gridColumns(context, mobile: 2, tablet: 3, desktop: 4),
+            crossAxisCount: AppResponsive.gridColumns(
+              context,
+              mobile: 2,
+              tablet: 3,
+              desktop: 4,
+            ),
             crossAxisSpacing: AppResponsive.gridSpacing(context),
             mainAxisSpacing: AppResponsive.gridSpacing(context),
-            // Lower ratio = taller cells, so the card content never bottom-overflows.
-            childAspectRatio: AppResponsive.getValue(context, mobile: 3.0, tablet: 2.6, desktop: 3.0),
+            // Absolute height for tablet AND desktop — see the full note in
+            // items_tab.dart. This grid never runs on mobile
+            // (_buildMobileLayout returns a ListView).
+            //
+            // Sized from the content, not guessed: the grid card is ONE row
+            // (icon · name · count · actions) whose name is maxLines: 1, and
+            // the audit line is `!isGrid` so it never appears here. That's
+            // ~42px of text plus 24px of vertical padding at desktop sizes,
+            // ~61px total on tablet — hence 76 with a little headroom.
+            //
+            // Much shorter than items_tab's 124 because that card stacks two
+            // rows and can show an audit line; this one cannot.
+            mainAxisExtent: 76.0,
           ),
           itemCount: filteredCategories.length,
           itemBuilder: (context, index) {
@@ -164,14 +206,25 @@ class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClient
     );
   }
 
+  /// Both layouts route through here, so the sort is applied once. The sort
+  /// is read from the service rather than passed in because this helper has
+  /// two call sites and the surrounding `ListenableBuilder` already
+  /// guarantees a rebuild when the preference changes.
   List<Category> _getFilteredCategories(List<Category> categories) {
-    return query.isEmpty
+    final filtered = query.isEmpty
         ? categories
         : categories.where((cat) {
             final name = cat.name.toLowerCase();
             final queryLower = query.toLowerCase();
             return name.contains(queryLower);
           }).toList();
+
+    return applySort(
+      filtered,
+      ListSortService.instance.optionFor(SortableList.categories),
+      nameOf: (cat) => cat.name,
+      createdAtOf: (cat) => cat.createdTime,
+    );
   }
 
   Widget _buildEmptyState(double height) {
@@ -180,22 +233,24 @@ class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClient
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Lottie.asset(AppImages.notfoundanimation, height: height * 0.25),
-          SizedBox(height: 16),
+          SizedBox(height: AppResponsive.largeSpacing(context)),
           Text(
             query.isEmpty ? 'No Categories Found' : 'No matching categories',
             style: GoogleFonts.poppins(
-              fontSize: 18,
+              fontSize: AppResponsive.subheadingFontSize(context),
               fontWeight: FontWeight.w600,
               color: Colors.grey.shade700,
             ),
           ),
           if (query.isEmpty)
             Padding(
-              padding: EdgeInsets.only(top: 8),
+              padding: EdgeInsets.only(
+                top: AppResponsive.smallSpacing(context),
+              ),
               child: Text(
                 'Start by adding your first category',
                 style: GoogleFonts.poppins(
-                  fontSize: 14,
+                  fontSize: AppResponsive.bodyFontSize(context),
                   color: Colors.grey.shade500,
                 ),
               ),
@@ -205,16 +260,27 @@ class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClient
     );
   }
 
-  Widget _buildCategoryCard(Category category, List<Items> items, {required bool isGrid}) {
+  Widget _buildCategoryCard(
+    Category category,
+    List<Items> items, {
+    required bool isGrid,
+  }) {
     return Container(
-      margin: isGrid ? EdgeInsets.zero : EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
+      margin: isGrid
+          ? EdgeInsets.zero
+          : EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
       // Grid cells have a fixed (short) height — keep vertical padding tight there.
       padding: isGrid
-          ? const EdgeInsets.symmetric(horizontal: 12, vertical: 10)
+          ? EdgeInsets.symmetric(
+              horizontal: AppResponsive.mediumSpacing(context),
+              vertical: AppResponsive.smallSpacing(context),
+            )
           : AppResponsive.cardPadding(context),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: AppColors.divider.withOpacity(0.5)),
         boxShadow: [
           BoxShadow(
@@ -233,15 +299,25 @@ class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClient
             children: [
               // Compact plain icon in the short grid cells; tinted box in the list.
               if (isGrid)
-                Icon(Icons.category_rounded, color: AppColors.primary, size: AppResponsive.iconSize(context))
+                Icon(
+                  Icons.category_rounded,
+                  color: AppColors.primary,
+                  size: AppResponsive.iconSize(context),
+                )
               else
                 Container(
                   padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
                   decoration: BoxDecoration(
                     color: AppColors.primary.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(AppResponsive.smallBorderRadius(context)),
+                    borderRadius: BorderRadius.circular(
+                      AppResponsive.smallBorderRadius(context),
+                    ),
                   ),
-                  child: Icon(Icons.category_rounded, color: AppColors.primary, size: AppResponsive.iconSize(context)),
+                  child: Icon(
+                    Icons.category_rounded,
+                    color: AppColors.primary,
+                    size: AppResponsive.iconSize(context),
+                  ),
                 ),
               SizedBox(width: isGrid ? 8 : 12),
               Expanded(
@@ -249,37 +325,80 @@ class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClient
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(category.name, style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context), fontWeight: FontWeight.w600, color: AppColors.textPrimary), maxLines: 1, overflow: TextOverflow.ellipsis),
-                    Text('${items.length} items', style: GoogleFonts.poppins(fontSize: AppResponsive.smallFontSize(context), color: AppColors.textSecondary)),
+                    Text(
+                      category.name,
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.bodyFontSize(context),
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      '${items.length} items',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.smallFontSize(context),
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
                   ],
                 ),
               ),
-              // Actions inline — edit & delete only for Admin/Manager
-              if (_canEdit) ...[
+              // Actions inline — edit & delete: Admin/Manager (plan enforced on tap)
+              if (_canEdit)
                 InkWell(
-                  onTap: () => AddCategoryDialog.show(context, editCategory: category),
-                  child: Padding(padding: const EdgeInsets.all(6), child: Icon(Icons.edit_outlined, size: AppResponsive.smallIconSize(context), color: AppColors.primary)),
+                  onTap: () {
+                    if (!PlanGuard.allowedOr(
+                      context,
+                      EntKeys.manageMenuCategoriesEdit,
+                      featureName: 'Edit Categories',
+                    ))
+                      return;
+                    AddCategoryDialog.show(context, editCategory: category);
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.all(6),
+                    child: Icon(
+                      Icons.edit_outlined,
+                      size: AppResponsive.smallIconSize(context),
+                      color: AppColors.primary,
+                    ),
+                  ),
                 ),
+              if (_canEdit)
                 InkWell(
                   onTap: () => _showDeleteDialog(category),
-                  child: Padding(padding: const EdgeInsets.all(6), child: Icon(Icons.delete_outline, size: AppResponsive.smallIconSize(context), color: Colors.red)),
-                ),
-              ],
-              if (items.isNotEmpty)
-                Builder(builder: (_) {
-                  final allEnabled = items.every((i) => i.isEnabled);
-                  return InkWell(
-                    onTap: () => _bulkToggleCategory(category.id, items),
-                    child: Padding(
-                      padding: const EdgeInsets.all(6),
-                      child: Icon(
-                        allEnabled ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                        size: AppResponsive.smallIconSize(context),
-                        color: allEnabled ? Colors.orange.shade700 : Colors.green.shade700,
-                      ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(6),
+                    child: Icon(
+                      Icons.delete_outline,
+                      size: AppResponsive.smallIconSize(context),
+                      color: Colors.red,
                     ),
-                  );
-                }),
+                  ),
+                ),
+              if (items.isNotEmpty)
+                Builder(
+                  builder: (_) {
+                    final allEnabled = items.every((i) => i.isEnabled);
+                    return InkWell(
+                      onTap: () => _bulkToggleCategory(category.id, items),
+                      child: Padding(
+                        padding: const EdgeInsets.all(6),
+                        child: Icon(
+                          allEnabled
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                          size: AppResponsive.smallIconSize(context),
+                          color: allEnabled
+                              ? Colors.orange.shade700
+                              : Colors.green.shade700,
+                        ),
+                      ),
+                    );
+                  },
+                ),
             ],
           ),
           // Audit trail — compact (mobile only)
@@ -288,7 +407,10 @@ class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClient
               padding: EdgeInsets.only(top: 4),
               child: Text(
                 'Edited ${category.editCount}x • ${category.lastEditedTime!.day}/${category.lastEditedTime!.month}/${category.lastEditedTime!.year}${category.editedBy != null ? ' by ${category.editedBy}' : ''}',
-                style: GoogleFonts.poppins(fontSize: 10, color: Colors.grey.shade500),
+                style: GoogleFonts.poppins(
+                  fontSize: 10,
+                  color: Colors.grey.shade500,
+                ),
               ),
             ),
         ],
@@ -298,8 +420,7 @@ class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClient
 
   // ── Bulk toggle ──────────────────────────────────────────────────────────────
 
-  Future<void> _bulkToggleCategory(
-      String categoryId, List<Items> items) async {
+  Future<void> _bulkToggleCategory(String categoryId, List<Items> items) async {
     // Enable all if any disabled; disable all if every item is enabled
     final anyDisabled = items.any((i) => !i.isEnabled);
     for (final item in items.where((i) => i.isEnabled != anyDisabled)) {
@@ -307,14 +428,22 @@ class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClient
     }
   }
 
-
   void _showDeleteDialog(Category category) async {
-    final itemCount = itemStore.items.where((i) => i.categoryOfItem == category.id).length;
+    if (!PlanGuard.allowedOr(
+      context,
+      EntKeys.manageMenuCategoriesDelete,
+      featureName: 'Delete Categories',
+    ))
+      return;
+    final itemCount = itemStore.items
+        .where((i) => i.categoryOfItem == category.id)
+        .length;
     final confirmed = await showAppConfirmDialog(
       context: context,
       title: 'Delete "${category.name}"?',
       message: itemCount > 0
-          ? 'This will also delete $itemCount item${itemCount > 1 ? 's' : ''} in this category.'
+          ? '$itemCount item${itemCount > 1 ? 's' : ''} in this category will '
+                'be moved to Uncategorized. Nothing is deleted.'
           : 'This category has no items.',
       confirmLabel: 'Delete',
       accent: AppColors.danger,
@@ -345,13 +474,23 @@ class _CategoryTabState extends State<CategoryTab> with AutomaticKeepAliveClient
           child: ElevatedButton.icon(
             onPressed: _showAddCategoryBottomSheet,
             icon: Icon(Icons.add, size: AppResponsive.iconSize(context)),
-            label: Text('Add Category', style: GoogleFonts.poppins(fontSize: AppResponsive.bodyFontSize(context), fontWeight: FontWeight.w500)),
+            label: Text(
+              'Add Category',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
               elevation: 0,
-              padding: EdgeInsets.symmetric(vertical: AppResponsive.mediumSpacing(context)),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              padding: EdgeInsets.symmetric(
+                vertical: AppResponsive.mediumSpacing(context),
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
           ),
         ),

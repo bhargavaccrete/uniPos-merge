@@ -5,6 +5,7 @@ import '../../../data/models/retail/hive_model/attribute_model_219.dart';
 import '../../../data/models/retail/hive_model/attribute_value_model_220.dart';
 import '../../../data/models/retail/hive_model/product_attribute_model_221.dart';
 import '../../../data/models/retail/hive_model/variante_model_201.dart';
+import 'variant_attribute_mapper.dart';
 
 /// Service for generating product variants from attribute combinations
 /// Similar to WooCommerce's variant generation system
@@ -81,7 +82,7 @@ class VariantGeneratorService {
     double? defaultPrice,
     double? defaultMrp,
     double? defaultCostPrice,
-    int defaultStock = 0,
+    double defaultStock = 0,
     List<VarianteModel>? existingVariants,
   }) {
     final variants = <VarianteModel>[];
@@ -102,34 +103,16 @@ class VariantGeneratorService {
         attributeValueIds[pair.attribute.attributeId] = pair.value.valueId;
       }
 
-      // Build custom attributes map (attribute name -> value)
-      final customAttributes = <String, String>{};
-      String? size, color, weight;
-
-      for (final pair in combo.attributeValuePairs) {
-        final attrName = pair.attribute.name.toLowerCase();
-        final attrValue = pair.value.value;
-
-        // Map to standard fields if applicable
-        if (attrName == 'size') {
-          size = attrValue;
-        } else if (attrName == 'color' || attrName == 'colour') {
-          color = attrValue;
-        } else if (attrName == 'weight') {
-          weight = attrValue;
-        } else {
-          // Store in custom attributes
-          customAttributes[pair.attribute.name] = attrValue;
-        }
-      }
+      // Every attribute of this combination, by name.
+      final customAttributes = mergeVariantAttributes({
+        for (final pair in combo.attributeValuePairs)
+          pair.attribute.name: pair.value.value,
+      });
 
       // Generate variant
       final variant = VarianteModel(
         varianteId: existingVariant?.varianteId ?? _uuid.v4(),
         productId: productId,
-        size: size,
-        color: color,
-        weight: weight,
         sku: existingVariant?.sku ?? _generateSku(productId, combo),
         barcode: existingVariant?.barcode,
         mrp: existingVariant?.mrp ?? defaultMrp,
@@ -139,7 +122,7 @@ class VariantGeneratorService {
         minStock: existingVariant?.minStock,
         taxRate: existingVariant?.taxRate,
         hsnCode: existingVariant?.hsnCode,
-        customAttributes: customAttributes.isNotEmpty ? customAttributes : null,
+        customAttributes: customAttributes,
         attributeValueIds: attributeValueIds,
         imagePath: existingVariant?.imagePath,
         isDefault: i == 0 && existingVariant?.isDefault != true

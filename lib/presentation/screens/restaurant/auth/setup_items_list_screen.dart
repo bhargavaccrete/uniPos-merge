@@ -6,6 +6,8 @@ import 'package:billberrylite/data/models/restaurant/db/itemmodel_302.dart';
 import 'package:billberrylite/data/models/restaurant/db/itemvariantemodel_312.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/util/common/responsive_route.dart';
 import 'package:billberrylite/presentation/screens/restaurant/manage%20menu/tab/edit_item.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
@@ -69,21 +71,29 @@ class _SetupItemsListScreenState extends State<SetupItemsListScreen> {
         children: [
           _buildSearchBar(),
           Expanded(
-            child: Observer(builder: (_) {
-              if (itemStore.isLoading) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              final items = _filtered(itemStore.items.toList());
-              if (itemStore.items.isEmpty) return _buildEmptyState();
-              if (items.isEmpty) return _buildNoResults();
-              return ListView.builder(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                itemCount: items.length,
-                itemBuilder: (context, index) => _ItemCard(
+            child: Observer(
+              builder: (_) {
+                if (itemStore.isLoading) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final items = _filtered(itemStore.items.toList());
+                if (itemStore.items.isEmpty) return _buildEmptyState();
+                if (items.isEmpty) return _buildNoResults();
+                return ListView.builder(
+                  padding: EdgeInsets.fromLTRB(
+                    AppResponsive.largeSpacing(context),
+                    AppResponsive.smallSpacing(context),
+                    AppResponsive.largeSpacing(context),
+                    AppResponsive.largeSpacing(context),
+                  ),
+                  itemCount: items.length,
+                  itemBuilder: (context, index) => _ItemCard(
                     item: items[index],
-                    categoryName: _categoryName(items[index].categoryOfItem)),
-              );
-            }),
+                    categoryName: _categoryName(items[index].categoryOfItem),
+                  ),
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -93,7 +103,12 @@ class _SetupItemsListScreenState extends State<SetupItemsListScreen> {
   Widget _buildSearchBar() {
     return Container(
       color: AppColors.white,
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      padding: EdgeInsets.fromLTRB(
+        AppResponsive.largeSpacing(context),
+        AppResponsive.smallSpacing(context),
+        AppResponsive.largeSpacing(context),
+        AppResponsive.mediumSpacing(context),
+      ),
       child: AppTextField(
         controller: _searchController,
         focusNode: _searchFocus,
@@ -105,8 +120,11 @@ class _SetupItemsListScreenState extends State<SetupItemsListScreen> {
                   _searchController.clear();
                   _searchFocus.unfocus();
                 },
-                child: const Icon(Icons.close,
-                    color: AppColors.textSecondary, size: 18),
+                child: Icon(
+                  Icons.close,
+                  color: AppColors.textSecondary,
+                  size: AppResponsive.smallIconSize(context),
+                ),
               )
             : null,
       ),
@@ -118,21 +136,35 @@ class _SetupItemsListScreenState extends State<SetupItemsListScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.search_off,
-              size: 52,
-              color: AppColors.textSecondary.withValues(alpha: 0.35)),
-          const SizedBox(height: 12),
-          Text('No items match "$_query"',
-              style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.textSecondary)),
+          Icon(
+            Icons.search_off,
+            size: AppResponsive.getValue(
+              context,
+              mobile: 52.0,
+              tablet: 62.0,
+              desktop: 72.0,
+            ),
+            color: AppColors.textSecondary.withValues(alpha: 0.35),
+          ),
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
+          Text(
+            'No items match "$_query"',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.bodyFontSize(context),
+              fontWeight: FontWeight.w500,
+              color: AppColors.textSecondary,
+            ),
+          ),
           const SizedBox(height: 6),
           TextButton(
             onPressed: () => _searchController.clear(),
-            child: Text('Clear search',
-                style: GoogleFonts.poppins(
-                    fontSize: 13, color: AppColors.primary)),
+            child: Text(
+              'Clear search',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+                color: AppColors.primary,
+              ),
+            ),
           ),
         ],
       ),
@@ -149,16 +181,22 @@ class _SetupItemsListScreenState extends State<SetupItemsListScreen> {
         builder: (_) => Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Menu Items',
-                style: GoogleFonts.poppins(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600)),
-            Text('${itemStore.items.length} item(s) in database',
-                style: GoogleFonts.poppins(
-                    color: Colors.white70,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500)),
+            Text(
+              'Menu Items',
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontSize: AppResponsive.subheadingFontSize(context),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            Text(
+              '${itemStore.items.length} item(s) in database',
+              style: GoogleFonts.poppins(
+                color: Colors.white70,
+                fontSize: AppResponsive.smallFontSize(context),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
           ],
         ),
       ),
@@ -170,19 +208,33 @@ class _SetupItemsListScreenState extends State<SetupItemsListScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.restaurant_menu,
-              size: 64,
-              color: AppColors.textSecondary.withValues(alpha: 0.3)),
-          const SizedBox(height: 16),
-          Text('No items added yet',
-              style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.textSecondary)),
-          const SizedBox(height: 8),
-          Text('Go back and add your first item',
-              style: GoogleFonts.poppins(
-                  fontSize: 13, color: AppColors.textSecondary)),
+          Icon(
+            Icons.restaurant_menu,
+            size: AppResponsive.getValue(
+              context,
+              mobile: 64.0,
+              tablet: 76.0,
+              desktop: 88.0,
+            ),
+            color: AppColors.textSecondary.withValues(alpha: 0.3),
+          ),
+          SizedBox(height: AppResponsive.largeSpacing(context)),
+          Text(
+            'No items added yet',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.subheadingFontSize(context),
+              fontWeight: FontWeight.w500,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          SizedBox(height: AppResponsive.smallSpacing(context)),
+          Text(
+            'Go back and add your first item',
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.smallFontSize(context),
+              color: AppColors.textSecondary,
+            ),
+          ),
         ],
       ),
     );
@@ -202,23 +254,31 @@ class _ItemCard extends StatelessWidget {
     final isVeg = (item.isVeg ?? 'Veg') == 'Veg';
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.only(bottom: AppResponsive.mediumSpacing(context)),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(
+          AppResponsive.borderRadius(context),
+        ),
         border: Border.all(color: AppColors.divider),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2))
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
       child: Column(
         children: [
           // ── Header row ──────────────────────────────────────────────
           Padding(
-            padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+            padding: EdgeInsets.fromLTRB(
+              AppResponsive.mediumSpacing(context),
+              AppResponsive.mediumSpacing(context),
+              AppResponsive.mediumSpacing(context),
+              AppResponsive.smallSpacing(context),
+            ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -229,8 +289,9 @@ class _ItemCard extends StatelessWidget {
                   margin: const EdgeInsets.only(top: 2),
                   decoration: BoxDecoration(
                     border: Border.all(
-                        color: isVeg ? AppColors.success : AppColors.danger,
-                        width: 1.5),
+                      color: isVeg ? AppColors.success : AppColors.danger,
+                      width: 1.5,
+                    ),
                     borderRadius: BorderRadius.circular(3),
                   ),
                   child: Center(
@@ -244,23 +305,29 @@ class _ItemCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(width: 10),
+                SizedBox(width: AppResponsive.smallSpacing(context)),
 
                 // Name + category
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(item.name,
-                          style: GoogleFonts.poppins(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textPrimary)),
+                      Text(
+                        item.name,
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.bodyFontSize(context),
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
                       const SizedBox(height: 2),
-                      Text(categoryName,
-                          style: GoogleFonts.poppins(
-                              fontSize: 12,
-                              color: AppColors.textSecondary)),
+                      Text(
+                        categoryName,
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.smallFontSize(context),
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -269,17 +336,22 @@ class _ItemCard extends StatelessWidget {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text('${CurrencyHelper.currentSymbol}${item.price?.toStringAsFixed(2) ?? '—'}',
-                        style: GoogleFonts.poppins(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.primary)),
+                    Text(
+                      '${CurrencyHelper.currentSymbol}${item.price?.toStringAsFixed(2) ?? '—'}',
+                      style: GoogleFonts.poppins(
+                        fontSize: AppResponsive.subheadingFontSize(context),
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primary,
+                      ),
+                    ),
                     if (item.taxRate != null && item.taxRate! > 0)
                       Text(
-                          'Tax ${(item.taxRate! * 100).toStringAsFixed(0)}%',
-                          style: GoogleFonts.poppins(
-                              fontSize: 11,
-                              color: AppColors.textSecondary)),
+                        'Tax ${(item.taxRate! * 100).toStringAsFixed(0)}%',
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.captionFontSize(context),
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
                   ],
                 ),
               ],
@@ -288,13 +360,19 @@ class _ItemCard extends StatelessWidget {
 
           // ── Chips row ────────────────────────────────────────────────
           Padding(
-            padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+            padding: EdgeInsets.fromLTRB(
+              AppResponsive.mediumSpacing(context),
+              0,
+              AppResponsive.mediumSpacing(context),
+              AppResponsive.smallSpacing(context),
+            ),
             child: Wrap(
               spacing: 6,
               runSpacing: 6,
               children: [
                 if (item.trackInventory)
                   _chip(
+                    context,
                     icon: Icons.inventory_2_outlined,
                     label: 'Stock: ${item.stockQuantity.toStringAsFixed(0)}',
                     color: item.stockQuantity > 0
@@ -303,30 +381,35 @@ class _ItemCard extends StatelessWidget {
                   ),
                 if ((item.variant?.isNotEmpty ?? false))
                   _chip(
+                    context,
                     icon: Icons.tune,
-                    label: '${item.variant!.length} Variants',
-                    color: Colors.deepPurple,
+                    label: _countLabel(item.variant!.length, 'Variant'),
+                    color: AppColors.primary,
                   ),
                 if ((item.choiceIds?.isNotEmpty ?? false))
                   _chip(
+                    context,
                     icon: Icons.checklist,
-                    label: '${item.choiceIds!.length} Choices',
-                    color: Colors.teal,
+                    label: _countLabel(item.choiceIds!.length, 'Choice'),
+                    color: AppColors.primary,
                   ),
                 if ((item.extraId?.isNotEmpty ?? false))
                   _chip(
+                    context,
                     icon: Icons.add_circle_outline,
-                    label: '${item.extraId!.length} Extras',
-                    color: Colors.orange,
+                    label: _countLabel(item.extraId!.length, 'Extra'),
+                    color: AppColors.primary,
                   ),
                 if (item.isSoldByWeight)
                   _chip(
+                    context,
                     icon: Icons.scale,
                     label: 'By Weight (${item.unit ?? ''})',
-                    color: Colors.brown,
+                    color: AppColors.textSecondary,
                   ),
                 if (!item.isEnabled)
                   _chip(
+                    context,
                     icon: Icons.block,
                     label: 'Disabled',
                     color: AppColors.danger,
@@ -337,28 +420,32 @@ class _ItemCard extends StatelessWidget {
 
           // ── Variant detail ───────────────────────────────────────────
           if (item.variant?.isNotEmpty ?? false)
-            _buildVariantRow(item.variant!),
+            _buildVariantRow(context, item.variant!),
 
           // ── Divider + edit button ───────────────────────────────────
           const Divider(height: 1, color: AppColors.divider),
           TextButton.icon(
             onPressed: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => EdititemScreen(items: item)),
-              );
-              // Reload after edit
-              await itemStore.loadItems();
+              // No reload after edit: itemStore.updateItem replaces the entry.
+              await pushResponsive(context, EdititemScreen(items: item));
             },
-            icon: const Icon(Icons.edit_outlined, size: 16),
-            label: Text('Edit Item',
-                style: GoogleFonts.poppins(
-                    fontSize: 13, fontWeight: FontWeight.w600)),
+            icon: Icon(
+              Icons.edit_outlined,
+              size: AppResponsive.smallIconSize(context),
+            ),
+            label: Text(
+              'Edit Item',
+              style: GoogleFonts.poppins(
+                fontSize: AppResponsive.bodyFontSize(context),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             style: TextButton.styleFrom(
               foregroundColor: AppColors.primary,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              padding: EdgeInsets.symmetric(
+                horizontal: AppResponsive.largeSpacing(context),
+                vertical: AppResponsive.smallSpacing(context),
+              ),
             ),
           ),
         ],
@@ -366,10 +453,15 @@ class _ItemCard extends StatelessWidget {
     );
   }
 
-  Widget _buildVariantRow(List<dynamic> variants) {
+  Widget _buildVariantRow(BuildContext context, List<dynamic> variants) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(14, 4, 14, 10),
+      padding: EdgeInsets.fromLTRB(
+        AppResponsive.mediumSpacing(context),
+        4,
+        AppResponsive.mediumSpacing(context),
+        AppResponsive.smallSpacing(context),
+      ),
       child: Wrap(
         spacing: 6,
         runSpacing: 4,
@@ -379,22 +471,27 @@ class _ItemCard extends StatelessWidget {
               .where((vm) => vm.id == iv.variantId)
               .firstOrNull;
           final name = variantModel?.name ?? iv.variantId;
-          final price = '${CurrencyHelper.currentSymbol}${iv.price.toStringAsFixed(2)}';
+          final price =
+              '${CurrencyHelper.currentSymbol}${iv.price.toStringAsFixed(2)}';
           return Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            padding: EdgeInsets.symmetric(
+              horizontal: AppResponsive.smallSpacing(context),
+              vertical: 3,
+            ),
             decoration: BoxDecoration(
-              color: Colors.deepPurple.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                  color: Colors.deepPurple.withValues(alpha: 0.2)),
+              color: AppColors.surfaceLight,
+              borderRadius: BorderRadius.circular(
+                AppResponsive.smallBorderRadius(context),
+              ),
+              border: Border.all(color: AppColors.divider),
             ),
             child: Text(
               price.isNotEmpty ? '$name · $price' : name,
               style: GoogleFonts.poppins(
-                  fontSize: 11,
-                  color: Colors.deepPurple,
-                  fontWeight: FontWeight.w500),
+                fontSize: AppResponsive.captionFontSize(context),
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           );
         }).toList(),
@@ -402,12 +499,21 @@ class _ItemCard extends StatelessWidget {
     );
   }
 
+  /// "1 Variant" / "2 Variants" — correct singular vs plural.
+  String _countLabel(int n, String singular) =>
+      '$n ${n == 1 ? singular : '${singular}s'}';
+
   Widget _chip(
-      {required IconData icon,
-      required String label,
-      required Color color}) {
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required Color color,
+  }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: EdgeInsets.symmetric(
+        horizontal: AppResponsive.smallSpacing(context),
+        vertical: 3,
+      ),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(20),
@@ -418,11 +524,14 @@ class _ItemCard extends StatelessWidget {
         children: [
           Icon(icon, size: 12, color: color),
           const SizedBox(width: 4),
-          Text(label,
-              style: GoogleFonts.poppins(
-                  fontSize: 11,
-                  color: color,
-                  fontWeight: FontWeight.w500)),
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: AppResponsive.captionFontSize(context),
+              color: color,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
         ],
       ),
     );

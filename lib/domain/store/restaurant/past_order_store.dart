@@ -1,5 +1,7 @@
 import 'package:mobx/mobx.dart';
+import '../../../core/di/service_locator.dart';
 import '../../../data/models/restaurant/db/cartmodel_308.dart';
+import '../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../data/models/restaurant/db/pastordermodel_313.dart';
 import '../../../data/repositories/restaurant/past_order_repository.dart';
 import '../../services/restaurant/refund_service.dart';
@@ -191,6 +193,24 @@ abstract class _PastOrderStore with Store {
       errorMessage = 'Failed to get todays past orders: $e';
       return [];
     }
+  }
+
+  /// Orders that count toward the daily bill cap (`billing.invoice.per_day_max`):
+  /// today's finalized bills PLUS today's still-open active orders.
+  ///
+  /// Counting the active orders is what makes the cap un-dodgeable: a "bill" is
+  /// only born when an order is settled, but settling can happen through paths
+  /// that aren't gated (e.g. the Active Orders screen). By counting orders at
+  /// PLACEMENT (active + past), the entrance is capped and settlement — an exit —
+  /// is never blocked, so an already-open order can always be closed.
+  Future<int> todaysBillLoad() async {
+    final past = (await getTodaysPastOrders()).length;
+    final now = DateTime.now();
+    final activeToday = orderStore.orders.where((o) {
+      final t = o.timeStamp;
+      return t.year == now.year && t.month == now.month && t.day == now.day;
+    }).length;
+    return past + activeToday;
   }
 
   @action

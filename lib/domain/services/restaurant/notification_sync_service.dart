@@ -1,9 +1,10 @@
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/core/routes/routes_name.dart';
-import 'package:billberrylite/data/models/restaurant/notification_presenter.dart';
+import 'package:billberrylite/data/models/common/notification_presenter.dart';
 import 'package:billberrylite/domain/services/common/auto_backup_service.dart';
 import 'package:billberrylite/domain/services/common/local_notification_service.dart';
 import 'package:billberrylite/domain/services/restaurant/day_management_service.dart';
+import 'package:billberrylite/domain/services/restaurant/low_stock_sync_service.dart';
 import 'package:billberrylite/domain/store/restaurant/license_store.dart';
 
 /// Raises app-level notifications and (re)schedules offline reminders so they
@@ -17,6 +18,10 @@ class NotificationSyncService {
     await _syncPendingEod();
     await _syncBackupDue();
     await _syncLicense();
+    // Catches anything that went low while the app was closed, and clears
+    // anything restocked outside the app's notice. This is also the backstop
+    // if a future stock write somehow bypasses ItemStore.
+    await LowStockSyncService.sync();
   }
 
   static Future<void> _syncPendingEod() async {

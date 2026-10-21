@@ -13,6 +13,17 @@ enum FontSize {
   large,
 }
 
+/// Receipt layout, matching the two thermal templates restaurant offers.
+///
+/// Thermal only — an A4 invoice has a fixed layout, so this is ignored there.
+enum BillTemplate {
+  /// Clean, structured layout with full spacing.
+  simple,
+
+  /// Compact spacing and tighter margins, to use less roll paper.
+  paperSaver,
+}
+
 class RetailPrinterSettings {
   // Paper Configuration
   final PaperSize paperSize;
@@ -41,7 +52,6 @@ class RetailPrinterSettings {
 
   // Item Details
   final bool showProductCode;
-  final bool showHSNCode;
   final bool showBarcode;
   final bool showVariantDetails; // size, color, weight
   final bool showItemDiscount;
@@ -86,14 +96,17 @@ class RetailPrinterSettings {
   final String lineStyle; // 'solid', 'dashed', 'dotted'
 
   // Language & Format
-  final String currencySymbol;
   final String dateFormat; // 'dd/MM/yyyy', 'MM/dd/yyyy', etc.
   final String timeFormat; // '12h', '24h'
+
+  /// Thermal receipt layout. Ignored for A4, which has a fixed layout.
+  final BillTemplate billTemplate;
 
   const RetailPrinterSettings({
     // Paper Configuration
     this.paperSize = PaperSize.mm80,
     this.paperWidth = 80,
+    this.billTemplate = BillTemplate.simple,
 
     // Logo Settings
     this.showLogo = true,
@@ -118,7 +131,6 @@ class RetailPrinterSettings {
 
     // Item Details
     this.showProductCode = false,
-    this.showHSNCode = false,
     this.showBarcode = false,
     this.showVariantDetails = true,
     this.showItemDiscount = true,
@@ -163,7 +175,6 @@ class RetailPrinterSettings {
     this.lineStyle = 'dashed',
 
     // Language & Format
-    this.currencySymbol = '₹',
     this.dateFormat = 'dd/MM/yyyy',
     this.timeFormat = '12h',
   });
@@ -189,7 +200,6 @@ class RetailPrinterSettings {
       'showCustomerDetails': showCustomerDetails,
       'showCustomerGST': showCustomerGST,
       'showProductCode': showProductCode,
-      'showHSNCode': showHSNCode,
       'showBarcode': showBarcode,
       'showVariantDetails': showVariantDetails,
       'showItemDiscount': showItemDiscount,
@@ -220,9 +230,9 @@ class RetailPrinterSettings {
       'boldProductNames': boldProductNames,
       'showBorders': showBorders,
       'lineStyle': lineStyle,
-      'currencySymbol': currencySymbol,
       'dateFormat': dateFormat,
       'timeFormat': timeFormat,
+      'billTemplate': billTemplate.index,
     };
   }
 
@@ -231,6 +241,11 @@ class RetailPrinterSettings {
     return RetailPrinterSettings(
       paperSize: PaperSize.values[json['paperSize'] ?? 1],
       paperWidth: json['paperWidth'] ?? 80,
+      // Index-clamped: a stored value from a future build with more templates
+      // would otherwise throw a RangeError on startup.
+      billTemplate: BillTemplate.values[
+          ((json['billTemplate'] as int?) ?? 0)
+              .clamp(0, BillTemplate.values.length - 1)],
       showLogo: json['showLogo'] ?? true,
       logoPath: json['logoPath'],
       logoHeight: json['logoHeight'] ?? 20,
@@ -247,7 +262,6 @@ class RetailPrinterSettings {
       showCustomerDetails: json['showCustomerDetails'] ?? true,
       showCustomerGST: json['showCustomerGST'] ?? false,
       showProductCode: json['showProductCode'] ?? false,
-      showHSNCode: json['showHSNCode'] ?? false,
       showBarcode: json['showBarcode'] ?? false,
       showVariantDetails: json['showVariantDetails'] ?? true,
       showItemDiscount: json['showItemDiscount'] ?? true,
@@ -278,7 +292,6 @@ class RetailPrinterSettings {
       boldProductNames: json['boldProductNames'] ?? true,
       showBorders: json['showBorders'] ?? false,
       lineStyle: json['lineStyle'] ?? 'dashed',
-      currencySymbol: json['currencySymbol'] ?? '₹',
       dateFormat: json['dateFormat'] ?? 'dd/MM/yyyy',
       timeFormat: json['timeFormat'] ?? '12h',
     );
@@ -288,6 +301,7 @@ class RetailPrinterSettings {
   RetailPrinterSettings copyWith({
     PaperSize? paperSize,
     int? paperWidth,
+    BillTemplate? billTemplate,
     bool? showLogo,
     String? logoPath,
     double? logoHeight,
@@ -304,7 +318,6 @@ class RetailPrinterSettings {
     bool? showCustomerDetails,
     bool? showCustomerGST,
     bool? showProductCode,
-    bool? showHSNCode,
     bool? showBarcode,
     bool? showVariantDetails,
     bool? showItemDiscount,
@@ -335,13 +348,13 @@ class RetailPrinterSettings {
     bool? boldProductNames,
     bool? showBorders,
     String? lineStyle,
-    String? currencySymbol,
     String? dateFormat,
     String? timeFormat,
   }) {
     return RetailPrinterSettings(
       paperSize: paperSize ?? this.paperSize,
       paperWidth: paperWidth ?? this.paperWidth,
+      billTemplate: billTemplate ?? this.billTemplate,
       showLogo: showLogo ?? this.showLogo,
       logoPath: logoPath ?? this.logoPath,
       logoHeight: logoHeight ?? this.logoHeight,
@@ -358,7 +371,6 @@ class RetailPrinterSettings {
       showCustomerDetails: showCustomerDetails ?? this.showCustomerDetails,
       showCustomerGST: showCustomerGST ?? this.showCustomerGST,
       showProductCode: showProductCode ?? this.showProductCode,
-      showHSNCode: showHSNCode ?? this.showHSNCode,
       showBarcode: showBarcode ?? this.showBarcode,
       showVariantDetails: showVariantDetails ?? this.showVariantDetails,
       showItemDiscount: showItemDiscount ?? this.showItemDiscount,
@@ -389,7 +401,6 @@ class RetailPrinterSettings {
       boldProductNames: boldProductNames ?? this.boldProductNames,
       showBorders: showBorders ?? this.showBorders,
       lineStyle: lineStyle ?? this.lineStyle,
-      currencySymbol: currencySymbol ?? this.currencySymbol,
       dateFormat: dateFormat ?? this.dateFormat,
       timeFormat: timeFormat ?? this.timeFormat,
     );

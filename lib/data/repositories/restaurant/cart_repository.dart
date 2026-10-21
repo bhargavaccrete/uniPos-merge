@@ -3,6 +3,8 @@ import 'package:billberrylite/core/constants/hive_box_names.dart';
 import '../../models/restaurant/db/cartmodel_308.dart';
 import '../../models/restaurant/db/itemmodel_302.dart';
 import '../../models/restaurant/db/variantmodel_305.dart';
+import '../../../domain/services/restaurant/inventory_service.dart';
+import '../../../../core/di/service_locator.dart';
 
 /// Repository layer for Cart data access (Restaurant)
 /// Handles all Hive database operations for cart items
@@ -57,10 +59,24 @@ class CartRepository {
       }
 
       // Check if inventory tracking is enabled and stock is available
-      if (inventoryItem != null && inventoryItem.trackInventory) {
+      if (inventoryItem != null &&
+          InventoryService.isStockGoverned(inventoryItem)) {
+        if (inventoryItem.isRecipeBased) {
+          final recipe = recipeRepository.getRecipeForItem(inventoryItem.id);
+          if (recipe == null || !recipe.hasIngredients) {
+            return {
+              'success': false,
+              'message': 'Recipe not configured for ${item.title}'
+            };
+          }
+        }
         if (!inventoryItem.allowOrderWhenOutOfStock) {
-          // Check stock availability
-          if (item.variantName != null && inventoryItem.variant != null) {
+          // Check stock availability. Recipe-Based items skip the variant
+          // branch — v1 recipes are item-level, so availability always comes
+          // from ingredients via effectiveAvailableStock.
+          if (!inventoryItem.isRecipeBased &&
+              item.variantName != null &&
+              inventoryItem.variant != null) {
             // Check variant stock
             try {
 
@@ -86,14 +102,17 @@ class CartRepository {
             } catch (e) {
             }
           } else {
-            // Check regular item stock
-            if (inventoryItem.stockQuantity < finalQuantity) {
+            // Check regular item stock (or, for Recipe-Based, how many the
+            // current ingredient stock can make)
+            final availableStock =
+                InventoryService.effectiveAvailableStock(inventoryItem);
+            if (availableStock.isFinite && availableStock < finalQuantity) {
               // Insufficient stock
               return {
                 'success': false,
                 'message':
-                    'Only ${inventoryItem.stockQuantity.toInt()} ${item.title} available in stock',
-                'availableStock': inventoryItem.stockQuantity.toInt()
+                    'Only ${availableStock.toInt()} ${item.title} available in stock',
+                'availableStock': availableStock.toInt()
               };
             }
           }

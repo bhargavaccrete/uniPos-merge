@@ -14,6 +14,11 @@ class AppSettings {
     "Item Image": true,
     "Item Price": true,
     "Round Off": false,
+    // Menu tab layout: false = list (default), true = grid view.
+    "Menu Grid View": false,
+    // List view only: keep every opened category expanded (don't auto-collapse
+    // the previous). OFF (default) = accordion, one category open at a time.
+    "Keep Categories Open": false,
 
     // Input & Interaction
     "Visual Keyboard": false,
@@ -26,9 +31,13 @@ class AppSettings {
     "Tax Is Inclusive": false, // ✅ WORKING
     "Discount On Items": false, // ✅ WORKING
     "Decimal Precision": true, // 🔢 Decimal places control
+    // When ON, paying a dine-in table instantly serves + completes it (settle →
+    // past COMPLETED). OFF (default) = current settle-then-serve behavior.
+    "Auto Serve Dine In On Payment": false,
 
     // Staff & Shifts
     "Shift Handover": true, // Enable 2-step cash handover between staff shifts
+    "Auto Close Stale Shift": true,
 
     // Inventory
     "Low Stock Alerts": true, // Master switch for low-stock badge + toast
@@ -58,6 +67,8 @@ class AppSettings {
     "Layout Settings": [
       "Item Image",
       "Item Price",
+      "Menu Grid View",
+      "Keep Categories Open",
       "Round Off",
     ],
     "Input & Interaction": [
@@ -69,7 +80,7 @@ class AppSettings {
       "Generate KOT", // ✅ WORKING
       // "Show Payment Method", // ❌ NOT IMPLEMENTED - Commented out
       "Tax Is Inclusive", // ✅ WORKING
-      "Discount On Items", // ✅ WORKING
+      // "Discount On Items", // ❌ NOT SHOWING IN UI - Commented out
     ],
     "Inventory": [
       "Low Stock Alerts",
@@ -107,6 +118,11 @@ class AppSettings {
   static final ValueNotifier<double> lowStockThresholdNotifier =
       ValueNotifier(_lowStockThresholdDefault);
 
+  static const String _maxSessionDurationHoursKey = 'maxSessionDurationHours';
+  static const int _maxSessionDurationHoursDefault = 24;
+  static final ValueNotifier<int> maxSessionDurationHoursNotifier =
+      ValueNotifier(_maxSessionDurationHoursDefault);
+
   /// ---- Public Getters ----
   static Map<String, bool> get values => settingsNotifier.value;
   static String get selectedRoundOffValue => roundOffNotifier.value;
@@ -118,6 +134,9 @@ class AppSettings {
   /// Master switch for refunds. When false, refunds are not offered anywhere.
   static bool get refundsEnabled => values["Allow Refunds"] ?? true;
   static double get lowStockThreshold => lowStockThresholdNotifier.value;
+
+  static bool get autoCloseStaleShift => values["Auto Close Stale Shift"] ?? true;
+  static int get maxSessionDurationHours => maxSessionDurationHoursNotifier.value;
 
   static Future<void> updateLowStockThreshold(double value) async {
     lowStockThresholdNotifier.value = value;
@@ -144,11 +163,17 @@ class AppSettings {
     await _save();
   }
 
+  static Future<void> updateMaxSessionDurationHours(int hours) async {
+    maxSessionDurationHoursNotifier.value = hours;
+    await _save();
+  }
+
   static Future<void> resetToDefaults() async {
     settingsNotifier.value = Map.from(_defaultSettingValues);
     roundOffNotifier.value = _roundOffDefault;
     refundWindowNotifier.value = _refundWindowDefault;
     lowStockThresholdNotifier.value = _lowStockThresholdDefault;
+    maxSessionDurationHoursNotifier.value = _maxSessionDurationHoursDefault;
     await _save();
   }
 
@@ -159,6 +184,7 @@ class AppSettings {
     await prefs.setString(_roundOffPrefKey, selectedRoundOffValue);
     await prefs.setInt(_refundWindowKey, refundWindowMinutes);
     await prefs.setDouble(_lowStockThresholdKey, lowStockThreshold);
+    await prefs.setInt(_maxSessionDurationHoursKey, maxSessionDurationHours);
   }
 
   static Future<void> load() async {
@@ -176,6 +202,8 @@ class AppSettings {
         prefs.getInt(_refundWindowKey) ?? _refundWindowDefault;
     lowStockThresholdNotifier.value =
         prefs.getDouble(_lowStockThresholdKey) ?? _lowStockThresholdDefault;
+    maxSessionDurationHoursNotifier.value =
+        prefs.getInt(_maxSessionDurationHoursKey) ?? _maxSessionDurationHoursDefault;
   }
 
 
@@ -185,6 +213,11 @@ class AppSettings {
   // static bool get showDefaultItemImage => values["Item Default Image"] ?? false;
   static bool get roundOff => values["Round Off"] ?? true;
 
+  /// The round-off step in force right now, 0 when rounding is off. Stamped on
+  /// a settled order so a reprint rounds the way the bill was rounded.
+  static double get roundOffStepForRecord =>
+      roundOff ? (double.tryParse(selectedRoundOffValue) ?? 0) : 0;
+
   static bool get visualKeyboard => values["Visual Keyboard"] ?? false;
   static bool get shiftHandover => values["Shift Handover"] ?? true;
 
@@ -192,6 +225,11 @@ class AppSettings {
   // static bool get autoPrintKotOnDelete => values["Auto Print KOT On Delete Item"] ?? false;
   // static bool get  estimate=> values["Estimate"] ?? false;
   static bool get generateKOT => values["Generate KOT"] ?? false;
+  static bool get autoServeDineInOnPayment =>
+      values["Auto Serve Dine In On Payment"] ?? false;
+  static bool get menuGridView => values["Menu Grid View"] ?? false;
+  static bool get keepCategoriesOpen =>
+      values["Keep Categories Open"] ?? false;
 
   static bool get showPaymentMethod => values["Show Payment Method"] ?? false;
   static bool get isTaxInclusive => values["Tax Is Inclusive"] ?? false;

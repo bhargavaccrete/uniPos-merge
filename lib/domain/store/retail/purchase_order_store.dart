@@ -94,7 +94,7 @@ abstract class _PurchaseOrderStore with Store {
   @action
   Future<String> addPurchaseOrder(PurchaseOrderModel po, List<PurchaseOrderItemModel> items) async {
     // Calculate totals
-    final totalItems = items.fold<int>(0, (sum, item) => sum + item.orderedQty);
+    final totalItems = items.fold<double>(0.0, (sum, item) => sum + item.orderedQty);
     final estimatedTotal = items.fold<double>(0.0, (sum, item) => sum + (item.estimatedTotal ?? 0));
 
     final updatedPO = po.copyWith(
@@ -112,7 +112,7 @@ abstract class _PurchaseOrderStore with Store {
   @action
   Future<void> updatePurchaseOrder(PurchaseOrderModel po, List<PurchaseOrderItemModel> items) async {
     // Calculate totals
-    final totalItems = items.fold<int>(0, (sum, item) => sum + item.orderedQty);
+    final totalItems = items.fold<double>(0.0, (sum, item) => sum + item.orderedQty);
     final estimatedTotal = items.fold<double>(0.0, (sum, item) => sum + (item.estimatedTotal ?? 0));
 
     final updatedPO = po.copyWith(
@@ -120,11 +120,19 @@ abstract class _PurchaseOrderStore with Store {
       estimatedTotal: estimatedTotal,
     );
 
-    await _poRepository.updatePurchaseOrder(updatedPO);
-
-    // Delete old items and add new ones
-    await _poItemRepository.deleteItemsByPOId(po.poId);
+    // New lines FIRST, then remove only the old ones they replace, header
+    // last. Deleting every line before re-adding meant a crash in between
+    // left the draft with no lines while its header still counted them; now
+    // the worst case is extra (visible, editable) lines, never lost ones.
+    final oldIds = (await _poItemRepository.getItemsByPOId(po.poId))
+        .map((i) => i.poItemId)
+        .toSet();
     await _poItemRepository.addPOItems(items);
+    final keptIds = items.map((i) => i.poItemId).toSet();
+    for (final id in oldIds.difference(keptIds)) {
+      await _poItemRepository.deletePOItem(id);
+    }
+    await _poRepository.updatePurchaseOrder(updatedPO);
 
     final index = purchaseOrders.indexWhere((p) => p.poId == po.poId);
     if (index != -1) {
@@ -218,8 +226,48 @@ abstract class _PurchaseOrderStore with Store {
     await loadPurchaseOrders();
   }
 
-  String generatePONumber() {
+  Future<String> generatePONumber() {
     return _poRepository.generatePONumber();
+  }
+
+  /// Cancel a PO. **Draft only** — once it's been sent to the supplier or any
+  /// goods have arrived, cancelling would strand the GRNs that reference it.
+  /// Returns false when the PO isn't in a cancellable state.
+  @action
+  Future<bool> cancelPurchaseOrder(String poId) async {
+    final po = _poRepository.getPurchaseOrderById(poId);
+    if (po == null || po.statusEnum != POStatus.draft) return false;
+
+    await updatePOStatus(poId, POStatus.cancelled);
+    return true;
+  }
+
+  /// Short-close a PO whose remaining quantity will never arrive — the
+  /// supplier shipped 8 of 10 and discontinued the item. Only while it can
+  /// still receive (sent / partially completed); cancel is draft-only, so
+  /// without this such an order stayed pending forever: in the Receive list,
+  /// in supplier on-order exposure and in the Purchase Summary outstanding.
+  ///
+  /// Terminal. What was received (stock, supplier bill, GRNs) stands; nothing
+  /// is reversed. Returns false when the PO isn't in a closable state.
+  /// (No @action: the only mutation is [updatePOStatus], which is one.)
+  Future<bool> closePurchaseOrder(String poId) async {
+    final po = _poRepository.getPurchaseOrderById(poId);
+    if (po == null || !po.canReceive) return false;
+
+    await updatePOStatus(poId, POStatus.closed);
+    return true;
+  }
+
+  /// A PO may only be deleted while it is still a draft **and** nothing has
+  /// been received against it. A GRN stores `poId`, so deleting the PO would
+  /// orphan the receiving history and the stock it already moved.
+  Future<bool> canDeletePurchaseOrder(String poId) async {
+    final po = _poRepository.getPurchaseOrderById(poId);
+    if (po == null || po.statusEnum != POStatus.draft) return false;
+
+    final poGRNs = await _grnRepository.getGRNsByPOId(poId);
+    return poGRNs.isEmpty;
   }
 
   // ==================== GRN OPERATIONS ====================
@@ -248,9 +296,12 @@ abstract class _PurchaseOrderStore with Store {
   @action
   Future<String> createGRN(GRNModel grn, List<GRNItemModel> items) async {
     // Calculate totals
-    final totalOrderedQty = items.fold<int>(0, (sum, item) => sum + item.orderedQty);
-    final totalReceivedQty = items.fold<int>(0, (sum, item) => sum + item.receivedQty);
-    final totalAmount = items.fold<double>(0.0, (sum, item) => sum + (item.totalAmount ?? 0));
+    final totalOrderedQty = items.fold<double>(0.0, (sum, item) => sum + item.orderedQty);
+    final totalReceivedQty = items.fold<double>(0.0, (sum, item) => sum + item.receivedQty);
+    // Billable, not accepted: the receipt accrues the full delivered value so
+    // it matches the supplier's invoice.
+    final totalAmount =
+        items.fold<double>(0.0, (sum, item) => sum + (item.billableAmount ?? 0));
 
     final updatedGRN = grn.copyWith(
       totalOrderedQty: totalOrderedQty,
@@ -268,9 +319,12 @@ abstract class _PurchaseOrderStore with Store {
   @action
   Future<void> updateGRN(GRNModel grn, List<GRNItemModel> items) async {
     // Calculate totals
-    final totalOrderedQty = items.fold<int>(0, (sum, item) => sum + item.orderedQty);
-    final totalReceivedQty = items.fold<int>(0, (sum, item) => sum + item.receivedQty);
-    final totalAmount = items.fold<double>(0.0, (sum, item) => sum + (item.totalAmount ?? 0));
+    final totalOrderedQty = items.fold<double>(0.0, (sum, item) => sum + item.orderedQty);
+    final totalReceivedQty = items.fold<double>(0.0, (sum, item) => sum + item.receivedQty);
+    // Billable, not accepted: the receipt accrues the full delivered value so
+    // it matches the supplier's invoice.
+    final totalAmount =
+        items.fold<double>(0.0, (sum, item) => sum + (item.billableAmount ?? 0));
 
     final updatedGRN = grn.copyWith(
       totalOrderedQty: totalOrderedQty,
@@ -325,7 +379,7 @@ abstract class _PurchaseOrderStore with Store {
     currentGRNItems.clear();
   }
 
-  String generateGRNNumber() {
+  Future<String> generateGRNNumber() {
     return _grnRepository.generateGRNNumber();
   }
 
@@ -356,6 +410,18 @@ abstract class _PurchaseOrderStore with Store {
     return items;
   }
 
+  /// Draft GRNs. Receiving only ever writes a draft as the first step of a
+  /// confirm, so every draft is a receipt that was interrupted part-way.
+  Future<List<GRNModel>> getDraftGRNs() => _grnRepository.getDraftGRNs();
+
+  Future<List<GRNItemModel>> getGRNItems(String grnId) =>
+      _grnItemRepository.getItemsByGRNId(grnId);
+
+  /// Whether a non-cancelled GRN already carries [grnNumber].
+  Future<bool> isGRNNumberUsed(String grnNumber) async =>
+      (await _grnRepository.getAllGRNs()).any((g) =>
+          g.grnNumber == grnNumber && g.statusEnum != GRNStatus.cancelled);
+
   /// Cancel a draft GRN
   @action
   Future<void> cancelGRN(String grnId) async {
@@ -367,25 +433,67 @@ abstract class _PurchaseOrderStore with Store {
     }
   }
 
-  /// Update PO status based on receiving progress
+  /// Tolerance for comparing received against ordered.
+  ///
+  /// Quantities are `double` so goods can be received by weight, and binary
+  /// floating point does not add them exactly: three receipts of 3.5 against an
+  /// order of 10.5 sum to 10.499999999999998, which a bare `>=` reads as short.
+  static const double _qtyEpsilon = 1e-6;
+
+  /// Update PO status based on receiving progress.
+  ///
+  /// **Completion is decided PER ITEM, never on the PO's totals.** Comparing
+  /// summed quantities let a surplus on one line cover a shortage on another —
+  /// an order for A 10 / B 10 receiving A 15 / B 5 summed to 20 of 20 and was
+  /// marked Completed with five units of B never delivered. That is not just a
+  /// wrong label: `canReceive` is `sent || partiallyCompleted`, so the PO left
+  /// the receiving flow and the outstanding goods had nowhere to land.
+  ///
+  /// Over-receipt still satisfies its OWN line — `>=` is deliberate, and a
+  /// trade surplus should not hold an order open.
+  ///
+  /// Reads `getTotalReceivedQtyForPOItem`, which the receiving screen already
+  /// uses to compute each line's remaining quantity, so the status and the
+  /// receiving UI agree by construction. It counts CONFIRMED GRNs only.
+  ///
+  /// Nothing here recomputes historical rows: a PO already stored as
+  /// `fullyCompleted` under the old total-based rule keeps that status until
+  /// something calls this again. Repairing those is a separate decision.
   Future<void> _updatePOStatusAfterGRN(String poId) async {
     final po = _poRepository.getPurchaseOrderById(poId);
     if (po == null) return;
+    // A closed or cancelled order is final: a receipt resumed after a crash
+    // (GrnReceivingService.resumeInterrupted) must not reopen it.
+    if (po.statusEnum == POStatus.closed ||
+        po.statusEnum == POStatus.cancelled) {
+      return;
+    }
 
-    // Get all PO items
     final poItems = await _poItemRepository.getItemsByPOId(poId);
-    final totalOrdered = poItems.fold<int>(0, (sum, item) => sum + item.orderedQty);
+    // Legacy/restore protection. An order with no lines, or nothing actually
+    // ordered, must never auto-complete — `0 >= 0` would have done exactly
+    // that. The PO screen already refuses a zero quantity at entry.
+    if (poItems.isEmpty) return;
+    final totalOrdered =
+        poItems.fold<double>(0.0, (sum, item) => sum + item.orderedQty);
+    if (totalOrdered <= 0) return;
 
-    // Get total received from all confirmed GRNs
-    final totalReceived = await _grnRepository.getTotalReceivedQtyForPO(poId);
+    var allSatisfied = true;
+    var anyReceived = false;
+    for (final item in poItems) {
+      final received =
+          await _grnItemRepository.getTotalReceivedQtyForPOItem(item.poItemId);
+      if (received > 0) anyReceived = true;
+      if (received < item.orderedQty - _qtyEpsilon) allSatisfied = false;
+    }
 
     POStatus newStatus;
-    if (totalReceived >= totalOrdered) {
+    if (allSatisfied) {
       newStatus = POStatus.fullyCompleted;
-    } else if (totalReceived > 0) {
+    } else if (anyReceived) {
       newStatus = POStatus.partiallyCompleted;
     } else {
-      return; // No change needed
+      return; // Nothing received yet — the order stays as it was sent.
     }
 
     await updatePOStatus(poId, newStatus);
@@ -430,8 +538,72 @@ abstract class _PurchaseOrderStore with Store {
   }
 
   /// Get already received quantity for a specific PO item (from confirmed GRNs)
-  Future<int> getReceivedQtyForPOItem(String poItemId) async {
+  Future<double> getReceivedQtyForPOItem(String poItemId) async {
     return await _grnItemRepository.getTotalReceivedQtyForPOItem(poItemId);
+  }
+
+  // ==================== RECEIVING PROGRESS ====================
+
+  /// Header-level progress for a PO, derived from the already-loaded [grns]
+  /// list. Synchronous on purpose — list cards render one of these per row and
+  /// a FutureBuilder per card would thrash. Reads the `grns` observable, so it
+  /// stays live inside an Observer.
+  ///
+  /// Only CONFIRMED GRNs count; a draft GRN has moved no stock and owes no
+  /// money, exactly as [confirmGRN] treats it.
+  POReceiptProgress progressFor(PurchaseOrderModel po) {
+    var received = 0.0;
+    var billedAmount = 0.0;
+
+    for (final grn in grns) {
+      if (grn.poId != po.poId) continue;
+      if (grn.statusEnum != GRNStatus.confirmed) continue;
+      received += grn.totalReceivedQty;
+      // GRN.totalAmount is the supplier's invoice value for that receipt —
+      // everything delivered, damaged included. Credits raised afterwards live
+      // on the supplier ledger, not on the order.
+      billedAmount += grn.totalAmount ?? 0;
+    }
+
+    return POReceiptProgress(
+      ordered: po.totalItems,
+      received: received,
+      billedAmount: billedAmount,
+    );
+  }
+
+  /// Per-PO-item receiving detail, keyed by `poItemId`. Aggregated across
+  /// CONFIRMED GRNs only. Async because it walks GRN items — fine for a single
+  /// PO's detail sheet, too slow for a list.
+  Future<Map<String, POItemReceipt>> getPOItemReceipts(String poId) async {
+    final poItems = await _poItemRepository.getItemsByPOId(poId);
+    final receipts = <String, POItemReceipt>{};
+
+    for (final poItem in poItems) {
+      final grnItems =
+          await _grnItemRepository.getItemsByPOItemId(poItem.poItemId);
+
+      var received = 0.0;
+      var accepted = 0.0;
+      var damaged = 0.0;
+
+      for (final grnItem in grnItems) {
+        final grn = _grnRepository.getGRNById(grnItem.grnId);
+        if (grn == null || grn.statusEnum != GRNStatus.confirmed) continue;
+        received += grnItem.receivedQty;
+        accepted += grnItem.acceptedQty;
+        damaged += grnItem.damagedQty ?? 0;
+      }
+
+      receipts[poItem.poItemId] = POItemReceipt(
+        ordered: poItem.orderedQty,
+        received: received,
+        accepted: accepted,
+        damaged: damaged,
+      );
+    }
+
+    return receipts;
   }
 
   // ==================== COMPUTED PROPERTIES ====================
@@ -460,4 +632,45 @@ abstract class _PurchaseOrderStore with Store {
 
   @computed
   int get draftGRNCount => grns.where((grn) => grn.statusEnum == GRNStatus.draft).length;
+}
+
+/// Header-level receiving progress for one PO.
+///
+/// [remaining] deliberately tracks [received] — a PO closes on what physically
+/// arrived, while stock only takes what was accepted. Damaged units therefore
+/// leave nothing outstanding on the order.
+///
+/// [billedAmount] is what the supplier invoiced across the confirmed receipts.
+/// Credits from returns and settled claims are NOT netted off here; they are
+/// supplier-ledger events, not order events.
+class POReceiptProgress {
+  final double ordered;
+  final double received;
+  final double billedAmount;
+
+  const POReceiptProgress({
+    required this.ordered,
+    required this.received,
+    required this.billedAmount,
+  });
+
+  double get remaining => (ordered - received).clamp(0.0, ordered);
+  bool get hasReceipts => received > 0;
+}
+
+/// Per-line receiving detail for a PO item.
+class POItemReceipt {
+  final double ordered;
+  final double received;
+  final double accepted;
+  final double damaged;
+
+  const POItemReceipt({
+    required this.ordered,
+    required this.received,
+    required this.accepted,
+    required this.damaged,
+  });
+
+  double get remaining => (ordered - received).clamp(0.0, ordered);
 }
