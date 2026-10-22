@@ -236,6 +236,8 @@ class _EmailVerificationStepState extends State<EmailVerificationStep> {
     await _license.savePendingKey(key);
     final activated = await _license.activateWithPendingKey(
       businessName: widget.store.storeName,
+      businessType: widget.store.businessTypeCode,
+      businessSubtype: widget.store.businessSubtypeCode,
     );
     if (!mounted) {
       _setLoading(false);

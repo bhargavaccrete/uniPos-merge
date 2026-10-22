@@ -9,7 +9,14 @@ import 'package:billberrylite/util/common/app_responsive.dart';
 /// proceeds to the dashboard.
 class LicenseActivatedScreen extends StatefulWidget {
   final String businessName;
-  const LicenseActivatedScreen({super.key, required this.businessName});
+  final String businessType;
+  final String businessSubtype;
+  const LicenseActivatedScreen({
+    super.key,
+    required this.businessName,
+    this.businessType = 'restaurant',
+    this.businessSubtype = 'other',
+  });
 
   @override
   State<LicenseActivatedScreen> createState() => _LicenseActivatedScreenState();
@@ -30,6 +37,8 @@ class _LicenseActivatedScreenState extends State<LicenseActivatedScreen> {
   Future<void> _activate() async {
     final success = await _store.activateWithPendingKey(
       businessName: widget.businessName,
+      businessType: widget.businessType,
+      businessSubtype: widget.businessSubtype,
     );
     if (mounted) {
       setState(() {

@@ -253,9 +253,13 @@ mixin _$LicenseStore on _LicenseStore, Store {
 
   @override
   Future<bool> activateLicense(String key,
-      {String businessName = '', int businessCategory = 6}) {
+      {String businessName = '',
+      String businessType = 'restaurant',
+      String businessSubtype = 'other'}) {
     return _$activateLicenseAsyncAction.run(() => super.activateLicense(key,
-        businessName: businessName, businessCategory: businessCategory));
+        businessName: businessName,
+        businessType: businessType,
+        businessSubtype: businessSubtype));
   }
 
   late final _$checkStatusAsyncAction =
@@ -286,9 +290,15 @@ mixin _$LicenseStore on _LicenseStore, Store {
       AsyncAction('_LicenseStore.activateWithPendingKey', context: context);
 
   @override
-  Future<bool> activateWithPendingKey({required String businessName}) {
-    return _$activateWithPendingKeyAsyncAction
-        .run(() => super.activateWithPendingKey(businessName: businessName));
+  Future<bool> activateWithPendingKey(
+      {required String businessName,
+      String businessType = 'restaurant',
+      String businessSubtype = 'other'}) {
+    return _$activateWithPendingKeyAsyncAction.run(() => super
+        .activateWithPendingKey(
+            businessName: businessName,
+            businessType: businessType,
+            businessSubtype: businessSubtype));
   }
 
   late final _$deactivateLicenseAsyncAction =

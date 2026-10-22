@@ -37,6 +37,20 @@ mixin _$SetupWizardStore on _SetupWizardStore, Store {
           Computed<bool>(() => super.hasRetailStoreType,
               name: '_SetupWizardStore.hasRetailStoreType'))
       .value;
+  Computed<bool>? _$needsRestaurantStoreTypeComputed;
+
+  @override
+  bool get needsRestaurantStoreType => (_$needsRestaurantStoreTypeComputed ??=
+          Computed<bool>(() => super.needsRestaurantStoreType,
+              name: '_SetupWizardStore.needsRestaurantStoreType'))
+      .value;
+  Computed<bool>? _$hasRestaurantStoreTypeComputed;
+
+  @override
+  bool get hasRestaurantStoreType => (_$hasRestaurantStoreTypeComputed ??=
+          Computed<bool>(() => super.hasRestaurantStoreType,
+              name: '_SetupWizardStore.hasRestaurantStoreType'))
+      .value;
   Computed<bool>? _$canProceedFromBusinessTypeComputed;
 
   @override
@@ -171,6 +185,23 @@ mixin _$SetupWizardStore on _SetupWizardStore, Store {
     _$selectedRetailStoreTypeAtom
         .reportWrite(value, super.selectedRetailStoreType, () {
       super.selectedRetailStoreType = value;
+    });
+  }
+
+  late final _$selectedRestaurantStoreTypeAtom = Atom(
+      name: '_SetupWizardStore.selectedRestaurantStoreType', context: context);
+
+  @override
+  String? get selectedRestaurantStoreType {
+    _$selectedRestaurantStoreTypeAtom.reportRead();
+    return super.selectedRestaurantStoreType;
+  }
+
+  @override
+  set selectedRestaurantStoreType(String? value) {
+    _$selectedRestaurantStoreTypeAtom
+        .reportWrite(value, super.selectedRestaurantStoreType, () {
+      super.selectedRestaurantStoreType = value;
     });
   }
 
@@ -672,6 +703,17 @@ mixin _$SetupWizardStore on _SetupWizardStore, Store {
   }
 
   @override
+  void selectRestaurantStoreType(String key) {
+    final _$actionInfo = _$_SetupWizardStoreActionController.startAction(
+        name: '_SetupWizardStore.selectRestaurantStoreType');
+    try {
+      return super.selectRestaurantStoreType(key);
+    } finally {
+      _$_SetupWizardStoreActionController.endAction(_$actionInfo);
+    }
+  }
+
+  @override
   void setStoreName(String value) {
     final _$actionInfo = _$_SetupWizardStoreActionController.startAction(
         name: '_SetupWizardStore.setStoreName');
@@ -955,6 +997,7 @@ errorMessage: ${errorMessage},
 selectedBusinessTypeId: ${selectedBusinessTypeId},
 selectedBusinessTypeName: ${selectedBusinessTypeName},
 selectedRetailStoreType: ${selectedRetailStoreType},
+selectedRestaurantStoreType: ${selectedRestaurantStoreType},
 storeName: ${storeName},
 ownerName: ${ownerName},
 phone: ${phone},
@@ -983,6 +1026,8 @@ hasBusinessType: ${hasBusinessType},
 hasStoreDetails: ${hasStoreDetails},
 needsRetailStoreType: ${needsRetailStoreType},
 hasRetailStoreType: ${hasRetailStoreType},
+needsRestaurantStoreType: ${needsRestaurantStoreType},
+hasRestaurantStoreType: ${hasRestaurantStoreType},
 canProceedFromBusinessType: ${canProceedFromBusinessType},
 canProceedFromStoreDetails: ${canProceedFromStoreDetails},
 progressPercentage: ${progressPercentage},

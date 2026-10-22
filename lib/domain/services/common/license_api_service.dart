@@ -32,14 +32,16 @@ class LicenseApiService {
   Future<Map<String, dynamic>> activate({
     required String key,
     required String businessName,
-    int businessCategory = 6,
+    required String businessType,
+    required String businessSubtype,
   }) async {
     final device = await DevicePayloadService.build();
     final location = await LocationService.build();
     return _post(ApiConstants.licenseActivatePath, {
       'licensekey': key,
       'device': device,
-      'businesscategory': businessCategory,
+      'businesstype': businessType,
+      'businesssubtype': businessSubtype,
       'businessname': businessName,
       'location': location,
     });
@@ -184,7 +186,8 @@ class LicenseApiService {
   // ── Self-Signup (Email OTP → License Key) ──────────────────────────────────
 
   /// Registers the business and triggers an OTP email. [signup] is the full
-  /// signup body assembled by the store (customername, businesscategory, …).
+  /// signup body assembled by the store (customername, businesstype,
+  /// businesssubtype, …).
   Future<Map<String, dynamic>> requestSignupOtp(
           Map<String, dynamic> signup) =>
       _post(ApiConstants.licenseRequestOtp, signup);

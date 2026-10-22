@@ -496,7 +496,8 @@ abstract class _LicenseStore with Store {
   Future<bool> activateLicense(
     String key, {
     String businessName = '',
-    int businessCategory = 6,
+    String businessType = 'restaurant',
+    String businessSubtype = 'other',
   }) async {
     isLoading = true;
     errorMessage = null;
@@ -504,7 +505,8 @@ abstract class _LicenseStore with Store {
       final data = await _api.activate(
         key: key,
         businessName: businessName,
-        businessCategory: businessCategory,
+        businessType: businessType,
+        businessSubtype: businessSubtype,
       );
       final devicePayload = await DevicePayloadService.build();
       final info = LicenseInfo.fromServerJson(data, devicePayload);
@@ -637,12 +639,23 @@ abstract class _LicenseStore with Store {
       _storage.delete(key: _pendingKeyStorageKey);
 
   /// Activates using the key saved by [savePendingKey]. Returns true on success.
-  /// Clears the pending key once activated.
+  /// Clears the pending key once activated. [businessType]/[businessSubtype] are
+  /// the stable server codes captured in the setup wizard (default to
+  /// restaurant/other if the caller doesn't know them yet).
   @action
-  Future<bool> activateWithPendingKey({required String businessName}) async {
+  Future<bool> activateWithPendingKey({
+    required String businessName,
+    String businessType = 'restaurant',
+    String businessSubtype = 'other',
+  }) async {
     final key = await getPendingKey();
     if (key == null || key.trim().isEmpty) return false;
-    final success = await activateLicense(key.trim(), businessName: businessName);
+    final success = await activateLicense(
+      key.trim(),
+      businessName: businessName,
+      businessType: businessType,
+      businessSubtype: businessSubtype,
+    );
     if (success) await clearPendingKey();
     return success;
   }

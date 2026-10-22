@@ -256,7 +256,11 @@ class _SetupWizardScreenState extends State<SetupWizardScreen>
               context,
               MaterialPageRoute(
                 builder: (_) =>
-                    LicenseActivatedScreen(businessName: _store.storeName),
+                    LicenseActivatedScreen(
+                      businessName: _store.storeName,
+                      businessType: _store.businessTypeCode,
+                      businessSubtype: _store.businessSubtypeCode,
+                    ),
               ),
             );
           } else {
@@ -275,7 +279,11 @@ class _SetupWizardScreenState extends State<SetupWizardScreen>
               context,
               MaterialPageRoute(
                 builder: (_) =>
-                    LicenseActivatedScreen(businessName: _store.storeName),
+                    LicenseActivatedScreen(
+                      businessName: _store.storeName,
+                      businessType: _store.businessTypeCode,
+                      businessSubtype: _store.businessSubtypeCode,
+                    ),
               ),
             );
           } else {

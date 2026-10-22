@@ -9,6 +9,7 @@ import 'package:billberrylite/data/repositories/business_details_repository.dart
 import 'package:billberrylite/data/repositories/tax_details_repository.dart';
 import 'package:billberrylite/core/config/app_config.dart';
 import 'package:billberrylite/core/constants/retail_store_types.dart';
+import 'package:billberrylite/core/constants/restaurant_store_types.dart';
 import 'package:billberrylite/core/init/hive_init.dart';
 import 'package:billberrylite/core/di/service_locator.dart' as sl;
 import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
@@ -55,6 +56,12 @@ abstract class _SetupWizardStore with Store {
   /// moves away from retail.
   @observable
   String? selectedRetailStoreType;
+
+  /// Restaurant sub-type: a stable `RestaurantStoreTypes` key (e.g. 'cafe').
+  /// Meaningless for retail, so it is cleared whenever the business type moves
+  /// away from restaurant. Mirrors [selectedRetailStoreType].
+  @observable
+  String? selectedRestaurantStoreType;
 
   // Store Details
   @observable
@@ -164,12 +171,22 @@ abstract class _SetupWizardStore with Store {
   bool get hasRetailStoreType =>
       RetailStoreTypes.isKnown(selectedRetailStoreType);
 
+  /// Restaurant also says WHICH kind of restaurant — same place/flow as retail.
+  @computed
+  bool get needsRestaurantStoreType => selectedBusinessTypeId == 'restaurant';
+
+  @computed
+  bool get hasRestaurantStoreType =>
+      RestaurantStoreTypes.isKnown(selectedRestaurantStoreType);
+
   @computed
   bool get canProceedFromBusinessType => hasBusinessType;
 
   @computed
   bool get canProceedFromStoreDetails =>
-      hasStoreDetails && (!needsRetailStoreType || hasRetailStoreType);
+      hasStoreDetails &&
+      (!needsRetailStoreType || hasRetailStoreType) &&
+      (!needsRestaurantStoreType || hasRestaurantStoreType);
 
   @computed
   double get progressPercentage => (currentStep + 1) / 10;
@@ -223,15 +240,25 @@ abstract class _SetupWizardStore with Store {
     selectedRetailStoreType = key;
   }
 
+  /// Pick the restaurant store type. Mirrors [selectRetailStoreType].
+  @action
+  void selectRestaurantStoreType(String key) {
+    if (!RestaurantStoreTypes.isKnown(key)) return;
+    selectedRestaurantStoreType = key;
+  }
+
   @action
   Future<void> selectBusinessType(String id, String name) async {
     selectedBusinessTypeId = id;
     selectedBusinessTypeName = name;
 
-    // A restaurant has no retail store type. Drop any stale pick so it can't
-    // be persisted onto a restaurant business.
+    // A restaurant has no retail store type (and vice versa). Drop any stale
+    // pick so it can't be persisted onto the wrong business.
     if (id != 'retail') {
       selectedRetailStoreType = null;
+    }
+    if (id != 'restaurant') {
+      selectedRestaurantStoreType = null;
     }
 
     // Determine the business mode based on selection
@@ -476,6 +503,9 @@ abstract class _SetupWizardStore with Store {
         if (RetailStoreTypes.isKnown(savedDetails.retailStoreType)) {
           selectedRetailStoreType = savedDetails.retailStoreType;
         }
+        if (RestaurantStoreTypes.isKnown(savedDetails.restaurantStoreType)) {
+          selectedRestaurantStoreType = savedDetails.restaurantStoreType;
+        }
         // Use AppConfig as source of truth for setup complete status
         if (!AppConfig.isBusinessModeSet) {
           isSetupComplete = savedDetails.isSetupComplete;
@@ -528,6 +558,8 @@ abstract class _SetupWizardStore with Store {
           existingDetails.copyWith(
             retailStoreType: selectedRetailStoreType,
             clearRetailStoreType: selectedRetailStoreType == null,
+            restaurantStoreType: selectedRestaurantStoreType,
+            clearRestaurantStoreType: selectedRestaurantStoreType == null,
           ),
         );
       }
@@ -564,6 +596,7 @@ abstract class _SetupWizardStore with Store {
         isSetupComplete: false,
         logo: logoByte,
         retailStoreType: selectedRetailStoreType,
+        restaurantStoreType: selectedRestaurantStoreType,
       );
       await _businessDetailsRepo.save(details);
       await _seedStoreTypeAttributeDefaults();
@@ -682,6 +715,7 @@ abstract class _SetupWizardStore with Store {
         logo: logoByte,
         isSetupComplete: true,
         retailStoreType: selectedRetailStoreType,
+        restaurantStoreType: selectedRestaurantStoreType,
       );
       await _businessDetailsRepo.save(details);
       await _seedStoreTypeAttributeDefaults();
@@ -781,22 +815,23 @@ abstract class _SetupWizardStore with Store {
 
   // ==================== HELPER METHODS ====================
 
-  /// Server business-category code. Samples used 3 for restaurant.
-  ///
-  /// TODO(backend): retail's code is UNKNOWN and currently reuses restaurant's 3.
-  /// This now matters — retail goes through self-signup + activation too, so a
-  /// retail shop would be registered under the restaurant category and could be
-  /// served the wrong plan catalog. Confirm the retail value and set it here.
-  /// (Note `LicenseStore.activateLicense` separately defaults `businessCategory`
-  /// to 6, so signup and activation do not agree today — confirm both.)
-  int get _businessCategoryCode =>
-      selectedBusinessTypeId == 'retail' ? 3 : 3;
+  /// Top-level business type code sent to the server (`restaurant` / `retail`).
+  /// Equals [selectedBusinessTypeId], which already uses those exact strings.
+  String get businessTypeCode => selectedBusinessTypeId ?? 'restaurant';
+
+  /// Sub-type code sent to the server as `businesssubtype`. Reads the relevant
+  /// store-type selection for the active type; falls back to 'other' so signup
+  /// never sends an empty sub-type (both master tables define an 'other' row).
+  String get businessSubtypeCode => selectedBusinessTypeId == 'retail'
+      ? (selectedRetailStoreType ?? 'other')
+      : (selectedRestaurantStoreType ?? 'other');
 
   /// Assembles the self-signup request body from the store details already
   /// captured in the wizard. Sent to the request-otp endpoint.
   Map<String, dynamic> buildSignupBody() => {
         'customername': storeName,
-        'businesscategory': _businessCategoryCode,
+        'businesstype': businessTypeCode,
+        'businesssubtype': businessSubtypeCode,
         'ownername': ownerName,
         'contactperson': ownerName,
         'email': email,

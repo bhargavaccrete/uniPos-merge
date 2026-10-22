@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:billberrylite/core/config/app_config.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/core/routes/routes_name.dart';
 import 'package:billberrylite/data/models/restaurant/license_model.dart';
@@ -59,7 +60,20 @@ class _LicenseLockScreenState extends State<LicenseLockScreen> {
       _loading = true;
       _errorMsg = null;
     });
-    final success = await _store.activateLicense(key);
+    // The business is already configured here — re-send its saved type/sub-type
+    // so the activation snapshot on the server reflects reality.
+    final details = businessDetailsRepository.get();
+    final businessType = AppConfig.isRetail ? 'retail' : 'restaurant';
+    final businessSubtype = (AppConfig.isRetail
+            ? details?.retailStoreType
+            : details?.restaurantStoreType) ??
+        'other';
+    final success = await _store.activateLicense(
+      key,
+      businessName: details?.storeName ?? '',
+      businessType: businessType,
+      businessSubtype: businessSubtype,
+    );
     setState(() => _loading = false);
     if (success) {
       widget.onActivated();
