@@ -501,8 +501,10 @@ abstract class _SetupWizardStore with Store {
   }
 
   @action
-  Future<void> saveBusinessType() async {
-    if (selectedBusinessTypeId == null || selectedBusinessTypeName == null) return;
+  Future<bool> saveBusinessType() async {
+    if (selectedBusinessTypeId == null || selectedBusinessTypeName == null) {
+      return true;
+    }
 
     isLoading = true;
     try {
@@ -529,15 +531,17 @@ abstract class _SetupWizardStore with Store {
           ),
         );
       }
+      return true;
     } catch (e) {
       errorMessage = 'Failed to save business type: $e';
+      return false;
     } finally {
       isLoading = false;
     }
   }
 
   @action
-  Future<void> saveBusinessDetails() async {
+  Future<bool> saveBusinessDetails() async {
     isLoading = true;
     try {
       final details = BusinessDetails(
@@ -577,8 +581,10 @@ abstract class _SetupWizardStore with Store {
         email: email.isNotEmpty ? email : null,
         gstNumber: gstin.isNotEmpty ? gstin : null,
       );
+      return true;
     } catch (e) {
       errorMessage = 'Failed to save business details: $e';
+      return false;
     } finally {
       isLoading = false;
     }
@@ -606,7 +612,7 @@ abstract class _SetupWizardStore with Store {
   }
 
   @action
-  Future<void> saveTaxDetails() async {
+  Future<bool> saveTaxDetails() async {
     isLoading = true;
     try {
       // Named tax rates themselves live in the shared TaxStore (see
@@ -622,8 +628,10 @@ abstract class _SetupWizardStore with Store {
         notes: taxNotes,
       );
       await _taxDetailsRepo.save(details);
+      return true;
     } catch (e) {
       errorMessage = 'Failed to save tax details: $e';
+      return false;
     } finally {
       isLoading = false;
     }
@@ -648,11 +656,10 @@ abstract class _SetupWizardStore with Store {
       // This is critical - must happen before navigating to POS screen
       await _registerBusinessDependencies(mode);
 
-      // 4. Save business type to Hive
-      await saveBusinessType();
-
-      // 5. Save tax details
-      await saveTaxDetails();
+      // 4–5. Both swallow their own errors, so check the result — otherwise
+      // setup is marked complete with a missing record.
+      if (!await saveBusinessType()) throw StateError(errorMessage!);
+      if (!await saveTaxDetails()) throw StateError(errorMessage!);
 
       // 6. Save business details with setup complete flag
       final details = BusinessDetails(

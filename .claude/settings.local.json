@@ -18,7 +18,8 @@
       "Bash(ls:*)",
       "Bash(sed:*)",
       "Bash(head:*)",
-      "Bash(python -)"
+      "Bash(python -)",
+      "PowerShell(git check-ignore *)"
     ]
   },
   "outputStyle": "Explanatory"

@@ -1042,6 +1042,10 @@ class _AddVariantDialogState extends State<_AddVariantDialog> {
   /// Whether this product's variants are stocked in fractional amounts.
   bool get _allowDecimal => _siblingUnitSource?.isDecimalQuantity ?? false;
 
+  /// A bundle sells from its components — no Stock box, saved at 0.
+  bool get _isBundle =>
+      productStore.getProductById(widget.productId)?.isBundle ?? false;
+
   bool _saving = false;
 
   /// Min Stock and Tax Rate start folded — see the [_MoreOptions] block below.
@@ -1152,7 +1156,8 @@ class _AddVariantDialogState extends State<_AddVariantDialog> {
       mrp: _mrpController.text.trim().isEmpty
           ? null
           : double.tryParse(_mrpController.text.trim()),
-      stockQty: double.tryParse(_stockController.text.trim()) ?? 0,
+      stockQty:
+          _isBundle ? 0 : double.tryParse(_stockController.text.trim()) ?? 0,
       minStock: _minStockController.text.trim().isEmpty
           ? null
           : double.tryParse(_minStockController.text.trim()),
@@ -1226,24 +1231,26 @@ class _AddVariantDialogState extends State<_AddVariantDialog> {
               keyboardType: TextInputType.number,
               inputFormatters: _moneyFormatters,
             ),
-            SizedBox(height: AppResponsive.mediumSpacing(context)),
-            AppTextField(
-              controller: _stockController,
-              label: _allowDecimal
-                  ? 'Stock Quantity (${_siblingUnitSource!.effectiveUnit})'
-                  : 'Stock Quantity',
-              hint: '0',
-              icon: Icons.inventory_2_outlined,
-              required: true,
-              keyboardType: _allowDecimal
-                  ? const TextInputType.numberWithOptions(decimal: true)
-                  : TextInputType.number,
-              inputFormatters: _allowDecimal
-                  ? _decimalQtyFormatters
-                  : _qtyFormatters,
-              validator: (v) =>
-                  (v == null || v.trim().isEmpty) ? 'Required' : null,
-            ),
+            if (!_isBundle) ...[
+              SizedBox(height: AppResponsive.mediumSpacing(context)),
+              AppTextField(
+                controller: _stockController,
+                label: _allowDecimal
+                    ? 'Stock Quantity (${_siblingUnitSource!.effectiveUnit})'
+                    : 'Stock Quantity',
+                hint: '0',
+                icon: Icons.inventory_2_outlined,
+                required: true,
+                keyboardType: _allowDecimal
+                    ? const TextInputType.numberWithOptions(decimal: true)
+                    : TextInputType.number,
+                inputFormatters: _allowDecimal
+                    ? _decimalQtyFormatters
+                    : _qtyFormatters,
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty) ? 'Required' : null,
+              ),
+            ],
             SizedBox(height: AppResponsive.mediumSpacing(context)),
             AppTextField(
               controller: _barcodeController,
@@ -1709,6 +1716,10 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
 
   bool get _allowDecimal => _siblingUnitSource?.isDecimalQuantity ?? false;
 
+  /// A bundle sells from its components — no Qty column, saved at 0.
+  bool get _isBundle =>
+      productStore.getProductById(widget.productId)?.isBundle ?? false;
+
   // Shared across every generated variant.
   final _costPriceController = TextEditingController();
   final _mrpController = TextEditingController();
@@ -2121,8 +2132,9 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
               double.tryParse(row?.priceController.text.trim() ?? '') ?? 0.0,
           costPrice: costPrice,
           mrp: mrp,
-          stockQty:
-              double.tryParse(row?.stockController.text.trim() ?? '') ?? 0,
+          stockQty: _isBundle
+              ? 0
+              : double.tryParse(row?.stockController.text.trim() ?? '') ?? 0,
           minStock: minStock,
           // Tax deliberately unset — the variant inherits the product's rate
           // through cart_store's Variant → Product → default resolution.
@@ -2697,22 +2709,24 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
               },
             ),
           ),
-          SizedBox(width: AppResponsive.smallSpacing(context)),
-          Expanded(
-            flex: 2,
-            child: AppTextField(
-              controller: row.stockController,
-              label: 'Qty',
-              hint: '0',
-              enabled: active,
-              keyboardType: _allowDecimal
-                  ? const TextInputType.numberWithOptions(decimal: true)
-                  : TextInputType.number,
-              inputFormatters: _allowDecimal
-                  ? _decimalQtyFormatters
-                  : _qtyFormatters,
+          if (!_isBundle) ...[
+            SizedBox(width: AppResponsive.smallSpacing(context)),
+            Expanded(
+              flex: 2,
+              child: AppTextField(
+                controller: row.stockController,
+                label: 'Qty',
+                hint: '0',
+                enabled: active,
+                keyboardType: _allowDecimal
+                    ? const TextInputType.numberWithOptions(decimal: true)
+                    : TextInputType.number,
+                inputFormatters: _allowDecimal
+                    ? _decimalQtyFormatters
+                    : _qtyFormatters,
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );

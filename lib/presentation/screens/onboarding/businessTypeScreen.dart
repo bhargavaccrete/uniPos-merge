@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/stores/setup_wizard_store.dart';
+import 'package:billberrylite/domain/services/common/notification_service.dart';
 import '../../../util/color.dart';
 import '../../../util/common/app_responsive.dart';
 
@@ -265,7 +266,13 @@ class BusinessTypeStep extends StatelessWidget {
               child: ElevatedButton(
                 onPressed: store.canProceedFromBusinessType
                     ? () async {
-                        await store.saveBusinessType();
+                        if (!await store.saveBusinessType()) {
+                          NotificationService.instance.showError(
+                            store.errorMessage ??
+                                'Failed to save business type',
+                          );
+                          return;
+                        }
                         onNext();
                       }
                     : null,

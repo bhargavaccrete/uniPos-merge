@@ -3,16 +3,10 @@ import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:billberrylite/presentation/screens/retail/add_product_screen.dart';
-import 'package:billberrylite/presentation/screens/retail/assemble_kit_screen.dart';
-import 'package:billberrylite/presentation/screens/retail/bundles_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/category_management_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/import_product/bulk_import_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/inventory_screen.dart';
-import 'package:billberrylite/presentation/screens/retail/stock_take_list_screen.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
-import 'package:billberrylite/core/plan/plan_guard.dart';
-import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
-import 'package:billberrylite/domain/services/retail/stock_adjustment_service.dart';
 import 'package:billberrylite/domain/services/retail/catalog_permission.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
@@ -94,78 +88,12 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
     }
   }
 
-  /// Bulk counting belongs to the Products tab, and the hub owns the only
-  /// AppBar — the embedded InventoryScreen has none, so this action cannot live
-  /// there.
   /// The importer refreshes the product/category stores itself on Done, so the
   /// hub picks up whatever it created without any extra plumbing here.
   void _openBulkImport() {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const BulkImportScreen()),
-    );
-  }
-
-  void _openStockTakes() {
-    if (!PlanGuard.allowedOr(
-      context,
-      RetailEntKeys.inventoryStockTake,
-      featureName: 'Stock Take',
-    )) {
-      return;
-    }
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const StockTakeListScreen()),
-    );
-  }
-
-  /// Assembling writes stock, so it rides the stock-adjustment plan key.
-  void _openAssembleKit() {
-    if (!PlanGuard.allowedOr(
-      context,
-      RetailEntKeys.inventory,
-      featureName: 'Assemble Kit',
-    )) {
-      return;
-    }
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const AssembleKitScreen()),
-    );
-  }
-
-  void _openBundles() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const BundlesScreen()),
-    );
-  }
-
-  /// A Products-tab, stock-adjuster-only app-bar action that appears only
-  /// while the catalog has something for it to act on.
-  Widget _productsTabAction({
-    required bool Function() hasTarget,
-    required IconData icon,
-    required String tooltip,
-    required VoidCallback onPressed,
-  }) {
-    return AnimatedBuilder(
-      animation: _tabController.animation!,
-      builder: (_, child) => Observer(
-        builder: (_) {
-          if (_tabController.animation!.value.round() != 0 ||
-              !StockAdjustmentService.canAdjust ||
-              !hasTarget()) {
-            return const SizedBox.shrink();
-          }
-          return IconButton(
-            icon: Icon(icon),
-            tooltip: tooltip,
-            onPressed: onPressed,
-          );
-        },
-      ),
     );
   }
 
@@ -180,37 +108,7 @@ class _ProductManagementScreenState extends State<ProductManagementScreen>
         title: 'Products',
         titleFontSize: AppResponsive.headingFontSize(context),
         actions: [
-          // Products tab only, admin only. Shares the tab-tracking builder
-          // below because its visibility depends on the same animation value.
-          AnimatedBuilder(
-            animation: _tabController.animation!,
-            builder: (_, child) {
-              final index = _tabController.animation!.value.round();
-              if (index != 0 || !StockAdjustmentService.canAdjust) {
-                return const SizedBox.shrink();
-              }
-              return IconButton(
-                icon: const Icon(Icons.fact_check_outlined),
-                tooltip: 'Stock Takes',
-                onPressed: _openStockTakes,
-              );
-            },
-          ),
-          // Kits are built here; the embedded InventoryScreen has no AppBar,
-          // so these can't live there.
-          _productsTabAction(
-            hasTarget: () => productStore.products.any((p) => p.isRepack),
-            icon: Icons.inventory_rounded,
-            tooltip: 'Assemble Kit',
-            onPressed: _openAssembleKit,
-          ),
-          _productsTabAction(
-            hasTarget: () =>
-                productStore.products.any((p) => p.isBundle || p.isRepack),
-            icon: Icons.widgets_outlined,
-            tooltip: 'Bundles',
-            onPressed: _openBundles,
-          ),
+          // Stock Takes, Assemble Kit and Bundles live in the Inventory hub.
           // Products tab only. Bulk import was previously reachable only from
           // the onboarding wizard, so an existing shop had no way back to it.
           AnimatedBuilder(

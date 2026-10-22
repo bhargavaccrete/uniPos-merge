@@ -579,7 +579,7 @@ mixin _$SetupWizardStore on _SetupWizardStore, Store {
       AsyncAction('_SetupWizardStore.saveBusinessType', context: context);
 
   @override
-  Future<void> saveBusinessType() {
+  Future<bool> saveBusinessType() {
     return _$saveBusinessTypeAsyncAction.run(() => super.saveBusinessType());
   }
 
@@ -587,7 +587,7 @@ mixin _$SetupWizardStore on _SetupWizardStore, Store {
       AsyncAction('_SetupWizardStore.saveBusinessDetails', context: context);
 
   @override
-  Future<void> saveBusinessDetails() {
+  Future<bool> saveBusinessDetails() {
     return _$saveBusinessDetailsAsyncAction
         .run(() => super.saveBusinessDetails());
   }
@@ -596,7 +596,7 @@ mixin _$SetupWizardStore on _SetupWizardStore, Store {
       AsyncAction('_SetupWizardStore.saveTaxDetails', context: context);
 
   @override
-  Future<void> saveTaxDetails() {
+  Future<bool> saveTaxDetails() {
     return _$saveTaxDetailsAsyncAction.run(() => super.saveTaxDetails());
   }
 

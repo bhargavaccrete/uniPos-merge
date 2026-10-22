@@ -1243,10 +1243,17 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
           Expanded(
             flex: 2,
             child: ElevatedButton.icon(
-              onPressed: () {
+              onPressed: () async {
                 if (_formKey.currentState!.validate()) {
                   _syncToStore();
-                  widget.store.saveBusinessDetails();
+                  if (!await widget.store.saveBusinessDetails()) {
+                    NotificationService.instance.showError(
+                      widget.store.errorMessage ??
+                          'Failed to save store details',
+                    );
+                    return;
+                  }
+                  if (!mounted) return;
                   widget.onNext();
                   return;
                 }

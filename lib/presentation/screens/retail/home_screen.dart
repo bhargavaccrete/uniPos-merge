@@ -14,6 +14,7 @@ import 'package:billberrylite/presentation/widget/componets/common/dashboard_men
 import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
 
 import 'package:billberrylite/presentation/screens/retail/product_management_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/inventory_hub_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/customer_list_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/reports_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/stock_alerts_screen.dart';
@@ -754,6 +755,25 @@ class _HomeScreenState extends State<HomeScreen> {
               context,
               MaterialPageRoute(
                 builder: (context) => const ProductManagementScreen(),
+              ),
+            ),
+          ),
+        ),
+      // Stock tasks (takes, kits, bundles, alerts) in one place — they used to
+      // be app-bar icons on the Products tab only.
+      if (RestaurantSession.canAccess('inventory'))
+        DashboardMenuCard(
+          icon: Icons.warehouse_rounded,
+          title: 'Inventory',
+          color: Colors.lightGreen.shade700,
+          onTap: _gated(
+            context,
+            RetailEntKeys.inventory,
+            'Inventory',
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const InventoryHubScreen(),
               ),
             ),
           ),

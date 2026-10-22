@@ -106,9 +106,15 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
     }
   }
 
-  Future<void> _saveTaxesToDatabase() async {
+  /// Returns false (after surfacing the error) on the first failed write.
+  /// Safe to retry: the diff is by name+rate, so rates already written are
+  /// skipped on the next attempt.
+  Future<bool> _saveTaxesToDatabase() async {
     // Shared TaxStore — both modes persist every named rate entered here, not
     // just the one marked default (retail used to discard the rest).
+    void fail() => NotificationService.instance.showError(
+          taxStore.errorMessage ?? 'Failed to save taxes',
+        );
     try {
       final existingTaxes = taxStore.taxes.toList();
 
@@ -128,9 +134,13 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
         final key = keyOf(item.name, item.rate);
         desiredKeys.add(key);
         if (!existingByKey.containsKey(key)) {
-          await taxStore.addTax(
+          final ok = await taxStore.addTax(
             Tax(id: _uuid.v4(), taxname: item.name, taxperecentage: item.rate),
           );
+          if (!ok) {
+            fail();
+            return false;
+          }
         }
       }
 
@@ -139,13 +149,17 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
         if (!desiredKeys.contains(
           keyOf(tax.taxname, tax.taxperecentage ?? 0.0),
         )) {
-          await taxStore.deleteTax(tax.id);
+          if (!await taxStore.deleteTax(tax.id)) {
+            fail();
+            return false;
+          }
         }
       }
+      return true;
     } catch (e) {
       debugPrint('Error saving taxes to database: $e');
-      if (mounted)
-        NotificationService.instance.showError('Failed to save taxes: $e');
+      NotificationService.instance.showError('Failed to save taxes: $e');
+      return false;
     }
   }
 
@@ -933,7 +947,13 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
               onPressed: widget.store.isLoading
                   ? null
                   : () async {
-                      widget.store.saveTaxDetails();
+                      if (!await widget.store.saveTaxDetails()) {
+                        NotificationService.instance.showError(
+                          widget.store.errorMessage ??
+                              'Failed to save tax details',
+                        );
+                        return;
+                      }
                       if (AppConfig.isRetail) {
                         // Through the store so its in-memory copy matches the
                         // preference — see CartStore.setTaxMode.
@@ -953,7 +973,8 @@ class _TaxSetupStepState extends State<TaxSetupStep> {
                           widget.store.taxInclusiveRestaurant,
                         );
                       }
-                      await _saveTaxesToDatabase();
+                      if (!await _saveTaxesToDatabase()) return;
+                      if (!mounted) return;
                       widget.onNext();
                     },
               icon: widget.store.isLoading

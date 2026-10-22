@@ -119,15 +119,25 @@ class _SecuritySetupStepState extends State<SecuritySetupStep> {
     // payment-setup step) so they persist even before wizard completion.
     // Written directly (not via AuthService, which is only DI-registered for
     // retail) to the shared key both modes read at login.
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      RestaurantAuthHelper.adminPinKey,
-      RestaurantAuthHelper.hashPassword(_pinController.text.trim()),
-    );
-    // Only set a backup password when the plan includes backups; otherwise it's
-    // collected lazily later (ensureBackupPassword) if the plan is upgraded.
-    if (PlanEnforce.allows(EntKeys.settings)) {
-      await BackupEncryptionService.setPassword(_pwdController.text.trim());
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = await prefs.setString(
+        RestaurantAuthHelper.adminPinKey,
+        RestaurantAuthHelper.hashPassword(_pinController.text.trim()),
+      );
+      if (!saved) throw StateError('admin PIN was not stored');
+      // Only set a backup password when the plan includes backups; otherwise
+      // it's collected lazily later (ensureBackupPassword) if the plan is upgraded.
+      if (PlanEnforce.allows(EntKeys.settings)) {
+        await BackupEncryptionService.setPassword(_pwdController.text.trim());
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _error = 'Could not save security settings: $e';
+      });
+      return;
     }
 
     if (!mounted) return;
