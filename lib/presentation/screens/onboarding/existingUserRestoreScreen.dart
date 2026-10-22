@@ -381,7 +381,18 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
       _licenseLoading = true;
       _licenseErrorMsg = null;
     });
-    final success = await _licenseStore.activateLicense(key);
+    // Best-effort: if a business is already configured locally, re-send its
+    // type/sub-type; otherwise fall back to restaurant/other.
+    final details = businessDetailsRepository.get();
+    final success = await _licenseStore.activateLicense(
+      key,
+      businessName: details?.storeName ?? '',
+      businessType: AppConfig.isRetail ? 'retail' : 'restaurant',
+      businessSubtype: (AppConfig.isRetail
+              ? details?.retailStoreType
+              : details?.restaurantStoreType) ??
+          'other',
+    );
     setState(() => _licenseLoading = false);
     if (success) {
       _goToDashboard();

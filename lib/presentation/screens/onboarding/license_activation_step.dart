@@ -64,6 +64,8 @@ class _LicenseActivationStepState extends State<LicenseActivationStep> {
     final success = await _store.activateLicense(
       key,
       businessName: businessName,
+      businessType: widget.store?.businessTypeCode ?? 'restaurant',
+      businessSubtype: widget.store?.businessSubtypeCode ?? 'other',
     );
     setState(() => _loading = false);
     if (success) {

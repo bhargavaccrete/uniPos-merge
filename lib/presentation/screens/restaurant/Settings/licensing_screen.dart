@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:billberrylite/core/config/app_config.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/data/models/restaurant/license_model.dart';
 import 'package:billberrylite/domain/store/restaurant/license_store.dart';
@@ -467,10 +468,15 @@ class _ActivateSheetState extends State<_ActivateSheet> {
     }
     setState(() => _loading = true);
 
-    final businessName = businessDetailsRepository.get()?.storeName ?? '';
+    final details = businessDetailsRepository.get();
     final success = await widget.store.activateLicense(
       key,
-      businessName: businessName,
+      businessName: details?.storeName ?? '',
+      businessType: AppConfig.isRetail ? 'retail' : 'restaurant',
+      businessSubtype: (AppConfig.isRetail
+              ? details?.retailStoreType
+              : details?.restaurantStoreType) ??
+          'other',
     );
     setState(() => _loading = false);
     if (success) {

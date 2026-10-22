@@ -6,6 +6,7 @@ import 'package:billberrylite/stores/setup_wizard_store.dart';
 import '../../../presentation/widget/componets/common/app_text_field.dart';
 import '../../../presentation/widget/componets/common/location_dropdown_field.dart';
 import '../../../presentation/widget/componets/retail/retail_store_type_field.dart';
+import '../../../presentation/widget/componets/restaurant/restaurant_store_type_field.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/config/food_license_rule.dart';
 import '../../../core/config/phone_rule.dart';
@@ -646,6 +647,12 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
             SizedBox(height: AppResponsive.mediumSpacing(context)),
             _buildStoreTypeField(context),
           ],
+          // Restaurant only: what kind of restaurant (cafe, QSR, …). Mirrors the
+          // retail store-type picker.
+          if (AppConfig.isRestaurant) ...[
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
+            _buildRestaurantStoreTypeField(context),
+          ],
         ],
       ),
     );
@@ -661,6 +668,16 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
       builder: (_) => RetailStoreTypeField(
         value: widget.store.selectedRetailStoreType,
         onChanged: widget.store.selectRetailStoreType,
+      ),
+    );
+  }
+
+  // ── Restaurant store type ───────────────────────────────────────────────────
+  Widget _buildRestaurantStoreTypeField(BuildContext context) {
+    return Observer(
+      builder: (_) => RestaurantStoreTypeField(
+        value: widget.store.selectedRestaurantStoreType,
+        onChanged: widget.store.selectRestaurantStoreType,
       ),
     );
   }
