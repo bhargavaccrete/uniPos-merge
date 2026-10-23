@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../core/di/service_locator.dart';
 import '../../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
+import '../../../../domain/services/restaurant/refund_restock_rule.dart';
 import '../../../../domain/services/restaurant/refund_service.dart';
 import '../../../../util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
@@ -43,14 +45,18 @@ class _PartialRefundDialogState extends State<PartialRefundDialog> {
   final _refundReasonController = TextEditingController();
   late Map<CartItem, int> _refundQuantities;
   double _totalRefundAmount = 0.0;
-  late Map<CartItem, bool> _restockStatus;
+  // Created once: the cashier's ticks outlive every rebuild of the dialog.
+  late final RefundRestockSelection _restock;
   bool _showReasonError = false;
 
   @override
   void initState() {
     super.initState();
     _refundQuantities = {for (var item in widget.orderItems) item: 0};
-    _restockStatus = {for (var item in widget.orderItems) item: true};
+    _restock = RefundRestockSelection(
+      widget.orderItems,
+      (productId) => itemStore.getItemById(productId),
+    );
   }
 
   @override
@@ -211,7 +217,6 @@ class _PartialRefundDialogState extends State<PartialRefundDialog> {
               final item = widget.orderItems[index];
               final maxQty = _maxRefundableQuantity(item);
               final currentRefundQty = _refundQuantities[item]!;
-              final bool isStockManaged = item.isStockManaged ?? false;
 
               if (maxQty == 0) return const SizedBox.shrink();
 
@@ -280,27 +285,52 @@ class _PartialRefundDialogState extends State<PartialRefundDialog> {
                           ),
                         ],
                       ),
-                      if (isStockManaged && currentRefundQty > 0)
+                      // Every line being refunded gets its own choice;
+                      // cooked food starts unchecked (RefundRestockRule).
+                      if (currentRefundQty > 0 && !_restock.canRestock(item))
                         Padding(
                           padding: EdgeInsets.only(
                             top: AppResponsive.smallSpacing(context),
                           ),
-                          child: SwitchListTile(
-                            title: Text(
-                              "Add to Stock?",
-                              style: GoogleFonts.poppins(
-                                fontSize: AppResponsive.bodyFontSize(context),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.inventory_2_outlined,
+                                size: AppResponsive.smallIconSize(context),
+                                color: AppColors.success,
                               ),
-                            ),
-                            value: _restockStatus[item]!,
-                            onChanged: (newValue) {
-                              setState(() {
-                                _restockStatus[item] = newValue;
-                              });
-                            },
-                            dense: true,
-                            contentPadding: EdgeInsets.zero,
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  'Already back in stock',
+                                  style: GoogleFonts.poppins(
+                                    fontSize:
+                                        AppResponsive.smallFontSize(context),
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
+                        )
+                      else if (currentRefundQty > 0)
+                        CheckboxListTile(
+                          title: Text(
+                            RefundRestockRule.restorable(item) < item.quantity
+                                ? 'Add back to stock (up to ${RefundRestockRule.restorable(item)})'
+                                : 'Add back to stock',
+                            style: GoogleFonts.poppins(
+                              fontSize: AppResponsive.bodyFontSize(context),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          value: _restock.isSelected(item),
+                          onChanged: (v) =>
+                              setState(() => _restock.select(item, v ?? false)),
+                          activeColor: AppColors.primary,
+                          controlAffinity: ListTileControlAffinity.leading,
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
                         ),
                     ],
                   ),
@@ -379,12 +409,7 @@ class _PartialRefundDialogState extends State<PartialRefundDialog> {
             final itemsToRefund = Map.of(_refundQuantities)
               ..removeWhere((key, value) => value == 0);
 
-            final Map<CartItem, int> itemsToRestock = {};
-            itemsToRefund.forEach((item, quantity) {
-              if (_restockStatus[item] == true) {
-                itemsToRestock[item] = quantity;
-              }
-            });
+            final itemsToRestock = _restock.restockFor(itemsToRefund);
 
             final result = PartialRefundResult(
               itemsToRefund: itemsToRefund,

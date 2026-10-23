@@ -6,16 +6,11 @@ import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
-import 'package:uuid/uuid.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/constants/item_units.dart';
 import '../../../../data/models/common/categorymodel_300.dart';
 import '../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../data/models/restaurant/db/itemvariantemodel_312.dart';
-import '../../../../data/models/restaurant/db/stock_movement_model.dart';
-import '../../../../data/repositories/restaurant/stock_movement_repository.dart';
-import '../../../../domain/services/restaurant/day_management_service.dart';
-import '../../../../util/restaurant/restaurant_session.dart';
 import '../../../../util/restaurant/staticswitch.dart';
 import '../../../../domain/services/restaurant/stock_adjust_service.dart';
 import '../../../../domain/services/restaurant/inventory_service.dart';
@@ -26,6 +21,7 @@ import 'purchase_order/purchase_order_list_screen.dart';
 import 'purchase_order/restaurant_grn_list_screen.dart';
 import 'supplier/restaurant_supplier_list_screen.dart';
 import 'production_screen.dart';
+import 'suggested_trade_items_screen.dart';
 import 'food_cost_report_screen.dart';
 import 'inventory_loss_list_screen.dart';
 import 'stock_take_list_screen.dart';
@@ -33,6 +29,7 @@ import 'damaged_goods/restaurant_damaged_goods_hub_screen.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/presentation/widget/componets/restaurant/stock_reason_chips.dart';
 import 'package:billberrylite/presentation/widget/componets/common/dialog_dispose_scope.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:billberrylite/presentation/widget/componets/common/dashboard_menu_card.dart';
@@ -67,7 +64,11 @@ int inventoryHubColumns(double gridWidth) {
 const double kStockAdjusterMaxWidth = 560.0;
 
 class ManageInventory extends StatefulWidget {
-  const ManageInventory({super.key});
+  /// Pre-fills the stock search — e.g. Edit Item's "Adjust Stock" opens
+  /// straight onto that item.
+  final String? initialSearch;
+
+  const ManageInventory({super.key, this.initialSearch});
 
   @override
   State<ManageInventory> createState() => _ManageInventoryState();
@@ -114,6 +115,11 @@ class _ManageInventoryState extends State<ManageInventory> {
   @override
   void initState() {
     super.initState();
+    final search = widget.initialSearch?.trim() ?? '';
+    if (search.isNotEmpty) {
+      _searchController.text = search;
+      _searchQuery = search.toLowerCase();
+    }
     _loadData();
   }
 
@@ -150,29 +156,11 @@ class _ManageInventoryState extends State<ManageInventory> {
     return _stockControllers[key]!;
   }
 
-  final _stockRepo = StockMovementRepository();
+  static const _purchaseReason = 'Restock / Purchase';
 
-  // Reasons offered in the dropdown when adjusting stock.
-  // Tune these lists to match how this restaurant categorises stock changes.
-  static const List<String> _addReasons = [
-    'Restock / Purchase',
-    'Customer return',
-    'Stock correction',
-    'Transfer in',
-    'Other',
-  ];
-  static const List<String> _removeReasons = [
-    'Wastage / Spoilage',
-    'Theft / Loss',
-    'Stock correction',
-    'Transfer out',
-    'Sample / Complimentary',
-    'Other',
-  ];
-
-  /// Ask for a reason (+ optional note) before adjusting stock.
-  /// Returns null if the user cancels.
-  Future<({String reason, String? note})?> _promptReason({
+  /// Ask for a reason (+ optional note, and an optional unit cost for a
+  /// purchase) before adjusting stock. Returns null if the user cancels.
+  Future<({String reason, String? note, double? unitCost})?> _promptReason({
     required bool isAdd,
     required String itemName,
     required double quantity,
@@ -180,9 +168,12 @@ class _ManageInventoryState extends State<ManageInventory> {
     required String unit,
     required bool isWeightBased,
   }) async {
-    final reasons = isAdd ? _addReasons : _removeReasons;
+    final reasons = isAdd
+        ? StockAdjustService.addReasons
+        : StockAdjustService.removeReasons;
     String selectedReason = reasons.first;
     final noteController = TextEditingController();
+    final costController = TextEditingController();
 
     // Intent-driven accent: green for adding, red for removing.
     final Color accent = isAdd ? AppColors.success : AppColors.danger;
@@ -190,10 +181,11 @@ class _ManageInventoryState extends State<ManageInventory> {
         ? Icons.add_circle_rounded
         : Icons.remove_circle_rounded;
 
-    final result = await showDialog<({String reason, String? note})>(
+    final result =
+        await showDialog<({String reason, String? note, double? unitCost})>(
       context: context,
       builder: (ctx) => DialogDisposeScope(
-        disposables: [noteController],
+        disposables: [noteController, costController],
         child: StatefulBuilder(
           builder: (ctx, setLocal) => AppDialogShell(
             title: isAdd ? 'Add Stock' : 'Remove Stock',
@@ -282,58 +274,31 @@ class _ManageInventoryState extends State<ManageInventory> {
                   ),
                 ),
                 const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: reasons.map((r) {
-                    final selected = r == selectedReason;
-                    return InkWell(
-                      onTap: () => setLocal(() => selectedReason = r),
-                      borderRadius: BorderRadius.circular(9),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 9,
-                        ),
-                        decoration: BoxDecoration(
-                          color: selected
-                              ? accent.withValues(alpha: 0.12)
-                              : AppColors.surfaceLight,
-                          borderRadius: BorderRadius.circular(9),
-                          border: Border.all(
-                            color: selected ? accent : AppColors.divider,
-                            width: selected ? 1.5 : 1,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (selected) ...[
-                              Icon(
-                                Icons.check_rounded,
-                                size: 15,
-                                color: accent,
-                              ),
-                              const SizedBox(width: 5),
-                            ],
-                            Text(
-                              r,
-                              style: GoogleFonts.poppins(
-                                fontSize: AppResponsive.smallFontSize(context),
-                                fontWeight: selected
-                                    ? FontWeight.w600
-                                    : FontWeight.w500,
-                                color: selected
-                                    ? accent
-                                    : AppColors.textPrimary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }).toList(),
+                StockReasonChips(
+                  reasons: reasons,
+                  selected: selectedReason,
+                  accent: accent,
+                  onSelected: (r) => setLocal(() => selectedReason = r),
                 ),
+                // A purchase can carry what was paid, so the item's cost and
+                // food cost stay right. Blank = no cost recorded, as before.
+                if (selectedReason == _purchaseReason) ...[
+                  const SizedBox(height: 16),
+                  AppTextField(
+                    controller: costController,
+                    label: 'Unit cost per $unit (optional)',
+                    hint: 'What you paid per $unit',
+                    icon: Icons.currency_rupee_rounded,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(
+                        RegExp(r'^\d*\.?\d{0,2}'),
+                      ),
+                    ],
+                  ),
+                ],
                 const SizedBox(height: 16),
                 Text(
                   'Note (optional)',
@@ -359,12 +324,28 @@ class _ManageInventoryState extends State<ManageInventory> {
               appDialogPrimaryButton(
                 label: isAdd ? 'Add Stock' : 'Remove Stock',
                 color: accent,
-                onPressed: () => Navigator.pop(ctx, (
-                  reason: selectedReason,
-                  note: noteController.text.trim().isEmpty
-                      ? null
-                      : noteController.text.trim(),
-                )),
+                onPressed: () {
+                  final costText = costController.text.trim();
+                  final cost = selectedReason == _purchaseReason &&
+                          costText.isNotEmpty
+                      ? double.tryParse(costText)
+                      : null;
+                  if (costText.isNotEmpty &&
+                      selectedReason == _purchaseReason &&
+                      (cost == null || cost <= 0)) {
+                    NotificationService.instance.showError(
+                      'Enter a unit cost above zero, or leave it blank',
+                    );
+                    return;
+                  }
+                  Navigator.pop(ctx, (
+                    reason: selectedReason,
+                    note: noteController.text.trim().isEmpty
+                        ? null
+                        : noteController.text.trim(),
+                    unitCost: cost,
+                  ));
+                },
               ),
             ],
           ),
@@ -373,40 +354,6 @@ class _ManageInventoryState extends State<ManageInventory> {
     );
 
     return result;
-  }
-
-  /// Append a stock movement to the audit log.
-  Future<void> _recordMovement({
-    required Items item,
-    ItemVariante? variant,
-    required bool isAdd,
-    required double quantity,
-    required double balanceAfter,
-    required String reason,
-    String? note,
-    required String unit,
-  }) async {
-    final sessionId = await DayManagementService.getCurrentSessionId();
-    await _stockRepo.saveMovement(
-      StockMovementModel(
-        id: const Uuid().v4(),
-        timestamp: DateTime.now(),
-        itemId: item.id,
-        variantId: variant?.variantId,
-        itemName: variant != null
-            ? '${item.name} (${_getVariantName(variant.variantId)})'
-            : item.name,
-        type: isAdd ? 'in' : 'out',
-        quantity: quantity,
-        balanceAfter: balanceAfter,
-        reason: reason,
-        note: note,
-        unit: unit,
-        staffName:
-            RestaurantSession.staffName ?? RestaurantSession.effectiveRole,
-        sessionId: sessionId,
-      ),
-    );
   }
 
   /// Stock status pill — priority: Out of Stock > Low Stock > In Stock.
@@ -563,42 +510,14 @@ class _ManageInventoryState extends State<ManageInventory> {
 
     setState(() => _busyKeys.add(key));
     try {
-      if (variant != null) {
-        // Update the variant's stock quantity
-        final updatedVariants = item.variant?.map((v) {
-          if (v.variantId == variant.variantId) {
-            return ItemVariante(
-              variantId: v.variantId,
-              price: v.price,
-              stockQuantity: (v.stockQuantity ?? 0) + stockToAdd,
-            );
-          }
-          return v;
-        }).toList();
-
-        // Use store's updateItem to ensure MobX observers are notified
-        await itemStore.updateItem(
-          item.copyWith(trackInventory: true, variant: updatedVariants),
-        );
-      } else {
-        // Use store's updateItem to ensure MobX observers are notified
-        await itemStore.updateItem(
-          item.copyWith(
-            trackInventory: true,
-            stockQuantity: item.stockQuantity + stockToAdd,
-          ),
-        );
-      }
-
-      await _recordMovement(
+      // The shared queued write: live balance, history after the write.
+      await StockAdjustService.adjustBy(
         item: item,
         variant: variant,
-        isAdd: true,
-        quantity: stockToAdd,
-        balanceAfter: newBalance,
+        delta: stockToAdd,
         reason: reasonData.reason,
         note: reasonData.note,
-        unit: unit,
+        unitCost: reasonData.unitCost,
       );
 
       controller.clear();
@@ -610,6 +529,8 @@ class _ManageInventoryState extends State<ManageInventory> {
               : 'Added ${stockToAdd.toStringAsFixed(0)} $unit to stock',
         );
       }
+    } on StateError catch (e) {
+      if (mounted) NotificationService.instance.showError(e.message);
     } catch (e) {
       if (mounted) {
         NotificationService.instance.showError(
@@ -692,51 +613,15 @@ class _ManageInventoryState extends State<ManageInventory> {
 
     setState(() => _busyKeys.add(key));
     try {
-      if (variant != null) {
-        // Subtract from variant stock
-        final updatedVariants = item.variant?.map((v) {
-          if (v.variantId == variant.variantId) {
-            return ItemVariante(
-              variantId: v.variantId,
-              price: v.price,
-              stockQuantity: (v.stockQuantity ?? 0) - stockToRemove,
-            );
-          }
-          return v;
-        }).toList();
-
-        // Use store's updateItem to ensure MobX observers are notified
-        await itemStore.updateItem(item.copyWith(variant: updatedVariants));
-      } else {
-        // Subtract from item stock
-        await itemStore.updateItem(
-          item.copyWith(stockQuantity: item.stockQuantity - stockToRemove),
-        );
-      }
-
-      await _recordMovement(
+      // The shared queued write; it refuses going below zero on the LIVE
+      // balance and records the loss row for loss reasons.
+      await StockAdjustService.adjustBy(
         item: item,
         variant: variant,
-        isAdd: false,
-        quantity: stockToRemove,
-        balanceAfter: newBalance,
+        delta: -stockToRemove,
         reason: reasonData.reason,
         note: reasonData.note,
-        unit: unit,
       );
-
-      // Loss-bearing reasons (wastage, theft, samples) also cost the
-      // business money, not just units — record that separately so it
-      // reaches the food-cost/wastage reports.
-      if (StockAdjustService.isLossReason(reasonData.reason)) {
-        await StockAdjustService.recordLoss(
-          item: item,
-          variant: variant,
-          quantity: stockToRemove,
-          reason: reasonData.reason,
-          note: reasonData.note,
-        );
-      }
 
       controller.clear();
 
@@ -747,6 +632,8 @@ class _ManageInventoryState extends State<ManageInventory> {
               : 'Removed ${stockToRemove.toStringAsFixed(0)} $unit from stock',
         );
       }
+    } on StateError catch (e) {
+      if (mounted) NotificationService.instance.showError(e.message);
     } catch (e) {
       if (mounted) {
         NotificationService.instance.showError(
@@ -1052,11 +939,24 @@ class _ManageInventoryState extends State<ManageInventory> {
     );
   }
 
+  /// Made in advance + make fresh when out: what the recipe can add on top
+  /// of the prepared stock shown above it.
+  String _makeFreshCaption(Items item, double prepared, String unit) {
+    if (!InventoryService.makesFreshWhenOut(item)) {
+      return 'No recipe — cannot make fresh';
+    }
+    final total = InventoryService.effectiveAvailableStock(item);
+    if (total.isInfinite) return '+ made fresh when out';
+    final fresh =
+        total - (item.trackInventory && prepared > 0 ? prepared : 0);
+    return '+${fresh.toStringAsFixed(0)} $unit can be made fresh';
+  }
+
   Widget _buildStockRow({required Items item, ItemVariante? variant}) {
     // Recipe-Based items hold no stock of their own — there is nothing to add
     // or remove here, so show the derived "can make" figure read-only instead
     // of an adjuster that would write to a field nothing reads.
-    if (item.isRecipeBased) return _buildRecipeAvailabilityRow(item);
+    if (item.isMadeToOrder) return _buildRecipeAvailabilityRow(item);
 
     final currentStock = variant != null
         ? (variant.stockQuantity ?? 0)
@@ -1104,6 +1004,15 @@ class _ManageInventoryState extends State<ManageInventory> {
                             : AppColors.danger,
                       ),
                     ),
+                    if (variant == null &&
+                        InventoryService.usesDerivedAvailability(item))
+                      Text(
+                        _makeFreshCaption(item, currentStock, unit),
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.captionFontSize(context),
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -1221,6 +1130,16 @@ class _ManageInventoryState extends State<ManageInventory> {
       onTap: () => Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const RecipesScreen()),
+      ),
+    ),
+    (
+      title: 'Suggested Trade Items',
+      subtitle: 'Older items that look bought-in',
+      icon: Icons.storefront_rounded,
+      color: AppColors.info,
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const SuggestedTradeItemsScreen()),
       ),
     ),
     (

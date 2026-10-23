@@ -54,6 +54,23 @@ class CartItem extends HiveObject {
   @HiveField(16)
   final bool? isStockManaged;
 
+  // --- PER-LINE STOCK MARKER (Phase 1, LineStock) ---
+  /// Units of this line the sale took from the item's own (prepared) stock.
+  @HiveField(17)
+  final int? ownStockQty;
+
+  /// Units of this line the sale made fresh from the recipe.
+  @HiveField(18)
+  final int? freshQty;
+
+  /// Units of this line already returned to stock (void / refund). A
+  /// restore never exceeds quantity − restockedQuantity.
+  @HiveField(19)
+  final int? restockedQuantity;
+
+  /// Stamped by a Phase 1 sale. Unstamped lines (sold before) restore by the
+  /// item's current type, as they always did.
+  bool get hasStockStamp => ownStockQty != null || freshQty != null;
 
   CartItem({
     required this.id,
@@ -73,6 +90,9 @@ class CartItem extends HiveObject {
     this.weightDisplay, // NEW: Added to constructor
     this.categoryName,
     this.refundedQuantity,
+    this.ownStockQty,
+    this.freshQty,
+    this.restockedQuantity,
   });
 // This getter calculates the price of a SINGLE item including variants and discounts.
   double get finalItemPrice {
@@ -144,7 +164,9 @@ class CartItem extends HiveObject {
     String? weightDisplay, // NEW
     String? categoryName,
     int? refundedQuantity,
-
+    int? ownStockQty,
+    int? freshQty,
+    int? restockedQuantity,
   }) {
     return CartItem(
       id: id ?? this.id,
@@ -165,6 +187,9 @@ class CartItem extends HiveObject {
       weightDisplay: weightDisplay ?? this.weightDisplay, // NEW
       categoryName: categoryName ?? this.categoryName,
       refundedQuantity: refundedQuantity ?? this.refundedQuantity,
+      ownStockQty: ownStockQty ?? this.ownStockQty,
+      freshQty: freshQty ?? this.freshQty,
+      restockedQuantity: restockedQuantity ?? this.restockedQuantity,
     );
   }
 
@@ -187,6 +212,9 @@ class CartItem extends HiveObject {
       'refundedQuantity': refundedQuantity,
       'productId': productId,
       'isStockManaged': isStockManaged,
+      'ownStockQty': ownStockQty,
+      'freshQty': freshQty,
+      'restockedQuantity': restockedQuantity,
     };
   }
 
@@ -209,6 +237,9 @@ class CartItem extends HiveObject {
       refundedQuantity: map['refundedQuantity'],
       productId: map['productId'] ?? '',
       isStockManaged: map['isStockManaged'],
+      ownStockQty: (map['ownStockQty'] as num?)?.toInt(),
+      freshQty: (map['freshQty'] as num?)?.toInt(),
+      restockedQuantity: (map['restockedQuantity'] as num?)?.toInt(),
     );
   }
 }

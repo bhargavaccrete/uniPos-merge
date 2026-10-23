@@ -832,6 +832,7 @@ abstract class _SetupWizardStore with Store {
         'customername': storeName,
         'businesstype': businessTypeCode,
         'businesssubtype': businessSubtypeCode,
+        'businesscategory': 3, // TEMP: until LMS accepts businesstype/subtype
         'ownername': ownerName,
         'contactperson': ownerName,
         'email': email,

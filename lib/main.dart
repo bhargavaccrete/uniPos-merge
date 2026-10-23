@@ -22,6 +22,7 @@ import 'util/restaurant/print_settings.dart';
 import 'util/restaurant/order_settings.dart';
 import 'domain/services/retail/retail_printer_settings_service.dart';
 import 'domain/services/restaurant/auto_backup_service.dart';
+import 'domain/services/restaurant/stock_journal.dart';
 import 'domain/services/common/local_notification_service.dart';
 import 'domain/services/common/firebase_messaging_service.dart';
 import 'domain/services/common/notification_sync.dart';
@@ -151,6 +152,16 @@ Future<void> _initializeApp() async {
   // Pre-load license cache so RestaurantGuard can check synchronously.
   await locator<LicenseStore>().loadCachedLicense();
   print('🔑 License cache loaded');
+
+  // Finish any Settle stock work a crash or force-close left unfinished,
+  // before the first sale can touch the same items. Never throws; an entry
+  // that still fails stays for the next Settle or start.
+  if (AppConfig.isRestaurant) {
+    final pending = await StockJournal.recoverAll();
+    if (pending.isNotEmpty) {
+      debugPrint('⚠️ Stock journal: ${pending.length} entry(ies) still pending');
+    }
+  }
 
   // Fire server validation in background — does not block startup.
   // The RestaurantGuard Observer reacts automatically if status changes.

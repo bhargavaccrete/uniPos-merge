@@ -234,10 +234,15 @@ class _InventoryScreenState extends State<InventoryScreen>
 
   Future<void> _deleteProduct(ProductModel product) async {
     if (!PlanGuard.allowedOr(
-      context,
-      RetailEntKeys.catalogProductsDelete,
-      featureName: 'Delete Products',
-    )) {
+          context,
+          RetailEntKeys.catalogProducts,
+          featureName: 'Products',
+        ) ||
+        !PlanGuard.allowedOr(
+          context,
+          RetailEntKeys.catalogProductsDelete,
+          featureName: 'Delete Products',
+        )) {
       return;
     }
     // A component of someone else's bundle can't go: the bundle would sell

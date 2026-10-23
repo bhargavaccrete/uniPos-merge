@@ -25,7 +25,7 @@ import 'package:billberrylite/util/restaurant/staticswitch.dart';
 /// for range-based reports. Stock is a level, not an event: there is no period
 /// to filter by, and the plan's history window deliberately does not apply.
 ///
-/// Recipe-Based items are measured on how many their ingredients can make —
+/// Made-to-order items are measured on how many their ingredients can make —
 /// a Burger with a full pantry is not low, whatever its unused
 /// `stockQuantity` says.
 ///
@@ -94,7 +94,7 @@ class _RestaurantLowStockReportScreenState
       summary: {
         'Items Flagged': rows.length,
         'Out of Stock': rows.where((r) => r['isOut'] == true).length,
-        'Recipe-Based': rows.where((r) => r['isRecipeBased'] == true).length,
+        'Made to Order': rows.where((r) => r['isMadeToOrder'] == true).length,
       },
     );
   }
@@ -140,7 +140,7 @@ class _RestaurantLowStockReportScreenState
 
   Widget _buildContent(List<Map<String, dynamic>> rows) {
     final out = rows.where((r) => r['isOut'] == true).length;
-    final recipe = rows.where((r) => r['isRecipeBased'] == true).length;
+    final recipe = rows.where((r) => r['isMadeToOrder'] == true).length;
     final page = ReportPagination.pageSlice(rows, _page, _rowsPerPage);
 
     return ReportBody(
@@ -163,7 +163,7 @@ class _RestaurantLowStockReportScreenState
                 color: out > 0 ? AppColors.danger : AppColors.textSecondary,
               ),
               ReportSummaryCard(
-                title: 'Recipe-Based',
+                title: 'Made to Order',
                 value: '$recipe',
                 subtitle: 'limited by ingredients',
                 icon: Icons.lunch_dining_rounded,
@@ -210,7 +210,7 @@ class _RestaurantLowStockReportScreenState
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(r['itemName'] as String),
-              if (r['isRecipeBased'] == true) ...[
+              if (r['isMadeToOrder'] == true) ...[
                 const SizedBox(width: 6),
                 // Its number is "can make", not a counted shelf quantity.
                 Container(

@@ -1,3 +1,5 @@
+import 'retail_entitlement_keys.dart';
+
 /// The entitlement catalog — the master vocabulary the server's manifest draws
 /// from. These strings are the contract: they must match the server's Feature
 /// Catalog exactly (same spelling on both sides).
@@ -241,4 +243,7 @@ const Map<String, Object> kEntitlementDefaults = {
 
   // Data scopes — 'all' = unlimited history by default
   EntKeys.reportsHistoryLimitDays: 'all',
+
+  // Retail catalog (`retail.`-prefixed, so no key can collide)
+  ...kRetailEntitlementDefaults,
 };

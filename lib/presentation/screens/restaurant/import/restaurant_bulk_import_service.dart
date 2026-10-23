@@ -356,6 +356,8 @@ class RestaurantBulkImportService {
       errors.add('Row $rowNumber: Pounds aren\'t supported — convert to kg first (1 lb = 0.4536 kg)');
     } else if (unit.isNotEmpty && normalizeItemUnit(unit) == null) {
       errors.add('Row $rowNumber: Unrecognized Unit "$unit" (use kg, gm, liter, ml or piece)');
+    } else if (isSoldByWeight && normalizeItemUnit(unit) == 'piece') {
+      errors.add('Row $rowNumber: Unit "piece" can\'t be sold by weight — set IsSoldByWeight to No, or use kg, gm, liter or ml');
     }
 
     // 6. Inventory validation

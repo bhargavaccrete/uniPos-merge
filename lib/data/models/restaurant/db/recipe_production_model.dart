@@ -3,8 +3,9 @@ import 'package:billberrylite/core/constants/hive_type_ids.dart';
 
 part 'recipe_production_model.g.dart';
 
-/// Append-only record of one "batch produced" run for a Semi-Finished item —
-/// e.g. "made 10 units of Burger Patty from the recipe". Mirrors
+/// Append-only record of one "batch produced" run for a Semi-Finished or
+/// made-in-advance Finished item — e.g. "made 10 units of Burger Patty from
+/// the recipe". Mirrors
 /// [StockMovementModel]: never edited or deleted. See
 /// docs/inventory_recipe_system_plan.md §6.3.
 @HiveType(typeId: HiveTypeIds.restaurantRecipeProduction)
@@ -15,7 +16,7 @@ class RecipeProductionModel extends HiveObject {
   @HiveField(1)
   final String recipeId;
 
-  /// The Semi-Finished item this production run replenished.
+  /// The item this production run replenished.
   @HiveField(2)
   final String itemId;
 
@@ -23,7 +24,7 @@ class RecipeProductionModel extends HiveObject {
   @HiveField(3)
   final String itemName;
 
-  /// How many yield-units were produced this run.
+  /// The planned batch, in yield-units — what the ingredients were drawn for.
   @HiveField(4)
   final double batchQty;
 
@@ -39,6 +40,11 @@ class RecipeProductionModel extends HiveObject {
   @HiveField(7)
   final List<String> movementIds;
 
+  /// What the batch actually yielded, when it differed from [batchQty].
+  /// Null on runs recorded before actual output existed.
+  @HiveField(8)
+  final double? actualQty;
+
   RecipeProductionModel({
     required this.id,
     required this.recipeId,
@@ -48,7 +54,11 @@ class RecipeProductionModel extends HiveObject {
     required this.producedTime,
     this.producedBy,
     this.movementIds = const [],
+    this.actualQty,
   });
+
+  /// Units added to stock by this run.
+  double get outputQty => actualQty ?? batchQty;
 
   Map<String, dynamic> toMap() => {
         'id': id,
@@ -59,6 +69,7 @@ class RecipeProductionModel extends HiveObject {
         'producedTime': producedTime.toIso8601String(),
         'producedBy': producedBy,
         'movementIds': movementIds,
+        'actualQty': actualQty,
       };
 
   factory RecipeProductionModel.fromMap(Map<String, dynamic> map) {
@@ -74,6 +85,7 @@ class RecipeProductionModel extends HiveObject {
       movementIds:
           (map['movementIds'] as List?)?.map((e) => e.toString()).toList() ??
               const [],
+      actualQty: (map['actualQty'] as num?)?.toDouble(),
     );
   }
 }

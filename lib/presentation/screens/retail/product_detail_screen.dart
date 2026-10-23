@@ -262,10 +262,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   Future<void> _deleteVariant(VarianteModel variant) async {
     if (!PlanGuard.allowedOr(
-      context,
-      RetailEntKeys.catalogVariantsDelete,
-      featureName: 'Delete Variants',
-    )) {
+          context,
+          RetailEntKeys.catalogVariants,
+          featureName: 'Variants',
+        ) ||
+        !PlanGuard.allowedOr(
+          context,
+          RetailEntKeys.catalogVariantsDelete,
+          featureName: 'Delete Variants',
+        )) {
       return;
     }
     // A product with no variants still shows in the list but the POS refuses
@@ -1098,10 +1103,15 @@ class _AddVariantDialogState extends State<_AddVariantDialog> {
 
   Future<void> _save() async {
     if (!PlanGuard.allowedOr(
-      context,
-      RetailEntKeys.catalogVariantsAdd,
-      featureName: 'Add Variants',
-    )) {
+          context,
+          RetailEntKeys.catalogVariants,
+          featureName: 'Variants',
+        ) ||
+        !PlanGuard.allowedOr(
+          context,
+          RetailEntKeys.catalogVariantsAdd,
+          featureName: 'Add Variants',
+        )) {
       return;
     }
     if (!_formKey.currentState!.validate() || _saving) return;
@@ -1415,10 +1425,15 @@ class _EditVariantDialogState extends State<_EditVariantDialog> {
 
   Future<void> _save() async {
     if (!PlanGuard.allowedOr(
-      context,
-      RetailEntKeys.catalogVariantsEdit,
-      featureName: 'Edit Variants',
-    )) {
+          context,
+          RetailEntKeys.catalogVariants,
+          featureName: 'Variants',
+        ) ||
+        !PlanGuard.allowedOr(
+          context,
+          RetailEntKeys.catalogVariantsEdit,
+          featureName: 'Edit Variants',
+        )) {
       return;
     }
     if (!_formKey.currentState!.validate()) return;
@@ -2014,10 +2029,15 @@ class _BulkAddVariantDialogState extends State<_BulkAddVariantDialog> {
 
   Future<void> _save() async {
     if (!PlanGuard.allowedOr(
-      context,
-      RetailEntKeys.catalogVariantsAdd,
-      featureName: 'Add Variants',
-    )) {
+          context,
+          RetailEntKeys.catalogVariants,
+          featureName: 'Variants',
+        ) ||
+        !PlanGuard.allowedOr(
+          context,
+          RetailEntKeys.catalogVariantsAdd,
+          featureName: 'Add Variants',
+        )) {
       return;
     }
     if (!_formKey.currentState!.validate() || _saving) return;

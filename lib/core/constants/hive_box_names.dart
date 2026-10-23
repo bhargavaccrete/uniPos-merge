@@ -215,6 +215,10 @@ class HiveBoxNames {
   /// Stock movement log (manual stock add/remove with reason + history)
   static const String restaurantStockMovements = 'stockMovementsBox';
 
+  /// Pending Settle stock work (StockJournal). Untyped — plain maps, no
+  /// adapter. Device-local: never exported, cleared on restore.
+  static const String restaurantStockJournal = 'restaurantStockJournal';
+
   /// Cash handover records (2-step shift handover between staff)
   static const String restaurantCashHandovers = 'cashHandoversBox';
 
@@ -371,6 +375,7 @@ class HiveBoxNames {
     shift,
     restaurantCashMovements,
     restaurantStockMovements,
+    restaurantStockJournal,
     restaurantCashHandovers,
     restaurantPrinters,
     restaurantSessions,

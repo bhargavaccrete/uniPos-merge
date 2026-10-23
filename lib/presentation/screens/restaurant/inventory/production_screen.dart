@@ -4,6 +4,7 @@ import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
+import 'package:billberrylite/core/constants/item_units.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/data/models/restaurant/db/itemmodel_302.dart';
 import 'package:billberrylite/data/models/restaurant/db/recipe_ingredient_model.dart';
@@ -20,7 +21,7 @@ import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 
 /// "Prep ahead of time" counterpart to sale-time cascading deduction: pick a
-/// Semi-Finished item, enter a batch quantity, see whether current raw
+/// Semi-Finished or made-in-advance Finished item, enter a batch quantity, see whether current raw
 /// material stock covers it, and confirm. All the state mutation lives in
 /// [InventoryService.produceBatch] — this screen is presentation only. See
 /// docs/inventory_recipe_system_plan.md §6.3.
@@ -34,6 +35,7 @@ class ProductionScreen extends StatefulWidget {
 class _ProductionScreenState extends State<ProductionScreen> {
   Items? _selectedItem;
   final TextEditingController _batchQtyController = TextEditingController();
+  final TextEditingController _actualQtyController = TextEditingController();
   bool _producing = false;
 
   @override
@@ -47,29 +49,49 @@ class _ProductionScreenState extends State<ProductionScreen> {
   @override
   void dispose() {
     _batchQtyController.dispose();
+    _actualQtyController.dispose();
     super.dispose();
   }
 
   List<Items> get _semiFinishedItems =>
-      itemStore.items.where((i) => i.isSemiFinished).toList()
+      itemStore.items.where(InventoryService.canProduce).toList()
         ..sort((a, b) => a.name.compareTo(b.name));
 
   RecipeModel? get _recipe => _selectedItem == null
       ? null
       : recipeRepository.getRecipeForItem(_selectedItem!.id);
 
-  double get _batchQty => double.tryParse(_batchQtyController.text.trim()) ?? 0;
+  /// What the user types: how many batches of the recipe to make.
+  double get _batches => double.tryParse(_batchQtyController.text.trim()) ?? 0;
+
+  double get _yieldPerBatch {
+    final y = _recipe?.yieldQty ?? 1.0;
+    return y > 0 ? y : 1.0;
+  }
+
+  /// Units those batches should make — what [InventoryService.produceBatch]
+  /// draws ingredients for.
+  double get _batchQty => _batches * _yieldPerBatch;
+
+  /// The item's own stock unit — production adds to that stock, so every
+  /// figure here is in it. No unit = pieces.
+  String get _unit => normalizeItemUnit(_selectedItem?.unit) ?? 'piece';
+
+  /// Blank = the batch came out as planned.
+  double? get _actualQty => double.tryParse(_actualQtyController.text.trim());
 
   bool get _canSubmit =>
       _selectedItem != null &&
       _recipe != null &&
       _recipe!.hasIngredients &&
-      _batchQty > 0;
+      _batchQty > 0 &&
+      (_actualQty == null || _actualQty! > 0);
 
   void _selectItem(Items item) {
     setState(() {
       _selectedItem = item;
       _batchQtyController.clear();
+      _actualQtyController.clear();
     });
   }
 
@@ -93,13 +115,15 @@ class _ProductionScreenState extends State<ProductionScreen> {
     setState(() => _producing = true);
     try {
       final production = await InventoryService.produceBatch(
-        semiFinishedItem: item,
+        item: item,
         batchQty: qty,
+        actualQty: _actualQty,
       );
       if (!mounted) return;
       _batchQtyController.clear();
+      _actualQtyController.clear();
       NotificationService.instance.showSuccess(
-        'Produced ${_fmt(production.batchQty)} ${item.unit ?? "units"} of ${item.name}',
+        'Produced ${_fmt(production.outputQty)} $_unit of ${item.name}',
       );
       // Re-sync the selection to the store's updated items so the
       // ingredient stock numbers shown below reflect the new balances.
@@ -137,14 +161,14 @@ class _ProductionScreenState extends State<ProductionScreen> {
               GradientHeroHeader(
                 title: 'Production',
                 subtitle:
-                    'Batch-prep semi-finished items straight from their recipes',
+                    'Batch-prep items straight from their recipes',
                 icon: Icons.outdoor_grill_rounded,
                 accent: AppColors.secondary,
                 stats: [
                   HeroStat(
                     icon: Icons.soup_kitchen_rounded,
                     value: '${semiFinishedItems.length}',
-                    label: 'Semi-Finished Items',
+                    label: 'Items to Produce',
                   ),
                 ],
               ),
@@ -156,9 +180,9 @@ class _ProductionScreenState extends State<ProductionScreen> {
                   child: semiFinishedItems.isEmpty
                       ? const AppEmptyState(
                           icon: Icons.outdoor_grill_rounded,
-                          title: 'No semi-finished items yet',
+                          title: 'Nothing to produce yet',
                           message:
-                              'Mark an item Semi-Finished to start producing batches here.',
+                              'Mark an item Semi-Finished, or Finished · Made in advance, to produce batches here.',
                         )
                       : SingleChildScrollView(
                           padding: AppResponsive.padding(context),
@@ -222,7 +246,7 @@ class _ProductionScreenState extends State<ProductionScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Semi-Finished item',
+                    'Item to produce',
                     style: GoogleFonts.poppins(
                       fontSize: AppResponsive.captionFontSize(context),
                       color: AppColors.textSecondary,
@@ -283,8 +307,8 @@ class _ProductionScreenState extends State<ProductionScreen> {
       );
     }
 
-    final yieldQty = recipe.yieldQty > 0 ? recipe.yieldQty : 1.0;
-    final batches = _batchQty / yieldQty;
+    final yieldQty = _yieldPerBatch;
+    final batches = _batches;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -306,7 +330,7 @@ class _ProductionScreenState extends State<ProductionScreen> {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'Makes ${_fmt(yieldQty)} ${recipe.yieldUnit ?? item.unit ?? 'units'} per batch',
+                  'One batch makes ${_fmt(yieldQty)} $_unit',
                   style: GoogleFonts.poppins(
                     fontSize: AppResponsive.bodyFontSize(context),
                     fontWeight: FontWeight.w600,
@@ -320,11 +344,25 @@ class _ProductionScreenState extends State<ProductionScreen> {
         const SizedBox(height: 16),
         AppTextField(
           controller: _batchQtyController,
-          label: 'Batch Quantity',
-          hint:
-              'How many ${recipe.yieldUnit ?? item.unit ?? 'units'} to produce',
+          label: 'Number of batches',
+          hint: 'e.g. 2',
+          helperText: batches > 0
+              ? '= ${_fmt(_batchQty)} $_unit planned'
+              : null,
           icon: Icons.numbers_rounded,
           required: true,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+          ],
+          onChanged: (_) => setState(() {}),
+        ),
+        const SizedBox(height: 12),
+        AppTextField(
+          controller: _actualQtyController,
+          label: 'Actual Output in $_unit (optional)',
+          hint: 'Leave blank if it came out as planned',
+          icon: Icons.fact_check_rounded,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           inputFormatters: [
             FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
@@ -515,7 +553,7 @@ class _ProductionScreenState extends State<ProductionScreen> {
   }
 
   Widget _buildProductionTile(BuildContext context, RecipeProductionModel p) {
-    final unit = _recipe?.yieldUnit ?? _selectedItem?.unit ?? 'units';
+    final unit = _unit;
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
@@ -544,7 +582,9 @@ class _ProductionScreenState extends State<ProductionScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '+${_fmt(p.batchQty)} $unit',
+                  p.actualQty == null
+                      ? '+${_fmt(p.outputQty)} $unit'
+                      : '+${_fmt(p.outputQty)} $unit  (planned ${_fmt(p.batchQty)})',
                   style: GoogleFonts.poppins(
                     fontSize: AppResponsive.bodyFontSize(context),
                     fontWeight: FontWeight.w700,
@@ -577,7 +617,7 @@ class _ProductionScreenState extends State<ProductionScreen> {
   }
 }
 
-/// Simple searchable list dialog limited to Semi-Finished items — same shape
+/// Simple searchable list dialog limited to producible items — same shape
 /// as the Raw Material picker in `add_purchase_order_screen.dart`.
 class _SemiFinishedPickerDialog extends StatefulWidget {
   final List<Items> items;
@@ -608,7 +648,7 @@ class _SemiFinishedPickerDialogState extends State<_SemiFinishedPickerDialog> {
               .toList();
 
     return AppDialogShell(
-      title: 'Select Semi-Finished Item',
+      title: 'Select Item to Produce',
       accent: AppColors.secondary,
       icon: Icons.outdoor_grill_rounded,
       body: SizedBox(
@@ -618,7 +658,7 @@ class _SemiFinishedPickerDialogState extends State<_SemiFinishedPickerDialog> {
           children: [
             AppTextField(
               controller: _searchController,
-              hint: 'Search semi-finished items...',
+              hint: 'Search items...',
               icon: Icons.search_rounded,
               autofocus: true,
               onChanged: (v) => setState(() => _query = v),

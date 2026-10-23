@@ -561,6 +561,23 @@ class _settingsScreenState extends State<Settingsscreen> {
                 vertical: AppResponsive.largeSpacing(context),
               ),
               children: [
+                // ── Business ────────────────────────────────────────────────
+                _sectionHeader(context, 'Business', Icons.storefront_rounded),
+                _sectionCard(context, [
+                  _navTile(
+                    context,
+                    'Store Information',
+                    'Name, restaurant type, tax, address & logo',
+                    Icons.store_rounded,
+                    Colors.deepPurple,
+                    () => Navigator.pushNamed(
+                      context,
+                      RouteNames.restaurantStoreInfo,
+                    ),
+                  ),
+                ]),
+                SizedBox(height: AppResponsive.largeSpacing(context)),
+
                 // ── 1. Account & Security ───────────────────────────────────
                 _sectionHeader(
                   context,

@@ -85,7 +85,7 @@ class RetailRoutes {
     RouteNames.addProduct: _guard(
       const AddProductScreen(),
       'catalogEdit',
-      RetailEntKeys.catalog,
+      RetailEntKeys.catalogProducts,
     ),
     RouteNames.categories: _guard(
       const CategoryManagementScreen(),

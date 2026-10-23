@@ -80,15 +80,13 @@ class _RestaurantStockTakeScreenState extends State<RestaurantStockTakeScreen> {
     return itemStore.items
         .where((item) {
           if (!item.trackInventory) return false;
-          // Anything holding physical stock can be counted — Raw Material,
-          // Semi-Finished and Finished Good alike. A bottled drink sits on a
-          // shelf and goes missing exactly like a sack of flour; excluding it
-          // meant a whole product type could never be reconciled.
+          // Anything holding physical stock can be counted — Raw, Semi,
+          // Trade and made-in-advance Finished alike.
           //
-          // Recipe-Based stays out: `resolvePhysicalStock` forces it to
+          // Made to order stays out: `resolvePhysicalStock` forces it to
           // `trackInventory: false`, so the guard above already drops it, and
           // counting a dish would double-count its ingredients.
-          if (item.isRecipeBased) return false;
+          if (item.isMadeToOrder) return false;
           if (counted.contains(item.id)) return false;
           return item.name.toLowerCase().contains(query);
         })
@@ -491,14 +489,13 @@ class _RestaurantStockTakeScreenState extends State<RestaurantStockTakeScreen> {
         borderRadius: BorderRadius.circular(6),
       ),
       child: Text(
-        // Three types reach this list now, so the old binary
-        // `isRawMaterial ? 'Raw' : 'Semi'` would have labelled every bottled
-        // drink "Semi".
         item.isRawMaterial
             ? 'Raw'
             : item.isSemiFinished
                 ? 'Semi'
-                : 'Finished',
+                : item.isTradeItem
+                    ? 'Trade'
+                    : 'Finished',
         style: GoogleFonts.poppins(
           fontSize: AppResponsive.captionFontSize(context),
           fontWeight: FontWeight.w700,

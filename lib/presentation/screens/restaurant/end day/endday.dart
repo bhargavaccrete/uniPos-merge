@@ -21,7 +21,7 @@ import 'package:billberrylite/core/constants/hive_box_names.dart';
 import 'package:billberrylite/data/models/common/attendance_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/eodmodel_317.dart';
 import 'package:billberrylite/data/models/restaurant/db/pastordermodel_313.dart';
-import 'package:billberrylite/data/models/restaurant/db/cartmodel_308.dart';
+import 'package:billberrylite/domain/services/restaurant/kot_layout.dart';
 import '../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../start order/startorder.dart';
 import '../start order/cart/cart.dart';
@@ -647,11 +647,20 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
     final staff = RestaurantSession.isAdmin
         ? 'Admin'
         : (RestaurantSession.staffName ?? 'Staff');
+    // Same per-KOT rule as the Active Orders void (KotStatusRule); the record
+    // keeps restored lines marked restocked.
+    final voidPlan = KotLayout.voidPlan(
+      items: o.items,
+      kotNumbers: o.kotNumbers,
+      kotBoundaries: o.kotBoundaries,
+      kotStatuses: o.kotStatuses ?? {},
+      orderStatus: o.status,
+    );
     final voidRecord = PastOrderModel(
       id: o.id,
       customerName: o.customerName,
       totalPrice: o.totalPrice,
-      items: o.items,
+      items: voidPlan.recordItems,
       orderAt: o.timeStamp,
       orderType: o.orderType,
       paymentmode: 'N/A',
@@ -670,15 +679,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
       discountOnItems: AppSettings.discountOnItems,
     );
     await pastOrderStore.addOrder(voidRecord);
-    if (o.status == 'Processing') {
-      final itemsToRestock = <CartItem, int>{};
-      for (final item in o.items) {
-        if (item.quantity > 0) itemsToRestock[item] = item.quantity;
-      }
-      if (itemsToRestock.isNotEmpty) {
-        await InventoryService.restoreStockForRefund(itemsToRestock);
-      }
-    }
+    await InventoryService.restoreLines(voidPlan.restores);
     await orderStore.deleteOrder(o.id);
     if (o.tableNo != null && o.tableNo!.isNotEmpty) {
       await tableStore.updateTableStatus(o.tableNo!, 'Available');

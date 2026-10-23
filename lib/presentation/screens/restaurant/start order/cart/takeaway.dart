@@ -13,6 +13,10 @@ import '../../../../../domain/services/restaurant/cart_calculation_service.dart'
 import '../../../../../domain/services/restaurant/day_management_service.dart';
 import '../../../../widget/restaurant/opening_balance_dialog.dart';
 import '../../../../../domain/services/restaurant/inventory_service.dart';
+import '../../../../../domain/services/restaurant/kot_layout.dart';
+import '../../../../../domain/services/restaurant/kot_status_rule.dart';
+import '../../../../../domain/services/restaurant/line_stock.dart';
+import '../../../../../domain/services/restaurant/order_line_cancel.dart';
 import '../../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../../util/common/currency_helper.dart';
 import '../../../../../util/restaurant/staticswitch.dart';
@@ -246,12 +250,9 @@ class _TakeawayState extends State<Takeaway> {
               .toList();
           final newKotItems = kotItems.where((item) => !item.isActive).toList();
 
-          final kotStatus = existingModel.getKotStatus(kotNum).toLowerCase();
-          final isCooked =
-              kotStatus == 'cooked' ||
-              kotStatus == 'ready' ||
-              kotStatus == 'served' ||
-              kotStatus == 'completed';
+          final isCooked = KotStatusRule.isConsumed(
+            existingModel.getKotStatus(kotNum),
+          );
 
           final group = <Widget>[];
 
@@ -1062,12 +1063,23 @@ class _TakeawayState extends State<Takeaway> {
     int cancelQty,
     String reason,
   ) async {
-    final existing = widget.existingModel;
-    if (existing == null) return;
+    if (widget.existingModel == null) return;
+    // The saved order, not the screen's snapshot: an earlier cancel on this
+    // screen already rewrote its lines and KOT boundaries.
+    final existing =
+        orderStore.getOrderById(widget.existingModel!.id) ??
+        widget.existingModel!;
 
-    // Baseline = the order's current saved active items.
-    final List<CartItem> savedItems =
-        widget.originalActiveItems ?? existing.items;
+    // The Cancel button reads the screen's snapshot; the kitchen may have
+    // moved this KOT on since. Cooked food must not go back on the shelf.
+    if (OrderLineCancel.isCooked(existing, item.id)) {
+      NotificationService.instance.showError('Cannot cancel cooked items');
+      return;
+    }
+
+    // Baseline = the order's current saved active items. kotBoundaries index
+    // into exactly this list, so both come from the same record.
+    final List<CartItem> savedItems = existing.items;
 
     // Which KOT did this item belong to (for audit + Cancel-KOT reference).
     int kotFor(String id) {
@@ -1084,15 +1096,15 @@ class _TakeawayState extends State<Takeaway> {
     final kot = kotFor(item.id);
 
     // Saved list with this line reduced/removed by cancelQty.
-    final List<CartItem> newSavedItems = [];
-    for (final o in savedItems) {
-      if (o.id == item.id) {
-        final remaining = o.quantity - cancelQty;
-        if (remaining > 0) newSavedItems.add(o.copyWith(quantity: remaining));
-      } else {
-        newSavedItems.add(o.copyWith());
-      }
-    }
+    final layout = KotLayout.removeQuantity(
+      items: savedItems,
+      kotNumbers: existing.kotNumbers,
+      kotBoundaries: existing.kotBoundaries,
+      kotStatuses: existing.kotStatuses ?? {},
+      lineId: item.id,
+      qty: cancelQty,
+    );
+    final List<CartItem> newSavedItems = layout.items;
 
     final bool taxInclusive =
         existing.isTaxInclusive ?? AppSettings.isTaxInclusive;
@@ -1120,6 +1132,10 @@ class _TakeawayState extends State<Takeaway> {
       await orderStore.updateOrder(
         existing.copyWith(
           items: newSavedItems,
+          kotNumbers: layout.kotNumbers,
+          kotBoundaries: layout.kotBoundaries,
+          kotStatuses: layout.kotStatuses,
+          itemCountAtLastKot: layout.itemCountAtLastKot,
           totalPrice: calc.grandTotal,
           subTotal: taxInclusive
               ? calc.subtotal - calc.totalGST
@@ -1129,9 +1145,13 @@ class _TakeawayState extends State<Takeaway> {
       );
     }
 
-    // Restore stock for the cancelled quantity.
+    // Restore stock for the cancelled quantity — from the SAVED line, whose
+    // stamp records what its sale took (prepared stock vs made fresh).
     final cancelledPortion = item.copyWith(quantity: cancelQty);
-    await InventoryService.restoreStockForOrder([cancelledPortion]);
+    final savedLine = savedItems.where((o) => o.id == item.id).firstOrNull;
+    await InventoryService.restoreLines([
+      (line: savedLine ?? cancelledPortion, qty: cancelQty),
+    ]);
 
     // Audit for the Item Cancellation Report.
     try {
@@ -1463,12 +1483,16 @@ class _TakeawayState extends State<Takeaway> {
     // Get current session ID
     final currentSessionId = await DayManagementService.getCurrentSessionId();
 
+    // Plan the stock first so the saved lines carry what each sale takes
+    // (prepared stock vs made fresh) — every later restore reads it.
+    final salePlan = await InventoryService.planSale(plainItems);
+
     final neworder = OrderModel(
       id: Uuid().v4(),
       customerName: nameController.text.trim(),
       customerNumber: mobileController.text.trim(),
       customerEmail: emailController.text.trim(),
-      items: plainItems,
+      items: salePlan.lines,
       status: 'Processing',
       timeStamp: DateTime.now(),
       orderType: widget.isDineIn ? 'Dine In' : 'Take Away',
@@ -1517,7 +1541,7 @@ class _TakeawayState extends State<Takeaway> {
     } else if (!AppSettings.generateKOT) {}
 
     // Deduct stock after successfully adding the order
-    await InventoryService.deductStockForOrder(plainItems);
+    await InventoryService.applyPlannedUnits(salePlan.units);
 
     // print("")
     if (widget.isDineIn && widget.selectedTableNo != null) {
@@ -1711,6 +1735,34 @@ class _TakeawayState extends State<Takeaway> {
 
     final currentSessionId = await DayManagementService.getCurrentSessionId();
 
+    // Stock stamps (LineStock): plan the increases and new lines now so the
+    // saved lines carry what each sale takes; a reduced line's stamp shrinks
+    // (fresh first). Restores below read the SAVED line, never a copy.
+    final origById = {for (final o in originalItems) o.id: o};
+    final salePlan =
+        await InventoryService.planSale([...stockToDeduct, ...newlyAddedItems]);
+    final stampedById = {for (final s in salePlan.lines) s.id: s};
+    CartItem restamp(CartItem curr) {
+      final orig = origById[curr.id];
+      if (orig == null || !orig.hasStockStamp) return curr; // pre-Phase-1 line
+      if (curr.quantity < orig.quantity) {
+        final r = LineStock.reduced(orig, orig.quantity - curr.quantity);
+        return curr.copyWith(ownStockQty: r.ownStockQty, freshQty: r.freshQty);
+      }
+      final sold = stampedById[curr.id];
+      final base = curr.copyWith(
+          ownStockQty: orig.ownStockQty, freshQty: orig.freshQty);
+      return sold == null
+          ? base
+          : LineStock.withSale(base,
+              own: sold.ownStockQty ?? 0, fresh: sold.freshQty ?? 0);
+    }
+
+    final List<CartItem> savedItems = [
+      for (final curr in currentActiveItems) restamp(curr),
+      for (final n in newlyAddedItems) stampedById[n.id] ?? n,
+    ];
+
     // Adding/removing items changes the total, so re-derive payment state from
     // the new balance. Existing payments (totalPaid / paymentListJson /
     // paymentMethod) are preserved by copyWith — we only recompute the flags,
@@ -1719,7 +1771,7 @@ class _TakeawayState extends State<Takeaway> {
     final bool nowFullyPaid = (calculations.grandTotal - alreadyPaid) < 0.01;
 
     final updateOrder = existingModel.copyWith(
-      items: allCurrentItems,
+      items: savedItems,
       totalPrice: calculations.grandTotal,
       subTotal: AppSettings.isTaxInclusive
           ? calculations.subtotal - calculations.totalGST
@@ -1746,15 +1798,14 @@ class _TakeawayState extends State<Takeaway> {
 
     await orderStore.updateOrder(updateOrder);
 
-    // Apply all inventory changes at commit time
-    for (final item in removedItems)
-      await InventoryService.restoreStockForOrder([item]);
-    if (stockToRestore.isNotEmpty)
-      await InventoryService.restoreStockForOrder(stockToRestore);
-    if (stockToDeduct.isNotEmpty)
-      await InventoryService.deductStockForOrder(stockToDeduct);
-    if (hasNewItems)
-      await InventoryService.deductStockForOrder(newlyAddedItems);
+    // Apply all inventory changes at commit time. Restores read the saved
+    // line's stamp; deductions apply the plan the saved stamps came from.
+    await InventoryService.restoreLines([
+      for (final item in removedItems) (line: item, qty: item.quantity),
+      for (final r in stockToRestore)
+        (line: origById[r.id] ?? r, qty: r.quantity),
+    ]);
+    await InventoryService.applyPlannedUnits(salePlan.units);
 
     // Audit: log each cancelled/reduced item with its reason for the
     // Item Cancellation Report. Failure here must never block the order update.
@@ -3289,12 +3340,15 @@ class _TakeawayState extends State<Takeaway> {
     // Get current session ID
     final currentSessionId = await DayManagementService.getCurrentSessionId();
 
+    // Stamped lines: a later refund restores what each sale actually took.
+    final salePlan = await InventoryService.planSale(plainItems);
+
     final pastOrder = PastOrderModel(
       id: Uuid().v4(), // Generate a unique ID for this transaction
       customerName: 'Quick Settle',
       totalPrice: calculations
           .grandTotal, // ✅ Use the final grand total from the service
-      items: plainItems,
+      items: salePlan.lines,
       orderAt: DateTime.now(),
       orderType: widget.isDineIn ? 'Dine In' : 'Take Away',
       paymentmode: paymentMethod,
@@ -3370,7 +3424,7 @@ class _TakeawayState extends State<Takeaway> {
     }
 
     // 2. Deduct stock after successfully adding the order
-    await InventoryService.deductStockForOrder(plainItems);
+    await InventoryService.applyPlannedUnits(salePlan.units);
 
     // 3. Free the table for Dine In quick settle
     final String? tableForQuickSettle = widget.isDineIn

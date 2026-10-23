@@ -6,8 +6,9 @@
 ///
 /// These strings are the contract — they must match the server Feature Catalog
 /// exactly. Read through the SAME engine as restaurant (`PlanEnforce` /
-/// `Entitlements.instance`), which is key-agnostic. Deny-by-default: a key absent
-/// from a present manifest resolves to off/0 (no separate retail default map needed).
+/// `Entitlements.instance`), which is key-agnostic. A key absent from a present
+/// manifest falls back to [kRetailEntitlementDefaults] (merged into
+/// `kEntitlementDefaults`).
 class RetailEntKeys {
   RetailEntKeys._();
 
@@ -31,12 +32,13 @@ class RetailEntKeys {
   // ── Submodules ───────────────────────────────────────────────────────────────
   static const billingReturns = 'retail.billing.returns';
   static const billingCredit = 'retail.billing.credit'; // pay-later (retail only)
+  // Parent of [billingInvoicePrint] only — no screen of its own.
   static const billingInvoice = 'retail.billing.invoice';
+  static const catalogProducts = 'retail.catalog.products';
   static const catalogCategories = 'retail.catalog.categories';
-  // No `retail.catalog.variants` submodule: retail's variant editors are dialogs
-  // inside Product Detail, not a route of their own, so there is nothing for a
-  // submodule flag to gate. The three variant ACTIONS below carry it instead.
-  static const purchaseGrn = 'retail.purchase.grn';
+  // Variant editors are dialogs inside Product Detail, not a route, so this
+  // parent is checked alongside each variant action at the dialog itself.
+  static const catalogVariants = 'retail.catalog.variants';
   static const purchaseReturns = 'retail.purchase.returns';
   static const purchaseDamaged = 'retail.purchase.damaged';
 
@@ -93,12 +95,9 @@ class RetailEntKeys {
   // [billingReturns] — the key that already owns the refund responsibility and
   // guards the write path in `sale_return_screen.dart`.
 
-  // ── Actions (add/edit/delete/create/void/print/export) ───────────────────────
-  // Mirrors restaurant's action granularity (EntKeys). Bill actions:
-  static const billingInvoiceCreate = 'retail.billing.invoice.create';
-  static const billingInvoiceEdit = 'retail.billing.invoice.edit';
-  static const billingInvoiceExport = 'retail.billing.invoice.export';
-  static const billingInvoiceVoid = 'retail.billing.invoice.void';
+  // ── Actions ──────────────────────────────────────────────────────────────────
+  // No invoice create/edit/export/void: retail has returns, not void, and sales
+  // aren't edited after the fact — nothing would read those keys.
   // Admin-controlled "Powered by Bill Berry Lite" footer (default shown).
   static const billingInvoicePrint = 'retail.billing.invoice.print';
 
@@ -133,8 +132,94 @@ class RetailEntKeys {
   static const customersMax = 'retail.customers.max';
   static const usersMax = 'retail.users.max';
   static const suppliersMax = 'retail.suppliers.max';
-  static const purchaseOrdersMax = 'retail.purchase.po.max';
 
   // ── Data scopes ──────────────────────────────────────────────────────────────
   static const reportsHistoryLimitDays = 'retail.reports.history_limit_days';
 }
+
+/// Server-mirrored defaults for [RetailEntKeys] — used only when a key is
+/// missing from the manifest. Spread into `kEntitlementDefaults`.
+const Map<String, Object> kRetailEntitlementDefaults = {
+  // Modules
+  RetailEntKeys.billing: false,
+  RetailEntKeys.catalog: false,
+  RetailEntKeys.customers: false,
+  RetailEntKeys.users: false,
+  RetailEntKeys.attendance: false,
+  RetailEntKeys.shifts: true,
+  RetailEntKeys.inventory: false,
+  RetailEntKeys.suppliers: false,
+  RetailEntKeys.purchase: false,
+  RetailEntKeys.reports: false,
+  RetailEntKeys.settings: true,
+  RetailEntKeys.cashDrawer: false,
+  RetailEntKeys.dataBackup: false,
+  RetailEntKeys.loyalty: false,
+
+  // Submodules
+  RetailEntKeys.billingInvoice: false,
+  RetailEntKeys.billingReturns: false,
+  RetailEntKeys.billingCredit: false,
+  RetailEntKeys.catalogProducts: false,
+  RetailEntKeys.catalogCategories: false,
+  RetailEntKeys.catalogVariants: false,
+  RetailEntKeys.inventoryStockTake: false,
+  RetailEntKeys.purchaseReturns: false,
+  RetailEntKeys.purchaseDamaged: false,
+
+  // Per-report keys — TRUE until the server catalog has them, for the same
+  // reason as restaurant's purchasing reports: no manifest sends them yet, so
+  // `false` would lock every report on a licensed shop. A manifest value
+  // always wins, so once the admin adds these they govern with no code edit —
+  // then flip these to `false` to mirror the server again.
+  RetailEntKeys.reportsDailySales: true,
+  RetailEntKeys.reportsMonthlySales: true,
+  RetailEntKeys.reportsSaleByProduct: true,
+  RetailEntKeys.reportsSaleByVariant: true,
+  RetailEntKeys.reportsSaleByCategory: true,
+  RetailEntKeys.reportsTopSelling: true,
+  RetailEntKeys.reportsProfit: true,
+  RetailEntKeys.reportsGst: true,
+  RetailEntKeys.reportsDiscounts: true,
+  RetailEntKeys.reportsQuickItems: true,
+  RetailEntKeys.reportsLowStock: true,
+  RetailEntKeys.reportsStockAdjustment: true,
+  RetailEntKeys.reportsPurchaseSummary: true,
+  RetailEntKeys.reportsSupplierPurchase: true,
+  RetailEntKeys.reportsPoStatus: true,
+  RetailEntKeys.reportsGrn: true,
+  RetailEntKeys.reportsDamagedItems: true,
+  RetailEntKeys.reportsPurchaseReturn: true,
+  RetailEntKeys.reportsCashDrawerHistory: true,
+  RetailEntKeys.reportsEodHistory: true,
+  RetailEntKeys.reportsAttendance: true,
+  RetailEntKeys.reportsShift: true,
+  RetailEntKeys.reportsStaffPerformance: true,
+
+  // Actions
+  RetailEntKeys.billingInvoicePrint: true, // footer shown unless admin hides it
+  RetailEntKeys.catalogProductsAdd: false,
+  RetailEntKeys.catalogProductsEdit: false,
+  RetailEntKeys.catalogProductsDelete: false,
+  RetailEntKeys.catalogCategoriesAdd: false,
+  RetailEntKeys.catalogCategoriesEdit: false,
+  RetailEntKeys.catalogCategoriesDelete: false,
+  RetailEntKeys.catalogVariantsAdd: false,
+  RetailEntKeys.catalogVariantsEdit: false,
+  RetailEntKeys.catalogVariantsDelete: false,
+  RetailEntKeys.suppliersAdd: false,
+  RetailEntKeys.suppliersEdit: false,
+  RetailEntKeys.suppliersDelete: false,
+  RetailEntKeys.purchaseCreate: false,
+  RetailEntKeys.purchaseReceive: false,
+
+  // Limits (0 = unlimited)
+  RetailEntKeys.billingPerDayMax: 0,
+  RetailEntKeys.catalogProductsMax: 0,
+  RetailEntKeys.customersMax: 0,
+  RetailEntKeys.usersMax: 2,
+  RetailEntKeys.suppliersMax: 0,
+
+  // Data scopes
+  RetailEntKeys.reportsHistoryLimitDays: 'all',
+};

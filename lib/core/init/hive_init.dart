@@ -809,6 +809,8 @@ class HiveInit {
     // Cash Management — movements (Cash In/Out) and handovers (shift transfers)
     await Hive.openBox<CashMovementModel>(HiveBoxNames.restaurantCashMovements);
     await Hive.openBox<StockMovementModel>(HiveBoxNames.restaurantStockMovements);
+    // Pending Settle stock work — see StockJournal. Restaurant only.
+    await Hive.openBox(HiveBoxNames.restaurantStockJournal);
     await Hive.openBox<CashHandoverModel>(HiveBoxNames.restaurantCashHandovers);
 
     // Saved thermal printers box moved to openCommonBoxes — shared with retail.

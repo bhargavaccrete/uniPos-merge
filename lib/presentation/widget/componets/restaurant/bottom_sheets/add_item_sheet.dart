@@ -28,6 +28,7 @@ import 'widgets/category_selector_button.dart';
 import 'widgets/tax_selector_button.dart';
 import 'widgets/inventory_toggle.dart';
 import 'widgets/product_type_selector.dart';
+import 'widgets/finished_prep_mode_selector.dart';
 import 'widgets/selling_method_selector.dart'
     show SellingMethodSheet, SellingMethodButton;
 
@@ -192,12 +193,11 @@ class _AddItemSheetState extends State<AddItemSheet> {
         return; // keep the sheet open; don't fire onItemAdded / pop
       }
       await StockAdjustService.recordOpeningStock(item);
-      // Semi-Finished/Recipe-Based items are created with no recipe (that's
-      // built in Edit) — make the incomplete state obvious instead of
-      // silently allowing a recipeless item to look fully configured.
-      if (ProductType.hasRecipe(item.productType)) {
+      // A Semi-Finished item needs a recipe to be produced; tell the user
+      // where to build it. (A Finished item's recipe is optional.)
+      if (item.productType == ProductType.semiFinished) {
         NotificationService.instance.showWarning(
-          '${item.name} saved — add its recipe in Edit before selling it.',
+          '${item.name} saved — add its recipe to produce it in batches.',
         );
       }
       widget.onItemAdded?.call();
@@ -451,7 +451,7 @@ class _AddItemSheetState extends State<AddItemSheet> {
   // ── Shared Form Fields ────────────────────────────────────────────────────
 
   List<Widget> _formFields() {
-    final isRecipeBased = _formState.productType == ProductType.recipeBased;
+    final isRecipeBased = _formState.isMadeToOrder;
     return [
       // Product Type drives every other field below it, so it's the first
       // decision the user makes.
@@ -587,12 +587,24 @@ class _AddItemSheetState extends State<AddItemSheet> {
           onChanged: (type) => setState(() => _formState.setProductType(type)),
           showRecipeHint: true,
         ),
+        if (_formState.productType == ProductType.finishedGood) ...[
+          SizedBox(height: AppResponsive.mediumSpacing(context)),
+          FinishedPrepModeSelector(
+            prepMode: _formState.prepMode,
+            makeFreshWhenOut: _formState.makeFreshWhenOut,
+            onPrepModeChanged: (mode) =>
+                setState(() => _formState.setPrepMode(mode)),
+            onMakeFreshChanged: (v) =>
+                setState(() => _formState.setMakeFreshWhenOut(v)),
+          ),
+        ],
       ],
     );
   }
 
-  /// Shown in place of the stock module for Recipe-Based items — they hold no
-  /// stock of their own; availability is derived from their ingredients.
+  /// Shown in place of the stock module for made-to-order Finished items —
+  /// they hold no stock of their own; a recipe, if added, governs
+  /// availability.
   Widget _buildRecipeBasedStockNote() {
     return Container(
       padding: const EdgeInsets.all(14),
@@ -613,7 +625,7 @@ class _AddItemSheetState extends State<AddItemSheet> {
           SizedBox(width: AppResponsive.smallSpacing(context)),
           Expanded(
             child: Text(
-              "No stock is tracked here — a Recipe-Based item's availability is calculated live from its ingredients.",
+              "No stock is tracked here — a made-to-order item's availability is calculated live from its recipe's ingredients, if it has one.",
               style: GoogleFonts.poppins(
                 fontSize: AppResponsive.smallFontSize(context),
                 color: AppColors.textPrimary,
@@ -631,7 +643,7 @@ class _AddItemSheetState extends State<AddItemSheet> {
     final bool required = _formState.isMenuType;
     final String label = isRaw
         ? 'Cost Price'
-        : (_formState.productType == ProductType.recipeBased
+        : (_formState.productType == ProductType.finishedGood
               ? 'Selling Price'
               : 'Price');
     return Column(

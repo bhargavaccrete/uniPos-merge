@@ -111,6 +111,17 @@ class Items extends HiveObject {
   @HiveField(31)
   bool? sellDirectlyAtPos; // null = use the per-product-type default (see sellsAtPos)
 
+  // --- FINISHED PREPARATION (Phase 1) ---
+  /// ProductType.{madeToOrder,madeInAdvance}; null = derived from the stored
+  /// type (ProductType.effectivePrepMode). Only meaningful for Finished.
+  @HiveField(32)
+  String? prepMode;
+
+  /// Made in advance only: when prepared stock runs out, make the rest fresh
+  /// from the recipe if its ingredients are available.
+  @HiveField(33, defaultValue: false)
+  bool makeFreshWhenOut;
+
   Items({
     required this.id,
     required this.name,
@@ -144,6 +155,8 @@ class Items extends HiveObject {
     this.recipeId,
     this.lastPurchaseCost,
     this.sellDirectlyAtPos,
+    this.prepMode,
+    this.makeFreshWhenOut = false,
   });
 
 // --- ADJUSTED HELPER LOGIC ---
@@ -155,16 +168,37 @@ class Items extends HiveObject {
 
   bool get isRawMaterial => effectiveProductType == ProductType.rawMaterial;
   bool get isSemiFinished => effectiveProductType == ProductType.semiFinished;
-  bool get isFinishedGood => effectiveProductType == ProductType.finishedGood;
-  bool get isRecipeBased => effectiveProductType == ProductType.recipeBased;
+  bool get isFinished => effectiveProductType == ProductType.finishedGood;
+  bool get isTradeItem => effectiveProductType == ProductType.tradeItem;
 
-  /// True when this item has (or should have) a [RecipeModel] attached.
-  bool get hasRecipe => ProductType.hasRecipe(effectiveProductType);
+  /// ProductType.{madeToOrder,madeInAdvance} — see [ProductType.effectivePrepMode].
+  String get effectivePrepMode =>
+      ProductType.effectivePrepMode(productType, prepMode);
+
+  /// Finished and made to order: has no stock of its own; a sale cascades
+  /// into its recipe's ingredients (the former Recipe-Based type).
+  bool get isMadeToOrder =>
+      isFinished && effectivePrepMode == ProductType.madeToOrder;
+
+  /// Finished and made in advance: sells its own (prepared) stock.
+  bool get isMadeInAdvance =>
+      isFinished && effectivePrepMode == ProductType.madeInAdvance;
+
+  /// Deprecated alias for [isMadeToOrder] — the pre-Phase-1 Recipe-Based
+  /// type. Same meaning, so existing call sites are unchanged.
+  bool get isRecipeBased => isMadeToOrder;
+
+  /// Deprecated alias — the pre-Phase-1 Finished Good: Finished, made in
+  /// advance (sells its own stock).
+  bool get isFinishedGood => isMadeInAdvance;
+
+  /// Pre-Phase-1 meaning: the type carries a [RecipeModel] (Semi-Finished or
+  /// made-to-order Finished).
+  bool get hasRecipe => isSemiFinished || isMadeToOrder;
 
   /// True when this item's stock is derived from its recipe's ingredients
   /// rather than stored on `stockQuantity` — see §5/§7 of the design doc.
-  bool get isStockDerivedFromRecipe =>
-      ProductType.isStockDerived(effectiveProductType);
+  bool get isStockDerivedFromRecipe => isMadeToOrder;
 
   /// Whether this item appears in the POS sale grid.
   ///
@@ -298,6 +332,8 @@ class Items extends HiveObject {
     String? recipeId,
     double? lastPurchaseCost,
     bool? sellDirectlyAtPos,
+    String? prepMode,
+    bool? makeFreshWhenOut,
   }) {
     return Items(
       id: id ?? this.id,
@@ -332,6 +368,8 @@ class Items extends HiveObject {
       recipeId: recipeId ?? this.recipeId,
       lastPurchaseCost: lastPurchaseCost ?? this.lastPurchaseCost,
       sellDirectlyAtPos: sellDirectlyAtPos ?? this.sellDirectlyAtPos,
+      prepMode: prepMode ?? this.prepMode,
+      makeFreshWhenOut: makeFreshWhenOut ?? this.makeFreshWhenOut,
     );
   }
 
@@ -370,6 +408,8 @@ class Items extends HiveObject {
       'recipeId': recipeId,
       'lastPurchaseCost': lastPurchaseCost,
       'sellDirectlyAtPos': sellDirectlyAtPos,
+      'prepMode': prepMode,
+      'makeFreshWhenOut': makeFreshWhenOut,
     };
   }
 
@@ -464,6 +504,8 @@ class Items extends HiveObject {
       recipeId: map['recipeId'] as String?,
       lastPurchaseCost: (map['lastPurchaseCost'] as num?)?.toDouble(),
       sellDirectlyAtPos: map['sellDirectlyAtPos'] as bool?,
+      prepMode: map['prepMode'] as String?,
+      makeFreshWhenOut: _parseBool(map['makeFreshWhenOut'], false),
     );
   }
 }

@@ -19,7 +19,8 @@
       "Bash(sed:*)",
       "Bash(head:*)",
       "Bash(python -)",
-      "PowerShell(git check-ignore *)"
+      "PowerShell(git check-ignore *)",
+      "PowerShell(flutter test *)"
     ]
   },
   "outputStyle": "Explanatory"

@@ -6,7 +6,9 @@ import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
+import 'package:billberrylite/core/config/app_config.dart';
 import 'package:billberrylite/core/config/food_license_rule.dart';
+import 'package:billberrylite/presentation/widget/componets/restaurant/restaurant_store_type_field.dart';
 import 'package:billberrylite/core/config/postal_code_rule.dart';
 import 'package:billberrylite/core/config/tax_id_rule.dart';
 import 'package:billberrylite/domain/services/restaurant/day_management_service.dart';
@@ -43,6 +45,10 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
   // Logo
   Uint8List? _logoBytes;
   bool _logoChanged = false;
+
+  // Restaurant only — a `RestaurantStoreTypes` key. Null on setups saved before
+  // the field existed; the picker is optional here so those can still save.
+  String? _restaurantStoreType;
 
   // Tax registration as saved, and as currently chosen on screen. Written only
   // on Save, and only while no day is open.
@@ -85,6 +91,7 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
     _isRegistered = _savedRegistered = TaxIdRule.isRegistered;
     // PAN, like the food licence, lives only on BusinessDetails.
     _panController.text = businessDetailsRepository.get()?.pan ?? '';
+    _restaurantStoreType = businessDetailsRepository.get()?.restaurantStoreType;
     _logoBytes = await _storeSettingsService.getStoreLogo();
 
     setState(() => _isLoading = false);
@@ -213,6 +220,7 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
           details.copyWith(
             foodLicenseNo: _foodLicenseController.text.trim(),
             pan: _panController.text.trim(),
+            restaurantStoreType: _restaurantStoreType,
           ),
         );
       }
@@ -361,6 +369,15 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
                         hint: 'e.g., John Doe',
                       ),
                       SizedBox(height: AppResponsive.largeSpacing(context)),
+                      if (AppConfig.isRestaurant) ...[
+                        RestaurantStoreTypeField(
+                          value: _restaurantStoreType,
+                          onChanged: (key) =>
+                              setState(() => _restaurantStoreType = key),
+                          required: false,
+                        ),
+                        SizedBox(height: AppResponsive.largeSpacing(context)),
+                      ],
                       _buildTaxRegistrationCard(),
                       SizedBox(height: AppResponsive.largeSpacing(context)),
                       // Hidden while "Not Registered", as on Store Details. The

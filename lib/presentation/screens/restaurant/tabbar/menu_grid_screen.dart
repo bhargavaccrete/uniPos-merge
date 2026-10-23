@@ -230,8 +230,8 @@ class _MenuGridScreenState extends State<MenuGridScreen> {
   _StockStatus _getStockStatus(Items item) {
     if (!InventoryService.isStockGoverned(item)) return _StockStatus.notTracked;
     final allowOrderWhenOutOfStock = item.allowOrderWhenOutOfStock;
-    // Recipe-Based: availability comes from ingredients, not a stored figure.
-    if (item.isRecipeBased) {
+    // Made to order / hybrid: availability is derived, not a stored figure.
+    if (InventoryService.usesDerivedAvailability(item)) {
       switch (InventoryService.posStatusFromAvailable(
         available: InventoryService.effectiveAvailableStock(item),
         allowOrderWhenOutOfStock: allowOrderWhenOutOfStock,

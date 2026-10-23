@@ -529,10 +529,15 @@ class _AddProductScreenState extends State<AddProductScreen> {
   Future<void> _updateProduct() async {
     if (!_formKey.currentState!.validate()) return;
     if (!PlanGuard.allowedOr(
-      context,
-      RetailEntKeys.catalogProductsEdit,
-      featureName: 'Edit Products',
-    )) {
+          context,
+          RetailEntKeys.catalogProducts,
+          featureName: 'Products',
+        ) ||
+        !PlanGuard.allowedOr(
+          context,
+          RetailEntKeys.catalogProductsEdit,
+          featureName: 'Edit Products',
+        )) {
       return;
     }
 

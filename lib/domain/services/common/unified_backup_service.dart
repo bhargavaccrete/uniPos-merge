@@ -14,6 +14,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:billberrylite/core/config/app_config.dart';
 import 'package:billberrylite/main.dart' show navigatorKey;
 import 'package:billberrylite/domain/services/common/backup_encryption_service.dart';
+import 'package:billberrylite/domain/services/restaurant/stock_journal.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/core/plan/plan_enforcement.dart';
 import 'package:billberrylite/core/plan/entitlement_keys.dart';
@@ -703,6 +704,20 @@ class UnifiedBackupService {
     }
   }
 
+  /// Test seams over the private export/restore steps; no behaviour of their own.
+  @visibleForTesting
+  static Future<Map<String, dynamic>> collectAllDataForTesting() =>
+      _collectAllData();
+
+  @visibleForTesting
+  static Future<void> restoreRestaurantDataForTesting(
+          Map<String, dynamic> data) =>
+      _restoreRestaurantData(data);
+
+  @visibleForTesting
+  static Future<void> restoreRetailDataForTesting(Map<String, dynamic> data) =>
+      _restoreRetailData(data);
+
   /// ---------------------------
   /// 🔧 COLLECT ALL DATA (MODE-AWARE)
   /// ---------------------------
@@ -941,6 +956,20 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Recipe Productions box error: $e");
         exportMap["recipeProductions"] = [];
+      }
+
+      // Stock movement audit trail (sales, production, voids, GRN, adjustments).
+      // Shared box with retail. On a read error the key is left out rather
+      // than exported empty, so restoring that backup keeps the device's rows.
+      try {
+        exportMap["stockMovements"] =
+            Hive.box<StockMovementModel>(HiveBoxNames.restaurantStockMovements)
+                .values
+                .map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>)
+                .toList();
+        debugPrint("📦 Stock movements exported: ${exportMap["stockMovements"]!.length}");
+      } catch (e) {
+        debugPrint("⚠️ Stock movements box error: $e");
       }
 
       // Restaurant Suppliers, Purchase Orders & GRNs
@@ -2396,6 +2425,26 @@ class UnifiedBackupService {
       );
     } catch (e) {
       debugPrint("⚠️ Error restoring recipe productions: $e");
+    }
+
+    // Absent key (older backups) → restoreBoxWithId leaves the box untouched.
+    try {
+      await restoreBoxWithId(
+        "stockMovements",
+        Hive.box<StockMovementModel>(HiveBoxNames.restaurantStockMovements),
+        (m) => StockMovementModel.fromMap(m),
+        (m) => m.id,
+      );
+    } catch (e) {
+      debugPrint("⚠️ Error restoring stock movements: $e");
+    }
+
+    // Pending stock work is device-local and never exported: its entries
+    // refer to orders and stock this restore just replaced.
+    try {
+      await StockJournal.clear();
+    } catch (e) {
+      debugPrint("⚠️ Error clearing the stock journal: $e");
     }
 
     try {

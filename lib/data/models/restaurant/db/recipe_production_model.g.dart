@@ -25,13 +25,14 @@ class RecipeProductionModelAdapter extends TypeAdapter<RecipeProductionModel> {
       producedTime: fields[5] as DateTime,
       producedBy: fields[6] as String?,
       movementIds: (fields[7] as List).cast<String>(),
+      actualQty: fields[8] as double?,
     );
   }
 
   @override
   void write(BinaryWriter writer, RecipeProductionModel obj) {
     writer
-      ..writeByte(8)
+      ..writeByte(9)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -47,7 +48,9 @@ class RecipeProductionModelAdapter extends TypeAdapter<RecipeProductionModel> {
       ..writeByte(6)
       ..write(obj.producedBy)
       ..writeByte(7)
-      ..write(obj.movementIds);
+      ..write(obj.movementIds)
+      ..writeByte(8)
+      ..write(obj.actualQty);
   }
 
   @override

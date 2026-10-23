@@ -6,6 +6,7 @@ import '../../data/models/restaurant/db/database/hive_order.dart';
 import '../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../domain/services/restaurant/day_management_service.dart';
 import '../../domain/services/restaurant/inventory_service.dart';
+import '../../domain/services/restaurant/line_stock.dart';
 import '../../domain/services/common/local_notification_service.dart';
 import '../../data/models/common/notification_presenter.dart';
 import '../../core/routes/routes_name.dart';
@@ -196,13 +197,16 @@ Future<Response> captainSendOrderHandler(Request request) async {
       existing = await HiveOrders.getActiveOrderByTableId(tableNo);
     }
 
+    // Stamped lines (LineStock): restores read what each sale took.
+    final salePlan = await InventoryService.planSale(newItems);
+
     if (existing != null) {
       // Add items to the existing order as a new KOT.
       final updated = await HiveOrders.updateOrderWithNewItems(
         existingOrder: existing,
-        newItems: newItems,
+        newItems: salePlan.lines,
       );
-      await InventoryService.deductStockForOrder(newItems);
+      await InventoryService.applyPlannedUnits(salePlan.units);
       // Update table total (dine-in only — Take Away has no table).
       if (updated.tableNo != null && updated.tableNo!.isNotEmpty) {
         await tableStore.updateTableStatus(
@@ -257,7 +261,7 @@ Future<Response> captainSendOrderHandler(Request request) async {
       customerName: 'Captain Order',
       customerNumber: '',
       customerEmail: '',
-      items: newItems,
+      items: salePlan.lines,
       status: 'Processing',
       timeStamp: DateTime.now(),
       orderType: orderType,
@@ -271,7 +275,7 @@ Future<Response> captainSendOrderHandler(Request request) async {
     );
 
     await orderStore.addOrder(order);
-    await InventoryService.deductStockForOrder(newItems);
+    await InventoryService.applyPlannedUnits(salePlan.units);
 
     if (tableNo != null) {
       await tableStore.updateTableStatus(
@@ -347,6 +351,25 @@ Future<Response> captainModifyOrderHandler(Request request, String orderId) asyn
       );
     }
 
+    // Stamps come from the SAVED lines, never the client: a kept line keeps
+    // its stamp (shrunk if its quantity went down, fresh first); a line the
+    // server never deducted gets an empty one.
+    final savedById = {for (final s in order.items) s.id: s};
+    final keptItems = [
+      for (final u in updatedItems)
+        () {
+          final saved = savedById[u.id];
+          if (saved == null) {
+            return LineStock.withStampOf(u, null)
+                .copyWith(ownStockQty: 0, freshQty: 0, restockedQuantity: 0);
+          }
+          final source = saved.hasStockStamp && u.quantity < saved.quantity
+              ? LineStock.reduced(saved, saved.quantity - u.quantity)
+              : saved;
+          return LineStock.withStampOf(u, source);
+        }(),
+    ];
+
     // Recalculate total from updated items
     final newTotal = updatedItems.fold(0.0, (sum, i) => sum + i.totalPrice);
 
@@ -360,18 +383,22 @@ Future<Response> captainModifyOrderHandler(Request request, String orderId) asyn
       await orderStore.deleteOrder(orderId);
     } else {
       final updatedOrder = order.copyWith(
-        items: updatedItems,
+        items: keptItems,
         totalPrice: newTotal,
       );
       await HiveOrders.updateOrder(updatedOrder);
     }
 
-    // Restore stock for cancelled items
+    // Restore stock for cancelled items — from the saved line's stamp; a
+    // line the server does not know restores by type, as before.
     if (cancelledItems.isNotEmpty) {
-      final restockMap = <CartItem, int>{
-        for (final item in cancelledItems) item: item.quantity,
-      };
-      await InventoryService.restoreStockForRefund(restockMap);
+      await InventoryService.restoreLines([
+        for (final c in cancelledItems)
+          (
+            line: savedById[c.id] ?? LineStock.withStampOf(c, null),
+            qty: c.quantity,
+          ),
+      ]);
     }
 
     // Table: free it when the order is gone, else update its running total.

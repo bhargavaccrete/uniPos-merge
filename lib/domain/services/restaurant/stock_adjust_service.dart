@@ -56,6 +56,120 @@ class StockAdjustService {
 
   static bool isLossReason(String reason) => lossReasons.contains(reason);
 
+  /// The manual add / remove reasons offered by Manage Inventory and the
+  /// Low Stock screen — one list, so both screens say the same thing.
+  static const List<String> addReasons = [
+    'Restock / Purchase',
+    'Customer return',
+    'Stock correction',
+    'Transfer in',
+    'Other',
+  ];
+  static const List<String> removeReasons = [
+    'Wastage / Spoilage',
+    'Theft / Loss',
+    'Stock correction',
+    'Transfer out',
+    'Sample / Complimentary',
+    'Other',
+  ];
+
+  /// Moves [item]'s stock (or [variant]'s) by [delta] and records why — THE
+  /// write for every manual adjustment. Returns the new balance.
+  ///
+  /// The stock goes through [ItemStore.applyStockDelta], the same queued
+  /// write sales use: it re-reads the live balance, so a screen's stale copy
+  /// of [item] can never overwrite a sale or another adjustment, and it keeps
+  /// a variant's own tracking flag. The history row is written only after
+  /// the stock is stored, from the balance actually stored.
+  ///
+  /// Refuses (nothing written): made-to-order items, a removal that would go
+  /// below zero (checked on the live balance), and a [unitCost] that is not
+  /// above zero. [unitCost] — a purchase price, e.g. for "Restock /
+  /// Purchase" — becomes the item's `lastPurchaseCost` in the same write.
+  static Future<double> adjustBy({
+    required Items item,
+    ItemVariante? variant,
+    required double delta,
+    required String reason,
+    String? note,
+    double? unitCost,
+    String? movementId,
+  }) async {
+    if (item.isMadeToOrder) {
+      throw StateError('${item.name} is made to order and has no stock of its own');
+    }
+    if (unitCost != null && !(unitCost > 0)) {
+      throw ArgumentError.value(unitCost, 'unitCost', 'must be above zero');
+    }
+    if (delta == 0) {
+      return variant != null
+          ? (variant.stockQuantity ?? 0)
+          : item.stockQuantity;
+    }
+
+    // Turning tracking on is a menu edit, so it goes through the gated
+    // update — and stops here if that is refused, before any stock moves.
+    final live = itemStore.getItemById(item.id);
+    if (live == null) {
+      throw StateError('${item.name} no longer exists');
+    }
+    if (!live.trackInventory) {
+      final ok = await itemStore.updateItem(live.copyWith(trackInventory: true));
+      if (!ok) {
+        throw StateError(itemStore.errorMessage ??
+            'Stock tracking could not be turned on for ${item.name}');
+      }
+    }
+
+    final balanceAfter = await itemStore.applyStockDelta(
+      itemId: item.id,
+      variantId: variant?.variantId,
+      delta: delta,
+      lastPurchaseCost: unitCost,
+      beforePersist: (_, after) async {
+        if (delta < 0 && after < 0) {
+          throw StateError('Not enough stock of ${item.name} to remove '
+              '${_fmtQty(-delta)}');
+        }
+      },
+    );
+
+    final sessionId = await DayManagementService.getCurrentSessionId();
+    await _repo.saveMovement(StockMovementModel(
+      id: movementId ?? const Uuid().v4(),
+      timestamp: DateTime.now(),
+      itemId: item.id,
+      variantId: variant?.variantId,
+      itemName: variant != null
+          ? '${item.name} (${_variantNameOf(variant.variantId)})'
+          : item.name,
+      type: delta > 0 ? 'in' : 'out',
+      quantity: delta.abs(),
+      balanceAfter: balanceAfter,
+      reason: reason,
+      note: note,
+      unit: item.unit ?? (item.isSoldByWeight ? 'kg' : 'pcs'),
+      staffName: RestaurantSession.staffName ?? RestaurantSession.effectiveRole,
+      sessionId: sessionId,
+      unitCost: unitCost,
+    ));
+
+    if (delta < 0 && isLossReason(reason)) {
+      await recordLoss(
+        item: item,
+        variant: variant,
+        quantity: -delta,
+        reason: reason,
+        note: note,
+      );
+    }
+    return balanceAfter;
+  }
+
+  static String _fmtQty(double v) =>
+      v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toString();
+
   /// Writes the cost side of a loss-bearing removal. Never moves stock —
   /// the caller has already done that; this only records the money. Returns
   /// the loss number, or null if [quantity] is zero/negative.
@@ -104,7 +218,7 @@ class StockAdjustService {
         continue;
       }
       final threshold = item.effectiveLowStockThreshold;
-      if (item.isRecipeBased) {
+      if (InventoryService.usesDerivedAvailability(item)) {
         final available = InventoryService.effectiveAvailableStock(item);
         // Infinite = nothing constrains it; never an alert.
         if (available.isFinite && (available <= 0 || available <= threshold)) {
@@ -208,61 +322,25 @@ class StockAdjustService {
   }
 
   /// Add [qty] to an item (or a specific variant) and log the movement.
-  /// Returns the new balance.
+  /// Returns the new balance. See [adjustBy].
+  ///
+  /// Throws [StateError] for a made-to-order item before any write: its
+  /// availability comes from ingredients, so a stored quantity would be
+  /// phantom stock.
   static Future<double> addStock({
     required Items item,
     ItemVariante? variant,
     required double qty,
     required String reason,
     String? note,
-  }) async {
-    double balanceAfter;
-
-    if (variant != null) {
-      final updatedVariants = item.variant?.map((v) {
-        if (v.variantId == variant.variantId) {
-          return ItemVariante(
-            variantId: v.variantId,
-            price: v.price,
-            stockQuantity: (v.stockQuantity ?? 0) + qty,
-          );
-        }
-        return v;
-      }).toList();
-      balanceAfter = (variant.stockQuantity ?? 0) + qty;
-      await itemStore.updateItem(item.copyWith(
-        trackInventory: true,
-        variant: updatedVariants,
-      ));
-    } else {
-      balanceAfter = item.stockQuantity + qty;
-      await itemStore.updateItem(item.copyWith(
-        trackInventory: true,
-        stockQuantity: balanceAfter,
-      ));
-    }
-
-    final sessionId = await DayManagementService.getCurrentSessionId();
-    await _repo.saveMovement(StockMovementModel(
-      id: const Uuid().v4(),
-      timestamp: DateTime.now(),
-      itemId: item.id,
-      variantId: variant?.variantId,
-      itemName: variant != null
-          ? '${item.name} (${_variantNameOf(variant.variantId)})'
-          : item.name,
-      type: 'in',
-      quantity: qty,
-      balanceAfter: balanceAfter,
-      reason: reason,
-      note: note,
-      unit: item.unit ?? (item.isSoldByWeight ? 'kg' : 'pcs'),
-      staffName: RestaurantSession.staffName ?? RestaurantSession.effectiveRole,
-      sessionId: sessionId,
-    ));
-
-    return balanceAfter;
-  }
+  }) =>
+      adjustBy(
+        item: item,
+        variant: variant,
+        delta: qty,
+        reason: reason,
+        note: note,
+      );
 
   /// Set [item] (or one of its variants) to an absolute [newStock] level and
   /// log the delta as a movement — used by stock-take commit, where each line
@@ -285,65 +363,29 @@ class StockAdjustService {
     String? movementId,
   }) async {
     if (movementId != null && _repo.contains(movementId)) return true;
-    final oldStock =
-        variant != null ? (variant.stockQuantity ?? 0) : item.stockQuantity;
-    if (newStock == oldStock) return true;
     if (newStock < 0) return false;
 
-    final isIn = newStock > oldStock;
-    final delta = (newStock - oldStock).abs();
+    // The difference from the LIVE level, not from [item] (the caller's copy
+    // may be older than a sale made since), applied through [adjustBy].
+    final live = itemStore.getItemById(item.id) ?? item;
+    final liveVariant = variant == null
+        ? null
+        : live.variant
+            ?.where((v) => v.variantId == variant.variantId)
+            .firstOrNull;
+    final oldStock = variant != null
+        ? (liveVariant?.stockQuantity ?? variant.stockQuantity ?? 0)
+        : live.stockQuantity;
+    if (newStock == oldStock) return true;
 
-    if (variant != null) {
-      final updatedVariants = item.variant?.map((v) {
-        if (v.variantId == variant.variantId) {
-          return ItemVariante(
-            variantId: v.variantId,
-            price: v.price,
-            stockQuantity: newStock,
-          );
-        }
-        return v;
-      }).toList();
-      await itemStore.updateItem(item.copyWith(
-        trackInventory: true,
-        variant: updatedVariants,
-      ));
-    } else {
-      await itemStore.updateItem(item.copyWith(
-        trackInventory: true,
-        stockQuantity: newStock,
-      ));
-    }
-
-    final sessionId = await DayManagementService.getCurrentSessionId();
-    await _repo.saveMovement(StockMovementModel(
-      id: movementId ?? const Uuid().v4(),
-      timestamp: DateTime.now(),
-      itemId: item.id,
-      variantId: variant?.variantId,
-      itemName: variant != null
-          ? '${item.name} (${_variantNameOf(variant.variantId)})'
-          : item.name,
-      type: isIn ? 'in' : 'out',
-      quantity: delta,
-      balanceAfter: newStock,
+    await adjustBy(
+      item: live,
+      variant: liveVariant ?? variant,
+      delta: newStock - oldStock,
       reason: reason,
       note: note,
-      unit: item.unit ?? (item.isSoldByWeight ? 'kg' : 'pcs'),
-      staffName: RestaurantSession.staffName ?? RestaurantSession.effectiveRole,
-      sessionId: sessionId,
-    ));
-
-    if (!isIn && isLossReason(reason)) {
-      await recordLoss(
-        item: item,
-        variant: variant,
-        quantity: delta,
-        reason: reason,
-        note: note,
-      );
-    }
-
+      movementId: movementId,
+    );
     return true;
   }
 }

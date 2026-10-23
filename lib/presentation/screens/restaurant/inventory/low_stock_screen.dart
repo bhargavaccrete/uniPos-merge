@@ -10,6 +10,7 @@ import '../../../widget/componets/common/app_text_field.dart';
 import '../../../widget/componets/common/app_dialog.dart';
 import '../../../widget/componets/common/dialog_dispose_scope.dart';
 import '../../../widget/componets/common/primary_app_bar.dart';
+import '../../../widget/componets/restaurant/stock_reason_chips.dart';
 import '../../../../core/constants/item_units.dart';
 import '../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../util/common/app_responsive.dart';
@@ -24,13 +25,7 @@ class LowStockScreen extends StatefulWidget {
 }
 
 class _LowStockScreenState extends State<LowStockScreen> {
-  static const List<String> _addReasons = [
-    'Restock / Purchase',
-    'Customer return',
-    'Stock correction',
-    'Transfer in',
-    'Other',
-  ];
+  static const List<String> _addReasons = StockAdjustService.addReasons;
 
   String _qty(double v) =>
       v % 1 == 0 ? v.toStringAsFixed(0) : v.toStringAsFixed(2);
@@ -65,8 +60,9 @@ class _LowStockScreenState extends State<LowStockScreen> {
             subtitle: e.variantName != null
                 ? '${e.item.name} (${e.variantName})'
                 : e.item.name,
-            accent: AppColors.primary,
-            icon: Icons.add_box_rounded,
+            // Same intent colour as Manage Inventory's Add Stock dialog.
+            accent: AppColors.success,
+            icon: Icons.add_circle_rounded,
             body: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -84,34 +80,21 @@ class _LowStockScreenState extends State<LowStockScreen> {
                   textInputAction: TextInputAction.next,
                   onFieldSubmitted: (_) => noteFocus.requestFocus(),
                 ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  initialValue: reason,
-                  isExpanded: true,
-                  decoration: InputDecoration(
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
+                const SizedBox(height: 16),
+                Text(
+                  'Reason',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.smallFontSize(context),
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
                   ),
-                  items: _addReasons
-                      .map(
-                        (r) => DropdownMenuItem(
-                          value: r,
-                          child: Text(
-                            r,
-                            style: GoogleFonts.poppins(
-                              fontSize: AppResponsive.bodyFontSize(context),
-                            ),
-                          ),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (v) =>
-                      setLocal(() => reason = v ?? _addReasons.first),
+                ),
+                const SizedBox(height: 10),
+                StockReasonChips(
+                  reasons: _addReasons,
+                  selected: reason,
+                  accent: AppColors.success,
+                  onSelected: (r) => setLocal(() => reason = r),
                 ),
                 const SizedBox(height: 12),
                 AppTextField(
@@ -133,7 +116,8 @@ class _LowStockScreenState extends State<LowStockScreen> {
               appDialogCancelButton(ctx),
               const SizedBox(width: 12),
               appDialogPrimaryButton(
-                label: 'Add',
+                label: 'Add Stock',
+                color: AppColors.success,
                 onPressed: () => Navigator.pop(ctx, (
                   qty: qtyController.text.trim(),
                   note: noteController.text.trim(),
@@ -159,13 +143,18 @@ class _LowStockScreenState extends State<LowStockScreen> {
       return;
     }
 
-    await StockAdjustService.addStock(
-      item: e.item,
-      variant: e.variant,
-      qty: qty,
-      reason: reason,
-      note: result.note.isEmpty ? null : result.note,
-    );
+    try {
+      await StockAdjustService.addStock(
+        item: e.item,
+        variant: e.variant,
+        qty: qty,
+        reason: reason,
+        note: result.note.isEmpty ? null : result.note,
+      );
+    } on StateError catch (err) {
+      NotificationService.instance.showError(err.message);
+      return;
+    }
 
     if (mounted) {
       NotificationService.instance.showSuccess('Added ${_qty(qty)} $unit');
@@ -305,7 +294,9 @@ class _LowStockScreenState extends State<LowStockScreen> {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      '${_qty(e.stock)} $unit left',
+                      e.item.isMadeToOrder
+                          ? 'Can make: ${_qty(e.stock)}'
+                          : '${_qty(e.stock)} $unit left',
                       style: GoogleFonts.poppins(
                         fontSize: AppResponsive.smallFontSize(context),
                         color: AppColors.textSecondary,
@@ -316,6 +307,8 @@ class _LowStockScreenState extends State<LowStockScreen> {
               ],
             ),
           ),
+          // Made-to-order stock is derived from ingredients — restock those.
+          if (!e.item.isMadeToOrder) ...[
           const SizedBox(width: 10),
           ElevatedButton.icon(
             onPressed: () => _restock(e),
@@ -337,6 +330,7 @@ class _LowStockScreenState extends State<LowStockScreen> {
               ),
             ),
           ),
+          ],
         ],
       ),
     );

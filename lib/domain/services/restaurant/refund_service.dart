@@ -6,6 +6,7 @@ import '../../../data/models/restaurant/db/pastordermodel_313.dart';
 import '../../../util/restaurant/restaurant_session.dart';
 import '../../../util/restaurant/staticswitch.dart';
 import 'inventory_service.dart';
+import 'line_stock.dart';
 
 /// Result class for partial refund operations
 class PartialRefundResult {
@@ -63,6 +64,26 @@ class RefundService {
         }
       });
 
+      // Restock per line, never past what a line can still restore
+      // (quantity − restockedQuantity): a line its void already put back
+      // (KotLayout.voidPlan) restores nothing again — F2. Each line records
+      // the return, so a second refund is capped too.
+      final restores = <({CartItem line, int qty})>[];
+      refundResult.itemsToRestock.forEach((itemToRestock, quantityToRestock) {
+        final groupKey = _itemGroupKey(itemToRestock);
+        int remaining = quantityToRestock;
+        for (int i = 0; i < updatedItems.length && remaining > 0; i++) {
+          final item = updatedItems[i];
+          if (_itemGroupKey(item) != groupKey) continue;
+          final available = item.quantity - (item.restockedQuantity ?? 0);
+          if (available <= 0) continue;
+          final take = available < remaining ? available : remaining;
+          restores.add((line: item, qty: take));
+          updatedItems[i] = LineStock.restocked(item, take);
+          remaining -= take;
+        }
+      });
+
       // Determine new order status
       bool allItemsRefunded = updatedItems.every((item) {
         final originalQty = item.quantity ?? 0;
@@ -91,10 +112,9 @@ class RefundService {
 
       await pastOrderStore.updateOrder(updatedOrder);
 
-      // Restore stock for items marked for restocking
-      if (refundResult.itemsToRestock.isNotEmpty) {
-        await InventoryService.restoreStockForRefund(refundResult.itemsToRestock);
-      }
+      // Restore stock for items marked for restocking — per line, from each
+      // line's stamp (what its sale actually took).
+      await InventoryService.restoreLines(restores);
 
       // Restore loyalty points proportional to refund amount
       final cid = order.customerId;
@@ -167,6 +187,9 @@ class RefundService {
         grouped[key] = existing.copyWith(
           quantity: existing.quantity + (item.quantity ?? 0),
           refundedQuantity: (existing.refundedQuantity ?? 0) + (item.refundedQuantity ?? 0),
+          // So the dialog knows how much a void already put back.
+          restockedQuantity: (existing.restockedQuantity ?? 0) +
+              (item.restockedQuantity ?? 0),
         );
       } else {
         grouped[key] = item.copyWith(

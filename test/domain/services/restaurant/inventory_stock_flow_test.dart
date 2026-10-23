@@ -415,7 +415,7 @@ void main() {
       ));
 
       await InventoryService.produceBatch(
-        semiFinishedItem:
+        item:
             Hive.box<Items>(HiveBoxNames.restaurantItems).get('dough')!,
         batchQty: 2,
       );
@@ -450,6 +450,53 @@ void main() {
   // ---------------------------------------------------------- void / refund
 
   group('restoreStockForRefund / restoreStockForOrder', () {
+    Items paneer(double stock) => Items(
+          id: 'paneer',
+          name: 'Paneer',
+          trackInventory: true,
+          isSoldByWeight: true,
+          unit: 'kg',
+          stockQuantity: stock,
+        );
+
+    CartItem weightLine(int qty) => makeCartItem(
+        id: 'w1', productId: 'paneer', title: 'Paneer',
+        price: 200, quantity: qty, weightDisplay: '500GM');
+
+    test('weight line with qty > 1 restores quantity × weight', () async {
+      await seedItems([paneer(8.5)]);
+
+      await InventoryService.restoreStockForOrder([weightLine(3)]);
+
+      expect(disk('paneer').stockQuantity, closeTo(10.0, 1e-9));
+      final m = movements('paneer').single;
+      expect(m.quantity, closeTo(1.5, 1e-9));
+      expect(m.balanceAfter, closeTo(10.0, 1e-9));
+      expect(m.reason, 'Void / Refund return');
+    });
+
+    test('weight line with qty 1 restores one weight', () async {
+      await seedItems([paneer(9.5)]);
+
+      await InventoryService.restoreStockForOrder([weightLine(1)]);
+
+      expect(disk('paneer').stockQuantity, closeTo(10.0, 1e-9));
+      expect(movements('paneer').single.quantity, closeTo(0.5, 1e-9));
+    });
+
+    test('deduct then restore of a weight line nets to zero', () async {
+      await seedItems([paneer(10)]);
+
+      await InventoryService.deductStockForOrder([weightLine(3)]);
+      expect(disk('paneer').stockQuantity, closeTo(8.5, 1e-9));
+      await InventoryService.restoreStockForOrder([weightLine(3)]);
+
+      expect(disk('paneer').stockQuantity, closeTo(10.0, 1e-9));
+      final moved = movements('paneer').fold<double>(
+          0, (sum, m) => sum + (m.type == 'in' ? m.quantity : -m.quantity));
+      expect(moved, closeTo(0, 1e-9));
+    });
+
     test('restores item stock and logs the post-restore balance', () async {
       await seedItems([tracked('tea', 'Tea', 5)]);
 
@@ -639,7 +686,7 @@ void main() {
       // The screen passes the instance it already holds — stale by the time
       // the stock write replaces the store entry. It must not be saved back.
       await InventoryService.produceBatch(
-          semiFinishedItem: semiFinished, batchQty: 4);
+          item: semiFinished, batchQty: 4);
 
       final expectedCost = doughRecipe().estimatedCostPerUnit(
           (id) => {'flour': 40.0, 'salt': 2.0}[id] ?? 0);
@@ -659,7 +706,7 @@ void main() {
       await seedRecipe(doughRecipe());
 
       await InventoryService.produceBatch(
-          semiFinishedItem: itemStore.getItemById('dough')!, batchQty: 4);
+          item: itemStore.getItemById('dough')!, batchQty: 4);
 
       expect(disk('flour').stockQuantity, 8);
       expect(disk('salt').stockQuantity, 4);
@@ -688,7 +735,7 @@ void main() {
 
       await expectLater(
         InventoryService.produceBatch(
-            semiFinishedItem: itemStore.getItemById('dough')!, batchQty: 4),
+            item: itemStore.getItemById('dough')!, batchQty: 4),
         throwsA(isA<Exception>()),
       );
 
@@ -717,10 +764,135 @@ void main() {
           observe(() => itemStore.getItemById('flour')?.stockQuantity);
 
       await InventoryService.produceBatch(
-          semiFinishedItem: itemStore.getItemById('dough')!, batchQty: 4);
+          item: itemStore.getItemById('dough')!, batchQty: 4);
 
       expect(produced, [(5.0, expectedCost)]);
       expect(flour, [8]);
+    });
+
+    // Phase 1.6 — made-in-advance Finished items, actual output, type guard.
+
+    Items sandwich({String? type = ProductType.finishedGood,
+            String? prepMode = ProductType.madeInAdvance}) =>
+        Items(
+          id: 'dough',
+          name: 'Sandwich',
+          productType: type,
+          prepMode: prepMode,
+          trackInventory: true,
+          stockQuantity: 1,
+        );
+
+    test('a made-in-advance Finished item with a recipe can be produced',
+        () async {
+      await seedItems([
+        sandwich(),
+        tracked('flour', 'Flour', 10, cost: 40),
+        tracked('salt', 'Salt', 5, cost: 2),
+      ]);
+      await seedRecipe(doughRecipe());
+
+      await InventoryService.produceBatch(
+          item: itemStore.getItemById('dough')!, batchQty: 4);
+
+      expect(disk('dough').stockQuantity, 5);
+      expect(disk('flour').stockQuantity, 8);
+    });
+
+    test('actual output: ingredients for the planned batch, stock and cost '
+        'by what was actually made', () async {
+      await seedItems([
+        dough(),
+        tracked('flour', 'Flour', 10, cost: 40),
+        tracked('salt', 'Salt', 5, cost: 2),
+      ]);
+      await seedRecipe(doughRecipe());
+
+      await InventoryService.produceBatch(
+          item: itemStore.getItemById('dough')!, batchQty: 4, actualQty: 3);
+
+      // Planned 4 → flour 2, salt 1 consumed = ₹82.
+      expect(disk('flour').stockQuantity, 8);
+      expect(disk('salt').stockQuantity, 4);
+      expect(disk('dough').stockQuantity, 4); // 1 + 3 actually made
+      expect(disk('dough').lastPurchaseCost, closeTo(82 / 3, 1e-9));
+      final produced = movements('dough').single;
+      expect(produced.quantity, 3);
+      expect(produced.unitCost, closeTo(82 / 3, 1e-9));
+      final record =
+          RecipeProductionRepository().getProductionsForItem('dough').single;
+      expect(record.batchQty, 4);
+      expect(record.actualQty, 3);
+      expect(record.outputQty, 3);
+    });
+
+    test('actual output defaults to the planned batch', () async {
+      await seedItems([
+        dough(),
+        tracked('flour', 'Flour', 10, cost: 40),
+        tracked('salt', 'Salt', 5, cost: 2),
+      ]);
+      await seedRecipe(doughRecipe());
+
+      await InventoryService.produceBatch(
+          item: itemStore.getItemById('dough')!, batchQty: 4);
+
+      final record =
+          RecipeProductionRepository().getProductionsForItem('dough').single;
+      expect(record.outputQty, 4);
+      expect(disk('dough').lastPurchaseCost, closeTo(41 / 2, 1e-9));
+    });
+
+    test('an actual output of zero or less is refused, nothing changes',
+        () async {
+      await seedItems([
+        dough(),
+        tracked('flour', 'Flour', 10, cost: 40),
+        tracked('salt', 'Salt', 5, cost: 2),
+      ]);
+      await seedRecipe(doughRecipe());
+
+      await expectLater(
+        InventoryService.produceBatch(
+            item: itemStore.getItemById('dough')!, batchQty: 4, actualQty: 0),
+        throwsA(isA<Exception>()),
+      );
+      expect(disk('flour').stockQuantity, 10);
+      expect(movements('dough'), isEmpty);
+    });
+
+    for (final c in [
+      (name: 'Raw Material', item: sandwich(type: ProductType.rawMaterial, prepMode: null)),
+      (name: 'Trade Item', item: sandwich(type: ProductType.tradeItem, prepMode: null)),
+      (name: 'made-to-order Finished', item: sandwich(prepMode: ProductType.madeToOrder)),
+      (name: 'legacy Recipe-Based', item: sandwich(type: ProductType.recipeBased, prepMode: null)),
+    ]) {
+      test('refused for a ${c.name}, nothing changes', () async {
+        await seedItems([
+          c.item,
+          tracked('flour', 'Flour', 10, cost: 40),
+          tracked('salt', 'Salt', 5, cost: 2),
+        ]);
+        await seedRecipe(doughRecipe());
+
+        expect(InventoryService.canProduce(c.item), isFalse);
+        await expectLater(
+          InventoryService.produceBatch(
+              item: itemStore.getItemById('dough')!, batchQty: 4),
+          throwsA(isA<Exception>()),
+        );
+        expect(disk('flour').stockQuantity, 10);
+        expect(disk('dough').stockQuantity, c.item.stockQuantity);
+        expect(movements('flour'), isEmpty);
+      });
+    }
+
+    test('canProduce: Semi-Finished and made-in-advance Finished only', () {
+      expect(InventoryService.canProduce(dough()), isTrue);
+      expect(InventoryService.canProduce(sandwich()), isTrue);
+      // Legacy Finished (no prep mode stored) is made in advance.
+      expect(InventoryService.canProduce(sandwich(type: null, prepMode: null)),
+          isTrue);
     });
   });
 
@@ -784,6 +956,28 @@ void main() {
       expect(movements('rice').map((m) => m.balanceAfter),
           unorderedEquals([5.0, 9.0]));
     });
+
+    for (final type in [ProductType.tradeItem, ProductType.semiFinished]) {
+      test('receiving a ${ProductType.displayName(type)} adds stock and cost',
+          () async {
+        await seedItems([
+          Items(
+            id: 'rice',
+            name: 'Rice',
+            productType: type,
+            trackInventory: true,
+            stockQuantity: 2,
+            lastPurchaseCost: 50,
+          ),
+        ]);
+
+        await confirm([line(accepted: 10, cost: 55)]);
+
+        expect(disk('rice').stockQuantity, 12);
+        expect(disk('rice').lastPurchaseCost, 55);
+        expect(movements('rice').single.reason, 'Purchase (PO-1)');
+      });
+    }
 
     test('a line without a cost keeps the existing cost', () async {
       await seedItems([tracked('rice', 'Rice', 2, cost: 50)]);

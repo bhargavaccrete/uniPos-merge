@@ -114,6 +114,22 @@ class NotificationPresenter {
           channelId: NotificationChannels.expiry,
         );
 
+      // A Settle stock deduction the journal could not confirm after a crash
+      // (StockJournal `review`): never auto-applied, so a person checks it.
+      case 'stock_check_needed':
+        final name = d['name'] ?? 'An item';
+        final qty = d['qty'];
+        final unit = d['unit'] ?? '';
+        final amount = qty == null ? '' : ' by $qty $unit';
+        return NotificationView(
+          title: 'Stock Check Needed',
+          body: '$name may be off$amount after an interrupted sale. '
+              'Count it and adjust stock.',
+          severity: AlertSeverity.warning,
+          icon: Icons.fact_check_outlined,
+          channelId: NotificationChannels.appAlerts,
+        );
+
       case 'backup_due':
         return const NotificationView(
           title: 'Database Backup Needed',

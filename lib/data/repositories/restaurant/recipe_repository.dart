@@ -24,6 +24,18 @@ class RecipeRepository {
     await _box.put(recipe.id, recipe);
   }
 
+  /// Saves [recipe] as THE recipe of its item: if the item already has one
+  /// under another id, that row is replaced in place (its id kept), so an
+  /// item can never end up with two recipes.
+  Future<void> saveForItem(RecipeModel recipe) async {
+    final existing = getRecipeForItem(recipe.itemId);
+    if (existing != null && existing.id != recipe.id) {
+      await _box.put(existing.id, recipe.copyWith(id: existing.id));
+      return;
+    }
+    await _box.put(recipe.id, recipe);
+  }
+
   Future<void> deleteRecipe(String id) async {
     await _box.delete(id);
   }

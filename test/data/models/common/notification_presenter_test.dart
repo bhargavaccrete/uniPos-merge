@@ -67,6 +67,15 @@ void main() {
       expect(v.body, 'Paneer: 2 kg left.');
     });
 
+    test('stock_check_needed → names the item and quantity, warning', () {
+      final v = NotificationPresenter.present(event('stock_check_needed',
+          {'name': 'Cheese', 'qty': 0.5, 'unit': 'kg', 'reason': 'Sale'}));
+      expect(v.title, 'Stock Check Needed');
+      expect(v.body, contains('Cheese'));
+      expect(v.body, contains('0.5 kg'));
+      expect(v.severity, AlertSeverity.warning);
+    });
+
     test('pending_eod → end day, critical', () {
       final v = NotificationPresenter.present(event('pending_eod'));
       expect(v.route, RouteNames.restaurantEndDay);

@@ -24,7 +24,9 @@ import '../../../../server/websocket.dart' as ws;
 import '../util/restaurant_print_helper.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import '../../../../domain/services/restaurant/inventory_service.dart';
-import '../../../../data/models/restaurant/db/cartmodel_308.dart';
+import '../../../../domain/services/restaurant/kot_layout.dart';
+import '../../../../domain/services/restaurant/kot_status_rule.dart';
+import '../../../../domain/services/restaurant/order_line_cancel.dart';
 import '../../../../util/common/app_responsive.dart';
 
 class Activeorder extends StatefulWidget {
@@ -156,12 +158,21 @@ class _ActiveorderState extends State<Activeorder> {
       final bool wasPaid =
           order.isPaid == true ||
           (order.paymentStatus?.toLowerCase() == 'paid');
+      // Restore only KOTs whose food is not consumed; the record keeps those
+      // lines marked restocked so a later refund cannot restore them again.
+      final voidPlan = KotLayout.voidPlan(
+        items: order.items,
+        kotNumbers: order.kotNumbers,
+        kotBoundaries: order.kotBoundaries,
+        kotStatuses: order.kotStatuses ?? {},
+        orderStatus: order.status,
+      );
       // Save to past orders as VOID/VOIDED so it appears in the Void Order Report
       final voidRecord = PastOrderModel(
         id: order.id,
         customerName: order.customerName ?? '',
         totalPrice: order.totalPrice,
-        items: order.items,
+        items: voidPlan.recordItems,
         orderAt: order.timeStamp ?? DateTime.now(),
         orderType: order.orderType,
         paymentmode: wasPaid ? (order.paymentMethod ?? 'N/A') : 'N/A',
@@ -189,36 +200,9 @@ class _ActiveorderState extends State<Activeorder> {
       );
       await pastOrderStore.addOrder(voidRecord);
 
-      // Restore stock only for items in KOTs that have NOT been served yet.
-      // Served KOT items were already consumed by the kitchen — don't restore.
-      {
-        final kotNums = order.kotNumbers;
-        final kotBounds = order.kotBoundaries;
-        final kotStatuses = Map<int, String>.from(order.kotStatuses ?? {});
-        final itemsToRestock = <CartItem, int>{};
-
-        int start = 0;
-        for (int i = 0; i < kotNums.length; i++) {
-          final kotNum = kotNums[i];
-          final end = (i < kotBounds.length ? kotBounds[i] : order.items.length)
-              .clamp(start, order.items.length);
-          final kotStatus = kotStatuses[kotNum] ?? order.status;
-
-          if (kotStatus != 'Served') {
-            for (final item in order.items.sublist(start, end)) {
-              if (item.quantity > 0) {
-                itemsToRestock[item] =
-                    (itemsToRestock[item] ?? 0) + item.quantity;
-              }
-            }
-          }
-          start = end;
-        }
-
-        if (itemsToRestock.isNotEmpty) {
-          await InventoryService.restoreStockForRefund(itemsToRestock);
-        }
-      }
+      // Restore stock only for KOTs whose food is not consumed yet — per
+      // line, from each line's own stamp.
+      await InventoryService.restoreLines(voidPlan.restores);
     }
 
     await orderStore.deleteOrder(orderId);
@@ -1162,7 +1146,9 @@ class _ActiveorderState extends State<Activeorder> {
                                                           TextOverflow.ellipsis,
                                                     ),
                                                   ),
-                                                  if (!isServed)
+                                                  if (!KotStatusRule.isConsumed(
+                                                    currentStatus,
+                                                  ))
                                                     InkWell(
                                                       onTap: () =>
                                                           _cancelKotItem(
@@ -1556,43 +1542,36 @@ class _ActiveorderState extends State<Activeorder> {
     );
     if (!confirmed) return;
 
-    // 1. Remove item from the list
-    final updatedItems = List<CartItem>.from(order.items)
-      ..removeAt(itemIndexInOrder);
-
-    // 2. Adjust boundaries: every boundary at index >= kotIndex decreases by 1
-    final updatedBoundaries = List<int>.from(order.kotBoundaries);
-    for (int i = kotIndex; i < updatedBoundaries.length; i++) {
-      updatedBoundaries[i] = updatedBoundaries[i] - 1;
+    // 1-5. Remove the line, fix the KOT bookkeeping and totals, persist —
+    // against the saved order, located by line id rather than screen index.
+    final saved = orderStore.getOrderById(order.id) ?? order;
+    final savedIndex = saved.items.indexWhere((i) => i.id == item.id);
+    void refuse(String message) {
+      if (dialogContext.mounted) Navigator.pop(dialogContext);
+      NotificationService.instance.showError(message);
     }
 
-    // 3. If this KOT is now empty, remove it from both lists
-    final updatedNumbers = List<int>.from(order.kotNumbers);
-    final updatedStatuses = Map<int, String>.from(order.kotStatuses ?? {});
-    final prevBoundary = kotIndex == 0 ? 0 : updatedBoundaries[kotIndex - 1];
-    if (updatedBoundaries[kotIndex] == prevBoundary) {
-      final removedKotNumber = updatedNumbers[kotIndex];
-      updatedNumbers.removeAt(kotIndex);
-      updatedBoundaries.removeAt(kotIndex);
-      updatedStatuses.remove(removedKotNumber);
+    if (savedIndex == -1) {
+      refuse('This item was already cancelled.');
+      return;
     }
-
-    // 4. Recalculate total
-    final newTotal = order.totalPrice - (item.finalItemPrice * item.quantity);
-
-    // 5. Persist the updated order
-    final updatedOrder = order.copyWith(
-      items: updatedItems,
-      kotNumbers: updatedNumbers,
-      kotBoundaries: updatedBoundaries,
-      kotStatuses: updatedStatuses,
-      totalPrice: newTotal.clamp(0, double.infinity),
-      itemCountAtLastKot: updatedItems.length,
+    // The card may predate a KDS status change; the saved status decides.
+    if (OrderLineCancel.isCooked(saved, item.id)) {
+      refuse('Cannot cancel cooked items');
+      return;
+    }
+    final cancel = OrderLineCancel.forActiveOrders(
+      saved,
+      itemIndexInOrder: savedIndex,
     );
-    await orderStore.updateOrder(updatedOrder);
+    if (cancel == null) {
+      refuse('This is the order\'s last item — void the order instead.');
+      return;
+    }
+    await orderStore.updateOrder(cancel.order);
 
-    // 6. Restore inventory stock
-    await InventoryService.restoreStockForOrder([item]);
+    // 6. Restore exactly what was removed from the saved order.
+    await InventoryService.restoreStockForOrder([cancel.cancelled]);
 
     // 7. Broadcast cancellation to KDS
     ws.broadcastEvent({

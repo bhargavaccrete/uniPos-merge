@@ -35,13 +35,16 @@ class CartItemAdapter extends TypeAdapter<CartItem> {
       weightDisplay: fields[11] as String?,
       categoryName: fields[13] as String?,
       refundedQuantity: fields[14] as int?,
+      ownStockQty: fields[17] as int?,
+      freshQty: fields[18] as int?,
+      restockedQuantity: fields[19] as int?,
     );
   }
 
   @override
   void write(BinaryWriter writer, CartItem obj) {
     writer
-      ..writeByte(16)
+      ..writeByte(19)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -73,7 +76,13 @@ class CartItemAdapter extends TypeAdapter<CartItem> {
       ..writeByte(15)
       ..write(obj.productId)
       ..writeByte(16)
-      ..write(obj.isStockManaged);
+      ..write(obj.isStockManaged)
+      ..writeByte(17)
+      ..write(obj.ownStockQty)
+      ..writeByte(18)
+      ..write(obj.freshQty)
+      ..writeByte(19)
+      ..write(obj.restockedQuantity);
   }
 
   @override

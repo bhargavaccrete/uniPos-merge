@@ -42,6 +42,7 @@ class LicenseApiService {
       'device': device,
       'businesstype': businessType,
       'businesssubtype': businessSubtype,
+      'businesscategory': 3, // TEMP: until LMS accepts businesstype/subtype
       'businessname': businessName,
       'location': location,
     });

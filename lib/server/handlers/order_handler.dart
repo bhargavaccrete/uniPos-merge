@@ -28,13 +28,16 @@ Future<Response> createOrderHandler(Request request) async {
         ?.map((item) => CartItem.fromMap(item as Map<String, dynamic>))
         .toList() ?? [];
 
+    // Stamped lines (LineStock): restores read what each sale took.
+    final salePlan = await InventoryService.planSale(items);
+
     // Create order model
     final order = OrderModel(
       id: orderId,
       customerName: data['customerName'] as String? ?? 'Walk-in',
       customerNumber: data['customerNumber'] as String? ?? '',
       customerEmail: data['customerEmail'] as String? ?? '',
-      items: items,
+      items: salePlan.lines,
       status: 'Processing', // Initial status
       timeStamp: DateTime.now(),
       orderType: data['orderType'] as String? ?? 'Dine In',
@@ -50,7 +53,7 @@ Future<Response> createOrderHandler(Request request) async {
     await orderStore.addOrder(order);
 
     // Deduct stock for ordered items
-    await InventoryService.deductStockForOrder(items);
+    await InventoryService.applyPlannedUnits(salePlan.units);
 
     // Update table status to Cooking (dine-in only)
     if (order.tableNo != null) {

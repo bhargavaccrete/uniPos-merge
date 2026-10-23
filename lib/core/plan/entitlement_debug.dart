@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import '../config/app_config.dart';
 import 'entitlement_keys.dart';
 import 'entitlements.dart';
 
@@ -94,8 +95,12 @@ class EntitlementDebug {
     }
 
     // 6/7. keys missing from the live map → fall back to catalog default
-    final missing =
-        kEntitlementDefaults.keys.where((k) => !loaded.containsKey(k)).toList();
+    // Only this mode's half of the catalog — the other vertical's keys are
+    // never in this manifest.
+    final missing = kEntitlementDefaults.keys
+        .where((k) => k.startsWith('retail.') == AppConfig.isRetail)
+        .where((k) => !loaded.containsKey(k))
+        .toList();
     b.writeln('--- 6/7. MISSING FROM MANIFEST → using DEFAULT (${missing.length}) ---');
     if (missing.isEmpty) {
       b.writeln('(none — every catalog key is present)');

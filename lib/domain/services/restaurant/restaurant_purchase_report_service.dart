@@ -585,8 +585,8 @@ class RestaurantPurchaseReportService {
   /// history window deliberately does not apply here.
   ///
   /// Delegates to [StockAdjustService.lowStockEntries], which is already
-  /// recipe-aware: a Recipe-Based item is measured on how many its ingredients
-  /// can make, not on a `stockQuantity` it never populates.
+  /// recipe-aware: a made-to-order item is measured on how many its
+  /// ingredients can make, not on a `stockQuantity` it never populates.
   Future<List<Map<String, dynamic>>> getLowStockReport() async {
     // The one place this service touches a store — lowStockEntries reads
     // itemStore, which unlike the purchase stores DOES expose ensureLoaded.
@@ -603,7 +603,7 @@ class RestaurantPurchaseReportService {
         'reorderPoint': e.item.effectiveLowStockThreshold.toDouble(),
         'unit': e.item.unit ?? (e.item.isSoldByWeight ? 'kg' : 'pcs'),
         'costPrice': (e.item.lastPurchaseCost ?? 0).toDouble(),
-        'isRecipeBased': e.item.isRecipeBased,
+        'isMadeToOrder': e.item.isMadeToOrder,
         'isOut': e.isOut,
       });
     }

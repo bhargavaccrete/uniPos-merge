@@ -778,20 +778,21 @@ class _MenuScreenState extends State<MenuScreen>
 
     final allowOrderWhenOutOfStock = item.allowOrderWhenOutOfStock;
 
-    // Recipe-Based items hold no stock of their own — show how many the
-    // current ingredient stock can make. Checked before the variant branch:
-    // v1 recipes are item-level, so a variant's own stock is meaningless here.
-    if (item.isRecipeBased) {
-      final recipe = recipeRepository.getRecipeForItem(item.id);
-      if (recipe == null || !recipe.hasIngredients) {
+    // Made to order shows how many the current ingredient stock can make;
+    // the made-in-advance hybrid shows prepared + makeable. Checked before
+    // the variant branch: recipes are item-level.
+    if (InventoryService.usesDerivedAvailability(item)) {
+      if (InventoryService.isRecipeMissing(item)) {
         return 'Recipe Not Configured';
       }
-      final canMake = InventoryService.effectiveAvailableStock(item);
-      if (canMake <= 0) {
+      final available = InventoryService.effectiveAvailableStock(item);
+      if (available <= 0) {
         return allowOrderWhenOutOfStock ? 'Order Available' : 'Out of Stock';
       }
-      if (canMake.isInfinite) return '';
-      return 'Makes ${canMake.toStringAsFixed(0)}';
+      if (available.isInfinite) return '';
+      return item.isMadeToOrder
+          ? 'Makes ${available.toStringAsFixed(0)}'
+          : '${available.toStringAsFixed(0)} available';
     }
 
     // For items with variants, show variant availability status
@@ -864,10 +865,9 @@ class _MenuScreenState extends State<MenuScreen>
 
     final allowOrderWhenOutOfStock = item.allowOrderWhenOutOfStock;
 
-    // Recipe-Based: availability comes from ingredients, not a stored figure.
-    if (item.isRecipeBased) {
-      final recipe = recipeRepository.getRecipeForItem(item.id);
-      if (recipe == null || !recipe.hasIngredients) {
+    // Made to order / hybrid: availability is derived, not a stored figure.
+    if (InventoryService.usesDerivedAvailability(item)) {
+      if (InventoryService.isRecipeMissing(item)) {
         return StockStatus.outOfStock;
       }
       switch (InventoryService.posStatusFromAvailable(
