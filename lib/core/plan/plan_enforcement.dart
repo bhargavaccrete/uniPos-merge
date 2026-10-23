@@ -32,13 +32,34 @@ class PlanEnforce {
           !Entitlements.instance.hasManifest &&
           locator<LicenseStore>().licenseInfo == null);
 
-  /// Action / module / submodule permission (add/edit/delete/export/view/create…).
-  static bool allows(String key) => _bypassed || Entitlements.instance.can(key);
+  /// This store's own business type as the manifest enum: 1 Restaurant,
+  /// 2 Retail. (There is no "Both" store — 3 only appears on features/plans.)
+  static int get storeBusinessTypeCode => AppConfig.isRetail ? 2 : 1;
 
-  /// True if ANY of [keys] is granted. For a screen fronting several sub-keys
-  /// (e.g. Sales Comparison, whose periods each carry their own key).
+  /// Business-type relevance filter (fail-open). A feature is relevant unless
+  /// the manifest EXPLICITLY tags it for a different business type:
+  ///   - not sent / key absent (null) → true  (old manifests, untagged keys)
+  ///   - 3 (Both)                     → true
+  ///   - else                         → must equal this store's type
+  /// Only an explicit mismatch withholds a feature, so this never regresses
+  /// existing behaviour; it activates as the server tags features.
+  static bool businessTypeAllows(String key) {
+    final ft = Entitlements.instance.featureBusinessType(key);
+    if (ft == null || ft == 3) return true;
+    return ft == storeBusinessTypeCode;
+  }
+
+  /// Action / module / submodule permission (add/edit/delete/export/view/create…).
+  /// Granted only when the plan grants it AND it applies to this business type.
+  static bool allows(String key) =>
+      _bypassed || (Entitlements.instance.can(key) && businessTypeAllows(key));
+
+  /// True if ANY of [keys] is granted (and business-type-relevant). For a screen
+  /// fronting several sub-keys (e.g. Sales Comparison, whose periods each carry
+  /// their own key).
   static bool allowsAny(Iterable<String> keys) =>
-      _bypassed || keys.any(Entitlements.instance.can);
+      _bypassed ||
+      keys.any((k) => Entitlements.instance.can(k) && businessTypeAllows(k));
 
   /// True if ONE more record fits under [maxKey] given the current [count].
   /// A limit of **0 or absent means NO cap** (unlimited) — availability is

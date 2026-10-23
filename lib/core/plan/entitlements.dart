@@ -16,12 +16,32 @@ class Entitlements {
   final ObservableMap<String, dynamic> _license =
       ObservableMap<String, dynamic>();
 
+  /// Per-feature business type from the manifest: { featurekey -> 1|2|3 }
+  /// (1 Restaurant, 2 Retail, 3 Both). Empty when the server didn't send it.
+  final ObservableMap<String, int> _featureBusinessTypes =
+      ObservableMap<String, int>();
+
+  /// The plan's business type (1 Restaurant, 2 Retail, 3 Both); null if unsent.
+  final Observable<int?> _planBusinessType = Observable<int?>(null);
+
   /// True once a verified manifest has been loaded (cache or server).
   bool get hasManifest => _map.isNotEmpty;
 
+  /// The plan's business type (1/2/3), or null if the manifest didn't carry it.
+  int? get planBusinessType => _planBusinessType.value;
+
+  /// This feature's business type (1/2/3), or null if absent / not sent.
+  int? featureBusinessType(String key) => _featureBusinessTypes[key];
+
   /// Debug only — a copy of the loaded manifest map (exactly what the server
   /// sent, BEFORE catalog defaults are applied). Used by EntitlementDebug.
-  Map<String, dynamic> debugSnapshot() => Map<String, dynamic>.from(_map);
+  Map<String, dynamic> debugSnapshot() => {
+        ..._map,
+        if (_planBusinessType.value != null)
+          'planBusinessType': _planBusinessType.value,
+        if (_featureBusinessTypes.isNotEmpty)
+          'featureBusinessTypes': Map<String, int>.from(_featureBusinessTypes),
+      };
 
   void loadFromManifest(ManifestData data) {
     _map
@@ -30,11 +50,17 @@ class Entitlements {
     _license
       ..clear()
       ..addAll(data.license);
+    _featureBusinessTypes
+      ..clear()
+      ..addAll(data.featureBusinessTypes);
+    _planBusinessType.value = data.planBusinessType;
   }
 
   void clear() {
     _map.clear();
     _license.clear();
+    _featureBusinessTypes.clear();
+    _planBusinessType.value = null;
   }
 
   // ── The only lookups callers use ───────────────────────────────────────────
