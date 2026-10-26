@@ -8,10 +8,20 @@ class ManifestData {
   final Map<String, dynamic> license;
   final int version;
 
+  /// Which business this plan is for: 1 Restaurant, 2 Retail, 3 Both.
+  /// null when an older server/manifest didn't send it.
+  final int? planBusinessType;
+
+  /// Per-feature business type, same keys as [entitlements]:
+  /// { featurekey -> 1 Restaurant | 2 Retail | 3 Both }. Empty when not sent.
+  final Map<String, int> featureBusinessTypes;
+
   const ManifestData({
     required this.entitlements,
     required this.license,
     required this.version,
+    this.planBusinessType,
+    this.featureBusinessTypes = const {},
   });
 }
 
@@ -60,7 +70,24 @@ class ManifestService {
       final ent = (m['entitlements'] as Map?)?.cast<String, dynamic>() ?? {};
       final lic = (m['license'] as Map?)?.cast<String, dynamic>() ?? {};
       final version = (m['version'] as num?)?.toInt() ?? 0;
-      return ManifestData(entitlements: ent, license: lic, version: version);
+
+      // New (2026-10-23) business-type fields. Tolerant: absent on older
+      // manifests → null / empty map, and callers treat those as "no filter".
+      final planBt = (m['planBusinessType'] as num?)?.toInt();
+      final fbtRaw = (m['featureBusinessTypes'] as Map?) ?? const {};
+      final fbt = <String, int>{};
+      fbtRaw.forEach((k, v) {
+        final n = (v is num) ? v.toInt() : int.tryParse('$v');
+        if (n != null) fbt['$k'] = n;
+      });
+
+      return ManifestData(
+        entitlements: ent,
+        license: lic,
+        version: version,
+        planBusinessType: planBt,
+        featureBusinessTypes: fbt,
+      );
     } catch (e) {
       if (kDebugMode) debugPrint('── MANIFEST parse error: $e');
       return null;
