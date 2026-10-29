@@ -140,20 +140,28 @@ void main() {
       expect(data.keys.where((k) => k.toLowerCase().contains('journal')),
           isEmpty);
 
-      await UnifiedBackupService.restoreRestaurantDataForTesting(data);
+      // SB-1e: the journal is cleared once the WHOLE restore succeeded, so
+      // this goes through the full restore path, not the restaurant step.
+      final full = jsonDecode(jsonEncode(
+              await UnifiedBackupService.collectAllDataForTesting()))
+          as Map<String, dynamic>;
+      await UnifiedBackupService.restoreDecodedBackupForTesting(full);
       expect(journal.isEmpty, isTrue);
     });
 
-    test('restoring a backup without stockMovements leaves the box untouched',
+    // SB-1d true replace: a restore makes the device match the backup, so an
+    // older backup that never carried stock movements leaves none behind,
+    // rather than this device's movements next to the restored stock levels.
+    test('restoring a backup without stockMovements empties the box',
         () async {
       await seedMovements();
-      final before = snapshot();
+      expect(snapshot(), isNotEmpty);
       final data = await exportedData()
         ..remove('stockMovements');
 
       await UnifiedBackupService.restoreRestaurantDataForTesting(data);
 
-      expect(snapshot(), before);
+      expect(snapshot(), isEmpty);
     });
   });
 

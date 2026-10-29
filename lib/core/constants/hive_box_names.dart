@@ -351,6 +351,9 @@ class HiveBoxNames {
     tax,
     shift,
     attendance,
+    restaurantSessions,
+    restaurantCashMovements,
+    restaurantStockMovements,
   ];
 
   /// All restaurant box names (for bulk operations like clearing/backup)
@@ -409,5 +412,9 @@ class HiveBoxNames {
     paymentMethods,
     dayManagementBox,
     appNotifications,
+    appCounters,
+    restaurantPrinters,
+    shift,
+    attendance,
   ];
 }

@@ -14,6 +14,7 @@ import 'package:file_selector/file_selector.dart';
 
 import 'package:billberrylite/domain/services/common/unified_backup_service.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/presentation/screens/common/backup/restore_replace_warning.dart';
 
 class BackupScreen extends StatefulWidget {
   const BackupScreen({super.key});
@@ -165,7 +166,8 @@ class _BackupScreenState extends State<BackupScreen> {
           );
           _loadData();
         } else {
-          NotificationService.instance.showError('Failed to create backup');
+          NotificationService.instance.showError(
+              UnifiedBackupService.lastExportError ?? 'Failed to create backup');
         }
       }
     } catch (e) {
@@ -349,7 +351,7 @@ class _BackupScreenState extends State<BackupScreen> {
                       SizedBox(width: AppResponsive.smallSpacing(context)),
                       Expanded(
                         child: Text(
-                          'This will restore all data from the backup file.',
+                          "Next you'll confirm replacing all current data with this backup.",
                           style: GoogleFonts.poppins(
                             fontSize: AppResponsive.captionFontSize(context),
                           ),
@@ -368,11 +370,7 @@ class _BackupScreenState extends State<BackupScreen> {
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(context, true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                foregroundColor: Colors.white,
-              ),
-              child: Text('Import & Restore'),
+              child: Text('Continue'),
             ),
           ],
         ),
@@ -395,67 +393,9 @@ class _BackupScreenState extends State<BackupScreen> {
     // 'dataBackup'), but this operation can overwrite the entire database,
     // so it verifies for itself rather than trusting how it was reached.
     if (!RestaurantSession.canAccess('dataBackup')) return;
-    // Show confirmation dialog
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Restore Backup'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Are you sure you want to restore from ${file.path.split('/').last}?',
-            ),
-            SizedBox(height: AppResponsive.largeSpacing(context)),
-            Container(
-              padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
-              decoration: BoxDecoration(
-                color: Colors.orange.shade50,
-                borderRadius: BorderRadius.circular(
-                  AppResponsive.smallBorderRadius(context),
-                ),
-                border: Border.all(color: Colors.orange.shade200),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.warning,
-                    color: Colors.orange.shade700,
-                    size: AppResponsive.iconSize(context),
-                  ),
-                  SizedBox(width: AppResponsive.smallSpacing(context)),
-                  Expanded(
-                    child: Text(
-                      'This will add data from the backup to your current data.',
-                      style: GoogleFonts.poppins(
-                        fontSize: AppResponsive.captionFontSize(context),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              foregroundColor: Colors.white,
-            ),
-            child: Text('Restore'),
-          ),
-        ],
-      ),
-    );
+    final confirm = await confirmRestoreReplacesData(context);
 
-    if (confirm == true) {
+    if (confirm) {
       try {
         setState(() => _isLoading = true);
 

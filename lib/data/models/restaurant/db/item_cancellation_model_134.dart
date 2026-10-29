@@ -66,4 +66,42 @@ class ItemCancellationModel extends HiveObject {
     this.orderType,
     this.tableNo,
   });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'itemName': itemName,
+      'variantName': variantName,
+      'quantity': quantity,
+      'amount': amount,
+      'reason': reason,
+      'orderId': orderId,
+      'billNumber': billNumber,
+      'kotNumber': kotNumber,
+      'staffName': staffName,
+      'timestamp': timestamp.toIso8601String(),
+      'sessionId': sessionId,
+      'orderType': orderType,
+      'tableNo': tableNo,
+    };
+  }
+
+  factory ItemCancellationModel.fromMap(Map<String, dynamic> map) {
+    return ItemCancellationModel(
+      id: map['id'] as String,
+      itemName: map['itemName'] as String,
+      variantName: map['variantName'] as String?,
+      quantity: (map['quantity'] as num).toInt(),
+      amount: (map['amount'] as num).toDouble(),
+      reason: map['reason'] as String,
+      orderId: map['orderId'] as String,
+      billNumber: (map['billNumber'] as num?)?.toInt(),
+      kotNumber: (map['kotNumber'] as num?)?.toInt(),
+      staffName: map['staffName'] as String?,
+      timestamp: DateTime.parse(map['timestamp'] as String),
+      sessionId: map['sessionId'] as String?,
+      orderType: map['orderType'] as String?,
+      tableNo: map['tableNo'] as String?,
+    );
+  }
 }

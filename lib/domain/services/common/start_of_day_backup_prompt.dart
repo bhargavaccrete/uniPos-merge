@@ -287,7 +287,8 @@ class StartOfDayBackupPrompt {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Backup failed. You can retry from the drawer menu.',
+            UnifiedBackupService.lastExportError ??
+                'Backup failed. You can retry from the drawer menu.',
             style: GoogleFonts.poppins(),
           ),
           backgroundColor: Colors.red,

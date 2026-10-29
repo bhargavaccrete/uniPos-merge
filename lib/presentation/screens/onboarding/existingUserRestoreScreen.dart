@@ -14,6 +14,8 @@ import 'package:billberrylite/presentation/screens/retail/login_screen.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import '../../../util/color.dart';
 import '../../../domain/services/common/unified_backup_service.dart';
+import '../common/backup/restore_skipped_notice.dart';
+import '../common/backup/restore_replace_warning.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/init/hive_init.dart';
 import '../../../core/di/service_locator.dart';
@@ -245,6 +247,14 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
       return;
     }
 
+    // The setup wizard may already have saved store details, staff,
+    // products… before the user came back here. A restore replaces them, so
+    // warn — but only when there is something to lose.
+    if (UnifiedBackupService.hasSetupDataToLose()) {
+      if (!await confirmRestoreReplacesData(context)) return;
+      if (!mounted) return;
+    }
+
     // Clear any previous error messages
     if (mounted) {
       ScaffoldMessenger.of(context).clearSnackBars();
@@ -304,6 +314,12 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
         _isLoading = false;
         _isRestoring = false;
       });
+
+      // Name any backup sections the restore could not read before moving on.
+      if (mounted) {
+        await showRestoreSkippedNotice(
+            context, UnifiedBackupService.lastRestoreSkippedSections);
+      }
 
       // Advance to license activation step
       if (mounted) {

@@ -168,7 +168,9 @@ class AutoBackupService {
         debugPrint('✅ Automatic backup successful: $filePath');
         debugPrint('📅 Last backup date updated to: $today');
       } else {
-        debugPrint('❌ Automatic backup failed: null file path');
+        // Not marked as backed up, so it is retried on the next run.
+        debugPrint('❌ Automatic backup failed: '
+            '${UnifiedBackupService.lastExportError ?? 'null file path'}');
       }
     } catch (e) {
       debugPrint('❌ Automatic backup error: $e');

@@ -5,6 +5,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:billberrylite/domain/services/common/unified_backup_service.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/presentation/screens/common/backup/restore_replace_warning.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 
@@ -110,7 +111,8 @@ Future<void> _export(BuildContext dialogContext, {required bool share}) async {
   // above is already gone.
   if (filePath == null) {
     NotificationService.instance.showError(
-      share ? 'Backup creation failed' : 'Backup failed. Please try again.',
+      UnifiedBackupService.lastExportError ??
+          (share ? 'Backup creation failed' : 'Backup failed. Please try again.'),
       duration: const Duration(seconds: 5),
     );
     return;
@@ -126,6 +128,9 @@ Future<void> _export(BuildContext dialogContext, {required bool share}) async {
 }
 
 Future<void> _import(BuildContext dialogContext) async {
+  // Warn before the file picker: a restore replaces this device's data.
+  if (!await confirmRestoreReplacesData(dialogContext)) return;
+  if (!dialogContext.mounted) return;
   Navigator.pop(dialogContext); // close the backup menu
   bool success = false;
   try {
