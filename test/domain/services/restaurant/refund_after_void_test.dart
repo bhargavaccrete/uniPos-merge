@@ -29,6 +29,7 @@ import 'package:billberrylite/domain/store/restaurant/past_order_store.dart';
 import 'package:billberrylite/domain/store/restaurant/variant_store.dart';
 
 import '../../../helpers/test_helpers.dart';
+import '../../../helpers/open_session_fixture.dart';
 
 /// Stock behaviour of the two paths that produce a 'VOIDED' order, followed
 /// by a refund. Characterises F2 (Phase 0 plan): no production code changed.
@@ -55,6 +56,7 @@ void main() {
     await Hive.openBox<AppNotificationModel>(HiveBoxNames.appNotifications);
     await Hive.openBox<PastOrderModel>(HiveBoxNames.restaurantPastOrders);
     await Hive.openBox(HiveBoxNames.dayManagementBox);
+    await openRestaurantSessionForTest(); // refunds need an open session (SB-2b-M8)
 
     locator
       ..registerLazySingleton<LicenseStore>(

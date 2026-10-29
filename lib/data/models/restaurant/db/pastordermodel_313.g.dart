@@ -57,13 +57,14 @@ class PastOrderModelAdapter extends TypeAdapter<PastOrderModel> {
       storeGstNumber: fields[37] as String?,
       roundOffStep: fields[38] as double?,
       discountOnItems: fields[39] as bool?,
+      refundEventsJson: fields[40] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, PastOrderModel obj) {
     writer
-      ..writeByte(40)
+      ..writeByte(41)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -143,7 +144,9 @@ class PastOrderModelAdapter extends TypeAdapter<PastOrderModel> {
       ..writeByte(38)
       ..write(obj.roundOffStep)
       ..writeByte(39)
-      ..write(obj.discountOnItems);
+      ..write(obj.discountOnItems)
+      ..writeByte(40)
+      ..write(obj.refundEventsJson);
   }
 
   @override

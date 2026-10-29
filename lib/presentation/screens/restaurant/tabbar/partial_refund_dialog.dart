@@ -21,7 +21,8 @@ class PartialRefundDialog extends StatefulWidget {
   final List<CartItem> orderItems; // Refundable items only
   final List<CartItem> allOrderItems; // ALL items for discount calculation
   final double orderGstRate;
-  final double orderTotalPrice; // Add the actual order total that was paid
+  final double orderTotalPrice; // Still refundable: paid minus earlier refunds
+  final double? orderPaidTotal; // What the order was paid in total (net payable)
   final double orderDiscount; // Order-level discount
   final double orderSubTotal; // Order subtotal
   final bool isTaxInclusive; // Whether tax was inclusive when order was placed
@@ -32,6 +33,7 @@ class PartialRefundDialog extends StatefulWidget {
     required this.allOrderItems,
     required this.orderGstRate,
     required this.orderTotalPrice, // Add this parameter
+    this.orderPaidTotal,
     this.orderDiscount = 0.0,
     this.orderSubTotal = 0.0,
     this.isTaxInclusive = false,
@@ -131,8 +133,20 @@ class _PartialRefundDialogState extends State<PartialRefundDialog> {
           total += _calculateItemPriceWithTax(item) * quantity;
         }
       });
+      // Scaled to what was actually paid (loyalty points, tax off, rounding)
+      // and never more than is still refundable (BLK-06).
+      double allItemsValue = 0.0;
+      for (final item in widget.allOrderItems) {
+        allItemsValue += _calculateItemPriceWithTax(item) * item.quantity;
+      }
+      final capped = RefundService.partialRefundAmount(
+        selectedValue: total,
+        allItemsValue: allItemsValue,
+        paidTotal: widget.orderPaidTotal ?? widget.orderTotalPrice,
+        remaining: widget.orderTotalPrice,
+      );
       setState(() {
-        _totalRefundAmount = total;
+        _totalRefundAmount = capped;
       });
     }
   }

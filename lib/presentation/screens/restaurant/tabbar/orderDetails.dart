@@ -5,6 +5,8 @@ import '../../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../../data/models/restaurant/db/pastordermodel_313.dart';
 import '../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
+import '../../../../domain/services/restaurant/day_management_service.dart';
+import '../../../../domain/services/restaurant/refund_service.dart';
 import '../../../../domain/services/restaurant/cart_calculation_service.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/plan/entitlement_keys.dart';
@@ -1229,6 +1231,14 @@ class _OrderdetailsState extends State<Orderdetails> {
   }
 
   Future<void> _showRefundDialog(BuildContext context) async {
+    // A refund needs an open session; tell the user before the dialog opens.
+    // RefundService.processRefund enforces the same rule.
+    if (!await DayManagementService.isSessionOpen()) {
+      NotificationService.instance
+          .showInfo(RefundService.refundNeedsOpenSessionMessage);
+      return;
+    }
+
     // Validate refund eligibility using store
     final eligibilityError = pastOrderStore.validateRefundEligibility(
       currentOrder,
@@ -1256,6 +1266,7 @@ class _OrderdetailsState extends State<Orderdetails> {
         allOrderItems: currentOrder.items ?? [],
         orderGstRate: gstRate,
         orderTotalPrice: remainingTotal,
+        orderPaidTotal: currentOrder.totalPrice,
         orderDiscount: currentOrder.Discount ?? 0.0,
         orderSubTotal: currentOrder.subTotal ?? 0.0,
         isTaxInclusive: currentOrder.isTaxInclusive ?? false,

@@ -6,6 +6,7 @@ import '../../../core/di/service_locator.dart';
 import '../../../data/models/restaurant/db/eodmodel_317.dart';
 import '../../../data/models/restaurant/db/pastordermodel_313.dart';
 import 'package:billberrylite/domain/services/restaurant/day_management_service.dart';
+import 'package:billberrylite/domain/services/restaurant/refund_service.dart';
 import '../../../core/constants/hive_box_names.dart';
 import '../../../data/models/restaurant/db/cash_movement_model.dart';
 import 'package:hive/hive.dart';
@@ -83,14 +84,35 @@ class EODService {
     final paymentSummaries = PaymentModeSummary.summarize(activeDayOrders);
     final taxSummaries = _calculateTaxSummaries(activeDayOrders);
 
-    // 1. Identify all orders refunded within this session's time range [startTime, endTime]
-    final sessionRefundedOrders = pastOrders.where((order) {
-      if (order.refundedAt == null) return false;
+    // SB-2b: refunds are attributed per refund, not per order. An order's
+    // `refundAmount` is a running total and `refundedAt` only the LAST refund,
+    // so an order refunded in session A and again in B used to have BOTH
+    // refunds subtracted again in B. Each refund now counts in the session it
+    // happened in: by session id when both sides have one, otherwise (orders
+    // refunded before history was recorded, or no session) by this session's
+    // time window — which reproduces the old result for old data exactly.
+    bool inThisSession(RefundEvent e) {
+      if (targetSessionId != null && e.sessionId != null) {
+        return e.sessionId == targetSessionId;
+      }
+      return (e.at.isAfter(startTime) || e.at.isAtSameMomentAs(startTime)) &&
+          (e.at.isBefore(endTime) || e.at.isAtSameMomentAs(endTime));
+    }
+
+    final refundedThisSession = <PastOrderModel, double>{};
+    for (final order in pastOrders) {
       final status = order.orderStatus?.toUpperCase() ?? '';
-      if (status == 'CANCELLED') return false;
-      return (order.refundedAt!.isAfter(startTime) || order.refundedAt!.isAtSameMomentAs(startTime)) &&
-             (order.refundedAt!.isBefore(endTime) || order.refundedAt!.isAtSameMomentAs(endTime));
-    }).toList();
+      if (status == 'CANCELLED') continue;
+      final amount = RefundService.refundEventsOf(order)
+          .where(inThisSession)
+          .fold<double>(0.0, (sum, e) => sum + e.amount);
+      if (amount > 0) refundedThisSession[order] = amount;
+    }
+    double sessionRefund(PastOrderModel order) =>
+        refundedThisSession[order] ?? 0.0;
+
+    // 1. Orders with at least one refund in this session
+    final sessionRefundedOrders = refundedThisSession.keys.toList();
 
     // 2. Identify external refunded orders (refunded in this session but created before this session)
     final externalRefundedOrders = sessionRefundedOrders.where((order) {
@@ -100,16 +122,16 @@ class EODService {
       return order.orderAt == null || (order.orderAt!.isBefore(startTime));
     }).toList();
 
-    // 3. Compute EOD totalRefunds as sum of refundAmount for all orders refunded in this session's period
-    final totalRefunds = sessionRefundedOrders.fold<double>(0.0, (sum, order) => sum + (order.refundAmount ?? 0.0));
+    // 3. EOD totalRefunds: only the refunds made in this session
+    final totalRefunds = sessionRefundedOrders.fold<double>(0.0, (sum, order) => sum + sessionRefund(order));
 
     final totalSalesBase = allDayOrders.fold<double>(0.0, (sum, order) {
       final status = order.orderStatus?.toUpperCase() ?? '';
       if (_isExcluded(status)) return sum;
       return sum + (order.totalPrice - (order.refundAmount ?? 0.0));
     });
-    // Deduct external refunds from today's net sales
-    final totalSales = totalSalesBase - externalRefundedOrders.fold<double>(0.0, (sum, order) => sum + (order.refundAmount ?? 0.0));
+    // Deduct this session's refunds of earlier sessions' orders from net sales
+    final totalSales = totalSalesBase - externalRefundedOrders.fold<double>(0.0, (sum, order) => sum + sessionRefund(order));
 
     final totalDiscount = allDayOrders.fold<double>(0.0, (sum, order) {
       final status = order.orderStatus?.toUpperCase() ?? '';
@@ -127,7 +149,7 @@ class EODService {
     });
     // Deduct external refund tax portions from today's net tax liability
     final double externalRefundedTax = externalRefundedOrders.fold<double>(0.0, (sum, order) {
-      final refund = order.refundAmount ?? 0.0;
+      final refund = sessionRefund(order);
       if (refund > 0 && order.totalPrice > 0) {
         return sum + (refund * ((order.gstAmount ?? 0.0) / order.totalPrice));
       }
@@ -137,7 +159,7 @@ class EODService {
 
     // Subtract external refunds from paymentSummaries
     for (final order in externalRefundedOrders) {
-      final refund = order.refundAmount ?? 0.0;
+      final refund = sessionRefund(order);
       if (refund <= 0) continue;
 
       if (order.isSplitPayment == true && order.paymentListJson != null && order.paymentListJson!.isNotEmpty) {

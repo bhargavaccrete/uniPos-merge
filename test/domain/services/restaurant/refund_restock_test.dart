@@ -30,6 +30,7 @@ import 'package:billberrylite/domain/store/restaurant/past_order_store.dart';
 import 'package:billberrylite/domain/store/restaurant/variant_store.dart';
 
 import '../../../helpers/test_helpers.dart';
+import '../../../helpers/open_session_fixture.dart';
 
 /// Refund dialog "Add back to stock": per-line, type-based defaults, the
 /// cashier's own choice wins, and only ticked lines restore — each from what
@@ -171,6 +172,7 @@ void main() {
       await Hive.openBox<AppNotificationModel>(HiveBoxNames.appNotifications);
       await Hive.openBox<PastOrderModel>(HiveBoxNames.restaurantPastOrders);
       await Hive.openBox(HiveBoxNames.dayManagementBox);
+      await openRestaurantSessionForTest(); // refunds need an open session (SB-2b-M8)
 
       locator
         ..registerLazySingleton<LicenseStore>(

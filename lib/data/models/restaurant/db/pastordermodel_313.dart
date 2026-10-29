@@ -138,6 +138,14 @@ class PastOrderModel extends HiveObject{
   @HiveField(39)
   final bool? discountOnItems; // Discount-on-items setting when settled; null = older record → live
 
+  /// One entry per refund: `[{amount, at (ISO), sessionId}]`, so EOD counts
+  /// each refund in the session it happened in. Null on records refunded
+  /// before this existed (and never-refunded orders); those fall back to one
+  /// entry built from `refundAmount` + `refundedAt` — see
+  /// `RefundService.refundEventsOf`.
+  @HiveField(40)
+  final String? refundEventsJson;
+
   PastOrderModel({
     required this.id,
     required this.customerName,
@@ -181,6 +189,7 @@ class PastOrderModel extends HiveObject{
     this.storeGstNumber,
     this.roundOffStep,
     this.discountOnItems,
+    this.refundEventsJson,
   }) : assert(kotNumbers.isNotEmpty, 'Order must have at least one KOT number'),
         assert(kotBoundaries.isNotEmpty, 'Order must have at least one KOT boundary'),
         assert(kotNumbers.length == kotBoundaries.length, 'KOT numbers and boundaries must match');
@@ -234,6 +243,7 @@ class PastOrderModel extends HiveObject{
     String? storeGstNumber,
     double? roundOffStep,
     bool? discountOnItems,
+    String? refundEventsJson,
   }) {
     return PastOrderModel(
       id: id ?? this.id,
@@ -276,6 +286,7 @@ class PastOrderModel extends HiveObject{
       storeGstNumber: storeGstNumber ?? this.storeGstNumber,
       roundOffStep: roundOffStep ?? this.roundOffStep,
       discountOnItems: discountOnItems ?? this.discountOnItems,
+      refundEventsJson: refundEventsJson ?? this.refundEventsJson,
     );
   }
 
@@ -364,6 +375,7 @@ class PastOrderModel extends HiveObject{
       'storeGstNumber': storeGstNumber,
       'roundOffStep': roundOffStep,
       'discountOnItems': discountOnItems,
+      'refundEventsJson': refundEventsJson,
     };
   }
 
@@ -410,6 +422,7 @@ class PastOrderModel extends HiveObject{
       storeGstNumber: map['storeGstNumber'] as String?,
       roundOffStep: (map['roundOffStep'] as num?)?.toDouble(),
       discountOnItems: map['discountOnItems'] as bool?,
+      refundEventsJson: map['refundEventsJson'] as String?,
     );
   }
 
