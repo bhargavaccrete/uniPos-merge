@@ -1,8 +1,13 @@
 /// Retail entitlement catalog — the retail half of the plan vocabulary.
 ///
 /// Kept **separate** from restaurant's `EntKeys` (`entitlement_keys.dart`) on purpose:
-/// every key here is `retail.`-prefixed so retail and restaurant keys can never be
+/// every key here is `retail_`-prefixed so retail and restaurant keys can never be
 /// confused in code or collide inside the one signed manifest the backend sends.
+///
+/// Underscore, not dot, after `retail`: the admin composes keys from a parent
+/// key + code segment and the segment can't contain a dot, so the top-level
+/// rows were entered as `retail_billing`, `retail_catalog`… Children still
+/// join with dots (`retail_catalog.products.add`).
 ///
 /// These strings are the contract — they must match the server Feature Catalog
 /// exactly. Read through the SAME engine as restaurant (`PlanEnforce` /
@@ -13,47 +18,47 @@ class RetailEntKeys {
   RetailEntKeys._();
 
   // ── Modules ─────────────────────────────────────────────────────────────────
-  static const billing = 'retail.billing';
-  static const catalog = 'retail.catalog'; // product catalog (retail's "menu")
-  static const customers = 'retail.customers';
-  static const users = 'retail.users'; // staff
-  static const attendance = 'retail.attendance'; // clock-in/out
-  static const shifts = 'retail.shifts'; // staff shift lifecycle
-  static const inventory = 'retail.inventory';
-  static const inventoryStockTake = 'retail.inventory.stock_take';
-  static const suppliers = 'retail.suppliers';
-  static const purchase = 'retail.purchase'; // PO + GRN
-  static const reports = 'retail.reports';
-  static const settings = 'retail.settings';
-  static const cashDrawer = 'retail.cashdrawer';
-  static const dataBackup = 'retail.data_backup';
-  static const loyalty = 'retail.loyalty';
+  static const billing = 'retail_billing';
+  static const catalog = 'retail_catalog'; // product catalog (retail's "menu")
+  static const customers = 'retail_customers';
+  static const users = 'retail_users'; // staff
+  static const attendance = 'retail_attendance'; // clock-in/out
+  static const shifts = 'retail_shifts'; // staff shift lifecycle
+  static const inventory = 'retail_inventory';
+  static const inventoryStockTake = 'retail_inventory.stock_take';
+  static const suppliers = 'retail_suppliers';
+  static const purchase = 'retail_purchase'; // PO + GRN
+  static const reports = 'retail_reports';
+  static const settings = 'retail_settings';
+  static const cashDrawer = 'retail_cashdrawer';
+  static const dataBackup = 'retail_data_backup';
+  static const loyalty = 'retail_loyalty';
 
   // ── Submodules ───────────────────────────────────────────────────────────────
-  static const billingReturns = 'retail.billing.returns';
-  static const billingCredit = 'retail.billing.credit'; // pay-later (retail only)
+  static const billingReturns = 'retail_billing.returns';
+  static const billingCredit = 'retail_billing.credit'; // pay-later (retail only)
   // Parent of [billingInvoicePrint] only — no screen of its own.
-  static const billingInvoice = 'retail.billing.invoice';
-  static const catalogProducts = 'retail.catalog.products';
-  static const catalogCategories = 'retail.catalog.categories';
+  static const billingInvoice = 'retail_billing.invoice';
+  static const catalogProducts = 'retail_catalog.products';
+  static const catalogCategories = 'retail_catalog.categories';
   // Variant editors are dialogs inside Product Detail, not a route, so this
   // parent is checked alongside each variant action at the dialog itself.
-  static const catalogVariants = 'retail.catalog.variants';
-  static const purchaseReturns = 'retail.purchase.returns';
-  static const purchaseDamaged = 'retail.purchase.damaged';
+  static const catalogVariants = 'retail_catalog.variants';
+  static const purchaseReturns = 'retail_purchase.returns';
+  static const purchaseDamaged = 'retail_purchase.damaged';
 
   // ── Reports — one key per report, flat under `retail.reports` ───────────────
   // Mirrors restaurant's flat `reports.*` family. Without these the whole
   // Reports hub is one all-or-nothing flag, so no plan can grant sales reports
   // while withholding profit or purchasing. Names follow the hub's tiles.
-  static const reportsDailySales = 'retail.reports.daily_sales';
-  static const reportsMonthlySales = 'retail.reports.monthly_sales';
-  static const reportsSaleByProduct = 'retail.reports.sale_by_product';
-  static const reportsSaleByVariant = 'retail.reports.sale_by_variant';
-  static const reportsSaleByCategory = 'retail.reports.sale_by_category';
-  static const reportsTopSelling = 'retail.reports.top_selling';
-  static const reportsProfit = 'retail.reports.profit';
-  static const reportsGst = 'retail.reports.gst';
+  static const reportsDailySales = 'retail_reports.daily_sales';
+  static const reportsMonthlySales = 'retail_reports.monthly_sales';
+  static const reportsSaleByProduct = 'retail_reports.sale_by_product';
+  static const reportsSaleByVariant = 'retail_reports.sale_by_variant';
+  static const reportsSaleByCategory = 'retail_reports.sale_by_category';
+  static const reportsTopSelling = 'retail_reports.top_selling';
+  static const reportsProfit = 'retail_reports.profit';
+  static const reportsGst = 'retail_reports.gst';
   // Covers all THREE give-away mechanisms the Discounts Given report totals —
   // bill/line discounts, price overrides and loyalty redemption — not just the
   // one that lands in `SaleModel.discountAmount`.
@@ -63,32 +68,32 @@ class RetailEntKeys {
   // `RestaurantSession.canAccess('billingDiscount')` and there is no
   // `billingDiscount` entitlement to reuse. No existing key owns "reporting
   // what was given away".
-  static const reportsDiscounts = 'retail.reports.discounts';
+  static const reportsDiscounts = 'retail_reports.discounts';
   // Ad-hoc lines typed at the POS. Minted rather than reused because adding
   // a quick item is deliberately UNGATED at the till — there is no billing
   // key that owns it, so nothing exists to point the report at.
-  static const reportsQuickItems = 'retail.reports.quick_items';
-  static const reportsLowStock = 'retail.reports.low_stock';
-  static const reportsStockAdjustment = 'retail.reports.stock_adjustment';
+  static const reportsQuickItems = 'retail_reports.quick_items';
+  static const reportsLowStock = 'retail_reports.low_stock';
+  static const reportsStockAdjustment = 'retail_reports.stock_adjustment';
   // Purchasing side
-  static const reportsPurchaseSummary = 'retail.reports.purchase_summary';
-  static const reportsSupplierPurchase = 'retail.reports.supplier_purchase';
+  static const reportsPurchaseSummary = 'retail_reports.purchase_summary';
+  static const reportsSupplierPurchase = 'retail_reports.supplier_purchase';
   // One key for all three PO-status tiles — they are named constructors of the
   // same screen (pending / partially received / completed).
-  static const reportsPoStatus = 'retail.reports.po_status';
-  static const reportsGrn = 'retail.reports.grn';
-  static const reportsDamagedItems = 'retail.reports.damaged_items';
-  static const reportsPurchaseReturn = 'retail.reports.purchase_return';
+  static const reportsPoStatus = 'retail_reports.po_status';
+  static const reportsGrn = 'retail_reports.grn';
+  static const reportsDamagedItems = 'retail_reports.damaged_items';
+  static const reportsPurchaseReturn = 'retail_reports.purchase_return';
   // Cash / day close
-  static const reportsCashDrawerHistory = 'retail.reports.cash_drawer_history';
-  static const reportsEodHistory = 'retail.reports.eod_history';
+  static const reportsCashDrawerHistory = 'retail_reports.cash_drawer_history';
+  static const reportsEodHistory = 'retail_reports.eod_history';
 
   // Staff reports — mirror restaurant's `reports.attendance`,
   // `reports.shift` and `reports.staff_performance`.
-  static const reportsAttendance = 'retail.reports.attendance';
-  static const reportsShift = 'retail.reports.shift';
+  static const reportsAttendance = 'retail_reports.attendance';
+  static const reportsShift = 'retail_reports.shift';
   static const reportsStaffPerformance =
-      'retail.reports.staff_performance';
+      'retail_reports.staff_performance';
   // NOTE: the Credit Reports tile deliberately has no key of its own — it reads
   // [billingCredit], the same key its route guard uses. One responsibility, one key.
   // The Sales Refunds report tile follows the same rule and reads
@@ -99,42 +104,42 @@ class RetailEntKeys {
   // No invoice create/edit/export/void: retail has returns, not void, and sales
   // aren't edited after the fact — nothing would read those keys.
   // Admin-controlled "Powered by Bill Berry Lite" footer (default shown).
-  static const billingInvoicePrint = 'retail.billing.invoice.print';
+  static const billingInvoicePrint = 'retail_billing.invoice.print';
 
   // Product catalog actions (retail analog of manage_menu.items.*):
-  static const catalogProductsAdd = 'retail.catalog.products.add';
-  static const catalogProductsEdit = 'retail.catalog.products.edit';
-  static const catalogProductsDelete = 'retail.catalog.products.delete';
+  static const catalogProductsAdd = 'retail_catalog.products.add';
+  static const catalogProductsEdit = 'retail_catalog.products.edit';
+  static const catalogProductsDelete = 'retail_catalog.products.delete';
 
-  static const catalogCategoriesAdd = 'retail.catalog.categories.add';
-  static const catalogCategoriesEdit = 'retail.catalog.categories.edit';
-  static const catalogCategoriesDelete = 'retail.catalog.categories.delete';
+  static const catalogCategoriesAdd = 'retail_catalog.categories.add';
+  static const catalogCategoriesEdit = 'retail_catalog.categories.edit';
+  static const catalogCategoriesDelete = 'retail_catalog.categories.delete';
 
   // Variant actions — retail's analog of restaurant's manage_menu.variants.*.
   // A retail product's variants carry the barcode, price and stock, so these
   // are edits to sellable units, not cosmetic options.
-  static const catalogVariantsAdd = 'retail.catalog.variants.add';
-  static const catalogVariantsEdit = 'retail.catalog.variants.edit';
-  static const catalogVariantsDelete = 'retail.catalog.variants.delete';
+  static const catalogVariantsAdd = 'retail_catalog.variants.add';
+  static const catalogVariantsEdit = 'retail_catalog.variants.edit';
+  static const catalogVariantsDelete = 'retail_catalog.variants.delete';
 
   // Supplier actions:
-  static const suppliersAdd = 'retail.suppliers.add';
-  static const suppliersEdit = 'retail.suppliers.edit';
-  static const suppliersDelete = 'retail.suppliers.delete';
+  static const suppliersAdd = 'retail_suppliers.add';
+  static const suppliersEdit = 'retail_suppliers.edit';
+  static const suppliersDelete = 'retail_suppliers.delete';
 
   // Purchase actions (PO create + GRN receive):
-  static const purchaseCreate = 'retail.purchase.create';
-  static const purchaseReceive = 'retail.purchase.receive';
+  static const purchaseCreate = 'retail_purchase.create';
+  static const purchaseReceive = 'retail_purchase.receive';
 
   // ── Limits (0/absent = unlimited) ────────────────────────────────────────────
-  static const billingPerDayMax = 'retail.billing.per_day_max';
-  static const catalogProductsMax = 'retail.catalog.products.max';
-  static const customersMax = 'retail.customers.max';
-  static const usersMax = 'retail.users.max';
-  static const suppliersMax = 'retail.suppliers.max';
+  static const billingPerDayMax = 'retail_billing.per_day_max';
+  static const catalogProductsMax = 'retail_catalog.products.max';
+  static const customersMax = 'retail_customers.max';
+  static const usersMax = 'retail_users.max';
+  static const suppliersMax = 'retail_suppliers.max';
 
   // ── Data scopes ──────────────────────────────────────────────────────────────
-  static const reportsHistoryLimitDays = 'retail.reports.history_limit_days';
+  static const reportsHistoryLimitDays = 'retail_reports.history_limit_days';
 }
 
 /// Server-mirrored defaults for [RetailEntKeys] — used only when a key is
@@ -167,34 +172,30 @@ const Map<String, Object> kRetailEntitlementDefaults = {
   RetailEntKeys.purchaseReturns: false,
   RetailEntKeys.purchaseDamaged: false,
 
-  // Per-report keys — TRUE until the server catalog has them, for the same
-  // reason as restaurant's purchasing reports: no manifest sends them yet, so
-  // `false` would lock every report on a licensed shop. A manifest value
-  // always wins, so once the admin adds these they govern with no code edit —
-  // then flip these to `false` to mirror the server again.
-  RetailEntKeys.reportsDailySales: true,
-  RetailEntKeys.reportsMonthlySales: true,
-  RetailEntKeys.reportsSaleByProduct: true,
-  RetailEntKeys.reportsSaleByVariant: true,
-  RetailEntKeys.reportsSaleByCategory: true,
-  RetailEntKeys.reportsTopSelling: true,
-  RetailEntKeys.reportsProfit: true,
-  RetailEntKeys.reportsGst: true,
-  RetailEntKeys.reportsDiscounts: true,
-  RetailEntKeys.reportsQuickItems: true,
-  RetailEntKeys.reportsLowStock: true,
-  RetailEntKeys.reportsStockAdjustment: true,
-  RetailEntKeys.reportsPurchaseSummary: true,
-  RetailEntKeys.reportsSupplierPurchase: true,
-  RetailEntKeys.reportsPoStatus: true,
-  RetailEntKeys.reportsGrn: true,
-  RetailEntKeys.reportsDamagedItems: true,
-  RetailEntKeys.reportsPurchaseReturn: true,
-  RetailEntKeys.reportsCashDrawerHistory: true,
-  RetailEntKeys.reportsEodHistory: true,
-  RetailEntKeys.reportsAttendance: true,
-  RetailEntKeys.reportsShift: true,
-  RetailEntKeys.reportsStaffPerformance: true,
+  // Per-report keys
+  RetailEntKeys.reportsDailySales: false,
+  RetailEntKeys.reportsMonthlySales: false,
+  RetailEntKeys.reportsSaleByProduct: false,
+  RetailEntKeys.reportsSaleByVariant: false,
+  RetailEntKeys.reportsSaleByCategory: false,
+  RetailEntKeys.reportsTopSelling: false,
+  RetailEntKeys.reportsProfit: false,
+  RetailEntKeys.reportsGst: false,
+  RetailEntKeys.reportsDiscounts: false,
+  RetailEntKeys.reportsQuickItems: false,
+  RetailEntKeys.reportsLowStock: false,
+  RetailEntKeys.reportsStockAdjustment: false,
+  RetailEntKeys.reportsPurchaseSummary: false,
+  RetailEntKeys.reportsSupplierPurchase: false,
+  RetailEntKeys.reportsPoStatus: false,
+  RetailEntKeys.reportsGrn: false,
+  RetailEntKeys.reportsDamagedItems: false,
+  RetailEntKeys.reportsPurchaseReturn: false,
+  RetailEntKeys.reportsCashDrawerHistory: false,
+  RetailEntKeys.reportsEodHistory: false,
+  RetailEntKeys.reportsAttendance: false,
+  RetailEntKeys.reportsShift: false,
+  RetailEntKeys.reportsStaffPerformance: false,
 
   // Actions
   RetailEntKeys.billingInvoicePrint: true, // footer shown unless admin hides it

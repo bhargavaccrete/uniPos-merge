@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Shared password hashing utility for restaurant auth.
 /// Uses SHA-256 + a fixed salt (matches retail pattern).
@@ -30,5 +31,40 @@ class RestaurantAuthHelper {
     }
     // Plaintext fallback — migration path
     return entered == stored;
+  }
+
+  /// First-run admin PIN, used when nothing has been stored yet.
+  static const String defaultAdminPin = '123456';
+
+  /// Change the admin PIN in both modes. Returns an error message, or null on
+  /// success.
+  ///
+  /// A missing key verifies against [defaultAdminPin] (restaurant never seeds
+  /// it before first login; retail does via `AuthService.ensureDefaultAdmin`),
+  /// and a pre-migration plaintext value still verifies via [verifyPassword].
+  static Future<String?> changeAdminPin({
+    required String oldPin,
+    required String newPin,
+    required String confirmPin,
+  }) async {
+    final oldValue = oldPin.trim();
+    final newValue = newPin.trim();
+    if (oldValue.isEmpty) return 'Current PIN is required';
+    if (newValue.isEmpty) return 'New PIN is required';
+    if (!RegExp(r'^\d{4,6}$').hasMatch(newValue)) {
+      return 'PIN must be 4–6 digits';
+    }
+    if (newValue != confirmPin.trim()) return 'New PINs do not match';
+    if (oldValue == newValue) {
+      return 'New PIN must be different from current PIN';
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final stored =
+        prefs.getString(adminPinKey) ?? hashPassword(defaultAdminPin);
+    if (!verifyPassword(oldValue, stored)) return 'Current PIN is incorrect';
+
+    await prefs.setString(adminPinKey, hashPassword(newValue));
+    return null;
   }
 }

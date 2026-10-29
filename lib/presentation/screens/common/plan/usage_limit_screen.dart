@@ -4,13 +4,20 @@ import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/util/color.dart';
 
-import '../../../core/di/service_locator.dart';
-import '../../../core/plan/plan_gate.dart';
-import '../../../core/plan/plan_enforcement.dart';
-import '../../../core/plan/entitlement_keys.dart';
+import 'package:billberrylite/core/config/app_config.dart';
+import 'package:billberrylite/core/di/service_locator.dart';
+import 'package:billberrylite/core/plan/plan_gate.dart';
+import 'package:billberrylite/core/plan/plan_enforcement.dart';
+import 'package:billberrylite/core/plan/entitlement_keys.dart';
+import 'package:billberrylite/core/plan/mode_keys.dart';
+import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
 
 /// Usage & Limits — a read-only overview of how much of each plan-capped
 /// resource the outlet has consumed against its plan allowance.
+///
+/// Shared by both modes. Each mode lists its own resources and only touches
+/// stores registered for that mode (restaurant `itemStore`/`tableStore`,
+/// retail `productStore`/`supplierStore`) — the other mode's are not in DI.
 ///
 /// The plan (Free/Premium/Trial) and every resource count are MobX observables,
 /// so the whole body is wrapped in a single [Observer]: a server-pushed plan
@@ -36,9 +43,14 @@ class _UsageLimitScreenState extends State<UsageLimitScreen> {
   Future<void> _refresh() async {
     await Future.wait(
       [
-        itemStore.loadItems(),
+        if (AppConfig.isRetail) ...[
+          productStore.loadProducts(),
+          supplierStore.loadSuppliers(),
+        ] else ...[
+          itemStore.loadItems(),
+          tableStore.loadTables(),
+        ],
         categoryStore.loadCategories(),
-        tableStore.loadTables(),
         staffStore.loadStaff(),
         customerStore.loadCustomers(),
         printerStore.loadSavedPrinters(),
@@ -90,6 +102,7 @@ class _UsageLimitScreenState extends State<UsageLimitScreen> {
                       _PlanBanner(
                         planLabel: PlanGate.planLabel,
                         isPremium: isPremium,
+                        message: _summary(metrics),
                       ),
                       const SizedBox(height: 20),
                       Text(
@@ -107,7 +120,9 @@ class _UsageLimitScreenState extends State<UsageLimitScreen> {
                         const SizedBox(height: 12),
                       ],
                       const SizedBox(height: 4),
-                      _FootNote(isPremium: isPremium),
+                      _FootNote(
+                        allUnlimited: metrics.every((m) => m.isUnlimited),
+                      ),
                     ],
                   );
                 },
@@ -117,6 +132,21 @@ class _UsageLimitScreenState extends State<UsageLimitScreen> {
         ),
       ),
     );
+  }
+
+  /// Banner line derived from the actual caps, not the plan tier — a Trial
+  /// counts as premium yet still carries count limits.
+  String _summary(List<_UsageMetric> metrics) {
+    final capped = metrics.where((m) => !m.isUnlimited).toList();
+    if (capped.isEmpty) return 'All resources are unlimited on your plan.';
+    final reached = capped.where((m) => m.atLimit).length;
+    if (reached > 0) {
+      return reached == 1
+          ? '1 limit reached — upgrade or remove entries to add more.'
+          : '$reached limits reached — upgrade or remove entries to add more.';
+    }
+    return '${capped.length} of ${metrics.length} resources have a limit on '
+        'your plan.';
   }
 
   /// The plan-capped resources, each paired with its live count and the plan
@@ -152,14 +182,25 @@ class _UsageLimitScreenState extends State<UsageLimitScreen> {
       );
     }
 
+    // Counts match what each store passes to PlanEnforce.withinLimit.
+    final isRetail = AppConfig.isRetail;
     return [
-      make(
-        'Menu Items',
-        Icons.restaurant_menu,
-        AppColors.menuTab,
-        itemStore.itemCount,
-        EntKeys.manageMenuItemsMax,
-      ),
+      if (isRetail)
+        make(
+          'Products',
+          Icons.inventory_2_outlined,
+          AppColors.menuTab,
+          productStore.products.length,
+          RetailEntKeys.catalogProductsMax,
+        )
+      else
+        make(
+          'Menu Items',
+          Icons.restaurant_menu,
+          AppColors.menuTab,
+          itemStore.itemCount,
+          EntKeys.manageMenuItemsMax,
+        ),
       make(
         'Categories',
         Icons.category_outlined,
@@ -167,27 +208,36 @@ class _UsageLimitScreenState extends State<UsageLimitScreen> {
         categoryStore.categoryCount,
         null,
       ),
-      make(
-        'Tables',
-        Icons.table_restaurant_outlined,
-        AppColors.tablesTab,
-        tableStore.totalTables,
-        EntKeys.billingTablesMax,
-      ),
+      if (!isRetail)
+        make(
+          'Tables',
+          Icons.table_restaurant_outlined,
+          AppColors.tablesTab,
+          tableStore.totalTables,
+          EntKeys.billingTablesMax,
+        ),
       make(
         'Staff',
         Icons.badge_outlined,
         AppColors.info,
         staffStore.totalStaff,
-        EntKeys.usersMax,
+        ModeKeys.usersMax,
       ),
       make(
         'Customers',
         Icons.people_alt_outlined,
         AppColors.orange,
         customerStore.totalCustomers,
-        EntKeys.customersMax,
+        ModeKeys.customersMax,
       ),
+      if (isRetail)
+        make(
+          'Suppliers',
+          Icons.local_shipping_outlined,
+          AppColors.tablesTab,
+          supplierStore.suppliers.length,
+          RetailEntKeys.suppliersMax,
+        ),
       make(
         'Printers',
         Icons.print_outlined,
@@ -239,10 +289,15 @@ class _UsageMetric {
 
 /// Top card summarising the active plan.
 class _PlanBanner extends StatelessWidget {
-  const _PlanBanner({required this.planLabel, required this.isPremium});
+  const _PlanBanner({
+    required this.planLabel,
+    required this.isPremium,
+    required this.message,
+  });
 
   final String planLabel;
   final bool isPremium;
+  final String message;
 
   @override
   Widget build(BuildContext context) {
@@ -317,9 +372,7 @@ class _PlanBanner extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  isPremium
-                      ? 'All resources are unlimited on your plan.'
-                      : 'Track how much of each free limit you have used.',
+                  message,
                   style: GoogleFonts.poppins(
                     fontSize: 13,
                     height: 1.35,
@@ -474,9 +527,9 @@ class _TrailingPill extends StatelessWidget {
 
 /// Small explanatory line under the list.
 class _FootNote extends StatelessWidget {
-  const _FootNote({required this.isPremium});
+  const _FootNote({required this.allUnlimited});
 
-  final bool isPremium;
+  final bool allUnlimited;
 
   @override
   Widget build(BuildContext context) {
@@ -487,7 +540,7 @@ class _FootNote extends StatelessWidget {
         const SizedBox(width: 6),
         Expanded(
           child: Text(
-            isPremium
+            allUnlimited
                 ? 'You can add resources without limits. Pull down to refresh.'
                 : 'Reaching a limit blocks new additions until you upgrade or remove existing entries. Pull down to refresh.',
             style: GoogleFonts.poppins(

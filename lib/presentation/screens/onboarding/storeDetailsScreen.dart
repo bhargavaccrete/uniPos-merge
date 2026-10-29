@@ -1037,7 +1037,6 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
           // food licence is independent of tax registration, so a business that
           // answers "Not Registered" must still be able to enter one.
           _buildFoodLicenseField(context),
-          SizedBox(height: AppResponsive.mediumSpacing(context)),
           _buildTaxRegistrationSelector(context, isIndia: isIndia),
           if (_isRegisteredForTax) ...[
             SizedBox(height: AppResponsive.mediumSpacing(context)),
@@ -1091,26 +1090,48 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
 
   /// Country-adaptive food-business licence (FSSAI in India). Always optional.
   /// Reads the LOCAL country controller, not the persisted record — nothing is
-  /// saved yet while the user is still on this step.
+  /// saved yet while the user is still on this step. Hidden for retail store
+  /// types that don't sell food (garment, footwear…) — see
+  /// `FoodLicenseRule.appliesFor`.
   Widget _buildFoodLicenseField(BuildContext context) {
     final country = _countryController.text;
     final digitsOnly = FoodLicenseRule.digitsOnlyFor(country);
 
-    return AppTextField(
-      controller: _foodLicenseController,
-      focusNode: _foodLicenseFocus,
-      textInputAction: TextInputAction.done,
-      onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
-      label: FoodLicenseRule.labelFor(country),
-      hint: FoodLicenseRule.hintFor(country),
-      icon: Icons.verified_user_outlined,
-      maxLength: FoodLicenseRule.maxLengthFor(country),
-      keyboardType: digitsOnly ? TextInputType.number : TextInputType.text,
-      inputFormatters: digitsOnly
-          ? [FilteringTextInputFormatter.digitsOnly]
-          : null,
-      onChanged: (v) => widget.store.setFoodLicenseNo(v),
-      validator: (v) => FoodLicenseRule.validateFor(country, v),
+    return Observer(
+      builder: (_) {
+        // Both read up front so the Observer always tracks them, even when
+        // appliesFor short-circuits for restaurant.
+        final retailStoreType = widget.store.selectedRetailStoreType;
+        final number = widget.store.foodLicenseNo;
+        if (!FoodLicenseRule.appliesFor(
+          isRestaurant: AppConfig.isRestaurant,
+          retailStoreType: retailStoreType,
+          number: number,
+        )) {
+          return const SizedBox.shrink();
+        }
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: AppResponsive.mediumSpacing(context),
+          ),
+          child: AppTextField(
+            controller: _foodLicenseController,
+            focusNode: _foodLicenseFocus,
+            textInputAction: TextInputAction.done,
+            onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
+            label: FoodLicenseRule.labelFor(country),
+            hint: FoodLicenseRule.hintFor(country),
+            icon: Icons.verified_user_outlined,
+            maxLength: FoodLicenseRule.maxLengthFor(country),
+            keyboardType: digitsOnly ? TextInputType.number : TextInputType.text,
+            inputFormatters: digitsOnly
+                ? [FilteringTextInputFormatter.digitsOnly]
+                : null,
+            onChanged: (v) => widget.store.setFoodLicenseNo(v),
+            validator: (v) => FoodLicenseRule.validateFor(country, v),
+          ),
+        );
+      },
     );
   }
 

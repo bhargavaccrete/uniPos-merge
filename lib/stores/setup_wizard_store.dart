@@ -15,6 +15,7 @@ import 'package:billberrylite/core/di/service_locator.dart' as sl;
 import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
 import 'package:billberrylite/domain/services/retail/store_type_attribute_defaults_service.dart';
 import 'package:billberrylite/domain/services/common/device_id_service.dart';
+import 'package:billberrylite/domain/services/common/license_api_service.dart';
 
 part 'setup_wizard_store.g.dart';
 
@@ -832,7 +833,8 @@ abstract class _SetupWizardStore with Store {
         'customername': storeName,
         'businesstype': businessTypeCode,
         'businesssubtype': businessSubtypeCode,
-        'businesscategory': 3, // TEMP: until LMS accepts businesstype/subtype
+        'businesscategory':
+            LicenseApiService.businessCategoryFor(businessTypeCode),
         'ownername': ownerName,
         'contactperson': ownerName,
         'email': email,

@@ -182,37 +182,14 @@ class AuthService {
     required String newPin,
     required String confirmPin,
   }) async {
-    if (oldPin.isEmpty) {
-      return AuthResult.failure('Current PIN is required');
-    }
-
-    if (newPin.isEmpty) {
-      return AuthResult.failure('New PIN is required');
-    }
-
-    if (!RegExp(r'^\d{4,6}$').hasMatch(newPin)) {
-      return AuthResult.failure('PIN must be 4–6 digits');
-    }
-
-    if (newPin != confirmPin) {
-      return AuthResult.failure('New PINs do not match');
-    }
-
-    if (oldPin == newPin) {
-      return AuthResult.failure('New PIN must be different from current PIN');
-    }
-
-    final prefs = await SharedPreferences.getInstance();
-    final storedHash = prefs.getString(RestaurantAuthHelper.adminPinKey);
-
-    if (storedHash == null || !RestaurantAuthHelper.verifyPassword(oldPin, storedHash)) {
-      return AuthResult.failure('Current PIN is incorrect');
-    }
-
-    await prefs.setString(
-        RestaurantAuthHelper.adminPinKey, RestaurantAuthHelper.hashPassword(newPin));
-
-    return AuthResult.success('Admin');
+    final error = await RestaurantAuthHelper.changeAdminPin(
+      oldPin: oldPin,
+      newPin: newPin,
+      confirmPin: confirmPin,
+    );
+    return error == null
+        ? AuthResult.success('Admin')
+        : AuthResult.failure(error);
   }
 
   /// Sets the admin PIN directly, without requiring the old one — used

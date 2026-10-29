@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:billberrylite/util/common/quantity_format.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
-import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/presentation/widget/componets/common/settings/common_setting_tiles.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_empty_state.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_status_pill.dart';
 import 'package:billberrylite/presentation/widget/componets/common/report_summary_card.dart';
@@ -32,81 +32,24 @@ class _StockAlertsScreenState extends State<StockAlertsScreen> {
     _alertStore.refresh();
   }
 
-  /// Threshold picker, on the shared [AppDialogShell] rather than a
-  /// `PopupMenuButton`. The menu gave no indication of which value was active
-  /// and looked nothing like the app's other dialogs.
+  /// Threshold picker — the same presets + custom control as Settings, so a
+  /// custom value shows as "Custom", selected and pre-filled, instead of
+  /// leaving no option selected.
   Future<void> _pickThreshold() async {
-    const options = StockAlertService.thresholdOptions;
     final current = _alertStore.threshold;
-
-    final picked = await showDialog<int>(
-      context: context,
-      builder: (dialogContext) => AppDialogShell(
-        title: 'Alert Threshold',
-        // Worth saying: a variant with its own minStock ignores this number,
-        // so changing it appears to do nothing for those rows.
-        subtitle:
-            'Flags variants at or below this stock level, unless the '
-            'variant sets its own minimum.',
-        icon: Icons.tune_rounded,
-        accent: AppColors.primary,
-        body: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: options.map((value) {
-            final selected = value == current;
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: AppResponsive.smallSpacing(context),
-              ),
-              child: Material(
-                color: selected
-                    ? AppColors.primary.withValues(alpha: 0.08)
-                    : AppColors.surfaceLight,
-                borderRadius: BorderRadius.circular(10),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(10),
-                  onTap: () => Navigator.pop(dialogContext, value),
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: AppResponsive.mediumSpacing(context),
-                      vertical: AppResponsive.mediumSpacing(context),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          selected
-                              ? Icons.radio_button_checked
-                              : Icons.radio_button_unchecked,
-                          size: AppResponsive.smallIconSize(dialogContext),
-                          color: selected
-                              ? AppColors.primary
-                              : AppColors.textSecondary,
-                        ),
-                        SizedBox(width: AppResponsive.mediumSpacing(context)),
-                        Text(
-                          '$value units or fewer',
-                          style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.bodyFontSize(dialogContext),
-                            fontWeight: selected
-                                ? FontWeight.w600
-                                : FontWeight.w400,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-        actions: [appDialogCancelButton(dialogContext)],
-      ),
+    final picked = await showLowStockThresholdPicker(
+      context,
+      value: current,
+      presets: StockAlertService.thresholdOptions,
+      allowDecimal: false,
+      // Worth saying: a variant with its own minStock ignores this number,
+      // so changing it appears to do nothing for those rows.
+      subtitle:
+          'Flags variants at or below this stock level, unless the '
+          'variant sets its own minimum.',
     );
-
-    if (picked == null || picked == current) return;
-    await _alertStore.setThreshold(picked);
+    if (picked == null || picked.toInt() == current) return;
+    await _alertStore.setThreshold(picked.toInt());
   }
 
   @override

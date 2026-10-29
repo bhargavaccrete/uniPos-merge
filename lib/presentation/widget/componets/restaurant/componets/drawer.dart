@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:flutter/services.dart' show FilteringTextInputFormatter;
@@ -252,7 +253,8 @@ class _DrawerrState extends State<Drawerr> {
                     ),
 
                     // End Day is always reachable (day lifecycle close path).
-                    if (RestaurantSession.canAccess('cashDrawer'))
+                    // Same key as the route ('endDay'), not 'cashDrawer'.
+                    if (RestaurantSession.canAccess('endDay'))
                     _buildDrawerItem(
                       context: context,
                       icon: Icons.sunny_snowing,
@@ -265,10 +267,11 @@ class _DrawerrState extends State<Drawerr> {
                     ),
                   ],
 
-                  if (RestaurantSession.canAccess('settings'))
+                  // Developer tool — never in a release build.
+                  if (kDebugMode && RestaurantSession.canAccess('settings'))
                   _buildDrawerItem(
                     context: context,
-                    icon: Icons.data_object_rounded,
+                    icon:Icons.data_object_rounded,
                     title: 'Test Data Generator',
                     onTap: () {
                       if (!PlanGuard.allowedOr(context, EntKeys.settings, featureName: 'Settings')) return;

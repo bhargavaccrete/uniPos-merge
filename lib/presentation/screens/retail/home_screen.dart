@@ -33,6 +33,7 @@ import 'package:billberrylite/presentation/screens/retail/damaged_goods_hub_scre
 import 'package:billberrylite/presentation/screens/retail/sales_history_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/cash_drawer_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/settings_screen.dart';
+import 'package:billberrylite/presentation/screens/common/plan/usage_limit_screen.dart';
 import 'package:billberrylite/core/plan/plan_guard.dart';
 import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
 import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
@@ -945,6 +946,17 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
+      // Read-only plan info, never plan-gated — same rule as restaurant's tile.
+      if (RestaurantSession.canAccess('settings'))
+        DashboardMenuCard(
+          icon: Icons.insights_rounded,
+          title: 'Usage & Limits',
+          color: Colors.cyan,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const UsageLimitScreen()),
+          ),
+        ),
       // Deliberately carries NO permission: every role must be able to end
       // their own session in one tap. It used to live inside Settings, whose
       // sensitive tiles are Manager-only — burying the only sign-out behind a

@@ -1,23 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 import 'package:google_fonts/google_fonts.dart';
-import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/restaurant/restaurant_auth_helper.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 
-/// Change PIN — same mechanism as restaurant's admin PIN (see
-/// `AuthService.changePin`). Kept the class/file name to avoid touching the
-/// home_screen.dart call site.
-class ChangePasswordScreen extends StatefulWidget {
-  const ChangePasswordScreen({super.key});
+/// Change Admin PIN — both modes. The admin login PIN is one credential
+/// (`RestaurantAuthHelper.adminPinKey`) set at onboarding and checked by both
+/// logins, so there is one screen for it. Calls the helper directly rather
+/// than `authService`, which is only registered in retail mode.
+class ChangeAdminPinScreen extends StatefulWidget {
+  const ChangeAdminPinScreen({super.key});
 
   @override
-  State<ChangePasswordScreen> createState() => _ChangePasswordScreenState();
+  State<ChangeAdminPinScreen> createState() => _ChangeAdminPinScreenState();
 }
 
-class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
+class _ChangeAdminPinScreenState extends State<ChangeAdminPinScreen> {
   final _formKey = GlobalKey<FormState>();
   final _currentPinController = TextEditingController();
   final _newPinController = TextEditingController();
@@ -48,15 +49,15 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     });
 
     try {
-      final result = await authService.changePin(
-        oldPin: _currentPinController.text.trim(),
-        newPin: _newPinController.text.trim(),
-        confirmPin: _confirmPinController.text.trim(),
+      final error = await RestaurantAuthHelper.changeAdminPin(
+        oldPin: _currentPinController.text,
+        newPin: _newPinController.text,
+        confirmPin: _confirmPinController.text,
       );
 
       if (!mounted) return;
 
-      if (result.success) {
+      if (error == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -69,7 +70,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         Navigator.pop(context);
       } else {
         setState(() {
-          _errorMessage = result.errorMessage;
+          _errorMessage = error;
           _isLoading = false;
         });
       }
@@ -86,7 +87,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      appBar: buildPrimaryAppBar(title: 'Change PIN', centerTitle: true),
+      appBar: buildPrimaryAppBar(title: 'Change Admin PIN', centerTitle: true),
       body: AppResponsive.constrainedContent(
         context: context,
         alignment: Alignment.topCenter,

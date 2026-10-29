@@ -50,6 +50,10 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
   /// its own `[5, 10, 20]`, so a store configured at 25 opened the report at 10
   /// and could not even select 25. `StockAlertService` centralises both.
   int _threshold = StockAlertService.defaultThreshold;
+
+  /// The saved global threshold — kept as a chip even when the filter moves
+  /// to a preset, so a custom value stays reachable.
+  int _storedThreshold = StockAlertService.defaultThreshold;
   int _currentPage = 0;
 
   @override
@@ -61,7 +65,7 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
   Future<void> _init() async {
     final stored = await _alertService.getThreshold();
     if (!mounted) return;
-    setState(() => _threshold = stored);
+    setState(() => _threshold = _storedThreshold = stored);
     await _loadReport();
   }
 
@@ -110,7 +114,10 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
               // share it; this screen offering a third had reintroduced the
               // exact drift that centralising it was meant to end.
               options: [
-                for (final value in StockAlertService.thresholdOptions)
+                // Includes the stored value when it is custom, so it still
+                // shows as the selected chip.
+                for (final value
+                    in StockAlertService.optionsIncluding(_storedThreshold))
                   ReportFilterOption(
                     value: value,
                     label: '≤ $value',

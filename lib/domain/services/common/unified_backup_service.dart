@@ -538,6 +538,33 @@ class UnifiedBackupService {
   }
 
   /// ---------------------------
+  /// 🔧 RESTART AFTER A SUCCESSFUL RESTORE
+  /// ---------------------------
+  /// A restore rewrites Hive and SharedPreferences (and may switch the business
+  /// mode) underneath stores, notifiers and DI that were loaded at startup —
+  /// none of which reload. Closing the app is the one way every surface comes
+  /// back reading the restored data, so EVERY restore entry point ends here.
+  ///
+  /// Web cannot `exit`, so it asks the user to reopen the tab instead.
+  static Future<void> promptRestartAfterRestore() async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    final ctx = navigatorKey.currentContext;
+    if (ctx == null || !ctx.mounted) return;
+    await showAppInfoDialog(
+      context: ctx,
+      title: 'Import Completed',
+      message: kIsWeb
+          ? 'Data imported successfully!\n\nClose this tab and open the app '
+                'again to load the restored data.'
+          : 'Data imported successfully!\n\nPlease close and restart the app.',
+      buttonLabel: kIsWeb ? 'OK' : 'Close App',
+      accent: AppColors.success,
+      icon: Icons.check_circle_rounded,
+    );
+    if (!kIsWeb) exit(0);
+  }
+
+  /// ---------------------------
   /// 🔧 ENSURE A BACKUP PASSWORD EXISTS (prompt to set one if missing)
   /// ---------------------------
   /// Returns true if a backup password is set (or was just set), false if the

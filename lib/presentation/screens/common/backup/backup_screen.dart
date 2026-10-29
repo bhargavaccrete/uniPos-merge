@@ -1,10 +1,9 @@
 import 'package:billberrylite/util/restaurant/restaurant_session.dart';
 import 'dart:io';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:billberrylite/domain/services/common/auto_backup_service.dart';
-import 'package:billberrylite/domain/services/common/backup_encryption_service.dart';
-import 'package:billberrylite/presentation/widget/componets/common/backup_password_dialog.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/settings/common_setting_tiles.dart';
+import 'package:billberrylite/presentation/widget/componets/common/settings/settings_components.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:flutter/material.dart';
@@ -13,8 +12,8 @@ import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:file_selector/file_selector.dart';
 
-import '../../../domain/services/common/unified_backup_service.dart';
-import '../../../domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/domain/services/common/unified_backup_service.dart';
+import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 
 class BackupScreen extends StatefulWidget {
   const BackupScreen({super.key});
@@ -27,8 +26,6 @@ class _BackupScreenState extends State<BackupScreen> {
   List<File> _backups = [];
   bool _isLoading = false;
   String? _backupDirectory;
-  bool _hasBackupPassword = false;
-  bool _autoBackupEnabled = false;
 
   @override
   void initState() {
@@ -36,142 +33,8 @@ class _BackupScreenState extends State<BackupScreen> {
     _loadData();
   }
 
-  /// Card wrapper shared by the two new setting rows.
-  Widget _settingCard({required Widget child}) => Container(
-    decoration: BoxDecoration(
-      color: AppColors.white,
-      borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
-      border: Border.all(color: AppColors.divider),
-    ),
-    child: child,
-  );
-
-  Widget _buildPasswordCard(BuildContext context) {
-    final accent = _hasBackupPassword ? AppColors.success : AppColors.warning;
-
-    return _settingCard(
-      child: ListTile(
-        leading: Container(
-          padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
-          decoration: BoxDecoration(
-            color: accent.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(
-              AppResponsive.smallBorderRadius(context),
-            ),
-          ),
-          child: Icon(
-            _hasBackupPassword ? Icons.lock_rounded : Icons.lock_open_rounded,
-            color: accent,
-            size: AppResponsive.iconSize(context),
-          ),
-        ),
-        title: Text(
-          'Backup Password',
-          style: GoogleFonts.poppins(
-            fontSize: AppResponsive.bodyFontSize(context),
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        subtitle: Text(
-          _hasBackupPassword
-              ? 'Set — backups are encrypted with it'
-              : 'Not set — you will be asked before the first backup',
-          style: GoogleFonts.poppins(
-            fontSize: AppResponsive.captionFontSize(context),
-            color: AppColors.textSecondary,
-          ),
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextButton(
-              onPressed: () async {
-                final saved = await showBackupPasswordDialog(
-                  context,
-                  isChange: _hasBackupPassword,
-                );
-                if (saved && mounted) {
-                  setState(() => _hasBackupPassword = true);
-                }
-              },
-              child: Text(_hasBackupPassword ? 'Change' : 'Set'),
-            ),
-            if (_hasBackupPassword)
-              IconButton(
-                icon: const Icon(
-                  Icons.delete_outline_rounded,
-                  color: AppColors.danger,
-                ),
-                tooltip: 'Remove password',
-                onPressed: () async {
-                  final removed = await confirmRemoveBackupPassword(context);
-                  if (removed && mounted) {
-                    setState(() => _hasBackupPassword = false);
-                  }
-                },
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildReminderCard(BuildContext context) {
-    return _settingCard(
-      child: SwitchListTile(
-        value: _autoBackupEnabled,
-        activeThumbColor: AppColors.success,
-        onChanged: (value) async {
-          await AutoBackupService.setAutoBackupEnabled(value);
-          if (mounted) setState(() => _autoBackupEnabled = value);
-        },
-        secondary: Container(
-          padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
-          decoration: BoxDecoration(
-            color:
-                (_autoBackupEnabled
-                        ? AppColors.success
-                        : AppColors.textSecondary)
-                    .withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(
-              AppResponsive.smallBorderRadius(context),
-            ),
-          ),
-          child: Icon(
-            Icons.alarm_rounded,
-            color: _autoBackupEnabled
-                ? AppColors.success
-                : AppColors.textSecondary,
-            size: AppResponsive.iconSize(context),
-          ),
-        ),
-        title: Text(
-          'Daily Backup Reminder',
-          style: GoogleFonts.poppins(
-            fontSize: AppResponsive.bodyFontSize(context),
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
-        ),
-        subtitle: Text(
-          'Show a backup prompt at the start of each day',
-          style: GoogleFonts.poppins(
-            fontSize: AppResponsive.captionFontSize(context),
-            color: AppColors.textSecondary,
-          ),
-        ),
-      ),
-    );
-  }
-
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
-
-    // Password + reminder state, read from the same shared services restaurant
-    // reads them from.
-    _hasBackupPassword = await BackupEncryptionService.hasPassword();
-    _autoBackupEnabled = await AutoBackupService.isAutoBackupEnabled();
 
     // Get backup files from Downloads folder
     final backupDir = await UnifiedBackupService.downloadsBackupPath();
@@ -606,33 +469,9 @@ class _BackupScreenState extends State<BackupScreen> {
           setState(() => _isLoading = false);
 
           if (success) {
-            // Show success dialog
-            showDialog(
-              context: context,
-              builder: (context) => AlertDialog(
-                title: Row(
-                  children: [
-                    Icon(Icons.check_circle, color: Colors.green, size: 28),
-                    SizedBox(width: AppResponsive.mediumSpacing(context)),
-                    Text('Restore Successful'),
-                  ],
-                ),
-                content: Text(
-                  'Backup restored successfully! All data has been imported.',
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      Navigator.pop(context); // Go back to main screen
-                    },
-                    child: Text('OK'),
-                  ),
-                ],
-              ),
-            );
-
-            _loadData();
+            // Same exit as every restore path: the restored data only shows
+            // once the app restarts (see promptRestartAfterRestore).
+            await UnifiedBackupService.promptRestartAfterRestore();
           } else {
             NotificationService.instance.showError(
               'Restore failed. Please check the backup file.',
@@ -707,17 +546,17 @@ class _BackupScreenState extends State<BackupScreen> {
             : ListView(
                 padding: AppResponsive.padding(context),
                 children: [
-                  // Backup password — retail had no way to set, change or clear it,
-                  // even though every backup is encrypted with it and the shared
-                  // service already supports all three.
-                  _buildPasswordCard(context),
-
-                  SizedBox(height: AppResponsive.mediumSpacing(context)),
-
-                  // Daily reminder — the same AutoBackupService toggle restaurant has.
-                  _buildReminderCard(context),
-
-                  SizedBox(height: AppResponsive.largeSpacing(context)),
+                  // Backup settings live here, not as separate Settings rows.
+                  // Rebuilt after every _isLoading swap, so a password set via
+                  // Create's prompt shows without an extra refresh.
+                  const SettingsSection(
+                    title: 'Backup Settings',
+                    icon: Icons.tune_rounded,
+                    children: [
+                      BackupPasswordSettingTile(),
+                      DailyBackupReminderTile(),
+                    ],
+                  ),
 
                   // Create Backup Button
                   ElevatedButton.icon(

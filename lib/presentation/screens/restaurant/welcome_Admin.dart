@@ -892,7 +892,8 @@ class _AdminWelcomeState extends State<AdminWelcome> {
         'End of Day',
         Icons.nightlight_round,
         Colors.deepOrange,
-        'cashDrawer',
+        // Same key as the route ('endDay') — a Cashier may close the day.
+        'endDay',
         () => Navigator.pushNamed(context, RouteNames.restaurantEndDay),
         entitlementKey: EntKeys.billing,
       ),

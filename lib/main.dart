@@ -485,12 +485,16 @@ class _SessionActivityWrapperState extends State<_SessionActivityWrapper> {
   }
 }
 
-/// App-wide back-button protection:
-///   • If popping navigates back inside the app (`Navigator.canPop()` is true),
-///     it pops the top screen immediately without showing any message.
-///   • If popping would exit/close the app (`Navigator.canPop()` is false), it
-///     intercepts the back press, shows a floating SnackBar ("Press back again
-///     to exit"), and requires a second back press within 2 seconds to exit.
+/// App-wide back-button protection: on a root screen, the first back press
+/// shows "Press back again to exit"; a second within 2 seconds exits.
+///
+/// This is a [WidgetsBindingObserver], not a `PopScope`: `MaterialApp.builder`
+/// sits ABOVE the Navigator, outside any route, where a PopScope never fires.
+/// `WidgetsBinding.handlePopRoute` asks observers in registration order, and
+/// WidgetsApp's own observer (registered first) runs `navigator.maybePop()`.
+/// So [didPopRoute] is reached only when no screen popped or blocked the press
+/// — i.e. exactly when the app would otherwise close. Screens with their own
+/// `PopScope(canPop: false)` keep handling back themselves.
 class _GlobalBackProtection extends StatefulWidget {
   final Widget child;
   const _GlobalBackProtection({required this.child});
@@ -499,58 +503,68 @@ class _GlobalBackProtection extends StatefulWidget {
   State<_GlobalBackProtection> createState() => _GlobalBackProtectionState();
 }
 
-class _GlobalBackProtectionState extends State<_GlobalBackProtection> {
+class _GlobalBackProtectionState extends State<_GlobalBackProtection>
+    with WidgetsBindingObserver {
   DateTime? _lastBackPress;
 
   @override
-  Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, _) {
-        if (didPop) return;
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
 
-        // If popping navigates back to a previous screen inside the app, pop normally.
-        final nav = navigatorKey.currentState;
-        if (nav != null && nav.canPop()) {
-          nav.pop();
-          return;
-        }
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
 
-        // Navigator cannot pop further — popping would exit/close the app.
-        // Prompt for double-press before exiting.
-        final now = DateTime.now();
-        if (_lastBackPress != null &&
-            now.difference(_lastBackPress!) < const Duration(seconds: 2)) {
-          SystemNavigator.pop();
-          return;
-        }
-        _lastBackPress = now;
+  @override
+  Future<bool> didPopRoute() async {
+    final now = DateTime.now();
+    if (_lastBackPress != null &&
+        now.difference(_lastBackPress!) < const Duration(seconds: 2)) {
+      SystemNavigator.pop();
+      return true;
+    }
+    _lastBackPress = now;
+    _showExitHint();
+    return true;
+  }
 
-        rootScaffoldMessengerKey.currentState?.clearSnackBars();
-        rootScaffoldMessengerKey.currentState?.showSnackBar(
-          SnackBar(
-            content: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.exit_to_app_rounded, color: Colors.white, size: 20),
-                const SizedBox(width: 10),
-                Text(
-                  'Press back again to exit',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500),
-                ),
-              ],
+  void _showExitHint() {
+    rootScaffoldMessengerKey.currentState?.clearSnackBars();
+    rootScaffoldMessengerKey.currentState?.showSnackBar(
+      SnackBar(
+        content: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.exit_to_app_rounded,
+              color: Colors.white,
+              size: 20,
             ),
-            duration: const Duration(seconds: 2),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: AppColors.primary,
-            margin: const EdgeInsets.only(bottom: 24, left: 24, right: 24),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-        );
-      },
-      child: widget.child,
+            const SizedBox(width: 10),
+            Text(
+              'Press back again to exit',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.poppins(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: AppColors.primary,
+        margin: const EdgeInsets.only(bottom: 24, left: 24, right: 24),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
     );
   }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

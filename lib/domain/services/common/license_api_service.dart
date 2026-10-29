@@ -19,6 +19,12 @@ class LicenseApiException implements Exception {
 class LicenseApiService {
   static const _timeout = Duration(seconds: 15);
 
+  /// LMS `businesscategory` for a `businesstype` code: retail 2, restaurant 3.
+  /// TEMP: until LMS accepts businesstype/subtype — the server still picks the
+  /// customer's category and trial plan from this, not from `businesstype`.
+  static int businessCategoryFor(String businessType) =>
+      businessType == 'retail' ? 2 : 3;
+
   // ── Validate Key ──────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>> validateKey(String key) async {
@@ -42,7 +48,7 @@ class LicenseApiService {
       'device': device,
       'businesstype': businessType,
       'businesssubtype': businessSubtype,
-      'businesscategory': 3, // TEMP: until LMS accepts businesstype/subtype
+      'businesscategory': businessCategoryFor(businessType),
       'businessname': businessName,
       'location': location,
     });

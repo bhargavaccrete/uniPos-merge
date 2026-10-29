@@ -98,7 +98,7 @@ class EntitlementDebug {
     // Only this mode's half of the catalog — the other vertical's keys are
     // never in this manifest.
     final missing = kEntitlementDefaults.keys
-        .where((k) => k.startsWith('retail.') == AppConfig.isRetail)
+        .where((k) => k.startsWith('retail_') == AppConfig.isRetail)
         .where((k) => !loaded.containsKey(k))
         .toList();
     b.writeln('--- 6/7. MISSING FROM MANIFEST → using DEFAULT (${missing.length}) ---');

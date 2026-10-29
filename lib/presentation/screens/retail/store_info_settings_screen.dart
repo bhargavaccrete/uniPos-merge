@@ -9,6 +9,7 @@ import 'package:billberrylite/domain/services/retail/store_settings_service.dart
 import 'package:billberrylite/core/config/app_config.dart';
 import 'package:billberrylite/core/config/food_license_rule.dart';
 import 'package:billberrylite/presentation/widget/componets/restaurant/restaurant_store_type_field.dart';
+import 'package:billberrylite/presentation/widget/componets/retail/retail_store_type_field.dart';
 import 'package:billberrylite/core/config/postal_code_rule.dart';
 import 'package:billberrylite/core/config/tax_id_rule.dart';
 import 'package:billberrylite/domain/services/restaurant/day_management_service.dart';
@@ -50,6 +51,21 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
   // the field existed; the picker is optional here so those can still save.
   String? _restaurantStoreType;
 
+  // Retail only — a `RetailStoreTypes` key. Sent to the licence server as
+  // `businesssubtype` on the next activation/check. Changing it never removes
+  // attributes: StoreTypeAttributeDefaultsService adds the new type's defaults
+  // once, additively.
+  String? _retailStoreType;
+
+  // Food licence as saved — keeps the field visible while it is being edited.
+  String? _savedFoodLicense;
+
+  bool get _showFoodLicense => FoodLicenseRule.appliesFor(
+    isRestaurant: AppConfig.isRestaurant,
+    retailStoreType: _retailStoreType,
+    number: _savedFoodLicense,
+  );
+
   // Tax registration as saved, and as currently chosen on screen. Written only
   // on Save, and only while no day is open.
   bool _savedRegistered = true;
@@ -86,12 +102,13 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
         await _storeSettingsService.getGSTNumber() ?? '';
     // Food licence is stored in Hive only — StoreSettingsService has no key
     // for it, and the receipt builders read it straight off BusinessDetails.
-    _foodLicenseController.text =
-        businessDetailsRepository.get()?.foodLicenseNo ?? '';
+    _savedFoodLicense = FoodLicenseRule.number;
+    _foodLicenseController.text = _savedFoodLicense ?? '';
     _isRegistered = _savedRegistered = TaxIdRule.isRegistered;
     // PAN, like the food licence, lives only on BusinessDetails.
     _panController.text = businessDetailsRepository.get()?.pan ?? '';
     _restaurantStoreType = businessDetailsRepository.get()?.restaurantStoreType;
+    _retailStoreType = businessDetailsRepository.get()?.retailStoreType;
     _logoBytes = await _storeSettingsService.getStoreLogo();
 
     setState(() => _isLoading = false);
@@ -218,9 +235,15 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
       if (details != null) {
         await businessDetailsRepository.save(
           details.copyWith(
-            foodLicenseNo: _foodLicenseController.text.trim(),
+            // Hidden only when nothing was saved, so '' here just drops text
+            // typed before switching to a non-food store type — it would
+            // otherwise print on bills from a field the owner can't see.
+            foodLicenseNo: _showFoodLicense
+                ? _foodLicenseController.text.trim()
+                : '',
             pan: _panController.text.trim(),
             restaurantStoreType: _restaurantStoreType,
+            retailStoreType: _retailStoreType,
           ),
         );
       }
@@ -378,6 +401,15 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
                         ),
                         SizedBox(height: AppResponsive.largeSpacing(context)),
                       ],
+                      if (AppConfig.isRetail) ...[
+                        RetailStoreTypeField(
+                          value: _retailStoreType,
+                          onChanged: (key) =>
+                              setState(() => _retailStoreType = key),
+                          required: false,
+                        ),
+                        SizedBox(height: AppResponsive.largeSpacing(context)),
+                      ],
                       _buildTaxRegistrationCard(),
                       SizedBox(height: AppResponsive.largeSpacing(context)),
                       // Hidden while "Not Registered", as on Store Details. The
@@ -408,24 +440,35 @@ class _StoreInfoSettingsScreenState extends State<StoreInfoSettingsScreen> {
                           SizedBox(height: AppResponsive.largeSpacing(context)),
                         ],
                       ],
-                      _buildTextField(
-                        controller: _foodLicenseController,
-                        label: FoodLicenseRule.label,
-                        icon: Icons.verified_user_outlined,
-                        hint: FoodLicenseRule.hint,
-                        maxLength: FoodLicenseRule.maxLength,
-                        keyboardType: FoodLicenseRule.digitsOnly
-                            ? TextInputType.number
-                            : TextInputType.text,
-                        textCapitalization: TextCapitalization.characters,
-                        inputFormatters: FoodLicenseRule.digitsOnly
-                            ? [FilteringTextInputFormatter.digitsOnly]
-                            : null,
-                        validator: FoodLicenseRule.validate,
-                      ),
-                      SizedBox(
-                        height: AppResponsive.extraLargeSpacing(context),
-                      ),
+                      // Hidden for non-food retail types; the controller still
+                      // saves its (empty) value back unchanged. Every branch
+                      // above already ends with largeSpacing, so when hidden only
+                      // the remainder is added to keep the usual section gap.
+                      if (_showFoodLicense) ...[
+                        _buildTextField(
+                          controller: _foodLicenseController,
+                          label: FoodLicenseRule.label,
+                          icon: Icons.verified_user_outlined,
+                          hint: FoodLicenseRule.hint,
+                          maxLength: FoodLicenseRule.maxLength,
+                          keyboardType: FoodLicenseRule.digitsOnly
+                              ? TextInputType.number
+                              : TextInputType.text,
+                          textCapitalization: TextCapitalization.characters,
+                          inputFormatters: FoodLicenseRule.digitsOnly
+                              ? [FilteringTextInputFormatter.digitsOnly]
+                              : null,
+                          validator: FoodLicenseRule.validate,
+                        ),
+                        SizedBox(
+                          height: AppResponsive.extraLargeSpacing(context),
+                        ),
+                      ] else
+                        SizedBox(
+                          height:
+                              AppResponsive.extraLargeSpacing(context) -
+                              AppResponsive.largeSpacing(context),
+                        ),
 
                       // Address Section
                       _buildSectionHeader('Address'),

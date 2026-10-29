@@ -42,7 +42,7 @@ import 'package:billberrylite/domain/store/restaurant/license_store.dart';
 
 // Restaurant - Home & Dashboard
 import 'package:billberrylite/presentation/screens/restaurant/welcome_Admin.dart';
-import 'package:billberrylite/presentation/screens/restaurant/usage_limit_screen.dart';
+import 'package:billberrylite/presentation/screens/common/plan/usage_limit_screen.dart';
 import 'package:billberrylite/presentation/screens/common/notifications/notifications_screen.dart';
 
 // Restaurant - Orders
@@ -92,7 +92,7 @@ import 'package:billberrylite/presentation/screens/restaurant/Reports/performanc
 import 'package:billberrylite/presentation/screens/restaurant/Settings/settingsScreen.dart';
 import 'package:billberrylite/presentation/screens/restaurant/Settings/orderSettings.dart';
 import 'package:billberrylite/presentation/screens/restaurant/Settings/paymentsMethods.dart';
-import 'package:billberrylite/presentation/screens/restaurant/Settings/changePassword.dart';
+import 'package:billberrylite/presentation/screens/common/auth/change_admin_pin_screen.dart';
 import 'package:billberrylite/presentation/screens/restaurant/Settings/licensing_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/store_info_settings_screen.dart';
 
@@ -473,7 +473,7 @@ class RestaurantRoutes {
       EntKeys.settings,
     ),
     RouteNames.restaurantChangePassword: _guard(
-      Changepassword(),
+      const ChangeAdminPinScreen(),
       'settings',
       EntKeys.settings,
     ),
@@ -528,9 +528,12 @@ class RestaurantRoutes {
     // from the license-lock screen, the upgrade blocker, and the setup wizard.
     // Guarding it bounced un-logged-in users to the PIN screen (a dead end).
     RouteNames.restaurantNeedHelp: (_) => const NeedhelpDrawer(),
+    // Entitled like its drawer entry — not a recovery path, so a direct route
+    // must not bypass the plan check the in-app entries apply.
     RouteNames.restaurantCustomizationDrawer: _guard(
       const CustomizationDrawer(),
       'settings',
+      EntKeys.settings,
     ),
     RouteNames.restaurantTestData: _guard(const TestDataScreen(), 'settings'),
     RouteNames.restaurantBulkImport: _guard(
