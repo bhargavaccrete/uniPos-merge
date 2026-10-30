@@ -27,6 +27,7 @@ import '../../../../domain/services/restaurant/inventory_service.dart';
 import '../../../../domain/services/restaurant/kot_layout.dart';
 import '../../../../domain/services/restaurant/kot_status_rule.dart';
 import '../../../../domain/services/restaurant/order_line_cancel.dart';
+import '../../../../domain/services/restaurant/paid_order_record.dart';
 import '../../../../util/common/app_responsive.dart';
 
 class Activeorder extends StatefulWidget {
@@ -1487,33 +1488,13 @@ class _ActiveorderState extends State<Activeorder> {
     final int billNumber =
         latestOrder.billNumber ?? await orderStore.getNextBillNumber();
 
-    final pastOrder = PastOrderModel(
-      id: latestOrder.id,
-      customerName: latestOrder.customerName,
-      totalPrice: latestOrder.totalPrice,
-      items: latestOrder.items,
-      orderAt: latestOrder.timeStamp,
-      orderType: latestOrder.orderType,
-      paymentmode: latestOrder.paymentMethod ?? 'N/A',
-      subTotal: latestOrder.subTotal,
-      gstAmount: latestOrder.gstAmount,
-      Discount: latestOrder.discount,
-      remark: latestOrder.remark,
-      kotNumbers: latestOrder.kotNumbers,
-      kotBoundaries: latestOrder.kotBoundaries,
+    // Same record as End of Day builds: payment, points, customer, shift.
+    final pastOrder = PaidOrderRecord.toPastOrder(
+      latestOrder,
       billNumber: billNumber,
-      isSplitPayment: latestOrder.isSplitPayment,
-      paymentListJson: latestOrder.paymentListJson,
-      totalPaid: latestOrder.totalPaid,
-      changeReturn: latestOrder.changeReturn,
-      tableNo: latestOrder.tableNo,
-      sessionId: latestOrder.sessionId,
-      serviceCharge: latestOrder.serviceCharge,
-      isTaxInclusive: latestOrder.isTaxInclusive,
-      taxEnabled: TaxFeature.enabled,
       storeGstNumber: await StoreSettingsService().gstNumberSnapshot(),
-      roundOffStep: AppSettings.roundOffStepForRecord,
-      discountOnItems: AppSettings.discountOnItems,
+      currentShiftId: RestaurantSession.currentShiftId,
+      paymentModeFallback: 'N/A',
     );
 
     await pastOrderStore.addOrder(pastOrder);

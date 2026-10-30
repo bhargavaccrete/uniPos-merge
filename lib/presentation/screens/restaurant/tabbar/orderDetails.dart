@@ -33,6 +33,7 @@ class Orderdetails extends StatefulWidget {
 
 class _OrderdetailsState extends State<Orderdetails> {
   late PastOrderModel currentOrder;
+  bool _refunding = false; // a refund is open or being saved
 
   @override
   void initState() {
@@ -1230,7 +1231,26 @@ class _OrderdetailsState extends State<Orderdetails> {
     );
   }
 
+  /// Reloads [currentOrder] from the saved order, so the screen never refunds
+  /// from (or shows) an out-of-date copy.
+  Future<void> _reloadCurrentOrder() async {
+    final latest = await pastOrderStore.getOrderById(currentOrder.id);
+    if (latest != null && mounted) setState(() => currentOrder = latest);
+  }
+
   Future<void> _showRefundDialog(BuildContext context) async {
+    // One refund at a time from this screen: further taps are ignored until
+    // the current one has been saved (or refused) and the order reloaded.
+    if (_refunding) return;
+    _refunding = true;
+    try {
+      await _openRefundDialog(context);
+    } finally {
+      _refunding = false;
+    }
+  }
+
+  Future<void> _openRefundDialog(BuildContext context) async {
     // A refund needs an open session; tell the user before the dialog opens.
     // RefundService.processRefund enforces the same rule.
     if (!await DayManagementService.isSessionOpen()) {
@@ -1238,6 +1258,10 @@ class _OrderdetailsState extends State<Orderdetails> {
           .showInfo(RefundService.refundNeedsOpenSessionMessage);
       return;
     }
+
+    // Work from the order as saved, not the copy this screen was opened with.
+    await _reloadCurrentOrder();
+    if (!context.mounted) return;
 
     // Validate refund eligibility using store
     final eligibilityError = pastOrderStore.validateRefundEligibility(
@@ -1286,9 +1310,6 @@ class _OrderdetailsState extends State<Orderdetails> {
     );
 
     if (updatedOrder != null) {
-      // Update UI state
-      setState(() => currentOrder = updatedOrder);
-
       // Show success message
       NotificationService.instance.showSuccess(
         'Refund processed: ${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(result.totalRefundAmount)}',
@@ -1299,6 +1320,9 @@ class _OrderdetailsState extends State<Orderdetails> {
         pastOrderStore.errorMessage ?? 'Failed to process refund',
       );
     }
+
+    // Either way, show the order as it is now saved.
+    await _reloadCurrentOrder();
   }
 
   // Business logic has been moved to RefundService and InventoryService

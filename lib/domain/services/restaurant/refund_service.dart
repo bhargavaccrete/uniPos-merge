@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import '../../../core/di/service_locator.dart';
@@ -77,6 +78,46 @@ class RefundService {
     if (!await DayManagementService.isSessionOpen()) {
       throw Exception(refundNeedsOpenSessionMessage);
     }
+    // L1: the [order] a screen passes in may be an old copy (opened from a
+    // list loaded earlier, or a second tap before the first refund saved).
+    // Refunds of one order run one at a time, and each works from the order
+    // as SAVED — so limits are checked against current data and the save
+    // never overwrites a refund made in between.
+    return _oneAtATime(order.id, () async {
+      final latest = await pastOrderStore.getOrderById(order.id);
+      if (latest == null) {
+        throw Exception('This order could not be found. Refresh and try again.');
+      }
+      return _refundLatest(latest, refundResult);
+    });
+  }
+
+  /// Refunds in flight, by order id; see [_oneAtATime].
+  static final Map<String, Future<void>> _refundsInFlight = {};
+
+  /// Runs [body] for [orderId] only after any earlier refund of that order
+  /// has finished, so two refunds never read the same saved state.
+  static Future<T> _oneAtATime<T>(
+      String orderId, Future<T> Function() body) async {
+    final previous = _refundsInFlight[orderId];
+    final done = Completer<void>();
+    _refundsInFlight[orderId] = done.future;
+    try {
+      if (previous != null) await previous;
+      return await body();
+    } finally {
+      done.complete();
+      if (identical(_refundsInFlight[orderId], done.future)) {
+        _refundsInFlight.remove(orderId);
+      }
+    }
+  }
+
+  /// The refund itself, applied to the latest saved [order].
+  static Future<PastOrderModel> _refundLatest(
+    PastOrderModel order,
+    PartialRefundResult refundResult,
+  ) async {
     try {
       // BLK-06: checked before any write. A refund never pays back more than
       // is still refundable (what was paid minus earlier refunds), and never
@@ -201,7 +242,11 @@ class RefundService {
         refundEventsJson: RefundEvent.encodeAll(events),
       );
 
-      await pastOrderStore.updateOrder(updatedOrder);
+      // L1b: the store reports a failed save as `false` rather than throwing.
+      // Stop here, before stock or loyalty points change.
+      if (!await pastOrderStore.updateOrder(updatedOrder)) {
+        throw Exception('The refund could not be saved. Nothing was refunded.');
+      }
 
       // Restore stock for items marked for restocking — per line, from each
       // line's stamp (what its sale actually took).
@@ -376,18 +421,38 @@ class RefundService {
           ? 'Admin'
           : '${RestaurantSession.staffName ?? RestaurantSession.effectiveRole} (${RestaurantSession.effectiveRole})';
 
-      final voidedOrder = order.copyWith(
-        orderStatus: 'VOIDED',
-        refundReason: reason.isNotEmpty ? 'VOIDED: $reason' : 'VOIDED: No reason provided',
-        refundedAt: DateTime.now(),
-        voidedBy: _staffLabel,
-      );
+      // Like a refund (L1): one operation per order at a time, built from the
+      // order as SAVED — a stale copy would otherwise write back an older
+      // refundAmount, refund history and refunded/restocked quantities,
+      // re-opening refunds and restocks that already happened.
+      return await _oneAtATime(order.id, () async {
+        final latest = await pastOrderStore.getOrderById(order.id);
+        if (latest == null) {
+          throw Exception(
+              'This order could not be found. Refresh and try again.');
+        }
 
-      await pastOrderStore.updateOrder(voidedOrder);
+        // Earlier refund notes are kept; the void is added as its own line.
+        final voidLine = reason.isNotEmpty
+            ? 'VOIDED: $reason'
+            : 'VOIDED: No reason provided';
+        final notes = latest.refundReason ?? '';
+        final voidedOrder = latest.copyWith(
+          orderStatus: 'VOIDED',
+          refundReason: notes.isEmpty ? voidLine : '$notes\n$voidLine',
+          refundedAt: DateTime.now(),
+          voidedBy: _staffLabel,
+        );
 
-      // Past orders (already served/paid) — stock was legitimately consumed, no restore.
+        // The store reports a failed save as `false`; never report success.
+        if (!await pastOrderStore.updateOrder(voidedOrder)) {
+          throw Exception('The void could not be saved. The order is unchanged.');
+        }
 
-      return voidedOrder;
+        // Past orders (already served/paid) — stock was legitimately consumed, no restore.
+
+        return voidedOrder;
+      });
     } catch (e, stackTrace) {
       rethrow;
     }

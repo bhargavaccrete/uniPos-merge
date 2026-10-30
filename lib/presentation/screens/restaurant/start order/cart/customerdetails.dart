@@ -22,6 +22,7 @@ import '../../../../widget/restaurant/opening_balance_dialog.dart';
 import '../../../../../domain/services/restaurant/inventory_service.dart';
 import '../../../../../domain/services/restaurant/settle_line_commit.dart';
 import '../../../../../domain/services/restaurant/notification_service.dart';
+import '../../../../../domain/services/restaurant/paid_order_record.dart';
 import '../../../../../util/common/app_responsive.dart';
 import '../../../../../util/common/currency_helper.dart';
 import '../../../../../util/common/loyalty_points.dart';
@@ -120,9 +121,6 @@ class _CustomerdetailsState extends State<Customerdetails> {
   @override
   void initState() {
     super.initState();
-    _amountController.addListener(() => setState(() {}));
-    _amountpercentageContorller.addListener(() => setState(() {}));
-    _serviceChargeController.addListener(() => setState(() {}));
 
     _nameController = TextEditingController(
         text: widget.existingModel?.customerName ?? '');
@@ -130,6 +128,26 @@ class _CustomerdetailsState extends State<Customerdetails> {
         text: widget.existingModel?.customerEmail ?? '');
     _mobileController = TextEditingController(
         text: widget.existingModel?.customerNumber ?? '');
+
+    // Paying a saved order: start from its discount and service charge, not
+    // empty — otherwise this payment drops them and overwrites the saved ones.
+    if (widget.existingModel != null) {
+      final saved = PaidOrderRecord.prefill(widget.existingModel!,
+          isDelivery: widget.orderType == 'Delivery');
+      if (saved.discountAmount > 0) {
+        discountApply = true;
+        _selectedDiscountType = DiscountType.amount;
+        _amountController.text = _prefillText(saved.discountAmount);
+      }
+      if (saved.serviceChargeValue > 0) {
+        servicechargeapply = true;
+        _serviceChargeController.text = _prefillText(saved.serviceChargeValue);
+      }
+    }
+    // After the pre-fill, so filling the fields doesn't call setState here.
+    _amountController.addListener(() => setState(() {}));
+    _amountpercentageContorller.addListener(() => setState(() {}));
+    _serviceChargeController.addListener(() => setState(() {}));
 
     // Auto-load existing customer so points toggle shows on settle screen
     final hasPhone = widget.existingModel?.customerNumber?.trim().isNotEmpty == true;
@@ -139,6 +157,12 @@ class _CustomerdetailsState extends State<Customerdetails> {
     }
 
     // Currency is loaded in main.dart via CurrencyHelper.load()
+  }
+
+  /// A pre-filled amount or %: up to 4 decimals, no trailing zeros.
+  static String _prefillText(double v) {
+    final s = v.toStringAsFixed(4).replaceFirst(RegExp(r'\.?0+$'), '');
+    return s.isEmpty ? '0' : s;
   }
 
   Future<void> _loadExistingCustomer() async {
@@ -1340,15 +1364,13 @@ class _CustomerdetailsState extends State<Customerdetails> {
     final bool settledInFull = newTotalPaid >= targetTotal - 0.01;
     final bool mergedIsSplit = mergedPaymentList.length > 1;
 
-    // Lines + KOT bookkeeping come from the commit.
-    final OrderModel completedOrder = commit.order.copyWith(
+    // Lines + KOT bookkeeping come from the commit; totals, tax, points,
+    // discount staff and shift from this payment (PaidOrderRecord).
+    final OrderModel completedOrder = PaidOrderRecord.applyPayment(
+      commit.order.copyWith(
       customerName: _nameController.text.trim(),
       customerNumber: _mobileController.text.trim(),
       customerEmail: _emailController.text.trim(),
-      discount: calculations.discountAmount,
-      // serviceCharge: widget.orderType == 'Delivery'?calculations.deliveryCharge: calculations.serviceChargeAmount,
-      serviceCharge: calculations.serviceChargeAmount,
-      totalPrice: calculations.grandTotal, // net payable (points folded into GST base)
       paymentMethod: mergedIsSplit ? 'Split Payment' : _paymentEntries.first.method,
       completedAt: DateTime.now(),
       status: calculatedStatus,
@@ -1362,6 +1384,13 @@ class _CustomerdetailsState extends State<Customerdetails> {
       totalPaid: newTotalPaid,
       changeReturn: _changeReturn,
       sessionId: currentSessionId ?? widget.existingModel!.sessionId, // Ensure sessionId is preserved/attached
+      ),
+      calculations,
+      pointsUsed: pointsUsed,
+      discountAppliedBy: RestaurantSession.isAdmin
+          ? 'Admin'
+          : '${RestaurantSession.staffName ?? RestaurantSession.effectiveRole} (${RestaurantSession.effectiveRole})',
+      shiftId: RestaurantSession.currentShiftId,
     );
     try {
       // For Dine In orders that haven't been served yet: just record the payment

@@ -17,6 +17,7 @@ import '../../../../../domain/services/restaurant/kot_layout.dart';
 import '../../../../../domain/services/restaurant/kot_status_rule.dart';
 import '../../../../../domain/services/restaurant/line_stock.dart';
 import '../../../../../domain/services/restaurant/order_line_cancel.dart';
+import '../../../../../domain/services/restaurant/saved_service_charge.dart';
 import '../../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../../util/common/currency_helper.dart';
 import '../../../../../util/restaurant/staticswitch.dart';
@@ -1108,17 +1109,8 @@ class _TakeawayState extends State<Takeaway> {
 
     final bool taxInclusive =
         existing.isTaxInclusive ?? AppSettings.isTaxInclusive;
-    final calc = CartCalculationService(
-      items: newSavedItems,
-      discountType: DiscountType.amount,
-      discountValue: existing.discount ?? 0.0,
-      serviceChargePercentage: widget.isdelivery
-          ? 0.0
-          : (existing.serviceCharge ?? 0.0),
-      deliveryCharge: widget.isdelivery ? (existing.serviceCharge ?? 0.0) : 0.0,
-      isDeliveryOrder: widget.isdelivery,
-      isTaxInclusive: taxInclusive,
-    );
+    final calc = SavedServiceCharge.calculate(existing, newSavedItems,
+        isDelivery: widget.isdelivery);
 
     // If the last active item is being cancelled AND nothing new is pending,
     // the order is empty → remove it entirely instead of leaving a blank active
@@ -1141,6 +1133,8 @@ class _TakeawayState extends State<Takeaway> {
               ? calc.subtotal - calc.totalGST
               : calc.subtotal,
           gstAmount: calc.totalGST,
+          // The new amount, so a later recalculation finds the same %.
+          serviceCharge: calc.serviceChargeAmount,
         ),
       );
     }
@@ -1985,42 +1979,18 @@ class _TakeawayState extends State<Takeaway> {
       (sum, w) => sum + w.item.quantity,
     );
 
-    // ✅ FIX: Use saved values from existing order to show correct total
-    final double discountValue;
-    final double serviceChargeValue;
-    final double deliveryChargeValue;
-
-    if (widget.isexisting && widget.existingModel != null) {
-      // Use the saved values from the existing order
-      discountValue = widget.existingModel!.discount ?? 0.0;
-      // For delivery orders, serviceCharge field stores the delivery charge
-      if (widget.isdelivery) {
-        serviceChargeValue = 0.0;
-        deliveryChargeValue = widget.existingModel!.serviceCharge ?? 0.0;
-      } else {
-        serviceChargeValue = widget.existingModel!.serviceCharge ?? 0.0;
-        deliveryChargeValue = 0.0;
-      }
-    } else {
-      // For new orders, use default values
-      discountValue = 0.0;
-      serviceChargeValue = 0.0;
-      deliveryChargeValue = 0.0;
-    }
-
-    // ✅ 1. Create an instance of the service here with correct values
-    final calculations = CartCalculationService(
-      items: plainItems,
-      discountType: DiscountType.amount,
-      discountValue: discountValue,
-      serviceChargePercentage: serviceChargeValue,
-      deliveryCharge: deliveryChargeValue,
-      isDeliveryOrder: widget.isdelivery,
-      // Use stored tax mode from existing order, or current app setting for new orders
-      isTaxInclusive: widget.isexisting
-          ? (widget.existingModel?.isTaxInclusive ?? AppSettings.isTaxInclusive)
-          : AppSettings.isTaxInclusive,
-    );
+    // An existing order is priced with its saved discount, service charge %
+    // (or delivery charge) and tax mode; a new order with none of them.
+    final calculations = (widget.isexisting && widget.existingModel != null)
+        ? SavedServiceCharge.calculate(widget.existingModel!, plainItems,
+            isDelivery: widget.isdelivery)
+        : CartCalculationService(
+            items: plainItems,
+            discountType: DiscountType.amount,
+            discountValue: 0.0,
+            isDeliveryOrder: widget.isdelivery,
+            isTaxInclusive: AppSettings.isTaxInclusive,
+          );
 
     final height = MediaQuery.of(context).size.height;
     final width = MediaQuery.of(context).size.width;

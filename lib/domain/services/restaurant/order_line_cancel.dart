@@ -1,9 +1,9 @@
 import '../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../util/restaurant/staticswitch.dart';
-import 'cart_calculation_service.dart';
 import 'kot_layout.dart';
 import 'kot_status_rule.dart';
+import 'saved_service_charge.dart';
 
 /// The saved order after cancelling part or all of one KOT'd line.
 class OrderLineCancelResult {
@@ -38,8 +38,9 @@ class OrderLineCancel {
   /// void, which also records the payment correctly.
   ///
   /// Totals are recomputed the way an existing order is everywhere else
-  /// (takeaway.dart, RestaurantPrintHelper.printBillForActiveOrder): saved
-  /// discount amount, service charge % (or delivery charge), stored tax mode.
+  /// ([SavedServiceCharge]): saved discount amount, the service charge at its
+  /// original % on the remaining lines (or the flat delivery charge), stored
+  /// tax mode.
   static OrderLineCancelResult? forActiveOrders(
     OrderModel order, {
     required int itemIndexInOrder,
@@ -58,15 +59,8 @@ class OrderLineCancel {
 
     final bool isDelivery = order.orderType.toLowerCase().contains('delivery');
     final bool taxInclusive = order.isTaxInclusive ?? AppSettings.isTaxInclusive;
-    final calc = CartCalculationService(
-      items: layout.items,
-      discountType: DiscountType.amount,
-      discountValue: order.discount ?? 0.0,
-      serviceChargePercentage: isDelivery ? 0.0 : (order.serviceCharge ?? 0.0),
-      deliveryCharge: isDelivery ? (order.serviceCharge ?? 0.0) : 0.0,
-      isDeliveryOrder: isDelivery,
-      isTaxInclusive: taxInclusive,
-    );
+    final calc = SavedServiceCharge.calculate(order, layout.items,
+        isDelivery: isDelivery);
 
     return OrderLineCancelResult(
       order: order.copyWith(
@@ -78,6 +72,8 @@ class OrderLineCancel {
         totalPrice: calc.grandTotal,
         subTotal: taxInclusive ? calc.subtotal - calc.totalGST : calc.subtotal,
         gstAmount: calc.totalGST,
+        // The new amount, so a later recalculation finds the same %.
+        serviceCharge: calc.serviceChargeAmount,
       ),
       cancelled: item,
     );

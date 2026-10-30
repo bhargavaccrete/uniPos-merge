@@ -22,6 +22,7 @@ import 'package:billberrylite/data/models/common/attendance_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/eodmodel_317.dart';
 import 'package:billberrylite/data/models/restaurant/db/pastordermodel_313.dart';
 import 'package:billberrylite/domain/services/restaurant/kot_layout.dart';
+import 'package:billberrylite/domain/services/restaurant/paid_order_record.dart';
 import '../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../start order/startorder.dart';
 import '../start order/cart/cart.dart';
@@ -601,36 +602,13 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
   /// No inventory change (stock already deducted). Returns the past record.
   Future<PastOrderModel> _completeServiceForOrder(OrderModel o) async {
     final int billNumber = o.billNumber ?? await orderStore.getNextBillNumber();
-    final pastOrder = PastOrderModel(
-      id: o.id,
-      customerName: o.customerName,
-      totalPrice: o.totalPrice,
-      items: o.items,
-      orderAt: o.timeStamp,
-      orderType: o.orderType,
-      paymentmode: o.paymentMethod ?? 'Cash',
-      subTotal: o.subTotal,
-      Discount: o.discount,
-      gstRate: o.gstRate,
-      gstAmount: o.gstAmount,
-      kotNumbers: o.kotNumbers,
-      kotBoundaries: o.kotBoundaries,
+    // Same record as Active Orders builds; the shift is the one that took
+    // the payment, not the one open at End of Day.
+    final pastOrder = PaidOrderRecord.toPastOrder(
+      o,
       billNumber: billNumber,
-      isTaxInclusive: o.isTaxInclusive,
-      taxEnabled: TaxFeature.enabled,
       storeGstNumber: await StoreSettingsService().gstNumberSnapshot(),
-      roundOffStep: AppSettings.roundOffStepForRecord,
-      discountOnItems: AppSettings.discountOnItems,
-      shiftId: RestaurantSession.currentShiftId,
-      sessionId: o.sessionId,
-      orderStatus: 'COMPLETED',
-      paymentListJson: o.paymentListJson,
-      isSplitPayment: o.isSplitPayment,
-      totalPaid: o.totalPaid,
-      changeReturn: o.changeReturn,
-      tableNo: o.tableNo,
-      customerId: o.customerId,
-      serviceCharge: o.serviceCharge,
+      currentShiftId: RestaurantSession.currentShiftId,
     );
     await pastOrderStore.addOrder(pastOrder);
     await orderStore.deleteOrder(o.id);
