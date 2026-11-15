@@ -123,10 +123,38 @@ class NotificationPresenter {
         final amount = qty == null ? '' : ' by $qty $unit';
         return NotificationView(
           title: 'Stock Check Needed',
-          body: '$name may be off$amount after an interrupted sale. '
+          body: '$name may be off$amount after an interrupted '
+              '${d['context'] ?? 'sale'}. '
               'Count it and adjust stock.',
           severity: AlertSeverity.warning,
           icon: Icons.fact_check_outlined,
+          channelId: NotificationChannels.appAlerts,
+        );
+
+      // A Retail sale finished by startup recovery after an interruption
+      // (RetailCheckoutCommit): it is complete, but no receipt was printed.
+      case 'retail_sale_recovered':
+        return NotificationView(
+          title: 'Sale Finished After Interruption',
+          body: 'Sale ${d['invoice'] ?? ''} was completed after the app '
+              'stopped. Its receipt was not printed — reprint it from sales '
+              'history. Do not bill it again.',
+          severity: AlertSeverity.warning,
+          icon: Icons.receipt_long_outlined,
+          channelId: NotificationChannels.appAlerts,
+        );
+
+      // A customer update of an interrupted Retail sale met data changed by
+      // something else: never guessed, so a person checks it.
+      case 'retail_customer_check_needed':
+        return NotificationView(
+          title: 'Customer Account Check Needed',
+          body: 'Sale ${d['invoice'] ?? ''}: the customer\'s balance or '
+              'points changed while the sale was interrupted, so this update '
+              'was not applied automatically. Check the account and correct '
+              'it.',
+          severity: AlertSeverity.warning,
+          icon: Icons.manage_accounts_outlined,
           channelId: NotificationChannels.appAlerts,
         );
 

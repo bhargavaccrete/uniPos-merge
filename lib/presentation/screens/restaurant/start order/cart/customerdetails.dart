@@ -19,8 +19,9 @@ import '../../../../../data/models/restaurant/db/pastordermodel_313.dart';
 import '../../../../../domain/services/restaurant/cart_calculation_service.dart';
 import '../../../../../domain/services/restaurant/day_management_service.dart';
 import '../../../../widget/restaurant/opening_balance_dialog.dart';
-import '../../../../../domain/services/restaurant/inventory_service.dart';
 import '../../../../../domain/services/restaurant/settle_line_commit.dart';
+import '../../../../../domain/services/restaurant/settle_new_order.dart';
+import '../../../../../domain/services/restaurant/order_close.dart';
 import '../../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../../domain/services/restaurant/paid_order_record.dart';
 import '../../../../../util/common/app_responsive.dart';
@@ -1301,6 +1302,14 @@ class _CustomerdetailsState extends State<Customerdetails> {
     } on SettleBlockedException catch (e) {
       NotificationService.instance.showError(e.message);
       return;
+    } on OrderChangedElsewhereException catch (e) {
+      // INVX-1: nothing of this settle was written — no KOT, payment or stock.
+      NotificationService.instance.showError(e.message);
+      return;
+    } on SettleStockShortException catch (e) {
+      // Nothing of this settle was written — no KOT, payment or stock.
+      NotificationService.instance.showError(e.message);
+      return;
     } on SettleStockIncompleteException catch (e) {
       // Lines are saved and the unfinished stock is journaled; a retry
       // finishes it without deducting anything twice.
@@ -1434,7 +1443,9 @@ class _CustomerdetailsState extends State<Customerdetails> {
 
         // Store the bill number on the order so later prints use the same number
         final orderWithBill = completedOrder.copyWith(billNumber: billNumber);
-        await orderStore.updateOrder(orderWithBill);
+        // A failed save throws into the catch below — before the cart, the
+        // points and the success dialog (SALE-11).
+        await OrderClose.saveActive(orderWithBill);
         await restaurantCartStore.clearCart();
         if (selectedCustomer != null) {
           if (pointsUsed > 0) {
@@ -1534,14 +1545,10 @@ class _CustomerdetailsState extends State<Customerdetails> {
       totalPaid: activeModel.totalPaid,
       changeReturn: activeModel.changeReturn,
     );
-    // Idempotency guard: if this order is already in pastOrderBox (crash on previous
-    // attempt between addOrder and deleteOrder), skip the write and just clean up.
-    final alreadySettled = await pastOrderStore.getOrderById(activeModel.id);
-    if (alreadySettled == null) {
-      await pastOrderStore.addOrder(pastOrder);
-    }
-    // Always attempt delete — harmless if already deleted after a crash.
-    await orderStore.deleteOrder(activeModel.id);
+    // Saved first, removed only once saved; an existing record (a crash on an
+    // earlier attempt) is not written again. A failed save throws, so the
+    // caller stops before clearing the cart or reporting success (SALE-4).
+    await OrderClose.moveToPast(pastOrder, orderId: activeModel.id);
 
     return billNumber; // Return the generated bill number
   }
@@ -1551,7 +1558,8 @@ class _CustomerdetailsState extends State<Customerdetails> {
     // Note: calculations.subtotal is already the base price (without tax)
     // CartCalculationService handles tax extraction for tax-inclusive mode
 
-    final int newKotNumber = await orderStore.getNextKotNumber();
+    // KOT number: taken per branch below — for Settle & Print only once the
+    // stock check has passed (S-04B), so a refused order uses none.
     final String newId = Uuid().v4();
     final List<CartItem> orderItems = widget.cartitems ?? [];
 
@@ -1565,56 +1573,69 @@ class _CustomerdetailsState extends State<Customerdetails> {
 
     // Check if this is a "Settle & Print" operation (immediate completion)
     if (widget.isSettle == true) {
-      // Generate bill number for immediate settlement
-      final int billNumber = await orderStore.getNextBillNumber();
-
-      // Stamped lines: a later refund restores what each sale actually took.
-      final salePlan = await InventoryService.planSale(orderItems);
-
-      // Create completed order directly (skip active orders)
-      final pastOrder = PastOrderModel(
-        id: newId,
-        customerName: _nameController.text.trim(),
-        totalPrice: calculations.grandTotal, // net payable (points folded into GST base)
-        items: salePlan.lines,
-        orderAt: DateTime.now(),
-        orderType: widget.orderType ?? 'Take Away',
-        paymentmode: paymentMethodDisplay,
-        remark: calculations.discountAmount > 0.009 ? SelectedRemark : 'no Remark',
-        Discount: calculations.discountAmount, // regular discount only
-        subTotal: calculations.subtotal,
-        gstRate: 0,
-        gstAmount: calculations.totalGST,
-        kotNumbers: [newKotNumber],
-        kotBoundaries: [orderItems.length],
-        billNumber: billNumber, // Daily bill number
-        // Split payment fields
-        paymentListJson: jsonEncode(paymentList),
-        isSplitPayment: isSplit,
-        totalPaid: _totalPaid,
-        changeReturn: _changeReturn,
-        isTaxInclusive: AppSettings.isTaxInclusive, // Store tax mode at order creation
-        taxEnabled: TaxFeature.enabled,
-        storeGstNumber: await StoreSettingsService().gstNumberSnapshot(),
-        roundOffStep: AppSettings.roundOffStepForRecord,
-        discountOnItems: AppSettings.discountOnItems,
-        tableNo: widget.orderType == 'Dine In' ? widget.tableid : null,
-        loyaltyPointsUsed: pointsUsed > 0 ? pointsUsed : null,
-        shiftId: RestaurantSession.currentShiftId,
-        sessionId: currentSessionId, // Link to POS session
-        discountAppliedBy: calculations.discountAmount > 0.009
-            ? (RestaurantSession.isAdmin ? 'Admin' : '${RestaurantSession.staffName ?? RestaurantSession.effectiveRole} (${RestaurantSession.effectiveRole})')
-            : null,
-        customerId: selectedCustomer?.customerId,
-        serviceCharge: calculations.serviceChargeAmount,
-      );
+      // S-04B: stock check, KOT + bill numbers, the bill write and the stock
+      // deduction run as ONE operation in the app-wide StockGate (same rule as
+      // Place Order and Captain). Refused → nothing written. A failed save
+      // throws before any stock is deducted.
+      final SettleNewOrderResult commit;
+      try {
+        commit = await SettleNewOrder.commit(
+          items: orderItems,
+          // Stamped lines: a later refund restores what each sale actually took.
+          build: (stampedLines, kotNumber, billNumber) async => PastOrderModel(
+            id: newId,
+            customerName: _nameController.text.trim(),
+            totalPrice: calculations.grandTotal, // net payable (points folded into GST base)
+            items: stampedLines,
+            orderAt: DateTime.now(),
+            orderType: widget.orderType ?? 'Take Away',
+            paymentmode: paymentMethodDisplay,
+            remark: calculations.discountAmount > 0.009 ? SelectedRemark : 'no Remark',
+            Discount: calculations.discountAmount, // regular discount only
+            subTotal: calculations.subtotal,
+            gstRate: 0,
+            gstAmount: calculations.totalGST,
+            kotNumbers: [kotNumber],
+            kotBoundaries: [orderItems.length],
+            billNumber: billNumber, // Daily bill number
+            // Split payment fields
+            paymentListJson: jsonEncode(paymentList),
+            isSplitPayment: isSplit,
+            totalPaid: _totalPaid,
+            changeReturn: _changeReturn,
+            isTaxInclusive: AppSettings.isTaxInclusive, // Store tax mode at order creation
+            taxEnabled: TaxFeature.enabled,
+            storeGstNumber: await StoreSettingsService().gstNumberSnapshot(),
+            roundOffStep: AppSettings.roundOffStepForRecord,
+            discountOnItems: AppSettings.discountOnItems,
+            tableNo: widget.orderType == 'Dine In' ? widget.tableid : null,
+            loyaltyPointsUsed: pointsUsed > 0 ? pointsUsed : null,
+            shiftId: RestaurantSession.currentShiftId,
+            sessionId: currentSessionId, // Link to POS session
+            discountAppliedBy: calculations.discountAmount > 0.009
+                ? (RestaurantSession.isAdmin ? 'Admin' : '${RestaurantSession.staffName ?? RestaurantSession.effectiveRole} (${RestaurantSession.effectiveRole})')
+                : null,
+            customerId: selectedCustomer?.customerId,
+            serviceCharge: calculations.serviceChargeAmount,
+          ),
+        );
+      } catch (e) {
+        NotificationService.instance.showError(
+          'Failed to settle order: $e',
+        );
+        return;
+      }
+      if (commit.refused) {
+        NotificationService.instance.showError(
+          'Cannot settle order: insufficient stock — ${commit.sale.message}',
+        );
+        return;
+      }
+      final PastOrderModel pastOrder = commit.order!;
+      final int billNumber = commit.billNumber!;
+      final int newKotNumber = commit.kotNumber!;
 
       try {
-        await pastOrderStore.addOrder(pastOrder);
-
-        // Deduct stock for direct settlement (order not placed first)
-        await InventoryService.applyPlannedUnits(salePlan.units);
-
         // Update customer stats if customer is linked
         if (selectedCustomer != null) {
           if (pointsUsed > 0) {
@@ -1675,6 +1696,7 @@ class _CustomerdetailsState extends State<Customerdetails> {
     }
 
     // Regular order placement (for kitchen - active order)
+    final int newKotNumber = await orderStore.getNextKotNumber();
     final newOrder = OrderModel(
       id: newId,
       // kotNumber removed - using kotNumbers only

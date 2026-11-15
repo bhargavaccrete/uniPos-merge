@@ -10,6 +10,7 @@ import 'package:billberrylite/core/constants/hive_box_names.dart';
 import 'package:billberrylite/data/models/common/categorymodel_300.dart';
 import 'package:billberrylite/data/models/restaurant/db/item_cancellation_model_134.dart';
 import 'package:billberrylite/data/models/restaurant/db/itemmodel_302.dart';
+import 'package:billberrylite/data/models/restaurant/db/saved_printer_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/session_model.dart';
 import 'package:billberrylite/domain/services/common/unified_backup_service.dart';
 
@@ -198,17 +199,40 @@ void main() {
     expect(sessions().keys, ['sess-device']);
   });
 
-  test('an unreadable tolerated section is left as it was and reported',
+  // BKP-9 (approved): itemCancellations is a critical section, so an
+  // unreadable one refuses the whole restore instead of being skipped.
+  test('an unreadable itemCancellations refuses the restore, device unchanged',
       () async {
+    final before = await deviceState(tempDir);
     final bad = copy(backup);
     (bad['data'] as Map<String, dynamic>)['itemCancellations'] = ['not a record'];
 
+    await expectLater(
+      UnifiedBackupService.restoreDecodedBackupForTesting(bad),
+      throwsA(isA<RestoreRefusedException>()
+          .having((e) => e.sections, 'sections', ['itemCancellations'])),
+    );
+
+    expect(await deviceState(tempDir), before);
+    expect(cancellations().keys, ['c-device']);
+    expect(categories().keys, ['cat-device'],
+        reason: 'nothing else from the backup was written either');
+    expect(UnifiedBackupService.lastRestoreSkippedSections, isEmpty);
+  });
+
+  test('an unreadable non-critical section is left as it was and reported',
+      () async {
+    final printersBox = Hive.box<SavedPrinterModel>(HiveBoxNames.restaurantPrinters);
+    await printersBox.clear();
+    await printersBox.put('pr-device', SavedPrinterModel(
+        id: 'pr-device', name: 'Kitchen', type: 'wifi', address: '10.0.0.9'));
+    final bad = copy(backup);
+    (bad['data'] as Map<String, dynamic>)['printers'] = ['not a record'];
+
     await UnifiedBackupService.restoreDecodedBackupForTesting(bad);
 
-    expect(cancellations().keys, ['c-device'],
-        reason: 'not silently emptied');
-    expect(UnifiedBackupService.lastRestoreSkippedSections,
-        ['itemCancellations']);
+    expect(printersBox.keys, ['pr-device'], reason: 'not silently emptied');
+    expect(UnifiedBackupService.lastRestoreSkippedSections, ['printers']);
     expect(categories().keys, ['cat-backup'],
         reason: 'the rest of the backup was restored');
   });

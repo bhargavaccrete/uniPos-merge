@@ -6,15 +6,24 @@ import '../../../core/plan/entitlement_keys.dart';
 import '../../../core/plan/plan_enforcement.dart';
 import '../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../data/models/restaurant/db/pastordermodel_313.dart';
+import '../../../util/restaurant/refund_allocation.dart';
 import '../../../util/restaurant/restaurant_session.dart';
 import '../../../util/restaurant/staticswitch.dart';
 import 'day_management_service.dart';
 import 'inventory_service.dart';
 import 'line_stock.dart';
 
+/// One method a refund was paid out by, and how much.
+typedef RefundLeg = ({String method, double amount});
+
 /// One refund of a past order: how much, when, and in which session.
 class RefundEvent {
-  const RefundEvent({required this.amount, required this.at, this.sessionId});
+  const RefundEvent({
+    required this.amount,
+    required this.at,
+    this.sessionId,
+    this.legs,
+  });
 
   final double amount;
   final DateTime at;
@@ -23,16 +32,36 @@ class RefundEvent {
   /// refunded before refund history was recorded.
   final String? sessionId;
 
+  /// How the money was actually handed back, per method (one entry, or
+  /// several for a split refund). Null on refunds recorded before the method
+  /// was asked for: those are spread across the order's payment methods in
+  /// proportion — an approximation (`RefundAllocation`).
+  final List<RefundLeg>? legs;
+
   Map<String, dynamic> toMap() => {
         'amount': amount,
         'at': at.toIso8601String(),
         'sessionId': sessionId,
+        // Written only when known, so an old-style event stays as it was.
+        if (legs != null)
+          'legs': [
+            for (final l in legs!) {'method': l.method, 'amount': l.amount},
+          ],
       };
 
   factory RefundEvent.fromMap(Map<String, dynamic> map) => RefundEvent(
         amount: (map['amount'] as num).toDouble(),
         at: DateTime.parse(map['at'] as String),
         sessionId: map['sessionId'] as String?,
+        legs: map['legs'] == null
+            ? null
+            : [
+                for (final l in map['legs'] as List)
+                  (
+                    method: (l as Map)['method'] as String,
+                    amount: (l['amount'] as num).toDouble(),
+                  ),
+              ],
       );
 
   static String encodeAll(List<RefundEvent> events) =>
@@ -46,11 +75,16 @@ class PartialRefundResult {
   final double totalRefundAmount;
   final Map<CartItem, int> itemsToRestock;
 
+  /// How the refund was paid out, per method; must add up to
+  /// [totalRefundAmount]. Null keeps the old, method-less record.
+  final List<RefundLeg>? refundLegs;
+
   PartialRefundResult({
     required this.itemsToRefund,
     required this.reason,
     required this.totalRefundAmount,
     required this.itemsToRestock,
+    this.refundLegs,
   });
 }
 
@@ -61,6 +95,14 @@ class RefundService {
   static const String refundNeedsOpenSessionMessage =
       'Start the day before issuing a refund.';
 
+  /// BLK-14: role keys checked through `RestaurantSession.canAccess`. Admin,
+  /// Manager and Cashier have them; Waiter (orders only) does not.
+  static const String refundPermission = 'refund';
+  static const String voidPermission = 'void';
+  static const String refundNotAllowedMessage =
+      'Your role cannot issue refunds.';
+  static const String voidNotAllowedMessage = 'Your role cannot void orders.';
+
   /// Process a partial or full refund for an order
   /// Returns the updated order after refund processing
   static Future<PastOrderModel> processRefund({
@@ -70,6 +112,10 @@ class RefundService {
     // Plan gate — refunds are the Returns capability (billing.returns).
     if (!PlanEnforce.allows(EntKeys.billingReturns)) {
       throw Exception('Refunds aren’t available on your current plan.');
+    }
+    // BLK-14: role check, here so no screen can skip it. Before any write.
+    if (!RestaurantSession.canAccess(refundPermission)) {
+      throw Exception(refundNotAllowedMessage);
     }
     // SB-2b-M8: a refund needs an open session, as a sale does. Made after
     // End of Day and before the next Start Day it would belong to no session
@@ -134,6 +180,35 @@ class RefundService {
             '${remainingAmount.toStringAsFixed(2)} still refundable on this order.');
       }
       if (refundAmount > remainingAmount) refundAmount = remainingAmount;
+
+      // How the money went back, checked before any write: every leg named
+      // and positive, together the refund. A sub-paisa trim by the cap above
+      // comes off the last leg so the legs still add up exactly.
+      final legs = refundResult.refundLegs;
+      List<RefundLeg>? recordedLegs;
+      if (legs != null) {
+        if (legs.isEmpty ||
+            legs.any((l) => l.method.trim().isEmpty || l.amount <= 0)) {
+          throw Exception(
+              'Each refund method needs a name and an amount above zero.');
+        }
+        final legsTotal = legs.fold(0.0, (s, l) => s + l.amount);
+        if ((legsTotal - refundResult.totalRefundAmount).abs() >
+            _moneyTolerance) {
+          throw Exception(
+              'The refund methods add up to ${legsTotal.toStringAsFixed(2)}, '
+              'not the refund of '
+              '${refundResult.totalRefundAmount.toStringAsFixed(2)}.');
+        }
+        final trim = legsTotal - refundAmount;
+        recordedLegs = [
+          for (var i = 0; i < legs.length; i++)
+            (
+              method: legs[i].method.trim(),
+              amount: i == legs.length - 1 ? legs[i].amount - trim : legs[i].amount,
+            ),
+        ];
+      }
 
       final unitsLeft = <String, int>{};
       for (final item in order.items) {
@@ -227,7 +302,12 @@ class RefundService {
       final sessionId = await DayManagementService.getCurrentSessionId();
       final events = [
         ...refundEventsOf(order),
-        RefundEvent(amount: refundAmount, at: now, sessionId: sessionId),
+        RefundEvent(
+          amount: refundAmount,
+          at: now,
+          sessionId: sessionId,
+          legs: recordedLegs,
+        ),
       ];
 
       // Create updated order
@@ -352,7 +432,13 @@ class RefundService {
   /// (`totalPrice` is the net payable — after loyalty points, with or without
   /// tax) minus everything already refunded.
   static double getRemainingRefundableAmount(PastOrderModel order) {
-    final originalTotal = order.totalPrice ?? 0.0;
+    // A paid-then-voided order may have been only PART paid: it can refund
+    // what was collected, never the whole bill. Every other order keeps the
+    // bill total, as before.
+    final isVoided = (order.orderStatus ?? '').toUpperCase().trim() == 'VOIDED';
+    final originalTotal = isVoided
+        ? RefundAllocation.collectedOf(order)
+        : (order.totalPrice ?? 0.0);
     final alreadyRefunded = order.refundAmount ?? 0.0;
     return originalTotal - alreadyRefunded;
   }
@@ -415,6 +501,10 @@ class RefundService {
       // Plan gate — voiding a completed order (billing.invoice.void).
       if (!PlanEnforce.allows(EntKeys.billingInvoiceVoid)) {
         throw Exception('Voiding orders isn’t available on your current plan.');
+      }
+      // BLK-14: role check, here so no screen can skip it. Before any write.
+      if (!RestaurantSession.canAccess(voidPermission)) {
+        throw Exception(voidNotAllowedMessage);
       }
 
       final _staffLabel = RestaurantSession.isAdmin

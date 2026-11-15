@@ -64,6 +64,8 @@ class _RestaurantGRNListScreenState extends State<RestaurantGRNListScreen> {
     // before this screen opened — and confirmGRN reloads too. Cheap: a read
     // off an already-open box.
     restaurantPurchaseOrderStore.loadGRNs();
+    // Finish any goods receipt a stop left as a draft (S-06).
+    restaurantPurchaseOrderStore.resumeInterruptedReceipts();
   }
 
   @override

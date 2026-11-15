@@ -12,6 +12,7 @@ import 'package:billberrylite/data/models/restaurant/db/session_model.dart';
 Future<void> openRestaurantSessionForTest({
   String sessionId = 'test-session',
   bool closed = false,
+  DateTime? startTime,
 }) async {
   final sessions = Hive.isBoxOpen(HiveBoxNames.restaurantSessions)
       ? Hive.box<RestaurantSessionModel>(HiveBoxNames.restaurantSessions)
@@ -21,7 +22,7 @@ Future<void> openRestaurantSessionForTest({
     sessionId,
     RestaurantSessionModel(
       sessionId: sessionId,
-      startTime: DateTime.now().subtract(const Duration(hours: 1)),
+      startTime: startTime ?? DateTime.now().subtract(const Duration(hours: 1)),
       openingCash: 0,
       isClosed: closed,
     ),

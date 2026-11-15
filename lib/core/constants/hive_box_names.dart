@@ -160,6 +160,10 @@ class HiveBoxNames {
   /// Retail expenses box
   static const String retailExpense = 'expenseBox';
 
+  /// Retail sales saved but not yet finished (RetailCheckoutCommit). Untyped —
+  /// plain maps, no adapter. Device-local crash recovery: never backed up.
+  static const String retailCheckoutJournal = 'retailCheckoutJournal';
+
   // ==================== RESTAURANT BOXES ====================
 
   /// Restaurant menu items box
@@ -348,6 +352,7 @@ class HiveBoxNames {
     retailEOD,
     retailExpenseCategory,
     retailExpense,
+    retailCheckoutJournal,
     tax,
     shift,
     attendance,

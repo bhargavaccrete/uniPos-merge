@@ -557,6 +557,26 @@ abstract class _OrderStore with Store {
 
   // ==================== HELPER METHODS ====================
 
+  /// The order as SAVED, read from the box — not [orders], which another
+  /// device's writes (Captain, through `HiveOrders`) never update. The
+  /// in-memory copy is refreshed to match (dropped when the order is gone),
+  /// so a screen reopened after a refusal starts from the saved order
+  /// (INVX-1).
+  Future<OrderModel?> readSaved(String orderId) async {
+    final saved = await _repository.getOrderById(orderId);
+    runInAction(() {
+      final index = orders.indexWhere((o) => o.id == orderId);
+      if (saved == null) {
+        if (index != -1) orders.removeAt(index);
+      } else if (index != -1) {
+        orders[index] = saved;
+      } else {
+        orders.add(saved);
+      }
+    });
+    return saved;
+  }
+
   /// Get order by ID
   OrderModel? getOrderById(String orderId) {
     try {

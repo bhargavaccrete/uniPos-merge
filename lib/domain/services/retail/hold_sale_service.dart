@@ -172,15 +172,35 @@ class HoldSaleService {
     // parked 10%-off bill used to restore at full price. The parked figure is a
     // resolved amount, so it is replayed as an amount regardless of how it was
     // originally entered.
-    final parkedDiscount = holdSale.discountAmount ?? 0;
-    if (parkedDiscount > 0) {
+    final billDiscount = billDiscountToReplay(holdSale, items);
+    if (billDiscount > 0) {
       retailCartStore.setDiscount(
         type: DiscountType.amount,
-        value: parkedDiscount,
+        value: billDiscount,
       );
     }
 
     await holdSaleStore.deleteHoldSale(holdSale.holdSaleId);
     return skipped;
+  }
+
+  /// The ORDER-level discount to put back on a restored sale.
+  ///
+  /// [park] stores the bill's `discountAmount`, which is line discounts AND
+  /// the order discount together. The lines get their own discounts back in
+  /// [restore], so replaying the whole parked figure as an order discount
+  /// took every line discount off twice (BLK-12). Only the remainder beyond
+  /// the parked lines' own discounts is order-level. Works for sales parked
+  /// before this fix too: they stored the same combined figure.
+  static double billDiscountToReplay(
+    HoldSaleModel holdSale,
+    List<HoldSaleItemModel> items,
+  ) {
+    final lineDiscounts =
+        items.fold<double>(0.0, (sum, i) => sum + (i.lineDiscountAmount ?? 0));
+    final remainder = (holdSale.discountAmount ?? 0) - lineDiscounts;
+    // Rounding can leave a sliver either side of zero; never a negative
+    // discount, and nothing to replay below half a paisa.
+    return remainder > 0.005 ? double.parse(remainder.toStringAsFixed(2)) : 0.0;
   }
 }

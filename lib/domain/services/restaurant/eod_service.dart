@@ -12,6 +12,9 @@ import '../../../data/models/restaurant/db/cash_movement_model.dart';
 import 'package:hive/hive.dart';
 import 'package:billberrylite/util/restaurant/order_status_filter.dart';
 import 'package:billberrylite/util/restaurant/payment_mode_summary.dart';
+import 'package:billberrylite/util/restaurant/refund_allocation.dart';
+import 'package:billberrylite/util/restaurant/staticswitch.dart';
+import 'package:billberrylite/domain/services/restaurant/cart_calculation_service.dart';
 import 'package:billberrylite/util/retail/payment_mode_summary.dart';
 import 'package:billberrylite/util/retail/retail_cash_expectation.dart';
 import 'package:billberrylite/domain/services/retail/eod_report_service.dart';
@@ -157,22 +160,29 @@ class EODService {
     });
     final totalTax = totalTaxBase - externalRefundedTax;
 
-    // Subtract external refunds from paymentSummaries
+    // Subtract external refunds from paymentSummaries — each off the method
+    // it was paid out by (refunds recorded before the method was asked for
+    // spread in proportion). Same rule as the cash drawer (RefundAllocation).
     for (final order in externalRefundedOrders) {
-      final refund = sessionRefund(order);
-      if (refund <= 0) continue;
+      if (sessionRefund(order) <= 0) continue;
+      RefundAllocation.refundedByMethod(order, where: inThisSession)
+          .forEach((method, amount) {
+        _subtractFromSummary(paymentSummaries, method, amount);
+      });
+    }
 
-      if (order.isSplitPayment == true && order.paymentListJson != null && order.paymentListJson!.isNotEmpty) {
-        final ratio = order.totalPrice > 0 ? refund / order.totalPrice : 0.0;
-        for (final p in order.paymentList) {
-          final method = (p['method'] as String? ?? '').toLowerCase().trim();
-          final amt = ((p['amount'] as num?)?.toDouble() ?? 0.0) * ratio;
-          _subtractFromSummary(paymentSummaries, method, amt);
-        }
-      } else {
-        final method = (order.paymentmode ?? '').toLowerCase().trim();
-        _subtractFromSummary(paymentSummaries, method, refund);
-      }
+    // M7: a PAID order voided in this session is "refund pending" — its money
+    // stays in the business until the refund is issued (owner's decision), so
+    // it still counts on the collection side and in expected cash, net of the
+    // refunds already issued on it by method. A refund made in a later
+    // session comes off there through the adjustment above. Sales totals keep
+    // excluding the order.
+    for (final order in allDayOrders) {
+      if ((order.orderStatus ?? '').toUpperCase().trim() != 'VOIDED') continue;
+      RefundAllocation.netLegsOf(order).forEach((method, amount) {
+        // Subtracting a negative ADDS it to that method's row.
+        if (amount != 0) _subtractFromSummary(paymentSummaries, method, -amount);
+      });
     }
 
     // Recompute percentages for paymentSummaries
@@ -248,8 +258,10 @@ class EODService {
     final closingBalance = openingBalance + expectedCash + totalCashIn - totalCashOut - cashExpenses;
     final cashDifference = actualCash - closingBalance;
 
+    // Tolerance, not `== 0` (M3): the closing balance sums floats, so a drawer
+    // that matches can differ by 0.0000001 — same rule as retail.
     String reconciliationStatus;
-    if (cashDifference == 0) {
+    if (cashDifference.abs() < kCashReconciliationTolerance) {
       reconciliationStatus = 'Balanced';
     } else if (cashDifference > 0) {
       reconciliationStatus = 'Overage';
@@ -273,14 +285,15 @@ class EODService {
     final cancelledOrderAmount =
         cancelledOrders.fold<double>(0.0, (s, o) => s + o.totalPrice);
 
-    // Round-off: per-order rounding delta = final total − (taxable + tax − discount + service).
-    // subTotal is stored as the pre-tax taxable base in both tax modes, so this is mode-independent.
+    // Round-off: per-order rounding delta = final total − (taxable + tax + service).
+    // subTotal is stored as the pre-tax taxable base AFTER the discount (and
+    // any points) in both tax modes, so the discount must not come off again —
+    // that reported every discount as round-off (M1).
     double roundOffSum = 0.0;
     for (final o in activeDayOrders) {
       if (o.subTotal == null) continue;
       final raw = o.subTotal! +
-          (o.gstAmount ?? 0) -
-          (o.Discount ?? 0) +
+          (o.gstAmount ?? 0) +
           (o.serviceCharge ?? 0);
       final delta = o.totalPrice - raw;
       if (delta.abs() >= 0.005) roundOffSum += double.parse(delta.toStringAsFixed(2));
@@ -382,9 +395,70 @@ class EODService {
   static List<TaxSummary> _calculateTaxSummaries(List<PastOrderModel> orders) {
     final Map<String, TaxInfo> taxData = {};
 
+    void add(double rate, double tax, double taxable) {
+      final taxKey = 'GST ${(rate * 100).toStringAsFixed(1)}%';
+      final existing = taxData[taxKey];
+      if (existing != null) {
+        existing.taxAmount += tax;
+        existing.taxableAmount += taxable;
+      } else {
+        taxData[taxKey] = TaxInfo(
+          taxName: taxKey,
+          taxRate: rate,
+          taxAmount: tax,
+          taxableAmount: taxable,
+        );
+      }
+    }
+
     for (final order in orders) {
       final status = order.orderStatus?.toUpperCase() ?? '';
       if (_isExcluded(status)) continue;
+
+      // Every writer stores `gstRate: 0` (an order mixes rates), so the
+      // order-level rate below never applied and the table was always empty
+      // (M2). Rows now come from the order's own lines, priced the way the
+      // order was settled — its discount, tax mode, points, discount-on-items
+      // and tax flag — with GST scaled to the order's stored total so the
+      // table always adds up to what was billed. Older rows that did carry a
+      // rate keep the path below.
+      final storedGst = order.gstAmount ?? 0.0;
+      if ((order.gstRate ?? 0) <= 0 && storedGst > 0 && order.items.isNotEmpty) {
+        final calc = CartCalculationService(
+          items: order.items,
+          discountType: DiscountType.amount,
+          discountValue: order.Discount ?? 0.0,
+          isTaxInclusive: order.isTaxInclusive ?? AppSettings.isTaxInclusive,
+          discountOnItems: order.discountOnItems,
+          loyaltyRedemption: (order.loyaltyPointsUsed ?? 0).toDouble(),
+          // Stored GST > 0 proves tax was on when it was billed; an older row
+          // without the flag must not follow today's setting.
+          taxEnabled: order.taxEnabled ?? true,
+          roundOffStep: 0,
+        );
+        final byRate = <double, ({double tax, double taxable})>{};
+        for (final r in calc.lineResults) {
+          if (r.taxRate <= 0) continue;
+          final prev = byRate[r.taxRate];
+          byRate[r.taxRate] = (
+            tax: (prev?.tax ?? 0) + r.gstAmount,
+            taxable: (prev?.taxable ?? 0) + r.taxableAmount,
+          );
+        }
+        final computedGst = byRate.values.fold(0.0, (s, v) => s + v.tax);
+        if (computedGst > 0.009) {
+          final scale = storedGst / computedGst;
+          final refundRatio = order.totalPrice > 0
+              ? ((order.totalPrice - (order.refundAmount ?? 0.0)) / order.totalPrice)
+              : 1.0;
+          byRate.forEach((rate, v) => add(
+                rate,
+                v.tax * scale * refundRatio,
+                v.taxable * refundRatio,
+              ));
+        }
+        continue;
+      }
 
       if (order.gstRate != null && order.gstAmount != null && order.gstRate! > 0) {
         final taxKey = 'GST ${(order.gstRate! * 100).toStringAsFixed(1)}%';

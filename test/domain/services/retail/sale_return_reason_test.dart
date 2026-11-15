@@ -31,6 +31,7 @@ import 'package:billberrylite/domain/store/common/customer_store.dart';
 import 'package:billberrylite/domain/store/restaurant/cash_movement_store.dart';
 import 'package:billberrylite/domain/store/retail/product_store.dart';
 import 'package:billberrylite/domain/store/retail/sale_store.dart';
+import '../../../helpers/open_retail_day_fixture.dart';
 
 /// Why a refund happened — the field `ReturnService` accepted for three
 /// releases and never wrote.
@@ -156,6 +157,8 @@ void main() {
       await Hive.openBox<CashMovementModel>(
           HiveBoxNames.restaurantCashMovements);
       await Hive.openBox(HiveBoxNames.dayManagementBox);
+      // BLK-16: returns, exchanges and collections need an open day.
+      await openRetailDayForTest();
       await Hive.openBox(HiveBoxNames.appCounters);
 
       locator.registerLazySingleton<SaleStore>(() => SaleStore());

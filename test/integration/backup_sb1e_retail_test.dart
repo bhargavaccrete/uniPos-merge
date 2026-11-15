@@ -81,4 +81,34 @@ void main() {
     await UnifiedBackupService.restoreDecodedBackupForTesting(copy(backup));
     expect(sessions().keys, ['sess-backup']);
   });
+
+  // BLK-13B: unfinished sales describe this device's pre-restore sales,
+  // stock, customers and carts — never replayed onto restored data, and never
+  // lost to a restore that rolled back.
+  group('pending checkout journal', () {
+    Box journal() => Hive.box(HiveBoxNames.retailCheckoutJournal);
+    const pending = {'saleId': 'S-7', 'v': 1};
+
+    tearDown(() => UnifiedBackupService.failWritingKeyForTesting = null);
+
+    test('a failed restore keeps it', () async {
+      await journal().put('S-7', pending);
+      UnifiedBackupService.failWritingKeyForTesting = 'restaurantSessions';
+      await expectLater(
+        UnifiedBackupService.restoreDecodedBackupForTesting(copy(backup)),
+        throwsA(isA<RestoreFailedException>()),
+      );
+      expect(journal().keys, ['S-7']);
+    });
+
+    test('a successful restore clears it', () async {
+      await journal().put('S-7', pending);
+      await UnifiedBackupService.restoreDecodedBackupForTesting(copy(backup));
+      expect(journal().isEmpty, isTrue);
+    });
+
+    test('it is never exported', () {
+      expect(jsonEncode(backup).contains('retailCheckoutJournal'), isFalse);
+    });
+  });
 }

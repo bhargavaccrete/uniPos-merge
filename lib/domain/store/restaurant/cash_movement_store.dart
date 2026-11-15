@@ -3,6 +3,8 @@ import 'package:uuid/uuid.dart';
 import '../../../data/models/restaurant/db/cash_movement_model.dart';
 import '../../../data/repositories/restaurant/cash_movement_repository.dart';
 import '../../../util/restaurant/restaurant_session.dart';
+import '../../../core/config/app_config.dart';
+import '../../../domain/services/retail/retail_day_gate.dart';
 
 import '../../../domain/services/restaurant/day_management_service.dart';
 
@@ -95,6 +97,17 @@ abstract class _CashMovementStore with Store {
       if (strictlyPending) {
         errorMessage = 'Day has ended. Complete End of Day to unlock.';
         return false;
+      }
+      // WF-4: Retail counts cash movements only from Start Day to End of
+      // Day, so one made with no day open (saved with no session) fell
+      // outside every End of Day. Same gate as returns and collections; the
+      // End-of-Day close itself (`systemClose`) is exempt.
+      if (!systemClose && AppConfig.isRetail) {
+        final block = await RetailDayGate.check();
+        if (block != null) {
+          errorMessage = RetailDayGate.messageFor(block);
+          return false;
+        }
       }
 
       final currentSessionId = await DayManagementService.getCurrentSessionId();

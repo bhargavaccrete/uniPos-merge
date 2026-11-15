@@ -71,6 +71,8 @@ void main() {
         HiveBoxNames.restaurantStockMovements);
     await Hive.openBox<AppNotificationModel>(HiveBoxNames.appNotifications);
     await Hive.openBox(HiveBoxNames.dayManagementBox);
+    // S-06: goods-receipt stock intents live in the stock-journal box.
+    await Hive.openBox(HiveBoxNames.restaurantStockJournal);
     await Hive.openBox<RestaurantSupplierModel>(
         HiveBoxNames.restaurantSuppliers);
     await Hive.openBox<RestaurantSupplierLedgerEntryModel>(

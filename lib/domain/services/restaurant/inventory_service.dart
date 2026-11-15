@@ -51,7 +51,200 @@ class SaleStockUnit {
       recipeRow == null ? '$key:$lineId' : '$key:$lineId:$recipeRow';
 }
 
+/// One item (or one variant of it) that a set of order lines asks for more of
+/// than can be sold — see [InventoryService.stockShortfalls].
+class StockShortfall {
+  final String itemId;
+  final String name;
+  final double available;
+  final double requested;
+  final String unit;
+
+  const StockShortfall({
+    required this.itemId,
+    required this.name,
+    required this.available,
+    required this.requested,
+    required this.unit,
+  });
+
+  static String _fmt(double v) =>
+      v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(2);
+
+  String get message =>
+      '$name (available ${_fmt(available < 0 ? 0 : available)} $unit, '
+      'requested ${_fmt(requested)} $unit)';
+}
+
 class InventoryService {
+  /// The lines of [cartItems] that current stock cannot cover — empty when
+  /// the order can be accepted. No writes.
+  ///
+  /// The server-side gate for orders another device sends (Captain, S-04):
+  /// it reads the POS's own item records, never stock flags or figures the
+  /// client sent. It validates exactly what [planSale] is about to deduct:
+  ///
+  /// * Lines resolve to items as [planSale] does (product id, then name); a
+  ///   line no item matches, or whose variant no longer exists, deducts
+  ///   nothing and is not limited.
+  /// * Not stock-governed ([isStockGoverned]) or "sell when out of stock"
+  ///   ([Items.allowOrderWhenOutOfStock]) → never limited.
+  /// * Made to order / make-fresh hybrid → [effectiveAvailableStock] (what
+  ///   the recipe can make, plus prepared stock for the hybrid), all lines of
+  ///   the item combined, whatever their variant — they draw on the same
+  ///   ingredients.
+  /// * A variant line → that variant's own stock, lines of the same item and
+  ///   variant combined.
+  /// * Otherwise the item's stock, lines combined; a weight line asks for
+  ///   quantity × its weight in the item's stock unit, as [planSale] deducts.
+  ///
+  /// [returning] — lines the SAME operation puts back (Place Order on an
+  /// existing order removing or reducing lines). Measured by the same rules
+  /// and credited against what [cartItems] ask of the same item / variant, so
+  /// "reduce X by 2, add X ×2" is not refused for stock it is handing back.
+  static Future<List<StockShortfall>> stockShortfalls(
+    List<CartItem> cartItems, {
+    List<CartItem> returning = const [],
+  }) async {
+    await itemStore.ensureLoaded();
+    if ([...cartItems, ...returning].any((c) => c.variantName != null) &&
+        variantStore.variants.isEmpty) {
+      await variantStore.loadVariants();
+    }
+    final items = itemStore.items;
+
+    final requested = <String, double>{};
+    final available = <String, double>{};
+    final label = <String, ({String itemId, String name, String unit})>{};
+    // RECIPE: net quantity per dish made from a recipe, for the combined
+    // ingredient pass below.
+    final recipeDishes = <String, ({Items item, RecipeModel recipe})>{};
+    final recipeNet = <String, double>{};
+
+    for (final (line, sign) in [
+      for (final l in cartItems) (l, 1.0),
+      for (final l in returning) (l, -1.0),
+    ]) {
+      final item = items
+              .where((i) => line.productId.isNotEmpty && i.id == line.productId)
+              .firstOrNull ??
+          items
+              .where((i) =>
+                  i.name.toLowerCase().trim() == line.title.toLowerCase().trim())
+              .firstOrNull;
+      if (item == null) continue;
+      if (!isStockGoverned(item) || item.allowOrderWhenOutOfStock) continue;
+
+      final unit = item.unit ?? (item.isSoldByWeight ? 'kg' : 'pcs');
+      final String key;
+      final double amount;
+      final double have;
+      String name = item.name;
+
+      if (usesDerivedAvailability(item)) {
+        have = effectiveAvailableStock(item);
+        if (have.isInfinite) continue; // nothing tracked limits it
+        key = 'd:${item.id}';
+        amount = line.quantity.toDouble();
+        final recipe = _usableRecipe(item);
+        if (recipe != null) {
+          recipeDishes[item.id] = (item: item, recipe: recipe);
+          recipeNet[item.id] = (recipeNet[item.id] ?? 0) + sign * amount;
+        }
+      } else if (line.variantName != null) {
+        final variant = item.variant
+            ?.where((v) => _getVariantName(v.variantId) == line.variantName)
+            .firstOrNull;
+        if (variant == null) continue; // planSale deducts nothing for it
+        key = 'v:${item.id}:${variant.variantId}';
+        amount = line.quantity.toDouble();
+        have = variant.stockQuantity ?? 0;
+        name = '${item.name} (${line.variantName})';
+      } else {
+        key = 'i:${item.id}';
+        amount = item.isSoldByWeight && line.weightDisplay != null
+            ? line.quantity *
+                _parseWeightToStockUnit(line.weightDisplay!, item.unit ?? 'kg')
+            : line.quantity.toDouble();
+        have = item.stockQuantity;
+      }
+
+      requested[key] = (requested[key] ?? 0) + sign * amount;
+      available[key] = have;
+      label[key] = (itemId: item.id, name: name, unit: unit);
+    }
+
+    List<StockShortfall> shortOf(Map<String, double> asked,
+            Map<String, double> have) =>
+        [
+          for (final key in asked.keys)
+            if (asked[key]! > have[key]! + 1e-9)
+              StockShortfall(
+                itemId: label[key]!.itemId,
+                name: label[key]!.name,
+                available: have[key]!,
+                requested: asked[key]!,
+                unit: label[key]!.unit,
+              ),
+        ];
+
+    // Each item / variant / dish on its own — unchanged.
+    final perItem = shortOf(requested, available);
+    if (perItem.isNotEmpty) return perItem;
+
+    // RECIPE: dishes judged one at a time each see the WHOLE ingredient
+    // stock, so two dishes sharing an ingredient, or a dish plus a direct
+    // sale of that ingredient, passed together for more than is on hand.
+    // Combine every line's demand on each tracked ingredient, as Retail
+    // does: direct sales (those limited above), plus what each dish makes
+    // fresh — made to order
+    // all of it; the hybrid only what its prepared stock does not cover.
+    // A hybrid handing units back earns no ingredient credit (its restore
+    // may go to prepared stock), so the pass can only refuse more.
+    final combined = <String, double>{
+      for (final key in requested.keys)
+        if (key.startsWith('i:')) key: requested[key]!,
+    };
+    final combinedHave = <String, double>{
+      for (final key in combined.keys) key: available[key]!,
+    };
+    for (final dishId in recipeNet.keys) {
+      final net = recipeNet[dishId]!;
+      final dish = recipeDishes[dishId]!;
+      double fresh;
+      if (dish.item.isMadeToOrder) {
+        fresh = net;
+      } else {
+        if (net <= 0) continue;
+        final prepared = dish.item.trackInventory && dish.item.stockQuantity > 0
+            ? dish.item.stockQuantity
+            : 0.0;
+        fresh = net > prepared ? net - prepared : 0;
+      }
+      if (fresh.abs() < 1e-9) continue;
+      for (final row in ingredientQuantitiesFor(dish.recipe, fresh.abs())) {
+        final ingredient =
+            items.where((i) => i.id == row.ingredientItemId).firstOrNull;
+        // Same rule as the per-dish figure (availableToMakeFrom): every
+        // tracked ingredient limits what can be made, whatever its own "sell
+        // when out of stock" flag — that flag governs selling the ingredient
+        // itself, and such direct sales were never limited above.
+        if (ingredient == null || !ingredient.trackInventory) continue;
+        final key = 'i:${ingredient.id}';
+        combined[key] =
+            (combined[key] ?? 0) + (fresh < 0 ? -row.quantity : row.quantity);
+        combinedHave[key] = ingredient.stockQuantity;
+        label[key] ??= (
+          itemId: ingredient.id,
+          name: ingredient.name,
+          unit: ingredient.unit ??
+              (ingredient.isSoldByWeight ? 'kg' : 'pcs'),
+        );
+      }
+    }
+    return shortOf(combined, combinedHave);
+  }
+
   /// Deducts [cartItems] straight away. Callers that save the order lines
   /// should use [planSale] instead, so the lines carry the stock stamp
   /// every restore relies on.
@@ -1004,6 +1197,100 @@ class InventoryService {
         );
       }
     }
+  }
+
+  /// The stock changes [restoreLines] makes for [requests], planned without
+  /// writing anything — so a void can persist them BEFORE its record is
+  /// saved and finish them exactly once after a stop (VoidOrderCommit).
+  /// Same item resolution, stamp split, recipe expansion, variant match and
+  /// weight conversion as [restoreLines]; each unit's qty is positive stock
+  /// to add back. A variant line no variant matches plans nothing (where
+  /// [restoreLines] logs an empty row).
+  static Future<List<SaleStockUnit>> planRestoreUnits(
+      List<({CartItem line, int qty})> requests) async {
+    if (requests.isEmpty) return const [];
+    await itemStore.ensureLoaded();
+    if (variantStore.variants.isEmpty) await variantStore.loadVariants();
+    final items = itemStore.items;
+    final units = <SaleStockUnit>[];
+
+    for (final req in requests) {
+      final cartItem = req.line;
+      final r = LineStock.take(cartItem, req.qty);
+      if (r.counted <= 0) continue;
+
+      final existingItem = (cartItem.productId.isNotEmpty
+              ? items.where((i) => i.id == cartItem.productId).firstOrNull
+              : null) ??
+          items
+              .where((i) =>
+                  i.name.toLowerCase().trim() ==
+                  cartItem.title.toLowerCase().trim())
+              .firstOrNull;
+      if (existingItem == null) continue;
+
+      final int freshUnits;
+      final int ownUnits;
+      if (r.isLegacy) {
+        freshUnits = existingItem.isRecipeBased ? r.counted : 0;
+        ownUnits = existingItem.isRecipeBased ? 0 : r.counted;
+      } else {
+        freshUnits = r.fromFresh;
+        ownUnits = r.fromOwn;
+      }
+
+      if (freshUnits > 0) {
+        final recipe = recipeRepository.getRecipeForItem(existingItem.id);
+        if (recipe != null && recipe.hasIngredients) {
+          final lines = ingredientQuantitiesFor(recipe, freshUnits.toDouble());
+          for (var row = 0; row < lines.length; row++) {
+            final ingredient = items
+                .where((i) => i.id == lines[row].ingredientItemId)
+                .firstOrNull;
+            if (ingredient == null || !ingredient.trackInventory) continue;
+            units.add(SaleStockUnit(
+              lineId: cartItem.id,
+              recipeRow: row,
+              item: ingredient,
+              qty: lines[row].quantity,
+              reason: 'Void / Refund return (recipe: ${existingItem.name})',
+              label: ingredient.name,
+            ));
+          }
+        }
+      }
+
+      if (ownUnits > 0 && existingItem.trackInventory) {
+        if (cartItem.variantName != null && existingItem.variant != null) {
+          final variant = existingItem.variant!
+              .where((v) => _getVariantName(v.variantId) == cartItem.variantName)
+              .firstOrNull;
+          if (variant == null) continue;
+          units.add(SaleStockUnit(
+            lineId: cartItem.id,
+            item: existingItem,
+            variantId: variant.variantId,
+            qty: ownUnits.toDouble(),
+            reason: 'Void / Refund return',
+            label: '${existingItem.name} (${cartItem.variantName})',
+          ));
+        } else {
+          final qty = existingItem.isSoldByWeight && cartItem.weightDisplay != null
+              ? ownUnits *
+                  _parseWeightToStockUnit(
+                      cartItem.weightDisplay!, existingItem.unit ?? 'kg')
+              : ownUnits.toDouble();
+          units.add(SaleStockUnit(
+            lineId: cartItem.id,
+            item: existingItem,
+            qty: qty,
+            reason: 'Void / Refund return',
+            label: existingItem.name,
+          ));
+        }
+      }
+    }
+    return units;
   }
 
   /// Puts [restockQuantity] units of [cartItem] back into [existingItem]'s

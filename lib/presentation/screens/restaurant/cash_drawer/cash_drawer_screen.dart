@@ -20,7 +20,8 @@ import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/util/restaurant/restaurant_session.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
-import 'package:billberrylite/util/restaurant/order_status_filter.dart';
+import 'package:billberrylite/domain/services/restaurant/refund_service.dart';
+import 'package:billberrylite/util/restaurant/refund_allocation.dart';
 
 // ─── Entry type for the merged activity log ───────────────────────────────────
 
@@ -161,48 +162,62 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
     // 3. Load cash sales from past orders (today only, cash payment method)
     await pastOrderStore.loadPastOrders();
 
-    final cashOrders = pastOrderStore.pastOrders.where((o) {
-      // Skip voided orders — no money changed hands
-      final status = (o.orderStatus ?? '').toUpperCase();
-      if (OrderStatusFilter.isVoided(status)) return false;
-
-      // Filter by session ID
-      if (targetSessionId != null) {
-        if (o.sessionId != targetSessionId) return false;
-      } else {
-        // Fallback for legacy data without session ID
-        final isToday =
-            o.orderAt != null &&
-            o.orderAt!.isAfter(dayStart.subtract(const Duration(seconds: 1)));
-        if (!isToday) return false;
-      }
-
-      // Pure cash payment
-      final method = (o.paymentmode ?? '').toLowerCase().trim();
-      if (method == 'cash') return true;
-
-      // Split payment with a cash component
-      if (o.isSplitPayment == true) {
-        return o.paymentList.any(
-          (p) => (p['method'] as String? ?? '').toLowerCase() == 'cash',
-        );
-      }
-
-      return false;
-    }).toList();
-    _cashSales = cashOrders.fold(0.0, (s, o) => s + _cashComponentOf(o));
-
-    // Digital (non-cash) collections for the SAME session — identical void /
-    // session filter as the cash total, so Cash + Digital form one coherent
-    // shift figure that reconciles with the End-of-Day report.
-    final sessionOrders = pastOrderStore.pastOrders.where((o) {
-      final status = (o.orderStatus ?? '').toUpperCase();
-      if (OrderStatusFilter.isVoided(status)) return false;
+    // Which orders and refunds belong to this session — same rules as before
+    // for orders; refunds by their own session (End of Day's rule), falling
+    // back to time when either side has no session.
+    bool inSession(PastOrderModel o) {
       if (targetSessionId != null) return o.sessionId == targetSessionId;
       return o.orderAt != null &&
           o.orderAt!.isAfter(dayStart.subtract(const Duration(seconds: 1)));
-    }).toList();
-    _computeDigitalTotals(sessionOrders);
+    }
+
+    bool refundInSession(RefundEvent e) {
+      if (targetSessionId != null && e.sessionId != null) {
+        return e.sessionId == targetSessionId;
+      }
+      return !e.at.isBefore(dayStart);
+    }
+
+    // One figure per method from the shared rule End of Day uses
+    // (RefundAllocation): this session's orders net of their refunds — each
+    // refund off the method it was paid by — a paid void still held until
+    // its refund (M7), less refunds paid today on earlier sessions' orders.
+    final allOrders = pastOrderStore.pastOrders.toList();
+    final collections = RefundAllocation.sessionCollections(
+      orders: allOrders,
+      inSession: inSession,
+      refundInSession: refundInSession,
+    );
+    _cashSales = collections['Cash'] ?? 0.0;
+    _applyDigitalTotals(collections);
+
+    // Log rows: this session's orders that moved cash, and today's refunds of
+    // earlier orders that paid cash out — together they make up _cashSales.
+    final cashOrders = allOrders
+        .where((o) =>
+            RefundAllocation.holdsMoney(o) &&
+            inSession(o) &&
+            _cashComponentOf(o).abs() > 0.000001)
+        .toList();
+    final earlierRefunds = <({DateTime at, String label, double cash})>[];
+    for (final o in allOrders) {
+      if (!RefundAllocation.holdsMoney(o) || inSession(o)) continue;
+      for (final e in RefundService.refundEventsOf(o)) {
+        if (!refundInSession(e)) continue;
+        final cash = RefundAllocation.refundedByMethod(
+              o,
+              where: (x) => x.at == e.at && x.amount == e.amount,
+            )['Cash'] ??
+            0.0;
+        if (cash.abs() > 0.000001) {
+          earlierRefunds.add((
+            at: e.at,
+            label: 'Refund — earlier sale #${o.billNumber ?? o.id.substring(0, 6)}',
+            cash: cash,
+          ));
+        }
+      }
+    }
 
     // 4. Load cash expenses (today only, paymentType == 'cash')
     await expenseStore.loadExpenses();
@@ -226,7 +241,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
     await expenseCategoryStore.loadCategories();
 
     // 6. Build the merged log
-    _buildLog(dayStart, cashOrders, cashExp);
+    _buildLog(dayStart, cashOrders, cashExp, earlierRefunds);
 
     // 6. Load all handover records (for the Handover History section)
     final handovers = await locator<CashHandoverRepository>().getAllHandovers();
@@ -237,72 +252,28 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
     });
   }
 
-  /// Returns the net cash component of an order.
-  /// Uses paymentListJson as the source of truth (mirrors EOD service logic).
-  /// Falls back to totalPrice for legacy orders without paymentListJson.
-  /// Voided orders should be excluded before calling this.
-  double _cashComponentOf(PastOrderModel o) {
-    final refund = o.refundAmount ?? 0.0;
+  /// The cash an order holds net of its refunds — each refund off the method
+  /// it was paid by (RefundAllocation, the rule End of Day uses).
+  double _cashComponentOf(PastOrderModel o) =>
+      RefundAllocation.netLegsOf(o)['Cash'] ?? 0.0;
 
-    // Use paymentListJson when present — same source of truth as EOD service.
-    if (o.paymentListJson != null && o.paymentListJson!.isNotEmpty) {
-      final rawCash = o.paymentList
-          .where((p) => (p['method'] as String? ?? '').toLowerCase() == 'cash')
-          .fold(0.0, (s, p) => s + ((p['amount'] as num?)?.toDouble() ?? 0.0));
-      if (rawCash <= 0) return 0.0;
-      if (refund > 0 && o.totalPrice > 0) {
-        final cashRatio = rawCash / o.totalPrice;
-        return (rawCash - refund * cashRatio).clamp(0.0, double.infinity);
-      }
-      return rawCash;
-    }
-
-    // Legacy fallback: no paymentListJson — use paymentmode + totalPrice.
-    final method = (o.paymentmode ?? '').toLowerCase().trim();
-    if (method == 'cash') {
-      return (o.totalPrice - refund).clamp(0.0, double.infinity);
-    }
-    return 0.0;
-  }
-
-  /// Aggregates the session's NON-cash collections into UPI / Card / Others.
-  /// Mirrors [_cashComponentOf]'s source of truth (paymentListJson, else
-  /// paymentmode) and is net of refunds. Cash is excluded — it's shown as the
-  /// drawer balance. (No credit/pay-later on the restaurant side, so every
-  /// non-cash amount here is money actually collected.)
-  void _computeDigitalTotals(List<PastOrderModel> orders) {
+  /// The session's NON-cash collections split into UPI / Card / Others, from
+  /// the same per-method figures as the cash total. (No credit on the
+  /// restaurant side, so every non-cash amount here is money collected.)
+  void _applyDigitalTotals(Map<String, double> collections) {
     double upi = 0, card = 0, others = 0;
-    for (final o in orders) {
-      final refund = o.refundAmount ?? 0.0;
-      final ratio = (refund > 0 && o.totalPrice > 0)
-          ? ((o.totalPrice - refund) / o.totalPrice)
-          : 1.0;
-      if (o.paymentListJson != null && o.paymentListJson!.isNotEmpty) {
-        for (final p in o.paymentList) {
-          final m = (p['method'] as String? ?? '').toLowerCase().trim();
-          if (m == 'cash' || m.isEmpty) continue;
-          final amt = ((p['amount'] as num?)?.toDouble() ?? 0.0) * ratio;
-          if (m == 'upi') {
-            upi += amt;
-          } else if (m == 'card') {
-            card += amt;
-          } else {
-            others += amt;
-          }
-        }
-      } else {
-        final m = (o.paymentmode ?? '').toLowerCase().trim();
-        if (m == 'cash' || m.isEmpty) continue;
-        final amt = (o.totalPrice - refund).clamp(0.0, double.infinity);
-        if (m == 'upi') {
-          upi += amt;
-        } else if (m == 'card') {
-          card += amt;
-        } else {
-          others += amt;
-        }
+    collections.forEach((method, amount) {
+      switch (method) {
+        case 'Cash':
+          break;
+        case 'UPI':
+          upi += amount;
+        case 'Card':
+          card += amount;
+        default:
+          others += amount;
       }
-    }
+    });
     _upiSales = upi;
     _cardSales = card;
     _otherDigitalSales = others;
@@ -325,6 +296,7 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
     DateTime dayStart,
     List<PastOrderModel> cashOrders,
     List<Expense> cashExp,
+    List<({DateTime at, String label, double cash})> earlierRefunds,
   ) {
     // shiftId → staffName for direct lookup on orders
     final shiftIdToName = <String, String>{
@@ -369,6 +341,19 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
           description: label,
           signedAmount: cashAmt,
           staffName: saleStaff,
+          type: _LogType.sale,
+        ),
+      );
+    }
+
+    // Cash refunded today on orders of earlier sessions.
+    for (final r in earlierRefunds) {
+      entries.add(
+        _LogEntry(
+          time: r.at,
+          description: r.label,
+          signedAmount: -r.cash,
+          staffName: _staffNameForTime(r.at),
           type: _LogType.sale,
         ),
       );

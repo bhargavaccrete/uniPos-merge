@@ -39,6 +39,7 @@ import 'package:billberrylite/domain/store/restaurant/variant_store.dart';
 
 import '../../../helpers/pre_refund_events_past_order_adapter.dart';
 import '../../../helpers/test_helpers.dart';
+import '../../../helpers/sign_in_fixture.dart';
 
 /// SB-2b: every restaurant refund is recorded as its own event (validated
 /// amount, time, session) in the same order write as the running total, and
@@ -49,6 +50,9 @@ import '../../../helpers/test_helpers.dart';
 /// `refundAmount` + `refundedAt` (the old result). How their earlier refunds
 /// were split across sessions was never stored and cannot be reconstructed.
 void main() {
+  // BLK-14: refunds and voids check the role; sign in as admin.
+  setUpAll(() => signInForTest());
+
   late Directory tempDir;
   final yesterday = DateTime.now().subtract(const Duration(days: 1));
 

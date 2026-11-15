@@ -31,6 +31,7 @@ import 'package:billberrylite/domain/store/restaurant/variant_store.dart';
 
 import '../../../helpers/open_session_fixture.dart';
 import '../../../helpers/test_helpers.dart';
+import '../../../helpers/sign_in_fixture.dart';
 
 /// A past-order store whose saves fail the way the real one reports them:
 /// `updateOrder` catches the error and returns false.
@@ -46,6 +47,9 @@ class _FailingSaveStore extends PastOrderStore {
 /// checked and saved against the order as SAVED, one refund per order at a
 /// time; a failed save stops the refund before stock or points change.
 void main() {
+  // BLK-14: refunds and voids check the role; sign in as admin.
+  setUpAll(() => signInForTest());
+
   late Directory tempDir;
 
   Future<void> setUpStores({bool failingSave = false}) async {

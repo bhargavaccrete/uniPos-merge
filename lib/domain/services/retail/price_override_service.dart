@@ -53,9 +53,9 @@ class PriceOverrideValidation {
 class PriceOverrideService {
   PriceOverrideService._();
 
-  /// Admin and Manager may override a price; a Cashier may not. An override
-  /// moves money off the books, so it gets the same manager-level gate as
-  /// `StockAdjustmentService.canAdjust`.
+  /// Admin, Manager and Cashier may override a price (every override carries a
+  /// mandatory reason). A Cashier does not see the cost price —
+  /// `CatalogPermission.canSeeCost`.
   ///
   /// Resolved from the signed-in staff member's ROLE, not their display name.
   ///
@@ -68,10 +68,14 @@ class PriceOverrideService {
   /// Order matters: hard blocks are checked before the soft warning, so a
   /// zero-or-negative price is refused outright rather than surfacing as a
   /// "below cost — are you sure?" the cashier can click through.
+  ///
+  /// [showCost] false keeps the cost figure out of the below-cost message, for
+  /// a user who may not see cost.
   static PriceOverrideValidation validate({
     required VarianteModel variant,
     required double newPrice,
     required double currentPrice,
+    bool showCost = true,
   }) {
     // 1. Hard block: a free or negative line is never a price.
     if (newPrice <= 0) {
@@ -102,7 +106,9 @@ class PriceOverrideService {
     final cost = variant.costPrice;
     if (cost != null && cost > 0 && newPrice < cost) {
       return PriceOverrideValidation.belowCost(
-        'This is below cost (${_money(cost)}). The line will sell at a loss.',
+        showCost
+            ? 'This is below cost (${_money(cost)}). The line will sell at a loss.'
+            : 'This is below cost. The line will sell at a loss.',
       );
     }
 

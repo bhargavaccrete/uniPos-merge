@@ -87,6 +87,10 @@ class _RestaurantStockTakeScreenState extends State<RestaurantStockTakeScreen> {
           // `trackInventory: false`, so the guard above already drops it, and
           // counting a dish would double-count its ingredients.
           if (item.isMadeToOrder) return false;
+          // An item with variants is stocked per variant; a stock-take line
+          // has no variant, so counting it would set stock nothing sells
+          // from (BLK-18). Count it per variant in Manage Inventory.
+          if (item.hasVariants) return false;
           if (counted.contains(item.id)) return false;
           return item.name.toLowerCase().contains(query);
         })

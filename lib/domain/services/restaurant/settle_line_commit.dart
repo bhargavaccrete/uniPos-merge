@@ -3,7 +3,11 @@ import '../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../data/models/restaurant/db/ordermodel_309.dart';
 import 'inventory_service.dart';
 import 'line_stock.dart';
+import 'order_concurrency.dart';
 import 'order_line_diff.dart';
+import 'stock_gate.dart';
+
+export 'order_concurrency.dart' show OrderChangedElsewhereException;
 import 'stock_journal.dart';
 
 /// What Settle on an existing order committed before taking payment.
@@ -49,6 +53,20 @@ class SettleStockIncompleteException implements Exception {
       'when you tap Settle again or on the next app start.';
 }
 
+/// Settle refused: stock cannot cover the increases and new lines (S-04C).
+/// Thrown before anything of this settle is written.
+class SettleStockShortException implements Exception {
+  final List<StockShortfall> shortfalls;
+  const SettleStockShortException(this.shortfalls);
+
+  String get message =>
+      'Cannot settle: insufficient stock — '
+      '${shortfalls.map((s) => s.message).join('; ')}';
+
+  @override
+  String toString() => message;
+}
+
 /// Settle refused: saved lines were removed or reduced. Those need Place
 /// Order, which prints the correction KOT and records the cancellation.
 class SettleBlockedException implements Exception {
@@ -67,11 +85,32 @@ class SettleLineCommit {
   /// Stock goes through a persisted [StockJournal] entry written BEFORE the
   /// order lines, so a failure part-way is finished later instead of lost.
   ///
-  /// Throws [SettleBlockedException] before any write when a saved line was
-  /// removed or reduced, and [SettleStockIncompleteException] when the lines
-  /// are saved but the deduction stopped part-way — pass its `pending` back
-  /// to get the same result once the stock completes.
+  /// Throws [OrderChangedElsewhereException] before any write when the saved
+  /// order is gone or another device changed it in a way these lines would
+  /// undo (INVX-1, see [OrderConcurrency.settleWouldUndo]),
+  /// [SettleBlockedException] before any write when a saved line was
+  /// removed or reduced, [SettleStockShortException] before any write when
+  /// stock cannot cover the increases and new lines, and
+  /// [SettleStockIncompleteException] when the lines are saved but the
+  /// deduction stopped part-way — pass its `pending` back to get the same
+  /// result once the stock completes.
+  ///
+  /// The whole commit — recovery, check, order write, deduction — runs in the
+  /// app-wide [StockGate] (S-04C), so a Captain or other POS order cannot
+  /// take the same stock between this check and its deduction. Nothing it
+  /// calls enters the gate again.
   static Future<SettleCommitResult> commit({
+    required OrderModel snapshot,
+    required List<CartItem> itemsToSettle,
+    SettlePendingStock? pending,
+  }) =>
+      StockGate.run(() => _commit(
+            snapshot: snapshot,
+            itemsToSettle: itemsToSettle,
+            pending: pending,
+          ));
+
+  static Future<SettleCommitResult> _commit({
     required OrderModel snapshot,
     required List<CartItem> itemsToSettle,
     SettlePendingStock? pending,
@@ -94,7 +133,24 @@ class SettleLineCommit {
       );
     }
 
-    final OrderModel saved = orderStore.getOrderById(snapshot.id) ?? snapshot;
+    // INVX-1: the order as SAVED — Captain writes the box directly, so the
+    // in-memory copy can be missing its lines. Refused before any write when
+    // the order is gone or saving these lines would undo another device's
+    // change (drop its new lines, or re-sell lines it cancelled).
+    final OrderModel? saved;
+    try {
+      saved = await orderStore.readSaved(snapshot.id);
+    } catch (e) {
+      // Nothing of this settle is written yet; a retry starts clean.
+      throw Exception('Could not read the order: $e');
+    }
+    if (saved == null) {
+      throw const OrderChangedElsewhereException(OrderConcurrency.goneMessage);
+    }
+    if (OrderConcurrency.settleWouldUndo(
+        baseline: snapshot.items, saved: saved.items, current: itemsToSettle)) {
+      throw const OrderChangedElsewhereException();
+    }
     final diff = OrderLineDiff.between(
       baseline: saved.items,
       current: itemsToSettle,
@@ -109,6 +165,15 @@ class SettleLineCommit {
       return SettleCommitResult(
           order: saved, addedLines: const [], newKotNumber: null);
     }
+
+    // S-04C: placement-time stock check, same rule as Place Order and Captain.
+    // Only what this settle adds is asked for — increases carry the delta,
+    // and the saved lines' stock already left at placement. Before the plan,
+    // the KOT number, the journal and the order write: refused → nothing of
+    // this settle is written.
+    final shortfalls = await InventoryService.stockShortfalls(
+        [...diff.increased, ...diff.added]);
+    if (shortfalls.isNotEmpty) throw SettleStockShortException(shortfalls);
 
     // One plan for the increases and new lines: its units go to the journal,
     // its stamps onto the saved lines (LineStock) for every later restore.

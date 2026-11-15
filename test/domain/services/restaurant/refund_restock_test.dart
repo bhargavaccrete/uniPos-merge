@@ -31,11 +31,15 @@ import 'package:billberrylite/domain/store/restaurant/variant_store.dart';
 
 import '../../../helpers/test_helpers.dart';
 import '../../../helpers/open_session_fixture.dart';
+import '../../../helpers/sign_in_fixture.dart';
 
 /// Refund dialog "Add back to stock": per-line, type-based defaults, the
 /// cashier's own choice wins, and only ticked lines restore — each from what
 /// its sale actually took (the line's stamp).
 void main() {
+  // BLK-14: refunds and voids check the role; sign in as admin.
+  setUpAll(() => signInForTest());
+
   Items item(String? type, {String? prepMode, bool makeFresh = false}) =>
       Items(
         id: 'x',

@@ -25,6 +25,8 @@ import 'package:billberrylite/data/repositories/retail/credit_payment_repository
 import 'package:billberrylite/data/repositories/retail/sale_item_repository.dart';
 import 'package:billberrylite/data/repositories/retail/variant_repository.dart';
 
+import 'package:billberrylite/data/models/common/staffModel_310.dart';
+import 'package:billberrylite/util/restaurant/restaurant_session.dart';
 import 'package:billberrylite/domain/services/retail/auth_service.dart';
 import 'package:billberrylite/util/restaurant/restaurant_auth_helper.dart';
 import 'package:billberrylite/domain/services/retail/exchange_service.dart';
@@ -33,6 +35,7 @@ import 'package:billberrylite/domain/store/common/customer_store.dart';
 import 'package:billberrylite/domain/store/restaurant/cash_movement_store.dart';
 import 'package:billberrylite/domain/store/retail/product_store.dart';
 import 'package:billberrylite/domain/store/retail/sale_store.dart';
+import '../../../helpers/open_retail_day_fixture.dart';
 
 /// RETAIL EXCHANGE — one item back, a different one out.
 ///
@@ -73,6 +76,8 @@ void main() {
         HiveBoxNames.restaurantStockMovements);
     await Hive.openBox<BusinessDetails>(HiveBoxNames.businessDetailsBox);
     await Hive.openBox(HiveBoxNames.dayManagementBox);
+    // BLK-16: returns, exchanges and collections need an open day.
+    await openRetailDayForTest();
     await Hive.openBox(HiveBoxNames.appCounters);
 
     locator.registerLazySingleton<SaleStore>(() => SaleStore());
@@ -579,6 +584,80 @@ void main() {
       expect(onTheReturn.success, isFalse);
       expect(onTheReturn.error, contains('return document'));
     });
+
+    // BLK-10: the return value of an invoice with a balance owed is written
+    // off the due, so it cannot also pay for a replacement.
+    test('an invoice with a balance owed cannot be quoted or exchanged',
+        () async {
+      await seedStandard(dueAmount: 0.01, paidAmount: 1061.99,
+          status: SaleStatus.partiallyPaid);
+
+      await expectLater(
+        service.quote(
+          originalSaleId: 'S1',
+          returnedVariantId: 'v1',
+          returnQty: 1,
+          replacementVariantId: 'v2',
+        ),
+        throwsA(predicate((e) =>
+            e.toString().contains(ExchangeService.unpaidBalanceMessage))),
+      );
+
+      final r = await service.processExchange(
+        originalSaleId: 'S1',
+        returnedVariantId: 'v1',
+        returnQty: 1,
+        replacementVariantId: 'v2',
+        paymentMethod: 'cash',
+      );
+      expect(r.success, isFalse);
+      expect(r.error, ExchangeService.unpaidBalanceMessage);
+      await expectNothingWritten();
+      expect(stockOf('v2'), 5);
+      expect(readSale('S1').dueAmount, 0.01);
+    });
+
+    test('a rounding remainder (0.005) counts as paid', () async {
+      await seedStandard(dueAmount: 0.005);
+
+      final r = await service.processExchange(
+        originalSaleId: 'S1',
+        returnedVariantId: 'v1',
+        returnQty: 1,
+        replacementVariantId: 'v2',
+        paymentMethod: 'cash',
+      );
+      expect(r.success, isTrue, reason: r.error);
+    });
+
+    test('once the balance is collected, the exchange goes through', () async {
+      await seedStandard(dueAmount: 1062, paidAmount: 0,
+          status: SaleStatus.due);
+      final refused = await service.processExchange(
+        originalSaleId: 'S1',
+        returnedVariantId: 'v1',
+        returnQty: 1,
+        replacementVariantId: 'v2',
+        paymentMethod: 'cash',
+      );
+      expect(refused.success, isFalse);
+
+      // The balance collected in full.
+      await Hive.box<SaleModel>(HiveBoxNames.sales).put(
+          'S1',
+          readSale('S1').copyWith(
+              dueAmount: 0, paidAmount: 1062, status: SaleStatus.paid));
+
+      final r = await service.processExchange(
+        originalSaleId: 'S1',
+        returnedVariantId: 'v1',
+        returnQty: 1,
+        replacementVariantId: 'v2',
+        paymentMethod: 'cash',
+      );
+      expect(r.success, isTrue, reason: r.error);
+      expect(r.difference, closeTo(1416 - 1062, 0.02));
+    });
   });
 
   // ==========================================================================
@@ -601,8 +680,36 @@ void main() {
       );
 
       expect(r.success, isFalse);
-      expect(r.error, contains('manager'));
+      expect(r.error, contains('permission'));
       expect(allSales().length, 1);
+    });
+
+    test('a Cashier can process an exchange', () async {
+      await seedStandard();
+      await RestaurantSession.saveStaffSession(StaffModel(
+        id: 'staff-cashier',
+        userName: 'cashier',
+        firstName: 'Cashier',
+        lastName: 'Tester',
+        isCashier: 'Cashier',
+        mobileNo: '',
+        emailId: '',
+        pinNo: '',
+        createdAt: DateTime(2026, 1, 1),
+      ));
+      expect(RestaurantSession.staffRole, 'Cashier');
+      expect(service.canExchange, isTrue);
+
+      final r = await service.processExchange(
+        originalSaleId: 'S1',
+        returnedVariantId: 'v1',
+        returnQty: 1,
+        replacementVariantId: 'v2',
+        paymentMethod: 'cash',
+      );
+
+      expect(r.success, isTrue, reason: r.error);
+      expect(allSales().length, 3, reason: 'original + return + replacement');
     });
   });
 

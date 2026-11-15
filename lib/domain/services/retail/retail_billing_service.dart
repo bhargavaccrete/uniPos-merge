@@ -241,6 +241,25 @@ class RetailBillingService {
     );
   }
 
+  /// Points a customer can redeem on [billBefore] (the bill WITHOUT
+  /// redemption), 1 point = 1 unit.
+  ///
+  /// The engine applies points to what they can reduce: the pre-tax base in
+  /// exclusive mode (GST then falls with it), the gross in inclusive mode.
+  /// Capping against the grand total including tax let a customer redeem
+  /// points the engine then ignored (R8) — ₹100 + 18% with 118 points took
+  /// all 118 for ₹100 of value.
+  static int redeemablePoints({
+    required RetailBill billBefore,
+    required int available,
+  }) {
+    final reducible = billBefore.isTaxInclusive
+        ? billBefore.taxableAmount + billBefore.totalGst
+        : billBefore.taxableAmount;
+    final cap = reducible > 0 ? reducible.floor() : 0;
+    return available.clamp(0, cap).toInt();
+  }
+
   /// Retail's tax-inclusive flag. Retail stores this under its own
   /// SharedPreferences key via [GstService], separate from the restaurant
   /// `AppSettings` toggle — so it must be passed to [compute] explicitly rather

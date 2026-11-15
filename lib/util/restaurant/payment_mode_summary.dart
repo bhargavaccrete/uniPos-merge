@@ -1,6 +1,8 @@
 import '../../data/models/restaurant/db/eodmodel_317.dart';
 import '../../data/models/restaurant/db/pastordermodel_313.dart';
 import 'order_status_filter.dart';
+import 'refund_allocation.dart';
+import '../../domain/services/restaurant/refund_service.dart';
 
 /// Aggregates past orders into one [PaymentSummary] per payment method.
 ///
@@ -24,31 +26,44 @@ class PaymentModeSummary {
 
     for (final order in orders) {
       final status = order.orderStatus?.toUpperCase() ?? '';
-      if (OrderStatusFilter.isExcludedFromRevenue(status)) continue;
-
-      final netAmount = order.totalPrice - (order.refundAmount ?? 0.0);
-
-      // Always decode paymentListJson if present — it's the source of truth.
-      // Avoid relying on isSplitPayment flag which can be null for legacy orders.
-      if (order.paymentListJson != null && order.paymentListJson!.isNotEmpty) {
-        final refundRatio =
-            order.totalPrice > 0 ? netAmount / order.totalPrice : 1.0;
-        for (final entry in order.paymentList) {
-          // Normalise so 'Cash'/'cash'/'CASH' collapse into one bucket.
-          final method = normalizeMethod(entry['method'] as String?);
-          final amt =
-              ((entry['amount'] as num?)?.toDouble() ?? 0.0) * refundRatio;
-          paymentTotals[method] = (paymentTotals[method] ?? 0.0) + amt;
-          paymentCounts[method] = (paymentCounts[method] ?? 0) + 1;
-          grandTotal += amt;
+      if (OrderStatusFilter.isExcludedFromRevenue(status)) {
+        // A fully refunded order nets to nothing overall — but a refund paid
+        // out by a different method than the sale (cash back on a UPI bill)
+        // still moved money between methods. Counted only when the refund's
+        // methods were recorded; older refunds keep the old exclusion.
+        if (status == 'FULLY_REFUNDED' &&
+            RefundService.refundEventsOf(order).any((e) => e.legs != null)) {
+          RefundAllocation.netLegsOf(order).forEach((method, amt) {
+            if (amt.abs() < 0.000001) return;
+            paymentTotals[method] = (paymentTotals[method] ?? 0.0) + amt;
+            grandTotal += amt;
+          });
         }
-      } else {
+        continue;
+      }
+
+      // What the order collected per method, net of its refunds — each
+      // refund off the method it was actually paid out by, or (refunds
+      // recorded before that was asked) spread in proportion. The same rule
+      // End of Day and the cash drawer use (RefundAllocation).
+      final hasLegs =
+          order.paymentListJson != null && order.paymentListJson!.isNotEmpty;
+      final net = RefundAllocation.netLegsOf(order);
+      if (net.isEmpty && !hasLegs) {
+        // No recorded method at all: one row under the stored mode, as before.
         final paymentType = normalizeMethod(order.paymentmode);
+        final netAmount = order.totalPrice - (order.refundAmount ?? 0.0);
         paymentTotals[paymentType] =
             (paymentTotals[paymentType] ?? 0.0) + netAmount;
         paymentCounts[paymentType] = (paymentCounts[paymentType] ?? 0) + 1;
         grandTotal += netAmount;
+        continue;
       }
+      net.forEach((method, amt) {
+        paymentTotals[method] = (paymentTotals[method] ?? 0.0) + amt;
+        paymentCounts[method] = (paymentCounts[method] ?? 0) + 1;
+        grandTotal += amt;
+      });
     }
 
     return paymentTotals.entries.map((entry) {

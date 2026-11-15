@@ -38,7 +38,7 @@ import 'package:billberrylite/domain/services/retail/inventory_service.dart';
 import '../../../../core/di/service_locator.dart';
 import 'package:billberrylite/core/routes/routes_name.dart';
 import 'package:billberrylite/domain/services/common/notification_service.dart';
-import 'package:billberrylite/domain/services/restaurant/day_management_service.dart';
+import 'package:billberrylite/domain/services/retail/retail_day_gate.dart';
 import 'package:billberrylite/domain/services/retail/hold_sale_service.dart';
 import 'package:billberrylite/presentation/widget/restaurant/opening_balance_dialog.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
@@ -361,20 +361,15 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
       return false;
     }
 
+    // The shared retail day rule (RetailDayGate) — the same one returns,
+    // exchanges and credit collections go through.
+    final dayBlock = await RetailDayGate.check();
+
     // End of Day pending → no new sales until it is completed.
-    //
-    // Both checks, because they answer different questions: `isEodStrictly-
-    // Pending` is a DURATION rule (session older than the auto-close window,
-    // and off entirely when that setting is disabled), while `hasPendingEOD` is
-    // a CALENDAR rule (the open session belongs to an earlier day). A shop that
-    // opened at 9 AM and returns at 8 AM the next morning trips the second but
-    // not the first, and used to be allowed to keep billing into yesterday's
-    // session.
-    if (await DayManagementService.isEodStrictlyPending() ||
-        await DayManagementService.hasPendingEOD()) {
+    if (dayBlock == RetailDayBlock.eodPending) {
       if (mounted) {
         NotificationService.instance.showError(
-          'Complete End of Day for the previous day first.',
+          RetailDayGate.messageFor(RetailDayBlock.eodPending),
         );
       }
       _billingBlock = _BillingBlock.eodPending;
@@ -384,7 +379,7 @@ class _RetailPosScreenState extends State<RetailPosScreen> {
     // No day open yet → offer to start it right here rather than bouncing the
     // user out to Settings. Uses the same opening-balance dialog as restaurant,
     // so both verticals start a day the same way.
-    if (!await DayManagementService.isDayStarted()) {
+    if (dayBlock == RetailDayBlock.dayNotStarted) {
       if (!mounted) return false;
       final started = await promptStartDay(context);
       if (started != true) {

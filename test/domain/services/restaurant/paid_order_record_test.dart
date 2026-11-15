@@ -37,6 +37,7 @@ import 'package:billberrylite/domain/store/restaurant/variant_store.dart';
 import '../../../helpers/open_session_fixture.dart';
 import '../../../helpers/pre_paid_order_fields_order_adapter.dart';
 import '../../../helpers/test_helpers.dart';
+import '../../../helpers/sign_in_fixture.dart';
 
 /// Same fake as cart_calculation_service_test: TaxFeature reads this, tax on.
 class _TaxOnBusinessDetails extends BusinessDetailsRepository {
@@ -49,6 +50,9 @@ class _TaxOnBusinessDetails extends BusinessDetailsRepository {
 /// shift); both ways the order later leaves Active Orders build the same past
 /// order; the payment screen starts from the saved discount and charge.
 void main() {
+  // BLK-14: refunds and voids check the role; sign in as admin.
+  setUpAll(() => signInForTest());
+
   setUp(() {
     if (!locator.isRegistered<BusinessDetailsRepository>()) {
       locator.registerSingleton<BusinessDetailsRepository>(

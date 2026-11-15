@@ -13,6 +13,7 @@ import 'package:billberrylite/domain/services/common/document_number_service.dar
 import 'package:billberrylite/domain/services/retail/inventory_service.dart';
 import 'package:billberrylite/util/common/quantity_format.dart';
 import 'package:billberrylite/domain/services/retail/retail_billing_service.dart';
+import 'package:billberrylite/domain/services/retail/retail_day_gate.dart';
 import 'package:billberrylite/domain/services/retail/return_math.dart';
 import 'package:billberrylite/domain/services/retail/return_service.dart';
 import 'package:uuid/uuid.dart';
@@ -164,8 +165,12 @@ class ExchangeResult {
 /// the cash drawer untouched. This is why no new payment concept is needed.
 ///
 /// **The original sale's payment identity is never rewritten.** 900 paid by
-/// CASH stays 900 CASH forever, whatever settles the difference. Only an
-/// outstanding receivable moves — see [ReturnService].
+/// CASH stays 900 CASH forever, whatever settles the difference.
+///
+/// **Only a fully paid invoice can be exchanged.** On one with a balance
+/// still owed, [ReturnService] writes the return value off the due — it
+/// cannot then also pay for the replacement. Collect the balance first, or
+/// process a plain return.
 ///
 /// V1 is deliberately one returned line and one replacement variant. No store
 /// credit, no wallet, no split payment, no multi-line.
@@ -196,6 +201,11 @@ class ExchangeService {
   static bool isExchangeCredit(String? method) =>
       (method ?? '').trim().toLowerCase() == exchangeCreditMethod;
 
+  /// Why an invoice with money still owed on it cannot be exchanged.
+  static const String unpaidBalanceMessage =
+      'This invoice still has an unpaid balance. Collect the balance first, '
+      'or process a return instead.';
+
   final ReturnService _returnService;
   final DocumentNumberService _numbers;
 
@@ -208,12 +218,8 @@ class ExchangeService {
   /// Guards against a double-tap producing two exchange groups.
   bool _inFlight = false;
 
-  /// Admin and Manager may process an exchange; a Cashier may not.
-  ///
-  /// Note the deliberate asymmetry: a Cashier CAN process a plain return
-  /// (`sale_return_screen`), but not an exchange — an exchange writes a new
-  /// sale at a possibly different price, so it carries the same manager-level
-  /// gate as price override and line discount.
+  /// Admin, Manager and Cashier may process an exchange, as they may a plain
+  /// return. Only a signed-out session is refused (`canAccess` fails closed).
   ///
   /// Callers must HIDE the action when this is false rather than showing it and
   /// refusing.
@@ -242,6 +248,12 @@ class ExchangeService {
     }
     if (originalSale.isReturn ?? false) {
       throw Exception('A return document cannot be exchanged');
+    }
+    // BLK-10: on an unpaid balance the return value is first written off the
+    // due (ReturnService), so it cannot also pay for the replacement — the
+    // same value would be spent twice.
+    if (originalSale.dueAmount > 0.009) {
+      throw Exception(unpaidBalanceMessage);
     }
 
     final soldLines = await saleItemRepository.getItemsBySaleId(originalSaleId);
@@ -406,12 +418,19 @@ class ExchangeService {
     }
     if (!canExchange) {
       return ExchangeResult.failure(
-          'Only an admin or manager can process an exchange');
+          'You do not have permission to process an exchange');
     }
 
     _inFlight = true;
     try {
       // ---- 0. validate + price; still zero writes -------------------------
+      // BLK-16: checked before the EXC number is taken, so a refused
+      // exchange consumes nothing.
+      final dayBlock = await RetailDayGate.check();
+      if (dayBlock != null) {
+        return ExchangeResult.failure(RetailDayGate.messageFor(dayBlock));
+      }
+
       final ExchangeQuote q;
       try {
         q = await quote(

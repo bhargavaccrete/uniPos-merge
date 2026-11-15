@@ -145,6 +145,10 @@ final Map<String, String> retailExcluded = {
   HiveBoxNames.retailCategories:
       'legacy String box superseded by the shared category box; restore '
           'repopulates it from the "categories" key',
+  HiveBoxNames.retailCheckoutJournal:
+      'crash-recovery journal of saved-but-unfinished Retail sales; its '
+          "entries describe this device's pre-restore stock, customers and "
+          'cart and must never replay onto restored data',
 };
 
 /// Registers every adapter and opens exactly what the app opens for [mode]

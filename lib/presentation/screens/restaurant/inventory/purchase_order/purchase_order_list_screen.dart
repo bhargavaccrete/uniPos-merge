@@ -71,6 +71,8 @@ class _PurchaseOrderListScreenState extends State<PurchaseOrderListScreen> {
   void initState() {
     super.initState();
     restaurantSupplierStore.loadSuppliers();
+    // Finish any goods receipt a stop left as a draft (S-06).
+    restaurantPurchaseOrderStore.resumeInterruptedReceipts();
   }
 
   @override

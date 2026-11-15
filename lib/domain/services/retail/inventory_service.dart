@@ -23,6 +23,25 @@ import 'grn_receiving_service.dart';
 /// docs/retail_inventory_system_plan.md) a service layer to hang off instead
 /// of growing inside the checkout screen. Mirrors restaurant's
 /// `InventoryService.deductStockForOrder`.
+/// Persisted record of a sale's stock writes (see
+/// `RetailInventoryService.deductStockForSale`). Implemented by
+/// `RetailCheckoutCommit`'s journal entry.
+abstract class SaleStockIntents {
+  /// The balances recorded before [rowId]'s stock write, or null.
+  ({double before, double after})? intentFor(String rowId);
+
+  /// [rowId] could not be resolved and was reported; never written again.
+  bool isConflict(String rowId);
+
+  /// Persists the write about to happen. Must complete before it.
+  Future<void> record(String rowId,
+      {required double before, required double after});
+
+  /// Stock is neither as recorded before nor after: report it, write nothing.
+  Future<void> conflict(String rowId,
+      {required String label, required double qty});
+}
+
 class RetailInventoryService {
   RetailInventoryService._();
 
@@ -35,12 +54,24 @@ class RetailInventoryService {
   /// (`sale_<saleId>_<cartItemId>`, plus the component for a bundle) and a
   /// line whose row already exists is skipped — so re-running the deduction
   /// for the same sale after a mid-way failure applies only what is missing.
+  ///
+  /// [intents] (checkout, BLK-13B) closes the one gap the row check leaves:
+  /// a stop between a stock write and its row. Each write is recorded first
+  /// with the balance before and after; a later run finds stock == after →
+  /// only the row is written, == before → applied, anything else → never
+  /// guessed, reported through [SaleStockIntents.conflict]. [staffName] and
+  /// [sessionId] replace the live ones when a recovery finishes an older sale.
   static Future<void> deductStockForSale(
     List<CartItemModel> cartItems, {
     String? saleId,
+    SaleStockIntents? intents,
+    ({String staffName, String? sessionId})? attribution,
   }) async {
-    final staffName = authService.currentUsername ?? 'Staff';
-    final sessionId = await DayManagementService.getCurrentSessionId();
+    final staffName =
+        attribution?.staffName ?? authService.currentUsername ?? 'Staff';
+    final sessionId = attribution != null
+        ? attribution.sessionId
+        : await DayManagementService.getCurrentSessionId();
 
     for (final item in cartItems) {
       final lineKey = saleId == null ? null : 'sale_${saleId}_${item.cartItemId}';
@@ -62,6 +93,7 @@ class RetailInventoryService {
           staffName: staffName,
           sessionId: sessionId,
           lineKey: lineKey,
+          intents: intents,
         );
         continue;
       }
@@ -70,15 +102,22 @@ class RetailInventoryService {
       final variant = await productStore.getVariantById(item.variantId);
       if (variant == null) continue;
 
-      // Never clamped: selling past zero (allow-when-out, or a race) leaves a
-      // negative count, so the row reconciles and the shortfall stays visible
-      // for the next stock take. Same as restaurant's applyStockDelta.
-      final finalStock = variant.stockQty - item.qty;
-      await productStore.updateVariantStock(item.variantId, finalStock);
-
       final label = product != null && variant.hasAttributes
           ? '${product.productName} (${variant.variantDescription})'
           : (product?.productName ?? item.productName);
+
+      // Never clamped: selling past zero (allow-when-out, or a race) leaves a
+      // negative count, so the row reconciles and the shortfall stays visible
+      // for the next stock take. Same as restaurant's applyStockDelta.
+      final finalStock = await _writeStock(
+        rowId: lineKey,
+        variantId: item.variantId,
+        current: variant.stockQty,
+        qty: item.qty,
+        label: label,
+        intents: intents,
+      );
+      if (finalStock == null) continue;
 
       await _movements.saveMovement(StockMovementModel(
         id: lineKey ?? const Uuid().v4(),
@@ -110,6 +149,7 @@ class RetailInventoryService {
     required String staffName,
     required String? sessionId,
     String? lineKey,
+    SaleStockIntents? intents,
   }) async {
     final RetailBundleModel? bundle = bundleRepository.getBundleForVariant(bundleVariantId);
     if (bundle == null || !bundle.hasComponents) return; // unconfigured bundle — nothing to deduct
@@ -122,8 +162,6 @@ class RetailInventoryService {
       if (variant == null) continue;
 
       final deductQty = saleQty * component.quantity;
-      final finalStock = variant.stockQty - deductQty; // not clamped — see above
-      await productStore.updateVariantStock(component.componentVariantId, finalStock);
 
       String label = variant.sku ?? component.componentVariantId;
       try {
@@ -134,6 +172,16 @@ class RetailInventoryService {
             ? '${componentProduct.productName} (${variant.variantDescription})'
             : componentProduct.productName;
       } catch (_) {}
+
+      final finalStock = await _writeStock(
+        rowId: rowId,
+        variantId: component.componentVariantId,
+        current: variant.stockQty,
+        qty: deductQty,
+        label: label,
+        intents: intents,
+      ); // not clamped — see above
+      if (finalStock == null) continue;
 
       await _movements.saveMovement(StockMovementModel(
         id: rowId ?? const Uuid().v4(),
@@ -150,6 +198,43 @@ class RetailInventoryService {
         sessionId: sessionId,
       ));
     }
+  }
+
+  static const double _intentEps = 1e-9;
+
+  /// Writes `current − qty` to [variantId] and returns the balance to log,
+  /// or null when nothing may be written or logged. Without [intents] (or a
+  /// row id) this is the plain write it always was.
+  static Future<double?> _writeStock({
+    required String? rowId,
+    required String variantId,
+    required double current,
+    required double qty,
+    required String label,
+    required SaleStockIntents? intents,
+  }) async {
+    final target = current - qty;
+    if (intents == null || rowId == null) {
+      await productStore.updateVariantStock(variantId, target);
+      return target;
+    }
+    if (intents.isConflict(rowId)) return null;
+    final prior = intents.intentFor(rowId);
+    if (prior != null) {
+      if ((current - prior.after).abs() < _intentEps) {
+        // The write landed before the stop; only its row is missing.
+        return prior.after;
+      }
+      if ((current - prior.before).abs() >= _intentEps) {
+        // Neither: another write moved this stock since. Never guess.
+        await intents.conflict(rowId, label: label, qty: qty);
+        return null;
+      }
+      // Still exactly as before: the write never happened. Apply it.
+    }
+    await intents.record(rowId, before: current, after: target);
+    await productStore.updateVariantStock(variantId, target);
+    return target;
   }
 
   /// Live "N can be sold" count for a bundle-type variant — the minimum,

@@ -1,6 +1,5 @@
 import '../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../data/models/restaurant/db/ordermodel_309.dart';
-import '../../../util/restaurant/staticswitch.dart';
 import 'kot_layout.dart';
 import 'kot_status_rule.dart';
 import 'saved_service_charge.dart';
@@ -58,7 +57,6 @@ class OrderLineCancel {
     );
 
     final bool isDelivery = order.orderType.toLowerCase().contains('delivery');
-    final bool taxInclusive = order.isTaxInclusive ?? AppSettings.isTaxInclusive;
     final calc = SavedServiceCharge.calculate(order, layout.items,
         isDelivery: isDelivery);
 
@@ -70,7 +68,8 @@ class OrderLineCancel {
         kotStatuses: layout.kotStatuses,
         itemCountAtLastKot: layout.itemCountAtLastKot,
         totalPrice: calc.grandTotal,
-        subTotal: taxInclusive ? calc.subtotal - calc.totalGST : calc.subtotal,
+        // Already the pre-tax base in both tax modes (M5).
+        subTotal: calc.subtotal,
         gstAmount: calc.totalGST,
         // The new amount, so a later recalculation finds the same %.
         serviceCharge: calc.serviceChargeAmount,

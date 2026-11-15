@@ -255,6 +255,10 @@ class _AddPurchaseOrderScreenState extends State<AddPurchaseOrderScreen> {
       NotificationService.instance.showSuccess(
         'Purchase order ${po.poNumber} created',
       );
+    } on StateError catch (e) {
+      // The store refuses an item with variants (BLK-18) — e.g. a line kept
+      // from a draft saved before such items were left out of the picker.
+      if (mounted) NotificationService.instance.showError(e.message);
     } finally {
       if (mounted) setState(() => _saving = false);
     }

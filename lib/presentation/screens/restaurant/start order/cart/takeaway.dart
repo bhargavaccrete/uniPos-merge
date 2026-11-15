@@ -12,11 +12,13 @@ import '../../../../../data/models/restaurant/db/pastordermodel_313.dart';
 import '../../../../../domain/services/restaurant/cart_calculation_service.dart';
 import '../../../../../domain/services/restaurant/day_management_service.dart';
 import '../../../../widget/restaurant/opening_balance_dialog.dart';
-import '../../../../../domain/services/restaurant/inventory_service.dart';
-import '../../../../../domain/services/restaurant/kot_layout.dart';
+import '../../../../../domain/services/restaurant/stock_gate.dart';
+import '../../../../../domain/services/restaurant/place_new_order.dart';
+import '../../../../../domain/services/restaurant/settle_new_order.dart';
+import '../../../../../domain/services/restaurant/existing_order_update.dart';
+import '../../../../../domain/services/restaurant/active_line_cancel.dart';
 import '../../../../../domain/services/restaurant/kot_status_rule.dart';
 import '../../../../../domain/services/restaurant/line_stock.dart';
-import '../../../../../domain/services/restaurant/order_line_cancel.dart';
 import '../../../../../domain/services/restaurant/saved_service_charge.dart';
 import '../../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../../util/common/currency_helper.dart';
@@ -1065,87 +1067,36 @@ class _TakeawayState extends State<Takeaway> {
     String reason,
   ) async {
     if (widget.existingModel == null) return;
-    // The saved order, not the screen's snapshot: an earlier cancel on this
-    // screen already rewrote its lines and KOT boundaries.
-    final existing =
-        orderStore.getOrderById(widget.existingModel!.id) ??
-        widget.existingModel!;
-
-    // The Cancel button reads the screen's snapshot; the kitchen may have
-    // moved this KOT on since. Cooked food must not go back on the shelf.
-    if (OrderLineCancel.isCooked(existing, item.id)) {
-      NotificationService.instance.showError('Cannot cancel cooked items');
-      return;
-    }
-
-    // Baseline = the order's current saved active items. kotBoundaries index
-    // into exactly this list, so both come from the same record.
-    final List<CartItem> savedItems = existing.items;
-
-    // Which KOT did this item belong to (for audit + Cancel-KOT reference).
-    int kotFor(String id) {
-      final idx = savedItems.indexWhere((o) => o.id == id);
-      if (idx == -1) return 0;
-      final boundaries = existing.kotBoundaries;
-      final kotNums = existing.getKotNumbers();
-      for (int i = 0; i < boundaries.length; i++) {
-        if (idx < boundaries[i]) return i < kotNums.length ? kotNums[i] : 0;
-      }
-      return 0;
-    }
-
-    final kot = kotFor(item.id);
-
-    // Saved list with this line reduced/removed by cancelQty.
-    final layout = KotLayout.removeQuantity(
-      items: savedItems,
-      kotNumbers: existing.kotNumbers,
-      kotBoundaries: existing.kotBoundaries,
-      kotStatuses: existing.kotStatuses ?? {},
-      lineId: item.id,
-      qty: cancelQty,
-    );
-    final List<CartItem> newSavedItems = layout.items;
-
-    final bool taxInclusive =
-        existing.isTaxInclusive ?? AppSettings.isTaxInclusive;
-    final calc = SavedServiceCharge.calculate(existing, newSavedItems,
-        isDelivery: widget.isdelivery);
-
     // If the last active item is being cancelled AND nothing new is pending,
     // the order is empty → remove it entirely instead of leaving a blank active
     // order. Otherwise just save the reduced order.
     final bool hasPendingNew = widget.cartItems.any((w) => !w.isActive);
-    final bool orderEmpty = newSavedItems.isEmpty && !hasPendingNew;
 
-    if (orderEmpty) {
-      await orderStore.deleteOrder(existing.id);
-    } else {
-      await orderStore.updateOrder(
-        existing.copyWith(
-          items: newSavedItems,
-          kotNumbers: layout.kotNumbers,
-          kotBoundaries: layout.kotBoundaries,
-          kotStatuses: layout.kotStatuses,
-          itemCountAtLastKot: layout.itemCountAtLastKot,
-          totalPrice: calc.grandTotal,
-          subTotal: taxInclusive
-              ? calc.subtotal - calc.totalGST
-              : calc.subtotal,
-          gstAmount: calc.totalGST,
-          // The new amount, so a later recalculation finds the same %.
-          serviceCharge: calc.serviceChargeAmount,
-        ),
+    // Read, checked, written and its stock returned against the order as
+    // SAVED, inside the stock gate (another device may have changed it).
+    final ActiveLineCancelResult result;
+    try {
+      result = await ActiveLineCancel.commit(
+        orderId: widget.existingModel!.id,
+        lineId: item.id,
+        qty: cancelQty,
+        whenEmpty: hasPendingNew ? WhenEmpty.keep : WhenEmpty.delete,
+        isDelivery: widget.isdelivery,
       );
+    } on ActiveLineCancelRefused catch (e) {
+      NotificationService.instance.showError(e.message);
+      return;
+    } catch (e) {
+      NotificationService.instance.showError('Could not cancel the item: $e');
+      return;
     }
-
-    // Restore stock for the cancelled quantity — from the SAVED line, whose
-    // stamp records what its sale took (prepared stock vs made fresh).
-    final cancelledPortion = item.copyWith(quantity: cancelQty);
-    final savedLine = savedItems.where((o) => o.id == item.id).firstOrNull;
-    await InventoryService.restoreLines([
-      (line: savedLine ?? cancelledPortion, qty: cancelQty),
-    ]);
+    final existing = result.before;
+    final kot = result.kotNumber ?? 0;
+    final bool orderEmpty = result.orderDeleted;
+    final cancelledPortion = result.cancelled;
+    if (result.stockWarning != null) {
+      NotificationService.instance.showWarning(result.stockWarning!);
+    }
 
     // Audit for the Item Cancellation Report.
     try {
@@ -1220,7 +1171,7 @@ class _TakeawayState extends State<Takeaway> {
         await tableStore.updateTableStatus(
           existing.tableNo!,
           existing.status,
-          total: calc.grandTotal,
+          total: result.order!.totalPrice,
           orderId: existing.id,
           orderTime: existing.timeStamp,
         );
@@ -1380,8 +1331,26 @@ class _TakeawayState extends State<Takeaway> {
   bool showNameSuggestions = false;
   bool showPhoneSuggestions = false;
 
+  /// Set synchronously by the first tap, before any await (SALE-5): a second
+  /// tap on Place Order / Quick Settle while the first is still running
+  /// returns at once instead of creating a second order and KOT.
+  bool _submitting = false;
+
+  Future<void> _oneAtATime(Future<void> Function() body) async {
+    if (_submitting) return;
+    _submitting = true;
+    try {
+      await body();
+    } finally {
+      _submitting = false;
+    }
+  }
+
   // NEW ORDER
-  Future<void> _placeOrder(CartCalculationService calculations) async {
+  Future<void> _placeOrder(CartCalculationService calculations) =>
+      _oneAtATime(() => _runPlaceOrder(calculations));
+
+  Future<void> _runPlaceOrder(CartCalculationService calculations) async {
     if (!_stockOkToOrder()) return;
     // Plan gate — placing an order is a billing entrance, so cap it here (not
     // only at settle). todaysBillLoad counts active + settled orders so this
@@ -1439,86 +1408,86 @@ class _TakeawayState extends State<Takeaway> {
       }
     }
 
-    // Check stock availability before placing order
-    final bool stockAvailable = await InventoryService.checkStockAvailability(
-      plainItems,
-    );
-    if (!stockAvailable) {
+    // S-04A: the stock check, the order write and the stock deduction run as
+    // ONE operation in the app-wide StockGate, so a Captain order (or another
+    // POS order) cannot take the same stock between them. Same rule as the
+    // Captain endpoint (InventoryService.stockShortfalls). The KOT prints
+    // after the gate — never hold other orders on a printer.
+    late final OrderModel neworder;
+    late final int newKotNumber;
+    final GatedSale sale;
+    try {
+      sale = await PlaceNewOrder.commit(items: plainItems, build: (stampedLines) async {
+      // Get or create customer BEFORE creating the order so we can link them
+      final customer = await _getOrCreateCustomer(
+        nameController.text.trim(),
+        mobileController.text.trim(),
+        widget.isDineIn ? 'Dine In' : 'Take Away',
+      );
+
+      newKotNumber = await orderStore.getNextKotNumber();
+
+      // Generate daily order number
+      final int orderNumber = await orderStore.getNextOrderNumber();
+
+      // Get current session ID
+      final currentSessionId = await DayManagementService.getCurrentSessionId();
+
+      // The plan's stamped lines are saved, so every later restore reads what
+      // each sale took (prepared stock vs made fresh).
+      neworder = OrderModel(
+        id: Uuid().v4(),
+        customerName: nameController.text.trim(),
+        customerNumber: mobileController.text.trim(),
+        customerEmail: emailController.text.trim(),
+        items: stampedLines,
+        status: 'Processing',
+        timeStamp: DateTime.now(),
+        orderType: widget.isDineIn ? 'Dine In' : 'Take Away',
+        // kotNumber removed - using kotNumbers only
+        tableNo: widget.selectedTableNo ?? '',
+        // widget.selectedTableNo.toString()
+        remark: remarkController.text.trim(),
+
+        // ✅ Use the service as the single source of truth for ALL financial data
+        // The engine's subtotal is already the pre-tax base in both tax modes;
+        // taking GST off again understated taxable sales (M5).
+        subTotal: calculations.subtotal,
+        gstAmount: calculations.totalGST,
+        totalPrice: calculations
+            .grandTotal, // This is the final, correct amount to be paid
+        gstRate: 0, // You can enhance your service to provide this if needed
+        // Initialize KOT tracking fields - single source of truth
+        kotNumbers: [newKotNumber],
+        itemCountAtLastKot: plainItems.length,
+        kotBoundaries: [plainItems.length], // First KOT boundary at item count
+        kotStatuses: {newKotNumber: 'Processing'}, // Initialize first KOT status
+        orderNumber: orderNumber, // Daily order number
+        customerId: customer?.customerId, // Link to customer (now properly set)
+        isTaxInclusive:
+            AppSettings.isTaxInclusive, // Store tax mode at order creation
+        sessionId: currentSessionId, // Link to POS session
+      );
+
+      // Saved by PlaceNewOrder, which refuses to deduct when the save fails.
+      // NOTE: Customer stats (visits + points) are updated only at settlement, not here.
+      // Adding points on order placement would double-count when the order is later settled.
+      return neworder;
+    });
+    } on OrderSaveFailedException catch (e) {
+      // Nothing deducted, no KOT, no success — the cart stays (SALE-3).
+      if (mounted) NotificationService.instance.showError(e.message);
+      return;
+    }
+    if (sale.refused) {
       if (mounted) {
         Navigator.pop(context);
         NotificationService.instance.showError(
-          'Cannot place order: Some items are out of stock or have insufficient quantity',
+          'Cannot place order: insufficient stock — ${sale.message}',
         );
-
-        // ScaffoldMessenger.of(context).showSnackBar(
-        //   SnackBar(
-        //     content: Text('Cannot place order: Some items are out of stock or have insufficient quantity'),
-        //     backgroundColor: Colors.red,
-        //   ),
-        // );
       }
-      return; // Stop order placement
+      return; // Stop order placement — nothing was written
     }
-
-    // Get or create customer BEFORE creating the order so we can link them
-    final customer = await _getOrCreateCustomer(
-      nameController.text.trim(),
-      mobileController.text.trim(),
-      widget.isDineIn ? 'Dine In' : 'Take Away',
-    );
-
-    if (customer != null) {}
-
-    final int newKotNumber = await orderStore.getNextKotNumber();
-
-    // Generate daily order number
-    final int orderNumber = await orderStore.getNextOrderNumber();
-
-    // Get current session ID
-    final currentSessionId = await DayManagementService.getCurrentSessionId();
-
-    // Plan the stock first so the saved lines carry what each sale takes
-    // (prepared stock vs made fresh) — every later restore reads it.
-    final salePlan = await InventoryService.planSale(plainItems);
-
-    final neworder = OrderModel(
-      id: Uuid().v4(),
-      customerName: nameController.text.trim(),
-      customerNumber: mobileController.text.trim(),
-      customerEmail: emailController.text.trim(),
-      items: salePlan.lines,
-      status: 'Processing',
-      timeStamp: DateTime.now(),
-      orderType: widget.isDineIn ? 'Dine In' : 'Take Away',
-      // kotNumber removed - using kotNumbers only
-      tableNo: widget.selectedTableNo ?? '',
-      // widget.selectedTableNo.toString()
-      remark: remarkController.text.trim(),
-
-      // ✅ Use the service as the single source of truth for ALL financial data
-      subTotal: AppSettings.isTaxInclusive
-          ? calculations.subtotal - calculations.totalGST
-          : calculations.subtotal,
-      gstAmount: calculations.totalGST,
-      totalPrice: calculations
-          .grandTotal, // This is the final, correct amount to be paid
-      gstRate: 0, // You can enhance your service to provide this if needed
-      // Initialize KOT tracking fields - single source of truth
-      kotNumbers: [newKotNumber],
-      itemCountAtLastKot: plainItems.length,
-      kotBoundaries: [plainItems.length], // First KOT boundary at item count
-      kotStatuses: {newKotNumber: 'Processing'}, // Initialize first KOT status
-      orderNumber: orderNumber, // Daily order number
-      customerId: customer?.customerId, // Link to customer (now properly set)
-      isTaxInclusive:
-          AppSettings.isTaxInclusive, // Store tax mode at order creation
-      sessionId: currentSessionId, // Link to POS session
-    );
-
-    await orderStore.addOrder(neworder);
-
-    // NOTE: Customer stats (visits + points) are updated only at settlement, not here.
-    // Adding points on order placement would double-count when the order is later settled.
 
     // Auto-print KOT directly to printer (only if Generate KOT setting is enabled)
     if (mounted && AppSettings.generateKOT) {
@@ -1533,9 +1502,6 @@ class _TakeawayState extends State<Takeaway> {
         // Don't block order placement if print fails
       }
     } else if (!AppSettings.generateKOT) {}
-
-    // Deduct stock after successfully adding the order
-    await InventoryService.applyPlannedUnits(salePlan.units);
 
     // print("")
     if (widget.isDineIn && widget.selectedTableNo != null) {
@@ -1600,7 +1566,10 @@ class _TakeawayState extends State<Takeaway> {
     }
   }
 
-  Future<void> _updateExistingOrder(CartCalculationService calculations) async {
+  Future<void> _updateExistingOrder(CartCalculationService calculations) =>
+      _oneAtATime(() => _runUpdateExistingOrder(calculations));
+
+  Future<void> _runUpdateExistingOrder(CartCalculationService calculations) async {
     if (!_stockOkToOrder()) return;
     if (!widget.isexisting || widget.existingModel == null) return;
     final existingModel = widget.existingModel!;
@@ -1716,90 +1685,124 @@ class _TakeawayState extends State<Takeaway> {
       existingModel.kotTimestamps ?? {},
     );
 
-    int? newAddedKotNumber;
-    if (hasNewItems) {
-      newAddedKotNumber = await orderStore.getNextKotNumber();
-      updatedKotNumbers.add(newAddedKotNumber);
-      updatedKotBoundaries.add(
-        currentActiveItems.length + newlyAddedItems.length,
-      );
-      updatedKotStatuses[newAddedKotNumber] = 'Processing';
-      updatedKotTimestamps[newAddedKotNumber] = DateTime.now();
-    }
-
-    final currentSessionId = await DayManagementService.getCurrentSessionId();
-
-    // Stock stamps (LineStock): plan the increases and new lines now so the
-    // saved lines carry what each sale takes; a reduced line's stamp shrinks
-    // (fresh first). Restores below read the SAVED line, never a copy.
+    // S-04D: stock check, add-on KOT number, order save, restores and stock
+    // deduction run as ONE operation in the app-wide StockGate (same rule as
+    // every other order path). Units this update hands back (removed /
+    // reduced lines) are credited in the check. Refused → nothing written;
+    // a failed save → no stock moves.
     final origById = {for (final o in originalItems) o.id: o};
-    final salePlan =
-        await InventoryService.planSale([...stockToDeduct, ...newlyAddedItems]);
-    final stampedById = {for (final s in salePlan.lines) s.id: s};
-    CartItem restamp(CartItem curr) {
-      final orig = origById[curr.id];
-      if (orig == null || !orig.hasStockStamp) return curr; // pre-Phase-1 line
-      if (curr.quantity < orig.quantity) {
-        final r = LineStock.reduced(orig, orig.quantity - curr.quantity);
-        return curr.copyWith(ownStockQty: r.ownStockQty, freshQty: r.freshQty);
-      }
-      final sold = stampedById[curr.id];
-      final base = curr.copyWith(
-          ownStockQty: orig.ownStockQty, freshQty: orig.freshQty);
-      return sold == null
-          ? base
-          : LineStock.withSale(base,
-              own: sold.ownStockQty ?? 0, fresh: sold.freshQty ?? 0);
+    final ExistingOrderUpdateResult commit;
+    try {
+      commit = await ExistingOrderUpdate.commit(
+        // INVX-1: refused, nothing written, if the saved lines no longer
+        // match the baseline the diff above was computed from.
+        orderId: existingModel.id,
+        baseline: origQtyMap,
+        deduct: [...stockToDeduct, ...newlyAddedItems],
+        returning: [...removedItems, ...stockToRestore],
+        // Restores read the SAVED line's stamp; deductions apply the plan the
+        // saved stamps came from.
+        restores: [
+          for (final item in removedItems) (line: item, qty: item.quantity),
+          for (final r in stockToRestore)
+            (line: origById[r.id] ?? r, qty: r.quantity),
+        ],
+        needsKot: hasNewItems,
+        build: (salePlan, newKot) async {
+          // The SAVED order (just re-read by the commit), not the screen's
+          // snapshot: KOT statuses, timestamps and payments may have moved on
+          // since this screen opened (INVX-1).
+          final saved =
+              orderStore.getOrderById(existingModel.id) ?? existingModel;
+          updatedKotStatuses
+            ..clear()
+            ..addAll(saved.kotStatuses ?? {});
+          updatedKotTimestamps
+            ..clear()
+            ..addAll(saved.kotTimestamps ?? {});
+          if (newKot != null) {
+            updatedKotNumbers.add(newKot);
+            updatedKotBoundaries.add(
+              currentActiveItems.length + newlyAddedItems.length,
+            );
+            updatedKotStatuses[newKot] = 'Processing';
+            updatedKotTimestamps[newKot] = DateTime.now();
+          }
+
+          final currentSessionId =
+              await DayManagementService.getCurrentSessionId();
+
+          // Stock stamps (LineStock): the plan's increases and new lines are
+          // stamped onto the saved lines; a reduced line's stamp shrinks
+          // (fresh first).
+          final stampedById = {for (final s in salePlan.lines) s.id: s};
+          CartItem restamp(CartItem curr) {
+            final orig = origById[curr.id];
+            if (orig == null || !orig.hasStockStamp) return curr; // pre-Phase-1 line
+            if (curr.quantity < orig.quantity) {
+              final r = LineStock.reduced(orig, orig.quantity - curr.quantity);
+              return curr.copyWith(ownStockQty: r.ownStockQty, freshQty: r.freshQty);
+            }
+            final sold = stampedById[curr.id];
+            final base = curr.copyWith(
+                ownStockQty: orig.ownStockQty, freshQty: orig.freshQty);
+            return sold == null
+                ? base
+                : LineStock.withSale(base,
+                    own: sold.ownStockQty ?? 0, fresh: sold.freshQty ?? 0);
+          }
+
+          final List<CartItem> savedItems = [
+            for (final curr in currentActiveItems) restamp(curr),
+            for (final n in newlyAddedItems) stampedById[n.id] ?? n,
+          ];
+
+          // Adding/removing items changes the total, so re-derive payment state from
+          // the new balance. Existing payments (totalPaid / paymentListJson /
+          // paymentMethod) are preserved by copyWith — we only recompute the flags,
+          // so a settled order that gets new items correctly reopens as pending.
+          final double alreadyPaid = saved.totalPaid ?? 0;
+          final bool nowFullyPaid = (calculations.grandTotal - alreadyPaid) < 0.01;
+
+          return saved.copyWith(
+            items: savedItems,
+            totalPrice: calculations.grandTotal,
+            // Already the pre-tax base in both tax modes (M5).
+            subTotal: calculations.subtotal,
+            gstAmount: calculations.totalGST,
+            customerName: nameController.text.isNotEmpty
+                ? nameController.text
+                : existingModel.customerName,
+            customerNumber: mobileController.text.isNotEmpty
+                ? mobileController.text
+                : existingModel.customerNumber,
+            tableNo: widget.selectedTableNo ?? existingModel.tableNo,
+            kotNumbers: updatedKotNumbers,
+            itemCountAtLastKot: allCurrentItems.length,
+            kotBoundaries: updatedKotBoundaries,
+            kotStatuses: updatedKotStatuses,
+            kotTimestamps: updatedKotTimestamps,
+            sessionId: currentSessionId ?? existingModel.sessionId,
+            isPaid: nowFullyPaid,
+            paymentStatus: nowFullyPaid
+                ? 'Paid'
+                : (alreadyPaid > 0 ? 'Partially Paid' : 'Unpaid'),
+          );
+        },
+      );
+    } catch (e) {
+      NotificationService.instance.showError('Failed to update order: $e');
+      return;
     }
-
-    final List<CartItem> savedItems = [
-      for (final curr in currentActiveItems) restamp(curr),
-      for (final n in newlyAddedItems) stampedById[n.id] ?? n,
-    ];
-
-    // Adding/removing items changes the total, so re-derive payment state from
-    // the new balance. Existing payments (totalPaid / paymentListJson /
-    // paymentMethod) are preserved by copyWith — we only recompute the flags,
-    // so a settled order that gets new items correctly reopens as pending.
-    final double alreadyPaid = existingModel.totalPaid ?? 0;
-    final bool nowFullyPaid = (calculations.grandTotal - alreadyPaid) < 0.01;
-
-    final updateOrder = existingModel.copyWith(
-      items: savedItems,
-      totalPrice: calculations.grandTotal,
-      subTotal: AppSettings.isTaxInclusive
-          ? calculations.subtotal - calculations.totalGST
-          : calculations.subtotal,
-      gstAmount: calculations.totalGST,
-      customerName: nameController.text.isNotEmpty
-          ? nameController.text
-          : existingModel.customerName,
-      customerNumber: mobileController.text.isNotEmpty
-          ? mobileController.text
-          : existingModel.customerNumber,
-      tableNo: widget.selectedTableNo ?? existingModel.tableNo,
-      kotNumbers: updatedKotNumbers,
-      itemCountAtLastKot: allCurrentItems.length,
-      kotBoundaries: updatedKotBoundaries,
-      kotStatuses: updatedKotStatuses,
-      kotTimestamps: updatedKotTimestamps,
-      sessionId: currentSessionId ?? existingModel.sessionId,
-      isPaid: nowFullyPaid,
-      paymentStatus: nowFullyPaid
-          ? 'Paid'
-          : (alreadyPaid > 0 ? 'Partially Paid' : 'Unpaid'),
-    );
-
-    await orderStore.updateOrder(updateOrder);
-
-    // Apply all inventory changes at commit time. Restores read the saved
-    // line's stamp; deductions apply the plan the saved stamps came from.
-    await InventoryService.restoreLines([
-      for (final item in removedItems) (line: item, qty: item.quantity),
-      for (final r in stockToRestore)
-        (line: origById[r.id] ?? r, qty: r.quantity),
-    ]);
-    await InventoryService.applyPlannedUnits(salePlan.units);
+    if (commit.refused) {
+      NotificationService.instance.showError(
+        commit.conflict ??
+            'Cannot place order: insufficient stock — ${commit.message}',
+      );
+      return; // nothing was written — no KOT, order change or stock movement
+    }
+    final OrderModel updateOrder = commit.order!;
+    final int? newAddedKotNumber = commit.newKotNumber;
 
     // Audit: log each cancelled/reduced item with its reason for the
     // Item Cancellation Report. Failure here must never block the order update.
@@ -3231,8 +3234,13 @@ class _TakeawayState extends State<Takeaway> {
     return Icons.payment_outlined;
   }
 
-  // Replace your entire _qucikSettleNewOrder function with this one.
   Future<void> _qucikSettleNewOrder(
+    CartCalculationService calculations,
+    String paymentMethod,
+  ) =>
+      _oneAtATime(() => _runQuickSettle(calculations, paymentMethod));
+
+  Future<void> _runQuickSettle(
     CartCalculationService calculations,
     String paymentMethod,
   ) async {
@@ -3281,75 +3289,81 @@ class _TakeawayState extends State<Takeaway> {
     // Get the plain cart items
     final plainItems = widget.cartItems.map((w) => w.item).toList();
 
-    // Check stock availability before processing order
-    final bool stockAvailable = await InventoryService.checkStockAvailability(
-      plainItems,
-    );
-    if (!stockAvailable) {
+    // S-04A: check, bill write and stock deduction run as ONE operation in
+    // the app-wide StockGate (same rule as the Captain endpoint), so another
+    // order cannot take the same stock between them. The KOT prints after.
+    late final PastOrderModel pastOrder;
+    late final int quickSettleKotNumber;
+    late final int billNumber;
+    late final String? currentSessionId;
+    final SettleNewOrderResult settled;
+    try {
+      // Check, numbers, bill write and deduction as one operation; a bill
+      // that is not saved deducts nothing (SALE-3).
+      settled = await SettleNewOrder.commit(
+          items: plainItems,
+          build: (stampedLines, kot, bill) async {
+      // No need for a temporary OrderModel. We create the final pastOrderModel directly.
+      quickSettleKotNumber = kot;
+
+      // Generate daily bill number for quick settle
+      billNumber = bill;
+
+      // Get current session ID
+      currentSessionId = await DayManagementService.getCurrentSessionId();
+
+      // Stamped lines: a later refund restores what each sale actually took.
+      pastOrder = PastOrderModel(
+        id: Uuid().v4(), // Generate a unique ID for this transaction
+        customerName: 'Quick Settle',
+        totalPrice: calculations
+            .grandTotal, // ✅ Use the final grand total from the service
+        items: stampedLines,
+        orderAt: DateTime.now(),
+        orderType: widget.isDineIn ? 'Dine In' : 'Take Away',
+        paymentmode: paymentMethod,
+
+        // ✅ Use the CORRECT values from the calculation service
+        // The engine's subtotal is already the pre-tax base in both tax modes;
+        // taking GST off again understated taxable sales (M5).
+        subTotal: calculations.subtotal,
+        gstAmount: calculations.totalGST,
+        gstRate: 0,
+
+        // ✅ KOT tracking - REQUIRED
+        kotNumbers: [quickSettleKotNumber],
+        kotBoundaries: [plainItems.length], // Single KOT with all items
+        billNumber: billNumber, // Daily bill number (resets every day)
+        isTaxInclusive:
+            AppSettings.isTaxInclusive, // Store tax mode at order creation
+        taxEnabled: TaxFeature.enabled,
+        storeGstNumber: await StoreSettingsService().gstNumberSnapshot(),
+        roundOffStep: AppSettings.roundOffStepForRecord,
+        discountOnItems: AppSettings.discountOnItems,
+        tableNo: widget.isDineIn
+            ? (widget.selectedTableNo ?? widget.tableid)
+            : null,
+        shiftId: RestaurantSession.currentShiftId,
+        sessionId: currentSessionId, // Link to POS session
+      );
+
+      // 1. SettleNewOrder saves it to history; 2. the gate deducts stock
+      //    right after, only when the save succeeded.
+      return pastOrder;
+    });
+    } on OrderSaveFailedException catch (e) {
+      if (mounted) NotificationService.instance.showError(e.message);
+      return; // Nothing deducted, no KOT, no success — the cart stays
+    }
+    final sale = settled.sale;
+    if (sale.refused) {
       if (mounted) {
         NotificationService.instance.showError(
-          'Cannot process order: Some items are out of stock or have insufficient quantity',
+          'Cannot process order: insufficient stock — ${sale.message}',
         );
-
-        // ScaffoldMessenger.of(context).showSnackBar(
-        //   SnackBar(
-        //     content: Text('Cannot process order: Some items are out of stock or have insufficient quantity'),
-        //     backgroundColor: Colors.red,
-        //   ),
-        // );
       }
-      return; // Stop order processing
+      return; // Stop order processing — nothing was written
     }
-
-    // No need for a temporary OrderModel. We create the final pastOrderModel directly.
-    final int quickSettleKotNumber = await orderStore.getNextKotNumber();
-
-    // Generate daily bill number for quick settle
-    final int billNumber = await orderStore.getNextBillNumber();
-
-    // Get current session ID
-    final currentSessionId = await DayManagementService.getCurrentSessionId();
-
-    // Stamped lines: a later refund restores what each sale actually took.
-    final salePlan = await InventoryService.planSale(plainItems);
-
-    final pastOrder = PastOrderModel(
-      id: Uuid().v4(), // Generate a unique ID for this transaction
-      customerName: 'Quick Settle',
-      totalPrice: calculations
-          .grandTotal, // ✅ Use the final grand total from the service
-      items: salePlan.lines,
-      orderAt: DateTime.now(),
-      orderType: widget.isDineIn ? 'Dine In' : 'Take Away',
-      paymentmode: paymentMethod,
-
-      // ✅ Use the CORRECT values from the calculation service
-      subTotal: AppSettings.isTaxInclusive
-          ? calculations.subtotal - calculations.totalGST
-          : calculations.subtotal,
-      gstAmount: calculations.totalGST,
-      gstRate: 0,
-
-      // ✅ KOT tracking - REQUIRED
-      kotNumbers: [quickSettleKotNumber],
-      kotBoundaries: [plainItems.length], // Single KOT with all items
-      billNumber: billNumber, // Daily bill number (resets every day)
-      isTaxInclusive:
-          AppSettings.isTaxInclusive, // Store tax mode at order creation
-      taxEnabled: TaxFeature.enabled,
-      storeGstNumber: await StoreSettingsService().gstNumberSnapshot(),
-      roundOffStep: AppSettings.roundOffStepForRecord,
-      discountOnItems: AppSettings.discountOnItems,
-      tableNo: widget.isDineIn
-          ? (widget.selectedTableNo ?? widget.tableid)
-          : null,
-      shiftId: RestaurantSession.currentShiftId,
-      sessionId: currentSessionId, // Link to POS session
-    );
-
-    // 1. Add the completed order to history
-    await pastOrderStore.addOrder(pastOrder);
-
     // 1b. Auto-print the KOT (same as Place Order) — Quick Settle still sends the
     // order to the kitchen. Non-blocking: a print failure must not fail settle.
     if (mounted && AppSettings.generateKOT) {
@@ -3368,9 +3382,8 @@ class _TakeawayState extends State<Takeaway> {
                   ? (widget.selectedTableNo ?? widget.tableid)
                   : null) ??
               '',
-          subTotal: AppSettings.isTaxInclusive
-              ? calculations.subtotal - calculations.totalGST
-              : calculations.subtotal,
+          // Already the pre-tax base in both tax modes (M5).
+          subTotal: calculations.subtotal,
           gstAmount: calculations.totalGST,
           totalPrice: calculations.grandTotal,
           gstRate: 0,
@@ -3393,8 +3406,6 @@ class _TakeawayState extends State<Takeaway> {
       }
     }
 
-    // 2. Deduct stock after successfully adding the order
-    await InventoryService.applyPlannedUnits(salePlan.units);
 
     // 3. Free the table for Dine In quick settle
     final String? tableForQuickSettle = widget.isDineIn

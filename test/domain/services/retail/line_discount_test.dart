@@ -234,6 +234,23 @@ void main() {
       expect(r.isAllowed, isTrue);
       expect(r.isBlocked, isFalse);
       expect(r.message, contains('below the'));
+      expect(r.message, contains('600'), reason: 'cost shown by default');
+    });
+
+    test('below cost without showCost keeps the warning but hides the figure',
+        () {
+      final r = LineDiscountService.validate(
+        variant: variant(costPrice: 600),
+        type: DiscountType.percentage,
+        value: 40,
+        chargedUnitPrice: 900,
+        qty: 1,
+        showCost: false,
+      );
+      expect(r.verdict, LineDiscountVerdict.belowCost);
+      expect(r.needsConfirmation, isTrue);
+      expect(r.message, contains('below cost'));
+      expect(r.message, isNot(contains('600')));
     });
 
     test('exactly at cost is OK, not a warning', () {

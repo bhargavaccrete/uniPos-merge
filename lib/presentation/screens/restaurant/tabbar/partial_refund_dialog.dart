@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+
+import '../../../../stores/payment_method_store.dart';
+import '../../../../util/restaurant/payment_mode_summary.dart';
 
 import '../../../../core/di/service_locator.dart';
 import '../../../../data/models/restaurant/db/cartmodel_308.dart';
@@ -27,6 +31,10 @@ class PartialRefundDialog extends StatefulWidget {
   final double orderSubTotal; // Order subtotal
   final bool isTaxInclusive; // Whether tax was inclusive when order was placed
 
+  /// The methods the order was paid by, largest first — the first one is the
+  /// default way the refund is paid back.
+  final List<String> paidMethods;
+
   const PartialRefundDialog({
     Key? key,
     required this.orderItems,
@@ -37,6 +45,7 @@ class PartialRefundDialog extends StatefulWidget {
     this.orderDiscount = 0.0,
     this.orderSubTotal = 0.0,
     this.isTaxInclusive = false,
+    this.paidMethods = const [],
   }) : super(key: key);
 
   @override
@@ -51,6 +60,11 @@ class _PartialRefundDialogState extends State<PartialRefundDialog> {
   late final RefundRestockSelection _restock;
   bool _showReasonError = false;
 
+  /// How the money goes back: one row per method. Refunds are recorded by
+  /// method so the drawer and End of Day take each one off the right method.
+  late final List<String> _methodChoices;
+  final List<_RefundMethodRow> _methodRows = [];
+
   @override
   void initState() {
     super.initState();
@@ -59,13 +73,58 @@ class _PartialRefundDialogState extends State<PartialRefundDialog> {
       widget.orderItems,
       (productId) => itemStore.getItemById(productId),
     );
+
+    final choices = <String>[];
+    void addChoice(String raw) {
+      final label = PaymentModeSummary.normalizeMethod(raw);
+      if (label != 'Unknown' && !choices.contains(label)) choices.add(label);
+    }
+
+    widget.paidMethods.forEach(addChoice);
+    if (locator.isRegistered<PaymentMethodStore>()) {
+      for (final m in locator<PaymentMethodStore>().enabledMethods) {
+        addChoice(m.value);
+      }
+    }
+    if (choices.isEmpty) choices.add('Cash');
+    _methodChoices = choices;
+    _methodRows.add(_RefundMethodRow(choices.first));
   }
 
   @override
   void dispose() {
     _refundReasonController.dispose();
+    for (final r in _methodRows) {
+      r.amount.dispose();
+    }
     super.dispose();
   }
+
+  /// With one method, its amount simply follows the refund total.
+  void _syncSingleMethodRow() {
+    if (_methodRows.length == 1) {
+      _methodRows.single.amount.text = _totalRefundAmount.toStringAsFixed(2);
+    }
+  }
+
+  void _addMethodRow() {
+    final used = _methodRows.map((r) => r.method).toSet();
+    final next = _methodChoices.firstWhere(
+      (m) => !used.contains(m),
+      orElse: () => _methodChoices.first,
+    );
+    setState(() => _methodRows.add(_RefundMethodRow(next)));
+  }
+
+  void _removeMethodRow(int index) {
+    setState(() {
+      _methodRows.removeAt(index).amount.dispose();
+      _syncSingleMethodRow();
+    });
+  }
+
+  double get _methodsTotal => _methodRows.fold(
+      0.0, (s, r) => s + (double.tryParse(r.amount.text.trim()) ?? 0.0));
 
   double _calculateItemPriceWithTax(CartItem item) {
     // Calculate the actual item price with its specific tax rate and discount
@@ -124,6 +183,7 @@ class _PartialRefundDialogState extends State<PartialRefundDialog> {
       // All remaining items selected - use exact remaining total to avoid rounding errors
       setState(() {
         _totalRefundAmount = widget.orderTotalPrice;
+        _syncSingleMethodRow();
       });
     } else {
       // Partial refund - calculate based on individual items
@@ -147,6 +207,7 @@ class _PartialRefundDialogState extends State<PartialRefundDialog> {
       );
       setState(() {
         _totalRefundAmount = capped;
+        _syncSingleMethodRow();
       });
     }
   }
@@ -172,6 +233,7 @@ class _PartialRefundDialogState extends State<PartialRefundDialog> {
 
       if (isFullRefund) {
         _totalRefundAmount = widget.orderTotalPrice;
+        _syncSingleMethodRow();
       } else {
         _updateRefundTotal();
       }
@@ -390,6 +452,8 @@ class _PartialRefundDialogState extends State<PartialRefundDialog> {
                 _showReasonError ? 'This field is required' : null,
           ),
           SizedBox(height: AppResponsive.largeSpacing(context)),
+          _buildRefundMethods(context),
+          SizedBox(height: AppResponsive.largeSpacing(context)),
           Text(
             'Total Refund: ${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalRefundAmount)}',
             style: GoogleFonts.poppins(
@@ -425,11 +489,37 @@ class _PartialRefundDialogState extends State<PartialRefundDialog> {
 
             final itemsToRestock = _restock.restockFor(itemsToRefund);
 
+            // How the money went back must add up to the refund.
+            final legs = <RefundLeg>[
+              for (final r in _methodRows)
+                (
+                  method: r.method,
+                  amount: double.tryParse(r.amount.text.trim()) ?? 0.0,
+                ),
+            ];
+            if (legs.any((l) => l.amount <= 0)) {
+              NotificationService.instance.showError(
+                'Enter an amount for each refund method, or remove it.',
+              );
+              return;
+            }
+            final legsTotal = legs.fold(0.0, (s, l) => s + l.amount);
+            if ((legsTotal - _totalRefundAmount).abs() > 0.01) {
+              NotificationService.instance.showError(
+                'Refund methods add up to '
+                '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(legsTotal)}, '
+                'but the refund is '
+                '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(_totalRefundAmount)}.',
+              );
+              return;
+            }
+
             final result = PartialRefundResult(
               itemsToRefund: itemsToRefund,
               reason: _refundReasonController.text.trim(),
               totalRefundAmount: _totalRefundAmount,
               itemsToRestock: itemsToRestock,
+              refundLegs: legs,
             );
 
             // Reset error state on successful submission
@@ -441,4 +531,109 @@ class _PartialRefundDialogState extends State<PartialRefundDialog> {
       ],
     );
   }
+
+  /// "Refund paid by": one row per method, each with its amount.
+  Widget _buildRefundMethods(BuildContext context) {
+    final labelStyle = GoogleFonts.poppins(
+      fontSize: AppResponsive.bodyFontSize(context),
+      fontWeight: FontWeight.w600,
+      color: Colors.black87,
+    );
+    final remaining = _totalRefundAmount - _methodsTotal;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Refund paid by', style: labelStyle),
+        SizedBox(height: AppResponsive.smallSpacing(context)),
+        for (var i = 0; i < _methodRows.length; i++)
+          Padding(
+            padding: EdgeInsets.only(bottom: AppResponsive.smallSpacing(context)),
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: DropdownButton<String>(
+                    isExpanded: true,
+                    value: _methodRows[i].method,
+                    style: GoogleFonts.poppins(
+                      fontSize: AppResponsive.bodyFontSize(context),
+                      color: AppColors.textPrimary,
+                    ),
+                    items: [
+                      for (final m in _methodChoices)
+                        DropdownMenuItem(value: m, child: Text(m)),
+                    ],
+                    onChanged: (m) {
+                      if (m != null) setState(() => _methodRows[i].method = m);
+                    },
+                  ),
+                ),
+                SizedBox(width: AppResponsive.smallSpacing(context)),
+                Expanded(
+                  flex: 2,
+                  child: AppTextField(
+                    controller: _methodRows[i].amount,
+                    hint: '0.00',
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                    ],
+                    readOnly: _methodRows.length == 1,
+                    onChanged: (_) => setState(() {}),
+                  ),
+                ),
+                if (_methodRows.length > 1)
+                  IconButton(
+                    tooltip: 'Remove method',
+                    icon: Icon(
+                      Icons.remove_circle_outline,
+                      size: AppResponsive.iconSize(context),
+                      color: AppColors.danger,
+                    ),
+                    onPressed: () => _removeMethodRow(i),
+                  ),
+              ],
+            ),
+          ),
+        Row(
+          children: [
+            if (_methodChoices.length > 1)
+              TextButton.icon(
+                onPressed: _addMethodRow,
+                icon: Icon(Icons.add, size: AppResponsive.smallIconSize(context)),
+                label: Text(
+                  'Add method',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.bodyFontSize(context),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            const Spacer(),
+            if (_methodRows.length > 1 && remaining.abs() > 0.009)
+              Flexible(
+                child: Text(
+                  remaining > 0
+                      ? 'Left to assign: ${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(remaining)}'
+                      : 'Over by ${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(-remaining)}',
+                  textAlign: TextAlign.right,
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.smallFontSize(context),
+                    color: AppColors.danger,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// One "Refund paid by" row.
+class _RefundMethodRow {
+  _RefundMethodRow(this.method);
+  String method;
+  final TextEditingController amount = TextEditingController();
 }

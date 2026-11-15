@@ -66,6 +66,8 @@ void main() {
     await Hive.openBox<RestaurantGRNModel>(HiveBoxNames.restaurantGrns);
     await Hive.openBox<RestaurantGRNItemModel>(HiveBoxNames.restaurantGrnItems);
     await Hive.openBox(HiveBoxNames.dayManagementBox);
+    // S-06: goods-receipt stock intents live in the stock-journal box.
+    await Hive.openBox(HiveBoxNames.restaurantStockJournal);
     await Hive.openBox(HiveBoxNames.appCounters);
 
     locator
@@ -109,6 +111,22 @@ void main() {
           expectedDeliveryDate: '2026-09-20',
           totalItems: 10,
           status: RestaurantPOStatus.sent,
+        ),
+      );
+      // The order's line the receipt below points at — a real PO always has
+      // its line rows (createPurchaseOrder writes them), and completion is
+      // decided per line (BLK-17).
+      await Hive.box<RestaurantPurchaseOrderItemModel>(
+              HiveBoxNames.restaurantPurchaseOrderItems)
+          .put(
+        'poi-1',
+        RestaurantPurchaseOrderItemModel(
+          poItemId: 'poi-1',
+          poId: 'po-1',
+          itemId: 'rice',
+          itemName: 'Rice',
+          orderedQty: 10,
+          createdAt: '2026-09-16',
         ),
       );
       await Hive.box<Items>(HiveBoxNames.restaurantItems).put(

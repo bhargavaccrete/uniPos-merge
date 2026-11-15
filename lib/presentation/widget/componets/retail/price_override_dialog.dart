@@ -10,6 +10,7 @@ import 'package:billberrylite/util/common/app_responsive.dart';
 import '../../../../data/models/retail/hive_model/cart_model_202.dart';
 import '../../../../data/models/retail/hive_model/variante_model_201.dart';
 import '../../../../domain/services/common/notification_service.dart';
+import '../../../../domain/services/retail/catalog_permission.dart';
 import '../../../../domain/services/retail/price_override_reason.dart';
 import '../../../../domain/services/retail/price_override_service.dart';
 
@@ -25,9 +26,9 @@ final _priceFormatters = <TextInputFormatter>[
 /// reason dropdown, same conditional note. Both exist for the same reason - a
 /// manual figure that moves money needs a machine-readable "why".
 ///
-/// Pops `true` when the line was changed. Admin-only; the caller must HIDE the
-/// entry point when `PriceOverrideService.canOverride` is false rather than
-/// showing it and refusing.
+/// Pops `true` when the line was changed. The caller must HIDE the entry point
+/// when `PriceOverrideService.canOverride` is false rather than showing it and
+/// refusing. Cost is shown only when `CatalogPermission.canSeeCost`.
 class PriceOverrideDialog extends StatefulWidget {
   final CartItemModel item;
   final VarianteModel variant;
@@ -80,6 +81,7 @@ class _PriceOverrideDialogState extends State<PriceOverrideDialog> {
       variant: widget.variant,
       newPrice: typed,
       currentPrice: widget.item.price,
+      showCost: CatalogPermission.canSeeCost,
     );
   }
 
@@ -260,11 +262,11 @@ class _PriceOverrideDialogState extends State<PriceOverrideDialog> {
   }
 
   /// Catalogue / MRP / cost, so the decision is made with the numbers in view.
-  /// Cost is shown because this dialog is admin-only - a cashier never reaches
-  /// it.
+  /// Cost only for a user allowed to see it.
   Widget _buildReferencePrices(BuildContext context) {
     final mrp = widget.variant.mrp;
-    final cost = widget.variant.costPrice;
+    final cost =
+        CatalogPermission.canSeeCost ? widget.variant.costPrice : null;
 
     return Container(
       width: double.infinity,

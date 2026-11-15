@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:billberrylite/util/restaurant/restaurant_session.dart';
 import 'package:flutter/foundation.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
@@ -5,6 +7,7 @@ import 'package:billberrylite/data/models/retail/hive_model/credit_payment_model
 import 'package:billberrylite/data/models/retail/hive_model/sale_item_model_204.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
 import 'package:billberrylite/domain/services/retail/inventory_service.dart';
+import 'package:billberrylite/domain/services/retail/retail_day_gate.dart';
 import 'package:billberrylite/domain/services/retail/return_math.dart';
 import 'package:billberrylite/domain/services/retail/sale_return_reason.dart';
 import 'package:billberrylite/data/models/retail/hive_model/inventory_loss_model_178.dart';
@@ -75,6 +78,11 @@ class ReturnService {
   /// drift apart. Use `CreditPaymentModel.isCollection` to filter.
   static const String returnAdjustmentMode =
       CreditPaymentModel.returnAdjustmentMode;
+
+  /// Leg method on a return document for the part of its value that cancelled
+  /// an unpaid balance. `'credit'` — the bucket the original pay-later sale
+  /// billed into — so the two net out and no money is shown moving.
+  static const String dueLegMethod = 'credit';
 
   // ==========================================================================
   // Queries
@@ -251,6 +259,10 @@ class ReturnService {
     String? stockNotePrefix,
   }) async {
     // ---- validate: nothing is written until every check passes -------------
+    // BLK-16: a refund made with no day open falls outside every End of Day,
+    // and one made while an EOD is pending lands in a stale day.
+    await RetailDayGate.ensureOpen();
+
     final originalSale = await saleStore.getSaleById(originalSaleId);
     if (originalSale == null) {
       throw Exception('Original sale not found');
@@ -309,6 +321,10 @@ class ReturnService {
     final returnSaleId = 'RTN_${_uuid.v4()}';
     final creditNoteNumber = await saleStore.nextCreditNoteNumber();
 
+    // How the return value splits between an unpaid balance and money paid
+    // out — known before any write, so the return document can record it.
+    final settlement = _settlementFor(originalSale, figures.totalAmount);
+
     // 1. The return document. Header amounts are NEGATED; lines stay positive.
     //    Built through the constructor rather than `SaleModel.create` so the
     //    tax mode and bill composition carry across — without them a reprinted
@@ -320,6 +336,7 @@ class ReturnService {
         original: originalSale,
         figures: figures,
         refundMethod: refundMethod,
+        settlement: settlement,
         returnReason: returnReason,
         returnNote: returnNote,
       ),
@@ -363,10 +380,10 @@ class ReturnService {
     }
 
     // 3. Settle the customer's money position.
-    final settlement = await _settle(
+    await _settle(
       original: originalSale,
       returnSaleId: returnSaleId,
-      returnValue: figures.totalAmount,
+      settlement: settlement,
     );
 
     // 4. Reverse the purchase stats and the points this sale granted.
@@ -404,11 +421,23 @@ class ReturnService {
     required SaleModel original,
     required ReturnFigures figures,
     required String refundMethod,
+    required _Settlement settlement,
     required String? returnReason,
     required String? returnNote,
   }) {
     final now = DateTime.now().toIso8601String();
     final gst = figures.taxAmount;
+
+    // BLK-11: when part of the value cancelled an unpaid balance, record the
+    // split as legs (negative, like the header) — the cash drawer and EOD read
+    // the cash leg, so only money actually handed back leaves the expected
+    // cash. A return on a paid invoice keeps no legs and reads as before.
+    final legs = <Map<String, dynamic>>[
+      if (settlement.appliedToDue > 0)
+        {'method': dueLegMethod, 'amount': -settlement.appliedToDue},
+      if (settlement.appliedToDue > 0 && settlement.refunded > 0)
+        {'method': refundMethod, 'amount': -settlement.refunded},
+    ];
 
     return SaleModel(
       saleId: returnSaleId,
@@ -421,7 +450,10 @@ class ReturnService {
       discountAmount: -figures.discountAmount,
       taxAmount: -gst,
       totalAmount: -figures.totalAmount,
-      paymentType: refundMethod,
+      // Nothing paid out → the whole return went against the balance.
+      paymentType: legs.length == 1 ? dueLegMethod : refundMethod,
+      paymentListJson: legs.isEmpty ? null : jsonEncode(legs),
+      isSplitPayment: legs.isEmpty ? null : legs.length > 1,
       date: now,
       createdAt: now,
       updatedAt: now,
@@ -512,20 +544,15 @@ class ReturnService {
   /// and `paymentListJson` are untouched. Only the receivable moves, and
   /// `paidAmount` stays put: a credit note cancels a debt without any money
   /// arriving, so raising it would record a payment that never happened.
-  Future<_Settlement> _settle({
+  Future<void> _settle({
     required SaleModel original,
     required String returnSaleId,
-    required double returnValue,
+    required _Settlement settlement,
   }) async {
+    final appliedToDue = settlement.appliedToDue;
+    if (appliedToDue <= 0) return;
+    final customerId = original.customerId!;
     final due = original.dueAmount;
-    final customerId = original.customerId;
-
-    if (due <= 0 || customerId == null) {
-      return _Settlement(appliedToDue: 0, refunded: returnValue);
-    }
-
-    final appliedToDue = returnValue < due ? returnValue : due;
-    final refunded = _r2(returnValue - appliedToDue);
 
     final customer = await customerStore.getCustomerById(customerId);
     final balanceBefore = customer?.creditBalance ?? 0;
@@ -556,8 +583,22 @@ class ReturnService {
         status: SaleModel.calculateStatus(original.paidAmount, newDue),
       ),
     );
+  }
 
-    return _Settlement(appliedToDue: appliedToDue, refunded: refunded);
+  /// The split [_settle] writes, worked out without writing: the outstanding
+  /// due absorbs the return value first (only when there is a customer to
+  /// carry it), and only the excess is paid out. The return document records
+  /// this same split, so the two can never disagree.
+  static _Settlement _settlementFor(SaleModel original, double returnValue) {
+    final due = original.dueAmount;
+    if (due <= 0 || original.customerId == null) {
+      return _Settlement(appliedToDue: 0, refunded: returnValue);
+    }
+    final appliedToDue = returnValue < due ? returnValue : due;
+    return _Settlement(
+      appliedToDue: appliedToDue,
+      refunded: _r2(returnValue - appliedToDue),
+    );
   }
 
   /// Audit-only trail for a cash refund. Never blocks the return: the money has

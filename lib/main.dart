@@ -20,9 +20,11 @@ import 'util/restaurant/staticswitch.dart';
 import 'util/restaurant/restaurant_session.dart';
 import 'util/restaurant/print_settings.dart';
 import 'util/restaurant/order_settings.dart';
-import 'domain/services/retail/retail_printer_settings_service.dart';
+import 'core/init/retail_startup.dart';
+import 'domain/services/retail/retail_checkout_commit.dart';
 import 'domain/services/restaurant/auto_backup_service.dart';
 import 'domain/services/restaurant/stock_journal.dart';
+import 'domain/services/restaurant/void_order_commit.dart';
 import 'domain/services/common/local_notification_service.dart';
 import 'domain/services/common/firebase_messaging_service.dart';
 import 'domain/services/common/notification_sync.dart';
@@ -161,6 +163,32 @@ Future<void> _initializeApp() async {
     if (pending.isNotEmpty) {
       debugPrint('⚠️ Stock journal: ${pending.length} entry(ies) still pending');
     }
+    // A void a stop left part-way: its record decides whether the stock return
+    // is finished or the void never happened. Never throws.
+    final voids = await VoidOrderCommit.recoverAll();
+    if (voids.isNotEmpty) {
+      debugPrint('⚠️ Void recovery: ${voids.length} entry(ies) still pending');
+    }
+    // An item cancel (POS or Captain) a stop left part-way: the saved order
+    // decides whether its stock return is owed. Never throws.
+    final cancels = await StockJournal.recoverCancels();
+    if (cancels.isNotEmpty) {
+      debugPrint('⚠️ Cancel recovery: ${cancels.length} entry(ies) still pending');
+    }
+    // Same for a goods receipt a stop left as a draft (S-06) — before any
+    // sale can move the stock its interrupted lines are judged by.
+    final receipts = await restaurantPurchaseOrderStore.resumeInterruptedReceipts();
+    if (receipts > 0) debugPrint('📦 Finished $receipts interrupted goods receipt(s)');
+  }
+
+  // Finish any Retail sale a crash left saved but unfinished, before the first
+  // sale can bill its cart again. Never throws; a failed entry stays for the
+  // next start.
+  if (AppConfig.isRetail) {
+    final pending = await RetailCheckoutCommit.recoverAll();
+    if (pending.isNotEmpty) {
+      debugPrint('⚠️ Retail checkout: ${pending.length} sale(s) still pending');
+    }
   }
 
   // Fire server validation in background — does not block startup.
@@ -218,11 +246,7 @@ Future<void> _initializeApp() async {
 
   } else if (AppConfig.isRetail) {
     print('   Loading retail settings...');
-    await Future.wait([
-      RetailPrinterSettingsService().initialize(),
-      DecimalSettings.load(),
-      CurrencyHelper.load()
-    ]);
+    await loadRetailStartupSettings();
     print('   ✅ Retail settings loaded');
   } else {
     print('   ⚠️  No business mode set - running in setup mode');

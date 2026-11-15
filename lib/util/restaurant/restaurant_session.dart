@@ -242,12 +242,10 @@ class RestaurantSession {
     'suppliers',
     'purchase',
     'dataBackup',
-    // Money-sensitive POS actions. Each is read through a named service getter
-    // (PriceOverrideService.canOverride and friends) whose callers HIDE the
-    // control rather than showing it and refusing.
-    'billingOverride',
-    'billingDiscount',
-    'billingExchange',
+    // Cost price in the price-override and line-discount dialogs. A Cashier
+    // may override, discount and exchange (billingOverride / billingDiscount /
+    // billingExchange are deliberately NOT listed), but not see cost.
+    'viewCostPrice',
   };
 
   /// Returns true if the current session can access the given feature key.
@@ -259,12 +257,13 @@ class RestaurantSession {
   ///
   /// Restaurant keys: 'startOrder', 'manageMenu', 'manageStaff', 'customers',
   ///   'reports', 'taxSettings', 'expenses', 'inventory', 'settings',
-  ///   'cashDrawer', 'endDay'.
+  ///   'cashDrawer', 'endDay', 'refund', 'void'. (`refund`/`void`: open to
+  ///   Cashier, denied to Waiter — who is allowed 'startOrder' only.)
   /// Retail keys: 'billing', 'customers', 'catalog', 'catalogEdit',
   ///   'inventory', 'inventoryAdjust', 'suppliers', 'purchase', 'reports',
   ///   'manageStaff', 'settings', 'taxSettings', 'dataBackup', 'cashDrawer',
   ///   'endDay', 'attendance', 'billingOverride', 'billingDiscount',
-  ///   'billingExchange'.
+  ///   'billingExchange', 'viewCostPrice'.
   static bool canAccess(String feature) {
     // Fail CLOSED when nobody is signed in. `clearSession` resets loginType to
     // 'admin' (its default), so `isAdmin` reads TRUE after a logout — without

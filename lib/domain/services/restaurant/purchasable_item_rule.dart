@@ -13,11 +13,17 @@ class PurchasableItemRule {
   static const String legacyLabel = 'Legacy — set as Trade Item';
 
   /// [hasRecipe]: the item has a recipe with at least one ingredient.
+  ///
+  /// An item with variants is never purchasable (BLK-18): it is stocked and
+  /// sold PER VARIANT, but PO / GRN lines carry no variant, so receiving it
+  /// would add to the item's own stock, which nothing sells from. Its stock is
+  /// managed per variant in Manage Inventory.
   static bool isPurchasable(Items item, {required bool hasRecipe}) =>
-      item.isRawMaterial ||
-      item.isSemiFinished ||
-      item.isTradeItem ||
-      isLegacyBoughtIn(item, hasRecipe: hasRecipe);
+      !item.hasVariants &&
+      (item.isRawMaterial ||
+          item.isSemiFinished ||
+          item.isTradeItem ||
+          isLegacyBoughtIn(item, hasRecipe: hasRecipe));
 
   static bool isLegacyBoughtIn(Items item, {required bool hasRecipe}) =>
       item.isMadeInAdvance && !hasRecipe;

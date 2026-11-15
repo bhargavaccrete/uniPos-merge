@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import '../../../core/constants/hive_box_names.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../data/models/restaurant/db/itemmodel_302.dart';
+import '../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../data/models/restaurant/db/stock_movement_model.dart';
 import '../../../data/repositories/restaurant/stock_movement_repository.dart';
 import '../../../util/restaurant/restaurant_session.dart';
@@ -26,6 +27,10 @@ class JournalUnit {
   final String unit;
   final double? unitCost;
 
+  /// [StockJournal.outbound] (a sale's deduction — every entry written before
+  /// this field existed) or [StockJournal.inbound] (a void's stock return).
+  final String direction;
+
   /// planned → applying (before/after recorded) → written (stock write
   /// confirmed) → done; or review.
   String state;
@@ -41,10 +46,16 @@ class JournalUnit {
     required this.itemName,
     required this.unit,
     this.unitCost,
+    this.direction = StockJournal.outbound,
     this.state = StockJournal.planned,
     this.before,
     this.after,
   });
+
+  bool get isInbound => direction == StockJournal.inbound;
+
+  /// The stock change this unit makes.
+  double get delta => isInbound ? qty : -qty;
 
   Map<String, dynamic> toMap() => {
         'uid': uid,
@@ -55,6 +66,8 @@ class JournalUnit {
         'itemName': itemName,
         'unit': unit,
         'unitCost': unitCost,
+        // Written only for a return, so a sale's entry is unchanged.
+        if (isInbound) 'direction': direction,
         'state': state,
         'before': before,
         'after': after,
@@ -69,6 +82,7 @@ class JournalUnit {
         itemName: m['itemName'] as String,
         unit: m['unit'] as String,
         unitCost: (m['unitCost'] as num?)?.toDouble(),
+        direction: m['direction'] as String? ?? StockJournal.outbound,
         state: m['state'] as String,
         before: (m['before'] as num?)?.toDouble(),
         after: (m['after'] as num?)?.toDouble(),
@@ -89,7 +103,10 @@ class JournalEntry {
   final String staffName;
   final String? sessionId;
 
-  /// Set right after the order lines are saved.
+  /// A void entry only: the table to free once the void is done.
+  final String? tableNo;
+
+  /// Set right after the order lines (for a void: the void record) are saved.
   bool orderSaved;
   final List<JournalUnit> units;
 
@@ -100,6 +117,7 @@ class JournalEntry {
     required this.target,
     required this.staffName,
     this.sessionId,
+    this.tableNo,
     this.orderSaved = false,
     required this.units,
   });
@@ -118,6 +136,7 @@ class JournalEntry {
         'target': target,
         'staffName': staffName,
         'sessionId': sessionId,
+        if (tableNo != null) 'tableNo': tableNo,
         'orderSaved': orderSaved,
         'units': [for (final u in units) u.toMap()],
       };
@@ -132,6 +151,7 @@ class JournalEntry {
         },
         staffName: m['staffName'] as String,
         sessionId: m['sessionId'] as String?,
+        tableNo: m['tableNo'] as String?,
         orderSaved: m['orderSaved'] as bool? ?? false,
         units: [
           for (final u in (m['units'] as List))
@@ -166,6 +186,10 @@ class StockJournal {
   static const String done = 'done';
   static const String review = 'review';
 
+  /// [JournalUnit.direction] values.
+  static const String outbound = 'out';
+  static const String inbound = 'in';
+
   /// Persisted alert raised for a `review` unit (NotificationPresenter).
   static const String reviewEvent = 'stock_check_needed';
 
@@ -183,10 +207,127 @@ class StockJournal {
         : JournalEntry.fromMap(Map<String, dynamic>.from(raw as Map));
   }
 
+  /// Key prefix of goods-receipt stock intents (RestaurantGrnReceiving), which
+  /// share this box and are not Settle entries.
+  static const String grnKeyPrefix = 'grn:';
+
+  /// Key prefix of void stock returns (VoidOrderCommit). They share this box
+  /// and its unit machinery but are resolved by their own recovery, which
+  /// judges them by the void record — never by Settle's order-line check.
+  static const String voidKeyPrefix = 'void:';
+
+  static String voidKey(String orderId) => '$voidKeyPrefix$orderId';
+
+  /// Key prefix of active-line cancel returns (ActiveLineCancel, Captain
+  /// modify). Resolved by [recoverCancels] from the saved order — never by
+  /// Settle's [recoverAll].
+  static const String cancelKeyPrefix = 'cancel:';
+
   static List<JournalEntry> all() => [
-        for (final raw in _box.values)
-          JournalEntry.fromMap(Map<String, dynamic>.from(raw as Map)),
+        for (final key in _box.keys)
+          if (!key.toString().startsWith(grnKeyPrefix) &&
+              !key.toString().startsWith(voidKeyPrefix) &&
+              !key.toString().startsWith(cancelKeyPrefix))
+            JournalEntry.fromMap(
+                Map<String, dynamic>.from(_box.get(key) as Map)),
       ];
+
+  /// Every cancel entry.
+  static List<JournalEntry> cancelEntries() => [
+        for (final key in _box.keys)
+          if (key.toString().startsWith(cancelKeyPrefix))
+            JournalEntry.fromMap(
+                Map<String, dynamic>.from(_box.get(key) as Map)),
+      ];
+
+  /// Persists the stock return of cancelling lines of an ACTIVE order, every
+  /// unit `planned`, before the order write.
+  ///
+  /// [target] is what the order write leaves, per cancelled line: its new
+  /// quantity, or 0 when the line is removed. Empty when the write deletes
+  /// the order. Every cancel lowers a line, so before the write no target
+  /// holds — that is how [recoverCancels] tells the two apart.
+  static Future<JournalEntry> openCancel({
+    required String orderId,
+    required Map<String, int> target,
+    required List<SaleStockUnit> units,
+    String? tableNo,
+    String? staffName,
+  }) async {
+    final key = '$cancelKeyPrefix${const Uuid().v4()}';
+    final entry = JournalEntry(
+      id: key,
+      orderId: orderId,
+      createdAt: DateTime.now(),
+      target: target,
+      staffName: staffName ??
+          RestaurantSession.staffName ??
+          RestaurantSession.effectiveRole,
+      sessionId: await DayManagementService.getCurrentSessionId(),
+      tableNo: tableNo,
+      units: [
+        for (var n = 0; n < units.length; n++)
+          JournalUnit(
+            uid: '$key:$n',
+            itemId: units[n].item.id,
+            variantId: units[n].variantId,
+            qty: units[n].qty,
+            reason: units[n].reason,
+            itemName: units[n].label,
+            unit: units[n].unit,
+            unitCost: units[n].item.lastPurchaseCost,
+            direction: inbound,
+          ),
+      ],
+    );
+    await save(entry);
+    return entry;
+  }
+
+  /// Every void entry, oldest key order.
+  static List<JournalEntry> voidEntries() => [
+        for (final key in _box.keys)
+          if (key.toString().startsWith(voidKeyPrefix))
+            JournalEntry.fromMap(
+                Map<String, dynamic>.from(_box.get(key) as Map)),
+      ];
+
+  /// Persists a void's stock return, every unit `planned`, before the void
+  /// record is written. Ids are fixed: `void:<orderId>:<n>`.
+  static Future<JournalEntry> openVoid({
+    required String orderId,
+    required String? tableNo,
+    required String staffName,
+    required String? sessionId,
+    required List<SaleStockUnit> units,
+  }) async {
+    final key = voidKey(orderId);
+    final entry = JournalEntry(
+      id: key,
+      orderId: orderId,
+      createdAt: DateTime.now(),
+      target: const {},
+      staffName: staffName,
+      sessionId: sessionId,
+      tableNo: tableNo,
+      units: [
+        for (var n = 0; n < units.length; n++)
+          JournalUnit(
+            uid: '$key:$n',
+            itemId: units[n].item.id,
+            variantId: units[n].variantId,
+            qty: units[n].qty,
+            reason: units[n].reason,
+            itemName: units[n].label,
+            unit: units[n].unit,
+            unitCost: units[n].item.lastPurchaseCost,
+            direction: inbound,
+          ),
+      ],
+    );
+    await save(entry);
+    return entry;
+  }
 
   static Future<void> delete(String id) => _box.delete(id);
 
@@ -312,7 +453,7 @@ class StockJournal {
       balance = await itemStore.applyStockDelta(
         itemId: unit.itemId,
         variantId: unit.variantId,
-        delta: -unit.qty,
+        delta: unit.delta,
         beforePersist: (before, after) async {
           hookRan = true;
           unit
@@ -364,7 +505,7 @@ class StockJournal {
       itemId: unit.itemId,
       variantId: unit.variantId,
       itemName: unit.itemName,
-      type: 'out',
+      type: unit.isInbound ? 'in' : 'out',
       quantity: unit.qty,
       balanceAfter: balanceAfter,
       reason: unit.reason,
@@ -375,6 +516,8 @@ class StockJournal {
     ));
     unit.state = done;
     await save(entry);
+    // A return raises stock; only a deduction can make it low.
+    if (unit.isInbound) return;
     final toast =
         InventoryService.lowStockToastFor(item, unit.itemName, balanceAfter);
     if (toast != null) toasts.add(toast);
@@ -397,6 +540,7 @@ class StockJournal {
           'qty': unit.qty,
           'unit': unit.unit,
           'reason': unit.reason,
+          if (unit.isInbound) 'context': 'void',
         },
       );
     } catch (e) {
@@ -442,6 +586,69 @@ class StockJournal {
       } catch (e) {
         failures[entry.id] = e;
         debugPrint('Stock journal ${entry.id} not finished: $e');
+      }
+    }
+    return failures;
+  }
+
+  /// Whether the order write a cancel entry covers happened, read from the
+  /// SAVED order: true / false, or null when it cannot be told (the read
+  /// failed, or the order is gone though the write was to keep it — it was
+  /// settled or voided since, and that path's own return already ran).
+  static Future<bool?> cancelWasSaved(JournalEntry entry) async {
+    if (entry.orderSaved) return true;
+    if (entry.units.any((u) => u.state != planned)) return true;
+    final OrderModel? saved;
+    try {
+      saved = await orderStore.readSaved(entry.orderId);
+    } catch (_) {
+      return null;
+    }
+    if (entry.target.isEmpty) return saved == null;
+    if (saved == null) return null;
+    return entry.target.entries.every((t) {
+      final line = saved!.items.where((l) => l.id == t.key).firstOrNull;
+      return t.value == 0 ? line == null : line?.quantity == t.value;
+    });
+  }
+
+  /// Finishes every persisted cancel entry (startup, and before every cancel).
+  /// Never throws: an entry that fails stays and its error is returned by id.
+  /// One that cannot be told apart is never guessed: its units go to
+  /// `review` with a Stock Check alert.
+  static Future<Map<String, Object>> recoverCancels() async {
+    final failures = <String, Object>{};
+    final List<JournalEntry> entries;
+    try {
+      entries = cancelEntries();
+    } catch (e) {
+      return {'journal': e};
+    }
+    for (final entry in entries) {
+      try {
+        if (!entry.orderSaved) {
+          final wasSaved = await cancelWasSaved(entry);
+          if (wasSaved == false) {
+            // The cancel never reached the order: nothing to return.
+            await delete(entry.id);
+            continue;
+          }
+          if (wasSaved == null) {
+            for (final unit in entry.units) {
+              if (unit.state == review) continue;
+              unit.state = review;
+              await save(entry);
+              await _raiseReview(unit);
+            }
+            failures[entry.id] = 'cancel could not be confirmed';
+            continue;
+          }
+          await markOrderSaved(entry);
+        }
+        await complete(entry);
+      } catch (e) {
+        failures[entry.id] = e;
+        debugPrint('Cancel stock return ${entry.id} not finished: $e');
       }
     }
     return failures;

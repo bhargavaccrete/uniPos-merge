@@ -360,6 +360,14 @@ class OrderModel extends HiveObject {
       'loyaltyPointsUsed': loyaltyPointsUsed,
       'discountAppliedBy': discountAppliedBy,
       'shiftId': shiftId,
+      // BKP-3: every Hive field travels with the backup. kotTimestamps as
+      // {"<kot number>": ISO time} so it is JSON on every export path.
+      'billNumber': billNumber,
+      'sessionId': sessionId,
+      'lastModifiedBy': lastModifiedBy,
+      'lastModifiedAt': lastModifiedAt?.toIso8601String(),
+      'kotTimestamps': kotTimestamps?.map(
+          (kot, at) => MapEntry(kot.toString(), at.toIso8601String())),
     };
   }
 
@@ -420,6 +428,21 @@ class OrderModel extends HiveObject {
           : null,
       discountAppliedBy: map['discountAppliedBy'] as String?,
       shiftId: map['shiftId'] as String?,
+      // BKP-3: absent in older backups, which restore them as null. A value
+      // that cannot be read is dropped rather than refusing the restore.
+      billNumber:
+          map['billNumber'] != null ? _toInt(map['billNumber']) : null,
+      sessionId: map['sessionId'] as String?,
+      lastModifiedBy: map['lastModifiedBy'] as String?,
+      lastModifiedAt: map['lastModifiedAt'] != null
+          ? DateTime.tryParse(map['lastModifiedAt'].toString())
+          : null,
+      kotTimestamps: map['kotTimestamps'] is Map
+          ? {
+              for (final e in (map['kotTimestamps'] as Map).entries)
+                _toInt(e.key): ?DateTime.tryParse(e.value.toString()),
+            }
+          : null,
     );
   }
 

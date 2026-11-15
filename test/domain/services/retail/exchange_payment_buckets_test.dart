@@ -47,7 +47,8 @@ import 'package:billberrylite/domain/store/restaurant/license_store.dart';
 import 'package:billberrylite/domain/store/retail/product_store.dart';
 import 'package:billberrylite/domain/store/retail/sale_store.dart';
 import 'package:billberrylite/util/restaurant/restaurant_auth_helper.dart';
-import 'package:billberrylite/util/retail/cash_drawer_ledger.dart';
+import 'package:billberrylite/util/retail/cash_drawer_ledger.dart';
+import '../../../helpers/open_retail_day_fixture.dart';
 
 /// EOD PAYMENT BUCKETS AFTER AN EXCHANGE — real money only.
 ///
@@ -89,6 +90,8 @@ void main() {
     await Hive.openBox<Expense>(HiveBoxNames.retailExpense);
     await Hive.openBox<EndOfDayReport>(HiveBoxNames.retailEOD);
     await Hive.openBox(HiveBoxNames.dayManagementBox);
+    // BLK-16: returns, exchanges and collections need an open day.
+    await openRetailDayForTest();
     await Hive.openBox(HiveBoxNames.appCounters);
 
     locator.registerLazySingleton<SaleStore>(() => SaleStore());

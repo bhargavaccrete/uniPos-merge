@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/restaurant/refund_allocation.dart';
 import '../../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../../data/models/restaurant/db/pastordermodel_313.dart';
 import '../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../domain/services/restaurant/day_management_service.dart';
 import '../../../../domain/services/restaurant/refund_service.dart';
+import '../../../../util/restaurant/restaurant_session.dart';
 import '../../../../domain/services/restaurant/cart_calculation_service.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/plan/entitlement_keys.dart';
@@ -106,14 +108,18 @@ class _OrderdetailsState extends State<Orderdetails> {
             if (!isFullyRefunded &&
                 (!isVoid || isPaidVoid) &&
                 AppSettings.refundsEnabled &&
-                PlanEnforce.allows(EntKeys.billingReturns))
+                PlanEnforce.allows(EntKeys.billingReturns) &&
+                // BLK-14: hidden from a Waiter; RefundService refuses too.
+                RestaurantSession.canAccess(RefundService.refundPermission))
               SizedBox(width: AppResponsive.mediumSpacing(context)),
             // Refund option is hidden entirely when refunds are turned off in
             // settings. When on, it stays subject to the refund-window check.
             if (!isFullyRefunded &&
                 (!isVoid || isPaidVoid) &&
                 AppSettings.refundsEnabled &&
-                PlanEnforce.allows(EntKeys.billingReturns))
+                PlanEnforce.allows(EntKeys.billingReturns) &&
+                // BLK-14: hidden from a Waiter; RefundService refuses too.
+                RestaurantSession.canAccess(RefundService.refundPermission))
               Expanded(
                 child: Tooltip(
                   message: isRefundEligible
@@ -1290,7 +1296,15 @@ class _OrderdetailsState extends State<Orderdetails> {
         allOrderItems: currentOrder.items ?? [],
         orderGstRate: gstRate,
         orderTotalPrice: remainingTotal,
-        orderPaidTotal: currentOrder.totalPrice,
+        // A part-paid voided order refunds what was collected, not the bill.
+        orderPaidTotal: (currentOrder.orderStatus ?? '').toUpperCase() == 'VOIDED'
+            ? RefundAllocation.collectedOf(currentOrder)
+            : currentOrder.totalPrice,
+        // Largest first: the default way the refund goes back.
+        paidMethods: (RefundAllocation.paidLegsOf(currentOrder).entries.toList()
+              ..sort((a, b) => b.value.compareTo(a.value)))
+            .map((e) => e.key)
+            .toList(),
         orderDiscount: currentOrder.Discount ?? 0.0,
         orderSubTotal: currentOrder.subTotal ?? 0.0,
         isTaxInclusive: currentOrder.isTaxInclusive ?? false,

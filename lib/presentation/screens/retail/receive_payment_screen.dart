@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/presentation/screens/retail/retail_day_guard.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/services.dart';
@@ -66,7 +67,21 @@ class _ReceivePaymentScreenState extends State<ReceivePaymentScreen> {
     }
   }
 
+  /// Set synchronously by the first tap, before any await (SALE-7): a second
+  /// tap while the day check is still open returns at once.
+  bool _submitting = false;
+
   Future<void> _processPayment() async {
+    if (_submitting) return;
+    _submitting = true;
+    try {
+      await _runPayment();
+    } finally {
+      _submitting = false;
+    }
+  }
+
+  Future<void> _runPayment() async {
     if (!_formKey.currentState!.validate()) return;
 
     final amount = double.tryParse(_amountController.text) ?? 0;
@@ -81,6 +96,9 @@ class _ReceivePaymentScreenState extends State<ReceivePaymentScreen> {
       );
       return;
     }
+
+    // BLK-16: a collection needs an open day (offers Start Day when none is).
+    if (!await ensureRetailDayOpen(context) || !mounted) return;
 
     setState(() => _isProcessing = true);
 

@@ -117,18 +117,44 @@ void main() {
     expect(AppConfig.box.get('isSetupComplete'), isTrue);
   });
 
-  test('a bad record in a step the restore tolerates does not block it',
+  // BKP-9 (approved): itemCancellations is critical. Its restore step still
+  // tolerates a bad record, but validation now refuses the whole backup.
+  test('a bad itemCancellations record refuses the backup before writing',
       () async {
+    await divergeFromBackup();
     final backup = copyOfValid();
-    // itemCancellations is a try/catch-guarded restore step: today a bad
-    // record there is logged and skipped, so validation must not refuse it.
     (backup['data'] as Map<String, dynamic>)['itemCancellations'] = ['bad'];
+
+    final before = await deviceState(tempDir);
+    await expectLater(
+      UnifiedBackupService.restoreDecodedBackupForTesting(backup),
+      throwsA(predicate(
+        (e) =>
+            e is RestoreRefusedException &&
+            e.toString().contains('itemCancellations') &&
+            e.toString().contains('Nothing on this device was changed'),
+        'a refusal naming itemCancellations',
+      )),
+    );
+
+    expect(await deviceState(tempDir), before);
+    expect(categories().get('cat-after')?.name, 'Desserts');
+    expect(dayMgmt().get('currentSessionId'), 'sess-after-backup');
+  });
+
+  test('a bad record in a non-critical step the restore tolerates does not '
+      'block it', () async {
+    final backup = copyOfValid();
+    // printers is a try/catch-guarded, non-critical restore step: a bad
+    // record there is logged and skipped, so validation must not refuse it.
+    (backup['data'] as Map<String, dynamic>)['printers'] = ['bad'];
 
     await UnifiedBackupService.restoreDecodedBackupForTesting(backup);
 
     expect(categories().keys, ['cat-1'],
         reason: 'the rest of the backup was restored');
     expect(dayMgmt().get('currentSessionId'), 'sess-1');
+    expect(UnifiedBackupService.lastRestoreSkippedSections, ['printers']);
   });
 
   test('a valid current-format backup restores every backed-up box',

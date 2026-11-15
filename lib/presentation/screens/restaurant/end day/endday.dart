@@ -23,6 +23,9 @@ import 'package:billberrylite/data/models/restaurant/db/eodmodel_317.dart';
 import 'package:billberrylite/data/models/restaurant/db/pastordermodel_313.dart';
 import 'package:billberrylite/domain/services/restaurant/kot_layout.dart';
 import 'package:billberrylite/domain/services/restaurant/paid_order_record.dart';
+import 'package:billberrylite/domain/services/restaurant/order_close.dart';
+import 'package:billberrylite/domain/services/restaurant/settle_new_order.dart';
+import 'package:billberrylite/domain/services/restaurant/void_order_commit.dart';
 import '../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../start order/startorder.dart';
 import '../start order/cart/cart.dart';
@@ -35,7 +38,6 @@ import 'package:billberrylite/domain/services/restaurant/day_management_service.
 import 'package:billberrylite/domain/services/restaurant/eod_service.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/domain/services/restaurant/esc_pos_receipt_builder.dart';
-import 'package:billberrylite/domain/services/restaurant/inventory_service.dart';
 import 'package:billberrylite/presentation/screens/restaurant/welcome_Admin.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
@@ -600,7 +602,8 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
 
   /// Mark the order served + move it to past as COMPLETED (payment preserved).
   /// No inventory change (stock already deducted). Returns the past record.
-  Future<PastOrderModel> _completeServiceForOrder(OrderModel o) async {
+  /// Null when it could not be saved — the order then stays active (SALE-4).
+  Future<PastOrderModel?> _completeServiceForOrder(OrderModel o) async {
     final int billNumber = o.billNumber ?? await orderStore.getNextBillNumber();
     // Same record as Active Orders builds; the shift is the one that took
     // the payment, not the one open at End of Day.
@@ -610,10 +613,11 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
       storeGstNumber: await StoreSettingsService().gstNumberSnapshot(),
       currentShiftId: RestaurantSession.currentShiftId,
     );
-    await pastOrderStore.addOrder(pastOrder);
-    await orderStore.deleteOrder(o.id);
-    if (o.tableNo != null && o.tableNo!.isNotEmpty) {
-      await tableStore.updateTableStatus(o.tableNo!, 'Available');
+    try {
+      await OrderClose.moveToPast(pastOrder, orderId: o.id, tableNo: o.tableNo);
+    } on OrderSaveFailedException catch (e) {
+      NotificationService.instance.showError(e.message);
+      return null;
     }
     return pastOrder;
   }
@@ -656,11 +660,19 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
       roundOffStep: AppSettings.roundOffStepForRecord,
       discountOnItems: AppSettings.discountOnItems,
     );
-    await pastOrderStore.addOrder(voidRecord);
-    await InventoryService.restoreLines(voidPlan.restores);
-    await orderStore.deleteOrder(o.id);
-    if (o.tableNo != null && o.tableNo!.isNotEmpty) {
-      await tableStore.updateTableStatus(o.tableNo!, 'Available');
+    // Record, removal, table and stock return — exactly once (SALE-4). A
+    // record that was not saved leaves the order untouched.
+    try {
+      final result = await VoidOrderCommit.commit(
+        order: o,
+        record: voidRecord,
+        restores: voidPlan.restores,
+      );
+      if (!result.stockFinished) {
+        NotificationService.instance.showWarning(result.message!);
+      }
+    } on OrderSaveFailedException catch (e) {
+      NotificationService.instance.showError(e.message);
     }
   }
 
@@ -668,6 +680,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
   /// Order Details where the existing Refund flow handles it (gating + audit).
   Future<void> _refundOrderAtEod(OrderModel o) async {
     final past = await _completeServiceForOrder(o);
+    if (past == null) return;
     if (mounted) {
       await Navigator.push(
         context,

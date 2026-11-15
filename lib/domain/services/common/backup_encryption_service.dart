@@ -165,6 +165,23 @@ class BackupEncryptionService {
     }
   }
 
+  /// BKP-11: true when [blob] is an encrypted backup whose bytes cannot be
+  /// complete — its header is cut short, or the AES-CBC data is empty or not
+  /// a whole number of 16-byte blocks. No password can open such a file: it
+  /// is damaged or was not fully saved or copied. (A file cut exactly on a
+  /// block boundary is not detectable here; it fails like a wrong password.)
+  static bool isTruncatedBlob(List<int> blob) {
+    if (!isEncryptedBlob(blob)) return false;
+    var p = _blobMagic.length;
+    if (blob.length <= p) return true;
+    p += 1 + blob[p]; // salt length byte + salt
+    if (blob.length <= p) return true;
+    p += 1 + blob[p]; // iv length byte + iv
+    if (blob.length < p) return true;
+    final cipherLength = blob.length - p;
+    return cipherLength == 0 || cipherLength % 16 != 0;
+  }
+
   /// True if [bytes] begins with the Bill Berry Lite encrypted-backup magic header.
   static bool isEncryptedBlob(List<int> bytes) {
     if (bytes.length < _blobMagic.length) return false;

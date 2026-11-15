@@ -32,6 +32,7 @@ import 'package:billberrylite/domain/store/restaurant/variant_store.dart';
 
 import '../../../helpers/test_helpers.dart';
 import '../../../helpers/open_session_fixture.dart';
+import '../../../helpers/sign_in_fixture.dart';
 
 /// Phase 1 safety checkpoint — NEW orders of the new types, end to end:
 /// sell through the real plan (stamped lines), then void / cancel / refund,
@@ -40,6 +41,9 @@ import '../../../helpers/open_session_fixture.dart';
 /// Stock: bun 10, cheese 10. Recipe for toOrder and hybrid: 1 bun + 2 cheese.
 /// hybrid has 2 prepared; cake (made in advance, no recipe use) has 4.
 void main() {
+  // BLK-14: refunds and voids check the role; sign in as admin.
+  setUpAll(() => signInForTest());
+
   TestWidgetsFlutterBinding.ensureInitialized();
   late Directory tempDir;
 

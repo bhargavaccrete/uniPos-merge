@@ -30,6 +30,7 @@ import 'package:billberrylite/domain/store/restaurant/variant_store.dart';
 
 import '../../../helpers/test_helpers.dart';
 import '../../../helpers/open_session_fixture.dart';
+import '../../../helpers/sign_in_fixture.dart';
 
 /// Stock behaviour of the two paths that produce a 'VOIDED' order, followed
 /// by a refund. Characterises F2 (Phase 0 plan): no production code changed.
@@ -41,6 +42,9 @@ import '../../../helpers/open_session_fixture.dart';
 /// Both records then reach RefundService.processRefund, which restocks every
 /// ticked line without knowing which path produced the record.
 void main() {
+  // BLK-14: refunds and voids check the role; sign in as admin.
+  setUpAll(() => signInForTest());
+
   late Directory tempDir;
 
   setUp(() async {

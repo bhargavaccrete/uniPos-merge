@@ -10,6 +10,7 @@ import 'package:billberrylite/util/common/app_responsive.dart';
 import '../../../../data/models/retail/hive_model/cart_model_202.dart';
 import '../../../../data/models/retail/hive_model/variante_model_201.dart';
 import '../../../../domain/services/common/notification_service.dart';
+import '../../../../domain/services/retail/catalog_permission.dart';
 import '../../../../domain/services/retail/line_discount_reason.dart';
 import '../../../../domain/services/retail/line_discount_service.dart';
 import '../../../../domain/services/retail/retail_billing_service.dart'
@@ -32,9 +33,9 @@ final _discountFormatters = <TextInputFormatter>[
 /// this takes a further cut, and the below-cost check runs on the price after
 /// both.
 ///
-/// Pops `true` when the line was changed. Admin-only; the caller must HIDE the
-/// entry point when `LineDiscountService.canDiscount` is false rather than
-/// showing it and refusing.
+/// Pops `true` when the line was changed. The caller must HIDE the entry point
+/// when `LineDiscountService.canDiscount` is false rather than showing it and
+/// refusing. Cost is shown only when `CatalogPermission.canSeeCost`.
 class LineDiscountDialog extends StatefulWidget {
   final CartItemModel item;
 
@@ -99,6 +100,7 @@ class _LineDiscountDialogState extends State<LineDiscountDialog> {
       value: typed,
       chargedUnitPrice: _unitPrice,
       qty: _qty,
+      showCost: CatalogPermission.canSeeCost,
     );
   }
 
@@ -302,11 +304,12 @@ class _LineDiscountDialogState extends State<LineDiscountDialog> {
   }
 
   /// Current selling price and the line it applies to, so the decision is made
-  /// with the numbers in view. Cost is shown because this dialog is admin-only.
+  /// with the numbers in view. Cost only for a user allowed to see it.
   Widget _buildReferencePrices(BuildContext context) {
-    // Null for a quick item — the cost row below is simply not built, the same
-    // way it is skipped for a catalogue variant with no cost on record.
-    final cost = widget.variant?.costPrice;
+    // Null for a quick item, or when cost is hidden from this user — the cost
+    // row below is simply not built.
+    final cost =
+        CatalogPermission.canSeeCost ? widget.variant?.costPrice : null;
 
     return Container(
       width: double.infinity,

@@ -561,6 +561,8 @@ class HiveInit {
     // Cash Drawer screen and makes EOD cash reconciliation accurate).
     await Hive.openBox<CashMovementModel>(HiveBoxNames.restaurantCashMovements);
     await Hive.openBox<StockMovementModel>(HiveBoxNames.restaurantStockMovements);
+    // Sales saved but not yet finished (BLK-13B) — plain maps, never backed up.
+    await Hive.openBox(HiveBoxNames.retailCheckoutJournal);
 
     _areRetailBoxesOpen = true;
   }

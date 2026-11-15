@@ -31,12 +31,16 @@ import 'package:billberrylite/domain/store/restaurant/variant_store.dart';
 
 import '../../../helpers/test_helpers.dart';
 import '../../../helpers/open_session_fixture.dart';
+import '../../../helpers/sign_in_fixture.dart';
 
 /// BLK-06: a restaurant refund never pays back more than is still refundable
 /// (what was actually paid minus earlier refunds), never refunds more units
 /// than are left, and a rejected refund changes nothing — order, stock,
 /// refund history or loyalty points.
 void main() {
+  // BLK-14: refunds and voids check the role; sign in as admin.
+  setUpAll(() => signInForTest());
+
   late Directory tempDir;
 
   setUp(() async {

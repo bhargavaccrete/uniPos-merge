@@ -203,6 +203,13 @@ abstract class _RestaurantStockTakeStore with Store {
       errorMessage = 'Counted quantity cannot be negative.';
       return false;
     }
+    // BLK-18: a stock-take line has no variant, and an item with variants is
+    // stocked per variant — its count would land on stock nothing sells from.
+    if (item.hasVariants) {
+      errorMessage = '${item.name} has variants. Count it per variant in '
+          'Manage Inventory, not in a stock take.';
+      return false;
+    }
 
     try {
       final systemQty =
