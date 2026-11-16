@@ -90,13 +90,27 @@ void main() {
       'StockJournal.recoverAll()',
       'VoidOrderCommit.recoverAll()',
       'RetailCheckoutCommit.recoverAll()',
-      'AutoBackupService.initialize()',
-      'startServer()',
-      'loadRetailStartupSettings()',
-      'LocalNotificationService.instance.init()',
+      // WF-6: settings, lifecycle, auto-backup, LAN server and notifications
+      // now run inside the shared once-only step (checked below).
+      'ModeServices.start()',
     ]) {
       final at = code.indexOf(later);
       expect(at, greaterThan(gate), reason: '$later must come after the gate');
+    }
+    final modeServices = File('lib/core/init/mode_services.dart')
+        .readAsLinesSync()
+        .where((l) => !l.trimLeft().startsWith('//'))
+        .join('\n');
+    for (final step in [
+      'AutoBackupService.initialize()',
+      'startServer()',
+      'loadRetailStartupSettings',
+      'LocalNotificationService.instance.init()',
+      'RestaurantSession.initLifecycle',
+    ]) {
+      expect(modeServices, contains(step), reason: '$step is a mode step');
+      expect(code.contains(step), isFalse,
+          reason: '$step must only run through ModeServices (once only)');
     }
     for (final bypass in [
       'HiveInit.init()',

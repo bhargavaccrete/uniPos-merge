@@ -106,12 +106,26 @@ Future<void> main(List<String> args) async {
           throwsA(isA<AppAlreadyRunningException>()));
       expect(AppInstanceLock.isHeld, isFalse);
     } finally {
+      // The dart launcher can run the script in a child process: end the
+      // whole tree, as a crash of the real app would.
+      if (Platform.isWindows) {
+        Process.runSync('taskkill', ['/F', '/T', '/PID', '${other.pid}']);
+      }
       other.kill(ProcessSignal.sigkill);
       await other.exitCode;
     }
     expect(File(lockPath()).existsSync(), isTrue,
         reason: 'the crashed copy left its lock file behind');
-    await AppInstanceLock.acquire(dir.path);
+    // The OS frees the lock once the dead process is fully torn down.
+    for (var i = 0;; i++) {
+      try {
+        await AppInstanceLock.acquire(dir.path);
+        break;
+      } on AppAlreadyRunningException {
+        if (i >= 50) rethrow;
+        await Future.delayed(const Duration(milliseconds: 200));
+      }
+    }
     expect(AppInstanceLock.isHeld, isTrue);
   }, skip: dartExecutable() != null ? false : 'Flutter SDK dart not found',
       timeout: const Timeout(Duration(minutes: 2)));

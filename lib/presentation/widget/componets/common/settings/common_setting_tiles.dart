@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 
 import 'package:billberrylite/domain/services/common/auto_backup_service.dart';
 import 'package:billberrylite/domain/services/common/backup_encryption_service.dart';
@@ -404,6 +405,41 @@ class _DailyBackupReminderTileState extends State<DailyBackupReminderTile> {
         await AutoBackupService.setAutoBackupEnabled(v);
         if (mounted) setState(() => _enabled = v);
       },
+    );
+  }
+}
+
+/// BKP-6: read-only status of automatic backups — the last success and, when
+/// the last attempt failed, when and why.
+class AutoBackupStatusTile extends StatelessWidget {
+  const AutoBackupStatusTile({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AutoBackupService.status();
+    final fmt = DateFormat('dd MMM yyyy, hh:mm a');
+    final failed = s.lastError != null;
+    return SettingsNavTile(
+      key: const Key('autoBackupStatus'),
+      title: 'Automatic Backup Status',
+      icon: failed ? Icons.cloud_off_rounded : Icons.history_rounded,
+      color: failed ? AppColors.danger : AppColors.success,
+      trailing: const SizedBox.shrink(),
+      subtitleWidget: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(s.lastSuccess == null
+              ? 'No automatic backup yet'
+              : 'Last successful: ${fmt.format(s.lastSuccess!)}'),
+          if (failed)
+            Text(
+              'Last attempt failed'
+              '${s.lastAttempt == null ? '' : ' (${fmt.format(s.lastAttempt!)})'}'
+              ': ${s.lastError}',
+              style: const TextStyle(color: AppColors.danger),
+            ),
+        ],
+      ),
     );
   }
 }

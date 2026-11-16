@@ -55,6 +55,13 @@ class ModeKeys {
   static String get shifts =>
       AppConfig.isRetail ? RetailEntKeys.shifts : EntKeys.shifts;
 
+  // ── Data backup (shared backup / restore / auto-backup code) ──────────────
+  // UnifiedBackupService, AutoBackupService and the start-of-day prompt are
+  // the same code in both modes; each mode's Backup screen is gated on its own
+  // key, so the operations behind it must ask the same one (M6b).
+  static String get dataBackup =>
+      AppConfig.isRetail ? RetailEntKeys.dataBackup : EntKeys.dataBackup;
+
   // ── Inventory (shared notification screen's tap guard) ────────────────────
   // A low-stock or expiry notification can fire for a module the plan doesn't
   // include; the shared notifications screen checks this before navigating.

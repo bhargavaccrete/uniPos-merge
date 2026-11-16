@@ -495,6 +495,7 @@ class _BackupScreenState extends State<BackupScreen> {
                     children: [
                       BackupPasswordSettingTile(),
                       DailyBackupReminderTile(),
+                      AutoBackupStatusTile(),
                     ],
                   ),
 

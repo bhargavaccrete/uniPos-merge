@@ -11,6 +11,7 @@ import 'package:billberrylite/core/config/app_config.dart';
 import 'package:billberrylite/core/constants/retail_store_types.dart';
 import 'package:billberrylite/core/constants/restaurant_store_types.dart';
 import 'package:billberrylite/core/init/hive_init.dart';
+import 'package:billberrylite/core/init/mode_services.dart';
 import 'package:billberrylite/core/di/service_locator.dart' as sl;
 import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
 import 'package:billberrylite/domain/services/retail/store_type_attribute_defaults_service.dart';
@@ -740,6 +741,17 @@ abstract class _SetupWizardStore with Store {
 
       // 9. Mark setup complete in AppConfig
       await AppConfig.setSetupComplete(true);
+
+      // 10. WF-6: the mode was not set when the app started, so startup ran
+      // none of the mode's services (settings, Restaurant session lifecycle,
+      // auto-backup, LAN server, notifications). Start them now, before the
+      // wizard navigates on — once per process. Setup itself is saved; a
+      // failure here only means they start at the next launch.
+      try {
+        await ModeServices.start();
+      } catch (e) {
+        debugPrint('Setup wizard: mode services not started — $e');
+      }
 
       isSetupComplete = true;
     } catch (e) {

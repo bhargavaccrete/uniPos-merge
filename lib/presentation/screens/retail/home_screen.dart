@@ -39,6 +39,7 @@ import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
 import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
 import 'package:billberrylite/util/common/quantity_format.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
+import 'package:billberrylite/domain/services/common/start_of_day_backup_prompt.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -54,7 +55,13 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadStoreName();
-    _startShiftIfNeeded();
+    final shiftCheck = _startShiftIfNeeded();
+    // M6a: as on the Restaurant home, after the day/shift checks — the
+    // prompt has its own plan, setting and once-a-day guards.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await shiftCheck;
+      if (mounted) await StartOfDayBackupPrompt.show(context);
+    });
   }
 
   /// Open (or restore) this staff member's shift on dashboard load.

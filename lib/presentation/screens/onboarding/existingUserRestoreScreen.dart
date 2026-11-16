@@ -5,22 +5,20 @@ import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/domain/store/restaurant/license_store.dart';
-import 'package:billberrylite/domain/store/common/customer_store.dart';
-import 'package:billberrylite/domain/store/retail/product_store.dart';
-import 'package:billberrylite/domain/store/retail/sale_store.dart';
-import 'package:billberrylite/domain/store/retail/supplier_store.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/screens/retail/login_screen.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import '../../../util/color.dart';
 import '../../../domain/services/common/unified_backup_service.dart';
-import '../common/backup/restore_skipped_notice.dart';
 import '../common/backup/restore_replace_warning.dart';
 import '../../../core/config/app_config.dart';
-import '../../../core/init/hive_init.dart';
 import '../../../core/di/service_locator.dart';
 
-// Retail stores
+/// What happens after a successful onboarding restore (WF-6): the existing
+/// restart prompt, as for every other restore. Replaceable in tests only.
+@visibleForTesting
+Future<void> Function() onboardingRestoreFinished =
+    UnifiedBackupService.promptRestartAfterRestore;
 
 class ExistingUserRestoreScreen extends StatefulWidget {
   const ExistingUserRestoreScreen({Key? key}) : super(key: key);
@@ -208,20 +206,6 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
     return '${(bytes / (1024 * 1024)).toStringAsFixed(2)} MB';
   }
 
-  void _nextStep() {
-    if (_currentStep < 1) {
-      setState(() {
-        _currentStep++;
-      });
-      _pageController.nextPage(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
-      _animationController.reset();
-      _animationController.forward();
-    }
-  }
-
   void _previousStep() {
     if (_currentStep > 0) {
       setState(() {
@@ -282,49 +266,19 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
         throw Exception('Import failed - please check the backup file format');
       }
 
-      // Reload AppConfig to get the restored business mode
-      await AppConfig.init();
-      debugPrint(
-        "📦 AppConfig reloaded after restore: ${AppConfig.businessMode.name}",
-      );
-
-      // Initialize business-specific Hive boxes for the restored business mode
-      await HiveInit.initializeBusinessBoxes();
-      debugPrint(
-        "📦 Business boxes initialized for: ${AppConfig.businessMode.name}",
-      );
-
-      // Register business-specific GetIt dependencies
-      await registerBusinessDependencies(AppConfig.businessMode);
-      debugPrint(
-        "📦 Business dependencies registered for: ${AppConfig.businessMode.name}",
-      );
-
-      // ✅ CRITICAL: Force reload stores from Hive after restore
-      if (AppConfig.isRetail) {
-        debugPrint("📦 Reloading retail stores from Hive...");
-        await _reloadRetailStores();
-      } else if (AppConfig.isRestaurant) {
-        debugPrint("📦 Reloading restaurant stores from Hive...");
-        // Restaurant uses direct Hive access (HiveBoxes, etc.), so no manual Store reload is needed.
-        // The UI will automatically fetch fresh data from the updated boxes.
-      }
-
       setState(() {
         _isLoading = false;
         _isRestoring = false;
       });
 
-      // Name any backup sections the restore could not read before moving on.
-      if (mounted) {
-        await showRestoreSkippedNotice(
-            context, UnifiedBackupService.lastRestoreSkippedSections);
-      }
-
-      // Advance to license activation step
-      if (mounted) {
-        _nextStep();
-      }
+      // WF-6: end like every other restore entry point. Settings, stores and
+      // services were loaded at startup from the empty install and none of
+      // them reload, so continuing into licensing and the dashboard here
+      // would bill with the old in-memory settings (tax mode, currency,
+      // decimals…). The existing prompt names any skipped sections and
+      // closes the app; the next start reads only the restored data (setup
+      // is complete then: Restaurant opens licence activation, Retail login).
+      await onboardingRestoreFinished();
     } catch (e) {
       setState(() {
         _isLoading = false;
@@ -339,51 +293,6 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
           ),
         );
       }
-    }
-  }
-
-  /// Reload retail stores from Hive after restore
-  Future<void> _reloadRetailStores() async {
-    try {
-      // Force reload ProductStore
-      if (locator.isRegistered<ProductStore>()) {
-        final productStore = locator<ProductStore>();
-        await productStore.loadProducts();
-        debugPrint(
-          "📦 ProductStore reloaded: ${productStore.products.length} products",
-        );
-      }
-
-      // Force reload SaleStore
-      if (locator.isRegistered<SaleStore>()) {
-        final saleStore = locator<SaleStore>();
-        await saleStore.loadSales();
-        debugPrint("📦 SaleStore reloaded");
-      }
-
-      // Force reload CustomerStore
-      if (locator.isRegistered<CustomerStore>()) {
-        final customerStore = locator<CustomerStore>();
-        await customerStore.loadCustomers();
-        debugPrint(
-          "📦 CustomerStore reloaded: ${customerStore.customers.length} customers",
-        );
-      }
-
-      // Force reload SupplierStore
-      if (locator.isRegistered<SupplierStore>()) {
-        final supplierStore = locator<SupplierStore>();
-        await supplierStore.loadSuppliers();
-        debugPrint(
-          "📦 SupplierStore reloaded: ${supplierStore.suppliers.length} suppliers",
-        );
-      }
-
-      debugPrint("✅ All retail stores reloaded successfully");
-    } catch (e, stackTrace) {
-      debugPrint("⚠️ Error reloading stores: $e");
-      debugPrint("Stack trace: $stackTrace");
-      // Don't throw - the data is in Hive, stores will reload on next app start
     }
   }
 

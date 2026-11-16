@@ -381,4 +381,57 @@ void main() {
       expect(active(kLowStock), hasLength(1));
     });
   });
+
+  // ==================== F. BACKUP REMINDER (BKP-6 K2) ====================
+
+  group('F. backup overdue reminder (same as Restaurant)', () {
+    Future<void> backupState({required bool enabled, DateTime? last}) async {
+      final box = await Hive.openBox(HiveBoxNames.appState);
+      await box.put('auto_backup_enabled', enabled);
+      if (last == null) {
+        await box.delete('last_backup_date');
+      } else {
+        await box.put(
+            'last_backup_date', last.toIso8601String().substring(0, 10));
+      }
+    }
+
+    List<AppNotificationModel> due() =>
+        notificationStore.activeOf('backup_due', subjectType: 'system');
+
+    test('auto-backup on and no backup for 7+ days: Retail raises it',
+        () async {
+      await backupState(
+          enabled: true,
+          last: DateTime.now().subtract(const Duration(days: 8)));
+      await sync();
+      expect(due(), hasLength(1));
+      await sync();
+      expect(due(), hasLength(1), reason: 'raised once, never duplicated');
+    });
+
+    test('a recent backup resolves it', () async {
+      await backupState(
+          enabled: true,
+          last: DateTime.now().subtract(const Duration(days: 8)));
+      await sync();
+      await backupState(enabled: true, last: DateTime.now());
+      await sync();
+      expect(due(), isEmpty);
+    });
+
+    test('auto-backup off: no reminder (unchanged rule)', () async {
+      await backupState(enabled: false);
+      await sync();
+      expect(due(), isEmpty);
+    });
+
+    test('the stock-write refresh does not run the backup check', () async {
+      await backupState(
+          enabled: true,
+          last: DateTime.now().subtract(const Duration(days: 8)));
+      await RetailNotificationSyncService.runStartupChecks(backupDue: false);
+      expect(due(), isEmpty);
+    });
+  });
 }

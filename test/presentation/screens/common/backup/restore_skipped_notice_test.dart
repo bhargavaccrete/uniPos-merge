@@ -57,16 +57,33 @@ void main() {
     expect(done, ['next step'], reason: 'setup continues straight away');
   });
 
-  test('onboarding restore shows the notice before the next setup step', () {
-    final source = File(
+  // WF-6 (Option R): an onboarding restore no longer moves on to the next
+  // setup step in the same session; it ends in the restart prompt every
+  // restore uses. That prompt is where the skipped sections are named.
+  test('onboarding restore names the skipped sections before the app moves on',
+      () {
+    final screen = File(
             'lib/presentation/screens/onboarding/existingUserRestoreScreen.dart')
         .readAsStringSync();
-    final notice = source.indexOf(RegExp(
-        r'showRestoreSkippedNotice\(\s*context,\s*UnifiedBackupService\.lastRestoreSkippedSections\)'));
-    final advance = source.indexOf('// Advance to license activation step');
+    expect(
+        RegExp(r'onboardingRestoreFinished\s*=\s*UnifiedBackupService\.promptRestartAfterRestore;')
+            .hasMatch(screen),
+        isTrue,
+        reason: 'the setup restore ends in the restore result prompt');
+    expect(screen, contains('await onboardingRestoreFinished();'));
 
-    expect(notice, isNonNegative,
-        reason: 'the setup restore passes the skipped sections to the notice');
-    expect(advance, greaterThan(notice));
+    final service = File(
+            'lib/domain/services/common/unified_backup_service.dart')
+        .readAsStringSync();
+    final prompt = service.indexOf(
+        'static Future<void> promptRestartAfterRestore() async {');
+    final skipped = service.indexOf(
+        'skipped: lastRestoreSkippedSections', prompt);
+    final close = service.indexOf('if (!kIsWeb) exit(0);', prompt);
+    expect(prompt, isNonNegative);
+    expect(skipped, greaterThan(prompt),
+        reason: 'the prompt passes the skipped sections to its message');
+    expect(close, greaterThan(skipped),
+        reason: 'they are shown before the app closes');
   });
 }

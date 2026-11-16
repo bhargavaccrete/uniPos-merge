@@ -18,7 +18,7 @@ import 'package:billberrylite/domain/services/restaurant/stock_journal.dart';
 import 'package:billberrylite/domain/services/retail/retail_checkout_commit.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/core/plan/plan_enforcement.dart';
-import 'package:billberrylite/core/plan/entitlement_keys.dart';
+import 'package:billberrylite/core/plan/mode_keys.dart';
 import 'package:billberrylite/core/constants/hive_box_names.dart';
 import 'package:billberrylite/core/init/hive_init.dart';
 import 'package:billberrylite/core/init/restore_record.dart';
@@ -522,9 +522,15 @@ class UnifiedBackupService {
   /// ---------------------------
   /// Automatically saves backup to Downloads folder
   /// Returns the file path or null if failed
-  static Future<String?> exportToDownloads({bool includeImages = true}) async {
+  /// [automatic]: an automatic backup — named `BillBerryLite_auto_<time>.zip`
+  /// so retention can tell it from a manual one (BKP-6). Same content/format.
+  static Future<String?> exportToDownloads(
+      {bool includeImages = true, bool automatic = false}) async {
     lastExportError = null;
-    if (!PlanEnforce.allows(EntKeys.dataBackup)) return null;
+    if (!PlanEnforce.allows(ModeKeys.dataBackup)) {
+      lastExportError = backupNotInPlanMessage;
+      return null;
+    }
     if (kIsWeb) {
       return await _exportForWeb();
     }
@@ -536,12 +542,54 @@ class UnifiedBackupService {
       final data = await _collectCompleteBackup();
 
       // Create ZIP backup
-      return await _createZipBackup(data, saveToDownloads: true, includeImages: includeImages);
+      return await _createZipBackup(data,
+          saveToDownloads: true,
+          includeImages: includeImages,
+          automatic: automatic);
     } catch (e, stackTrace) {
       debugPrint("❌ Auto-save backup failed: $e");
       debugPrint("Stack trace: $stackTrace");
+      lastExportError ??= backupFailureMessage(e);
       return null;
     }
+  }
+
+  /// Shown when the plan does not include backups (BKP-6 K3).
+  static const String backupNotInPlanMessage =
+      'Backups are not included in your plan, so no backup was made.';
+
+  /// A clear reason for a backup that could not be made (BKP-6 K3): no
+  /// password, no permission, no storage space, or the underlying error.
+  /// Messages of the verified write (BKP-11) and of an incomplete export are
+  /// already specific and are kept as they are.
+  @visibleForTesting
+  static String backupFailureMessage(Object e) {
+    if (e is BackupVerificationException) return e.message;
+    final text = '$e';
+    if (text.contains('No backup password set')) {
+      return 'No backup password is set, so the backup could not be '
+          'encrypted and was not made. Set a backup password first.';
+    }
+    if (e is FileSystemException) {
+      final code = e.osError?.errorCode;
+      final os = (e.osError?.message ?? '').toLowerCase();
+      final where = e.path == null || e.path!.isEmpty ? '' : ' (${e.path})';
+      // ENOSPC 28 (Android/Linux), ERROR_DISK_FULL 112 / HANDLE_DISK_FULL 39
+      // (Windows).
+      if (code == 28 || code == 112 || code == 39 ||
+          os.contains('no space') || os.contains('not enough space') ||
+          e.message.toLowerCase().contains('no space')) {
+        return 'Backup not saved: there is not enough free storage space$where.';
+      }
+      // EACCES 13 / EPERM 1 (Android/Linux), ERROR_ACCESS_DENIED 5 (Windows).
+      if (e is PathAccessException || code == 13 || code == 1 || code == 5) {
+        return 'Backup not saved: the app is not allowed to write to this '
+            'location$where.';
+      }
+      return 'Backup not saved: the file could not be written$where '
+          '(${e.osError?.message ?? e.message}).';
+    }
+    return 'Backup not saved: ${text.replaceFirst('Exception: ', '')}';
   }
 
   /// Web-only: serialize backup to JSON, zip it and trigger browser download.
@@ -604,7 +652,10 @@ class UnifiedBackupService {
   /// Returns the file path or null if failed
   static Future<String?> exportToCustomFolder(String folderPath) async {
     lastExportError = null;
-    if (!PlanEnforce.allows(EntKeys.dataBackup)) return null;
+    if (!PlanEnforce.allows(ModeKeys.dataBackup)) {
+      lastExportError = backupNotInPlanMessage;
+      return null;
+    }
     if (kIsWeb) {
       return await _exportForWeb();
     }
@@ -620,7 +671,27 @@ class UnifiedBackupService {
     } catch (e, stackTrace) {
       debugPrint("❌ Custom folder backup failed: $e");
       debugPrint("Stack trace: $stackTrace");
+      lastExportError ??= backupFailureMessage(e);
       return null;
+    }
+  }
+
+  /// Temporary share copies older than this are removed before a new one is
+  /// written (BKP-6 K5). Only `backup_share_cache/` is touched.
+  static const Duration shareCopyMaxAge = Duration(hours: 24);
+
+  static void _removeOldShareCopies(Directory cacheDir) {
+    try {
+      final cutoff = DateTime.now().subtract(shareCopyMaxAge);
+      for (final f in cacheDir.listSync().whereType<File>()) {
+        final name = p.basename(f.path);
+        if (!name.startsWith('BillBerryLite_') || !name.endsWith('.zip')) {
+          continue;
+        }
+        if (f.lastModifiedSync().isBefore(cutoff)) f.deleteSync();
+      }
+    } catch (e) {
+      debugPrint("⚠️ Old share copies not removed: $e");
     }
   }
 
@@ -631,16 +702,21 @@ class UnifiedBackupService {
   /// On web, triggers a browser download instead.
   static Future<String?> exportToShare() async {
     lastExportError = null;
-    if (!PlanEnforce.allows(EntKeys.dataBackup)) return null;
+    if (!PlanEnforce.allows(ModeKeys.dataBackup)) {
+      lastExportError = backupNotInPlanMessage;
+      return null;
+    }
     if (kIsWeb) return await _exportForWeb();
     try {
       final data = await _collectCompleteBackup();
       final appDir = await getApplicationDocumentsDirectory();
       final cacheDir = Directory('${appDir.path}/backup_share_cache');
       if (!cacheDir.existsSync()) cacheDir.createSync(recursive: true);
+      _removeOldShareCopies(cacheDir);
       return await _createZipBackup(data, customPath: cacheDir.path);
     } catch (e) {
       debugPrint("❌ exportToShare failed: $e");
+      lastExportError ??= backupFailureMessage(e);
       return null;
     }
   }
@@ -651,7 +727,7 @@ class UnifiedBackupService {
   /// Imports backup file and automatically detects mode.
   /// Shows a password dialog if the backup is encrypted.
   static Future<bool> importData(BuildContext context) async {
-    if (!PlanEnforce.allows(EntKeys.dataBackup)) return false;
+    if (!PlanEnforce.allows(ModeKeys.dataBackup)) return false;
     try {
       debugPrint("📦 Starting import process...");
 
@@ -2159,6 +2235,8 @@ class UnifiedBackupService {
         // BKP-5: the restore snapshot when no device PIN is stored is locked
         // with the PIN of the backup being restored. Same format.
         String? passwordOverride,
+        // BKP-6: automatic backups get their own name for retention.
+        bool automatic = false,
       }) async {
     try {
       final appDir = await getApplicationDocumentsDirectory();
@@ -2243,7 +2321,7 @@ class UnifiedBackupService {
 
       // 6️⃣ Save ZIP to destination
       final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').substring(0, 19);
-      final suffix = isEncrypted ? 'encrypted' : 'backup';
+      final suffix = automatic ? 'auto' : (isEncrypted ? 'encrypted' : 'backup');
       final fileName = 'BillBerryLite_${suffix}_$timestamp.zip';
 
       File outputFile;
@@ -2277,7 +2355,8 @@ class UnifiedBackupService {
 
       return outputFile.path;
     } catch (e, stackTrace) {
-      if (e is BackupVerificationException) lastExportError = e.message;
+      // BKP-6 K3: every failure carries a reason the dialogs can show.
+      lastExportError = backupFailureMessage(e);
       debugPrint("❌ ZIP backup creation failed: $e");
       debugPrint("Stack trace: $stackTrace");
       return null;

@@ -167,6 +167,18 @@ class NotificationPresenter {
           channelId: NotificationChannels.appAlerts,
         );
 
+      // An automatic backup that failed (BKP-6), with its reason; resolved by
+      // the next successful automatic backup.
+      case 'backup_failed':
+        return NotificationView(
+          title: 'Automatic Backup Failed',
+          body: '${d['reason'] ?? 'The last automatic backup was not saved.'} '
+              'Open Backup & Restore to back up now.',
+          severity: AlertSeverity.critical,
+          icon: Icons.cloud_off_rounded,
+          channelId: NotificationChannels.appAlerts,
+        );
+
       case 'app_update':
         return NotificationView(
           title: 'App Update Available',

@@ -7,30 +7,21 @@ import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/core/config/app_config.dart';
 import 'package:billberrylite/core/init/hive_init.dart';
 import 'package:billberrylite/core/init/hive_safe_open.dart';
+import 'package:billberrylite/core/init/mode_services.dart';
 import 'package:billberrylite/data/repositories/business_type_repository.dart';
 import 'package:billberrylite/presentation/screens/common/recovery/startup_recovery_screen.dart';
 import 'package:billberrylite/core/routes/app_routes.dart';
 import 'package:billberrylite/core/routes/routes_name.dart';
 
-import 'package:billberrylite/server/server.dart';
-import 'package:billberrylite/util/common/currency_helper.dart';
 
 import 'domain/store/restaurant/appStore.dart';
 import 'domain/store/restaurant/license_store.dart';
 import 'domain/services/common/notification_service.dart';
-import 'util/common/decimal_settings.dart';
-import 'util/restaurant/staticswitch.dart';
 import 'util/restaurant/restaurant_session.dart';
-import 'util/restaurant/print_settings.dart';
-import 'util/restaurant/order_settings.dart';
-import 'core/init/retail_startup.dart';
 import 'domain/services/retail/retail_checkout_commit.dart';
-import 'domain/services/restaurant/auto_backup_service.dart';
 import 'domain/services/restaurant/stock_journal.dart';
 import 'domain/services/restaurant/void_order_commit.dart';
 import 'domain/services/common/local_notification_service.dart';
-import 'domain/services/common/firebase_messaging_service.dart';
-import 'domain/services/common/notification_sync.dart';
 import 'package:billberrylite/presentation/screens/retail/login_screen.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 final appStore = AppStore();
@@ -223,94 +214,10 @@ Future<void> _startServices() async {
   locator<LicenseStore>().checkStatusInBackground();
 
 
-  // Load restaurant customization settings from SharedPreferences
-  print('⚙️  Step 6/7: Loading app settings...');
-  if (AppConfig.isRestaurant) {
-    print('   Loading restaurant settings...');
-    // await AppSettings.load();
-    // print('⚙️  Restaurant settings loaded');
-    //
-    // // Load print customization settings
-    // await PrintSettings.load();
-    // print('🖨️  Print settings loaded');
-    //
-    // // Load decimal precision settings
-    // await DecimalSettings.load();
-    // print('💰 Decimal precision loaded: ${DecimalSettings.precision} places');
-    //
-    // // Load order settings
-    // await OrderSettings.load();
-    // print('📋 Order settings loaded');
-    //
-    // // Load currency settings
-    // await CurrencyHelper.load();
-    // print('💰 Currency loaded: ${CurrencyHelper.currentCurrencyCode}');
-
-
-    await Future.wait([
-      AppSettings.load(),
-      PrintSettings.load(),
-      DecimalSettings.load(),
-      OrderSettings.load(),
-      CurrencyHelper.load(),
-      RestaurantSession.load(),
-    ]);
-    RestaurantSession.initLifecycle(); // pause/resume handling for auto-logout
-    print('   ✅ Restaurant settings loaded');
-
-    // Start auto-backup timer (runs hourly, triggers daily backups)
-    AutoBackupService.initialize();
-    print('   ✅ Auto-backup service initialized');
-
-    // Start local server FIRST — captain/KDS clients connect to :9090 on launch,
-    // so it must bind before anything slower (notifications) runs. Fire-and-forget.
-    print('🌐 Starting local server (background)...');
-    startServer().then((_) {
-      print('   ✅ Bill Berry Lite Local Server Started Successfully');
-    }).catchError((e) {
-      print('   ⚠️  Failed to start Bill Berry Lite Local Server: $e');
-    });
-
-  } else if (AppConfig.isRetail) {
-    print('   Loading retail settings...');
-    await loadRetailStartupSettings();
-    print('   ✅ Retail settings loaded');
-  } else {
-    print('   ⚠️  No business mode set - running in setup mode');
-  }
-
-  // ==================== NOTIFICATIONS (both modes) ====================
-  // Shared by restaurant and retail: one Hive box, one store, one screen.
-  // `NotificationSync` picks which startup checks to run for the active mode.
-  //
-  // Deliberately placed AFTER the mode branches so restaurant keeps its
-  // original ordering — the local server is already binding by now, and
-  // notifications are slow enough that they must not delay it.
-  //
-  // Both blocks are wrapped so a failure (exact-alarm permission denied on
-  // Android 13/14, a missing Firebase config) can never break or block
-  // startup. Permission is requested AFTER the first frame (see main()),
-  // because the Android 13+ prompt needs a resumed activity.
-  if (AppConfig.isBusinessModeSet) {
-    try {
-      await LocalNotificationService.instance.init();
-      await notificationStore.load();
-      await NotificationSync.runStartupChecks();
-      print('   ✅ Local notifications ready');
-    } catch (e) {
-      print('   ⚠️  Local notifications init failed (non-fatal): $e');
-    }
-
-    // Firebase Cloud Messaging (push). Runs after local notifications because
-    // foreground pushes are rendered through that plugin's channels. No-op on
-    // desktop/web (no google-services config for those platforms here).
-    try {
-      await FirebaseMessagingService.instance.init();
-      print('   ✅ Firebase push notifications ready');
-    } catch (e) {
-      print('   ⚠️  Firebase messaging init failed (non-fatal): $e');
-    }
-  }
+  // Per-mode startup (settings, Restaurant session lifecycle, auto-backup,
+  // LAN server, notifications) — same steps and order as before, now shared
+  // with the setup wizard and guarded to run once per process (WF-6).
+  await ModeServices.start();
 
   // Debug: Print initialization status
   print('');
