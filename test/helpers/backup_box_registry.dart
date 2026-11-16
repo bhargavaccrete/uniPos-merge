@@ -4,6 +4,9 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
 import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
+import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:billberrylite/core/config/app_config.dart';
@@ -172,6 +175,7 @@ Future<Set<String>> openBoxesFor(String mode, Directory dir) async {
 /// opening nothing else, so the business mode is still unset (a fresh install).
 Future<void> initHiveForBackupTest(Directory dir) async {
   SharedPreferences.setMockInitialValues({});
+  await ensureTestDocumentsFolder(dir);
   Hive.init(dir.path);
 
   void reg<T>(TypeAdapter<T> a) {
@@ -191,6 +195,30 @@ Future<void> initHiveForBackupTest(Directory dir) async {
   await HiveInit.registerRetailAdapters();
 
   await AppConfig.init();
+}
+
+/// BKP-5: every native restore writes a verified safety snapshot under the
+/// app documents folder before changing anything. Tests that did not set up
+/// a documents folder get a temporary one inside [dir]; a test that installed
+/// its own keeps it.
+Future<void> ensureTestDocumentsFolder(Directory dir) async {
+  try {
+    await getApplicationDocumentsDirectory();
+  } catch (_) {
+    PathProviderPlatform.instance = _TestDocuments(
+        (Directory(p.join(dir.path, 'documents'))..createSync(recursive: true))
+            .path);
+  }
+}
+
+class _TestDocuments extends PathProviderPlatform
+    with MockPlatformInterfaceMixin {
+  _TestDocuments(this.path);
+  final String path;
+  @override
+  Future<String?> getApplicationDocumentsPath() async => path;
+  @override
+  Future<String?> getTemporaryPath() async => path;
 }
 
 /// The Hive boxes that exist on disk in [dir] (Hive lower-cases file names).

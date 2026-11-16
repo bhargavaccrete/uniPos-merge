@@ -20,6 +20,8 @@ import 'package:billberrylite/models/legacy/legacy_tax_rate_item.dart';
 import 'package:billberrylite/models/payment_method.dart' as pm;
 import 'package:billberrylite/models/tax_details.dart';
 
+import '../helpers/backup_box_registry.dart' show ensureTestDocumentsFolder;
+
 /// D-A0: restaurant backups exported and restored stock movements only in the
 /// retail branch, so a restored restaurant lost its whole stock audit trail.
 /// Runs the real UnifiedBackupService export → JSON → restore path.
@@ -30,6 +32,8 @@ void main() {
   setUpAll(() async {
     SharedPreferences.setMockInitialValues({});
     tempDir = await Directory.systemTemp.createTemp('restaurant_backup_mov_');
+    // BKP-5: a restore needs a documents folder for its safety snapshot.
+    await ensureTestDocumentsFolder(tempDir);
     Hive.init(tempDir.path);
 
     void reg<T>(TypeAdapter<T> a) {

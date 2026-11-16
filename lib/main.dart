@@ -6,6 +6,9 @@ import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/core/config/app_config.dart';
 import 'package:billberrylite/core/init/hive_init.dart';
+import 'package:billberrylite/core/init/hive_safe_open.dart';
+import 'package:billberrylite/data/repositories/business_type_repository.dart';
+import 'package:billberrylite/presentation/screens/common/recovery/startup_recovery_screen.dart';
 import 'package:billberrylite/core/routes/app_routes.dart';
 import 'package:billberrylite/core/routes/routes_name.dart';
 
@@ -56,7 +59,18 @@ void main() async {
     WakelockPlus.enable();
 
     try {
-      await _initializeApp();
+      await _openData();
+      await _startServices();
+    } on HiveStartupBlocked catch (blocked) {
+      // M4: a box could not be opened safely. Nothing has started; the
+      // Recovery screen continues startup only once every box opens.
+      runApp(StartupRecoveryApp(
+        blocked: blocked,
+        onRecovered: _startAfterRecovery,
+        navigatorKey: navigatorKey,
+        scaffoldMessengerKey: rootScaffoldMessengerKey,
+      ));
+      return;
     } catch (e, stackTrace) {
       print('🔴🔴🔴 INITIALIZATION ERROR 🔴🔴🔴');
       print('Error: $e');
@@ -111,7 +125,23 @@ class _NotificationPermissionRequester with WidgetsBindingObserver {
   }
 }
 
-Future<void> _initializeApp() async {
+/// Recovery succeeded (every box is open): normal startup from the service
+/// locator on. A failed restore attempt may already have built the locator.
+Future<void> _startAfterRecovery() async {
+  try {
+    if (locator.isRegistered<BusinessTypeRepository>()) {
+      await resetServiceLocator();
+    }
+    await _startServices();
+  } catch (e) {
+    runApp(ErrorApp(error: e.toString()));
+    return;
+  }
+  runApp(const BillBerryApp());
+  _NotificationPermissionRequester.scheduleOnResume();
+}
+
+Future<void> _openData() async {
   print('🚀 Starting app initialization...');
 
   // Initialize Hive with Flutter and register common adapters
@@ -126,24 +156,21 @@ Future<void> _initializeApp() async {
 
 
 
-  // Initialize Hive FIRST, then AppConfig
-  print('📦 Step 1/7: Initializing Hive...');
-  await HiveInit.init();
-  print('✅ Hive initialized');
+  // Steps 1-4: Hive, AppConfig, common boxes, business boxes. Throws
+  // HiveStartupBlocked (shown by ErrorApp) if any box could not be opened
+  // safely — so nothing below can run with a missing box. Damaged originals
+  // are preserved, never repaired or deleted.
+  print('📦 Steps 1-4/7: Opening data...');
+  await HiveInit.openStartupBoxes();
+  print('✅ Data opened - Mode: ${AppConfig.businessMode.name}');
+  for (final r in HiveSafeOpen.repairs) {
+    print('🛟 ${r.boxName}: unfinished last write dropped; original kept at '
+        '${r.preserved.path}');
+  }
+}
 
-  print('⚙️  Step 2/7: Initializing AppConfig...');
-  await AppConfig.init();
-  print('✅ AppConfig initialized - Mode: ${AppConfig.businessMode.name}');
-
-  // Initialize business-specific boxes if business mode is already set
-  // (This handles the case where app is restarted after initial setup)
-  print('📦 Step 3/7: Opening common boxes...');
-  await HiveInit.openCommonBoxes();
-  print('✅ Common boxes opened');
-
-  print('📦 Step 4/7: Initializing business boxes...');
-  await HiveInit.initializeBusinessBoxes();
-  print('✅ Business boxes initialized');
+/// Everything after the data is open. Never runs while a box is missing.
+Future<void> _startServices() async {
 
   // Setup GetIt dependency injection
   // IMPORTANT: This must be called AFTER boxes are initialized
@@ -305,7 +332,8 @@ class ErrorApp extends StatelessWidget {
       home: Scaffold(
         backgroundColor: Colors.red[50],
         body: SafeArea(
-          child: Padding(
+          // Scrolls: a blocked start lists every affected box and its copy.
+          child: SingleChildScrollView(
             padding: const EdgeInsets.all(24.0),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,

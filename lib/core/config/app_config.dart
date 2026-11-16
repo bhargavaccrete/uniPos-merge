@@ -1,4 +1,5 @@
 import 'package:hive/hive.dart';
+import 'package:billberrylite/core/init/hive_safe_open.dart';
 
 /// Business mode enum for the app
 enum BusinessMode { none, restaurant, retail }
@@ -51,7 +52,10 @@ class AppConfig {
 
   /// Initialize AppConfig - MUST be called before accessing any properties
   static Future<void> init() async {
-    _box = await Hive.openBox(_boxName);
+    final box = await HiveSafeOpen.openBox(_boxName);
+    // No business mode without this box: stop before anything reads it.
+    if (box == null) HiveSafeOpen.throwIfBlocked();
+    _box = box;
 
     // Set first launch date if not already set
     if (!_box!.containsKey(_firstLaunchDateKey)) {

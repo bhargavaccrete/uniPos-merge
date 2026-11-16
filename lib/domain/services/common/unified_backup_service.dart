@@ -21,6 +21,8 @@ import 'package:billberrylite/core/plan/plan_enforcement.dart';
 import 'package:billberrylite/core/plan/entitlement_keys.dart';
 import 'package:billberrylite/core/constants/hive_box_names.dart';
 import 'package:billberrylite/core/init/hive_init.dart';
+import 'package:billberrylite/core/init/restore_record.dart';
+import 'package:crypto/crypto.dart' show sha256;
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/presentation/screens/common/backup/restore_skipped_notice.dart';
@@ -187,6 +189,14 @@ class _RestoreRun {
       if (inject == key) {
         throw StateError('injected write failure on "$key"');
       }
+      final kill = isRollback
+          ? UnifiedBackupService.killDuringRollbackAfterKeyForTesting
+          : UnifiedBackupService.killAfterWritingKeyForTesting;
+      if (kill == key) throw SimulatedProcessKill('after writing "$key"');
+    } on SimulatedProcessKill catch (e) {
+      // Test only: the process "dies" here. Every later write is skipped and
+      // the kill surfaces as-is, without a rollback.
+      writeFailure = e;
     } catch (e) {
       writeFailure = StateError('Writing "$key" failed: $e');
     }
@@ -240,7 +250,8 @@ class _ImageJournal {
 
 /// This device's data taken just before a restore's first write.
 class _Snapshot {
-  _Snapshot(this.data, this.itemImages, this.filePath);
+  _Snapshot(this.data, this.itemImages, this.filePath,
+      {this.sha256, this.pin});
 
   /// The export map (`_collectAllData`), detached through JSON.
   final Map<String, dynamic> data;
@@ -248,8 +259,14 @@ class _Snapshot {
   /// Restaurant item image bytes, which the export map strips.
   final Map<String, Uint8List> itemImages;
 
-  /// Encrypted copy on disk, or null (no backup password, web, or failed).
+  /// Encrypted copy on disk, or null (no PIN available, web, or failed).
   final String? filePath;
+
+  /// SHA-256 of [filePath] (BKP-5).
+  final String? sha256;
+
+  /// Which PIN locks [filePath] (BKP-5).
+  final SnapshotPin? pin;
 }
 
 /// A restore that failed after it had started writing.
@@ -725,7 +742,11 @@ class UnifiedBackupService {
   /// ---------------------------
   /// ✅ IMPORT FROM FILE PATH
   /// ---------------------------
-  static Future<bool> importFromFilePath(BuildContext context, String filePath) async {
+  /// [password]: already entered and checked by the caller (M4 startup
+  /// recovery validates the file before moving damaged data aside); null
+  /// asks for it in the usual dialog.
+  static Future<bool> importFromFilePath(BuildContext context, String filePath,
+      {String? password, bool fromRecovery = false}) async {
     try {
       final file = File(filePath);
       debugPrint("📦 Importing from file: $filePath");
@@ -743,11 +764,16 @@ class UnifiedBackupService {
         throw Exception(_unencryptedMsg);
       }
       // Pass a password dialog as the provider for encrypted backups
+      String? usedPassword;
       final decoded = await _extractZipBackup(
         file,
-        passwordProvider: () => _showPasswordDialog(context),
+        passwordProvider: () async =>
+            usedPassword = password ?? await _showPasswordDialog(context),
       );
-      await _restoreDecodedBackup(decoded.data, images: decoded.images);
+      await _restoreDecodedBackup(decoded.data,
+          images: decoded.images,
+          password: usedPassword,
+          source: fromRecovery ? RestoreSource.recovery : RestoreSource.normal);
 
       debugPrint("✅ Import completed successfully!");
       return true;
@@ -2130,6 +2156,9 @@ class UnifiedBackupService {
         bool saveToDownloads = false,
         String? customPath,
         bool includeImages = true,
+        // BKP-5: the restore snapshot when no device PIN is stored is locked
+        // with the PIN of the backup being restored. Same format.
+        String? passwordOverride,
       }) async {
     try {
       final appDir = await getApplicationDocumentsDirectory();
@@ -2141,7 +2170,8 @@ class UnifiedBackupService {
 
       // 2️⃣ Encryption is mandatory — a backup password MUST be set.
       // We never write plaintext: no password ⇒ no backup.
-      final password = await BackupEncryptionService.getStoredPassword();
+      final password =
+          passwordOverride ?? await BackupEncryptionService.getStoredPassword();
       if (password == null || password.isEmpty) {
         throw Exception(
             'No backup password set — refusing to write an unencrypted backup');
@@ -2229,6 +2259,12 @@ class UnifiedBackupService {
         outputFile = File('$customPath/$fileName');
       } else {
         throw Exception("No save location specified");
+      }
+      // Two files in the same second never share a name: an existing backup
+      // or restore snapshot is never replaced (BKP-5 R1).
+      for (var i = 1; outputFile.existsSync(); i++) {
+        outputFile = File(p.join(outputFile.parent.path,
+            'BillBerryLite_${suffix}_$timestamp-$i.zip'));
       }
 
       // BKP-11: never trust the write. The file only gets its final name once
@@ -2657,6 +2693,14 @@ class UnifiedBackupService {
 
   /// Empties the pending-work journal (inside the restore transaction).
   static Future<void> _clearWorkJournal(String mode) async {
+    final killAfter = killDuringWorkJournalClearForTesting;
+    if (killAfter != null) {
+      final box = Hive.box(_workJournalBox(mode));
+      for (final key in box.keys.take(killAfter).toList()) {
+        await box.delete(key);
+      }
+      throw SimulatedProcessKill('clearing the work journal');
+    }
     final failAfter = failWorkJournalClearForTesting;
     if (failAfter != null) {
       final box = Hive.box(_workJournalBox(mode));
@@ -2734,6 +2778,20 @@ class UnifiedBackupService {
   @visibleForTesting
   static String? failRollbackWritingKeyForTesting;
 
+  /// Test hook (BKP-5): the process "dies" right after this key is written.
+  @visibleForTesting
+  static String? killAfterWritingKeyForTesting;
+
+  /// Test hook (BKP-5): the process "dies" during the rollback, right after
+  /// this key is written back.
+  @visibleForTesting
+  static String? killDuringRollbackAfterKeyForTesting;
+
+  /// Test hook (BKP-5): the process "dies" while clearing the pending-work
+  /// journal, after removing this many entries.
+  @visibleForTesting
+  static int? killDuringWorkJournalClearForTesting;
+
   /// The single restore path both import entry points share once the file is
   /// decoded: decide the backup's business type, refuse a cross-mode restore,
   /// read the whole backup, snapshot this device, and only then write. A
@@ -2741,6 +2799,10 @@ class UnifiedBackupService {
   static Future<void> _restoreDecodedBackup(
     Map<String, dynamic> data, {
     List<Map<String, dynamic>> images = const [],
+    // BKP-5: the PIN that opened this backup (locks the snapshot when no
+    // device PIN is stored) and where the restore was started.
+    String? password,
+    RestoreSource source = RestoreSource.normal,
   }) async {
     lastRestoreSkippedSections = const [];
     lastRestorePostRestoreWarnings = const [];
@@ -2772,7 +2834,27 @@ class UnifiedBackupService {
     }
 
     // Nothing has been written yet.
-    final snapshot = await _takeSnapshot(backupMode);
+    final snapshot =
+        await _takeSnapshot(backupMode, fallbackPassword: password);
+
+    // BKP-5 (Android, Windows): no business data is written until a verified
+    // snapshot file exists, so an interrupted restore can always be undone.
+    String? docs;
+    RestoreRecord? openBefore;
+    if (!kIsWeb) {
+      if (snapshot.filePath == null || snapshot.sha256 == null) {
+        throw Exception(
+          'The restore did not start: a safety copy of this device\'s data '
+          'could not be saved and checked, so an interrupted restore could not '
+          'be undone. Nothing on this device was changed.'
+          '${lastExportError == null ? '' : ' ($lastExportError)'}',
+        );
+      }
+      docs = (await getApplicationDocumentsDirectory()).path;
+      // A record already open (Undo, or a restore after an interrupted one)
+      // still points to the TRUE original data: it is kept, not replaced.
+      openBefore = RestoreRecordStore.read(docs);
+    }
     _ImageJournal? journal;
     if (!kIsWeb && images.isNotEmpty) {
       journal = _ImageJournal(Directory(p.join(
@@ -2787,6 +2869,36 @@ class UnifiedBackupService {
     // Copied now, before any write, so a rollback can put every entry back.
     final pendingWork = _captureWorkJournal(backupMode);
 
+    // BKP-5: the restore-in-progress record (snapshot + hash, mode, source,
+    // PIN, the journal copy) is written and verified before the first write.
+    // While it is open, the next start is blocked: no journal replay, no POS.
+    var ownsRecord = false;
+    if (!kIsWeb && openBefore == null) {
+      try {
+        await RestoreRecordStore.write(
+          docs!,
+          RestoreRecord(
+            snapshotPath: snapshot.filePath!,
+            snapshotSha256: snapshot.sha256!,
+            mode: backupMode,
+            startedAt: DateTime.now(),
+            source: source,
+            pin: snapshot.pin!,
+            journal: [
+              for (final e in pendingWork.entries)
+                MapEntry(e.key as Object, e.value),
+            ],
+          ),
+        );
+        ownsRecord = true;
+      } catch (e) {
+        throw Exception(
+          'The restore did not start: its safety record could not be saved. '
+          'Nothing on this device was changed. ($e)',
+        );
+      }
+    }
+
     final run = _RestoreRun(validateOnly: false, tolerated: check.tolerated);
     try {
       await _writeImageEntries(images, journal);
@@ -2796,10 +2908,17 @@ class UnifiedBackupService {
       // rolls back like any write failure, so stale entries can never be
       // replayed against the restored data.
       await _clearWorkJournal(backupMode);
+    } on SimulatedProcessKill {
+      rethrow; // test only: the process died — no rollback, record stays open
     } catch (e) {
       debugPrint("❌ Restore failed while writing, rolling back: $e");
       final rolledBack = await _rollback(snapshot, backupMode, journal);
       final journalBack = await _putBackWorkJournal(backupMode, pendingWork);
+      // R4: only a rollback verified for both the data and the journal closes
+      // the record. Otherwise the next start stays blocked (Undo offered).
+      if (ownsRecord && rolledBack && journalBack) {
+        await _closeRestoreRecord(docs!, 'rolled-back');
+      }
       throw RestoreFailedException(
         cause: e,
         dataRolledBack: rolledBack,
@@ -2811,6 +2930,9 @@ class UnifiedBackupService {
     }
 
     journal?.discard();
+    // A restore closes only the record it opened; Undo and restores started
+    // over an open record are closed by the recovery that started them.
+    if (ownsRecord) await _closeRestoreRecord(docs!, 'completed');
 
     lastRestoreSkippedSections = {
       ...check.tolerated.values,
@@ -2840,19 +2962,62 @@ class UnifiedBackupService {
         has<Items>(HiveBoxNames.restaurantItems);
   }
 
+  /// The restore path tests drive. A real restore always knows the PIN that
+  /// opened the backup, so tests pass one too (BKP-5 snapshot fallback).
   @visibleForTesting
   static Future<void> restoreDecodedBackupForTesting(
     Map<String, dynamic> data, {
     List<Map<String, dynamic>> images = const [],
+    String password = testBackupPin,
+    RestoreSource source = RestoreSource.normal,
   }) =>
-      _restoreDecodedBackup(data, images: images);
+      _restoreDecodedBackup(data,
+          images: images, password: password, source: source);
+
+  @visibleForTesting
+  static const String testBackupPin = '135790';
+
+  /// Closes the restore record; a failure is logged (the record then stays
+  /// open and the next start offers recovery, which is safe).
+  static Future<void> _closeRestoreRecord(String docs, String status) async {
+    try {
+      await RestoreRecordStore.close(docs, status);
+    } catch (e) {
+      debugPrint('⚠️ Could not close the restore record: $e');
+    }
+  }
+
+  /// BKP-5 Undo: after the snapshot was restored (which empties the
+  /// pending-work journal), puts the journal back exactly as the record holds
+  /// it and checks every entry. False means it is NOT as it was.
+  static Future<bool> putBackWorkJournalEntries(
+      String mode, List<MapEntry<Object, Object?>> entries) async {
+    try {
+      final box = Hive.box(_workJournalBox(mode));
+      await box.clear();
+      for (final e in entries) {
+        await box.put(e.key, e.value);
+      }
+      if (box.length != entries.length) return false;
+      return entries.every(
+          (e) => box.containsKey(e.key) && _deepEquals(box.get(e.key), e.value));
+    } catch (e) {
+      debugPrint('❌ Could not put the pending-work journal back: $e');
+      return false;
+    }
+  }
 
   /// Takes this device's data just before a restore's first write: the
   /// export map and restaurant item image bytes in memory, plus, on native
   /// with a backup password set, an encrypted copy (the normal backup format)
   /// in app-private `restore_snapshots/`. Never writes an unencrypted file:
   /// `_createZipBackup` refuses without a password.
-  static Future<_Snapshot> _takeSnapshot(String mode) async {
+  ///
+  /// BKP-5: with no device PIN stored, [fallbackPassword] (the PIN of the
+  /// backup being restored) locks the file instead. Old snapshots are removed
+  /// except the one an open restore record still points to (R1).
+  static Future<_Snapshot> _takeSnapshot(String mode,
+      {String? fallbackPassword}) async {
     final exported = await _collectAllData(mode: mode);
     // A section that failed to export is an empty list in the snapshot;
     // rolling back to it would empty that box and still compare equal. Refuse
@@ -2877,29 +3042,53 @@ class UnifiedBackupService {
     }
 
     String? filePath;
+    String? fileSha;
+    SnapshotPin? pin;
     if (!kIsWeb) {
       try {
-        final password = await BackupEncryptionService.getStoredPassword();
+        final stored = await BackupEncryptionService.getStoredPassword();
+        final useStored = stored != null && stored.isNotEmpty;
+        final password = useStored ? stored : fallbackPassword;
         if (password != null && password.isNotEmpty) {
-          final dir = Directory(p.join(
-              (await getApplicationDocumentsDirectory()).path,
-              'restore_snapshots'));
+          final docs = (await getApplicationDocumentsDirectory()).path;
+          final dir = Directory(p.join(docs, RestoreRecordStore.folderName));
           if (!dir.existsSync()) dir.createSync(recursive: true);
-          filePath = await _createZipBackup(exported, customPath: dir.path);
+          // Written, read back, decrypted and compared (BKP-11).
+          filePath = await _createZipBackup(exported,
+              customPath: dir.path,
+              passwordOverride: useStored ? null : password);
           if (filePath != null) {
-            // Keep only the newest snapshot. p.equals, not ==: the new path
-            // is built with '/', while listSync uses the platform separator.
+            fileSha = sha256
+                .convert(await File(filePath).readAsBytes())
+                .toString();
+            pin = useStored
+                ? SnapshotPin.deviceBackupPin
+                : SnapshotPin.restoredBackupPin;
+            // Keep only the newest snapshot, and never the one an open
+            // restore record points to. p.equals, not ==: the new path is
+            // built with '/', while listSync uses the platform separator.
+            final open = RestoreRecordStore.read(docs);
             for (final old in dir.listSync().whereType<File>()) {
-              if (!p.equals(old.path, filePath)) old.deleteSync();
+              if (!p.basename(old.path).startsWith('BillBerryLite_') ||
+                  !old.path.endsWith('.zip')) {
+                continue;
+              }
+              if (p.equals(old.path, filePath)) continue;
+              if (open != null &&
+                  (!open.readable || p.equals(old.path, open.snapshotPath))) {
+                continue;
+              }
+              old.deleteSync();
             }
           }
         }
       } catch (e) {
         debugPrint("⚠️ Could not save the encrypted pre-restore snapshot: $e");
+        filePath = null;
       }
     }
     debugPrint("📦 Pre-restore snapshot taken (file: ${filePath ?? 'none'})");
-    return _Snapshot(data, itemImages, filePath);
+    return _Snapshot(data, itemImages, filePath, sha256: fileSha, pin: pin);
   }
 
   /// Puts the snapshot back through the same restore path, then re-exports
@@ -2927,6 +3116,8 @@ class UnifiedBackupService {
           ? "✅ Rollback verified: previous data is back"
           : "❌ Rollback did not reproduce the previous data");
       return same;
+    } on SimulatedProcessKill {
+      rethrow; // test only: the process died during the rollback
     } catch (e) {
       debugPrint("❌ Rollback failed: $e");
       return false;
@@ -3027,6 +3218,31 @@ class UnifiedBackupService {
   @visibleForTesting
   static Future<String?> takeSnapshotFileForTesting() async =>
       (await _takeSnapshot(AppConfig.businessMode.name)).filePath;
+
+  /// M4 startup recovery: opens a backup file exactly as a restore would
+  /// (truncation check, password, outer and inner integrity, data.json) and
+  /// reports its business type and the BKP-9 critical sections it does not
+  /// contain. Writes nothing and needs no Hive box. Throws with the same
+  /// messages as an import (damaged, wrong password, unencrypted…).
+  static Future<({String mode, List<String> missingCriticalSections})>
+      inspectBackupFile(String path, String password) async {
+    final file = File(path);
+    if (p.extension(path).toLowerCase() == '.json') {
+      throw Exception(_unencryptedMsg);
+    }
+    final decoded =
+        await _extractZipBackup(file, passwordProvider: () async => password);
+    final mode = _resolveBackupMode(decoded.data);
+    final sections = decoded.data['data'];
+    final present = sections is Map<String, dynamic> ? sections.keys.toSet() : <String>{};
+    final critical = mode == BusinessMode.retail.name
+        ? retailCriticalSections
+        : restaurantCriticalSections;
+    return (
+      mode: mode,
+      missingCriticalSections: critical.difference(present).toList()..sort(),
+    );
+  }
 
   @visibleForTesting
   static Future<Map<String, dynamic>> readBackupFileForTesting(
