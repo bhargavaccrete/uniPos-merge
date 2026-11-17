@@ -172,6 +172,34 @@ void main() {
         NotificationPresenter.present(event('license_expired')).route,
         isNull,
       );
+      expect(
+        NotificationPresenter.present(event('bill_requested')).route,
+        isNull,
+      );
+    });
+  });
+
+  // ==================== C. CAPTAIN BILL REQUEST (CAP-3) ====================
+
+  group('C. Captain bill request', () {
+    setUp(useRestaurant);
+
+    test('bill_requested names the table and order, opens Active Orders', () {
+      final v = NotificationPresenter.present(
+        event('bill_requested', {'location': 'Table T1', 'orderNumber': 7}),
+      );
+      expect(v.title, 'Bill Requested');
+      expect(v.body, 'Table T1 · Order #7 asked for the bill.');
+      expect(v.route, RouteNames.restaurantActiveOrders);
+      expect(v.severity, AlertSeverity.info);
+      expect(v.channelId, NotificationChannels.orders);
+    });
+
+    test('bill_requested without an order number still reads', () {
+      final v = NotificationPresenter.present(
+        event('bill_requested', {'location': 'Take Away'}),
+      );
+      expect(v.body, 'Take Away asked for the bill.');
     });
   });
 }

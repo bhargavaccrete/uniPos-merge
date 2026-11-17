@@ -1,5 +1,6 @@
 import 'package:billberrylite/domain/services/retail/line_discount_service.dart';
 import 'package:billberrylite/domain/services/retail/checkout_customer_posting.dart';
+import 'package:billberrylite/domain/services/retail/loyalty_redemption_check.dart';
 import 'package:flutter/material.dart';
 import 'package:billberrylite/util/restaurant/restaurant_session.dart';
 import 'package:billberrylite/util/common/short_ref.dart';
@@ -121,9 +122,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         : _selectedDiscountReason;
   }
 
-  /// Loyalty points the customer is redeeming on this bill (1 point = 1 unit).
-  int _pointsRedeemed = 0;
-
   /// Collect less than the bill now and put the balance on the customer's
   /// account. Requires a customer, same as a full Pay Later.
   bool _allowPartialPayment = false;
@@ -156,7 +154,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     // the store still held the discount — the bill and the input disagreeing.
     final existing = retailCartStore.discountValue;
     _discountController.text = existing > 0 ? _trimZeros(existing) : '0';
-    _pointsRedeemed = retailCartStore.loyaltyRedemption.round();
 
     // From here on, keep the store in step with the field.
     _discountController.addListener(_syncDiscountToStore);
@@ -295,6 +292,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     // Plan gate — daily bill cap (a credit sale is still a bill).
     if (!await _withinDailyBillCap()) return;
     if (!await _hasStockForCheckout()) return;
+    if (!await _loyaltyRedemptionStillValid()) return;
 
     // Require customer for credit sales
     if (customerStore.selectedCustomer == null) {
@@ -690,6 +688,27 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     return false;
   }
 
+  /// LOY-1: the points this bill applies must belong to the customer on it,
+  /// who must still hold them (read from storage, not the picked copy). Runs
+  /// before an invoice number is minted. A refused redemption is removed so
+  /// the cashier sees the corrected total before taking payment again.
+  Future<bool> _loyaltyRedemptionStillValid() async {
+    final problem = await LoyaltyRedemptionCheck.atCommit(
+      points: _bill.loyaltyRedemption.floor(),
+      customerId: customerStore.selectedCustomer?.customerId,
+      lookup: customerStore.getCustomerById,
+    );
+    if (problem == null) return true;
+    retailCartStore.setLoyaltyRedemption(0);
+    if (mounted) {
+      NotificationService.instance.showError(
+        '$problem The points were removed from this bill — check the total '
+        'and payment, then try again.',
+      );
+    }
+    return false;
+  }
+
   String _unfinishedSaleMessage(Object e) =>
       'Sale ${_committedSale!.invoiceNumber} is saved, but finishing it '
       'failed: $e. Tap again to finish it — it will not be recorded twice.';
@@ -703,6 +722,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     // Plan gate — daily bill cap, checked before we start processing.
     if (!await _withinDailyBillCap()) return;
     if (!await _hasStockForCheckout()) return;
+    if (!await _loyaltyRedemptionStillValid()) return;
     if (!await _balanceWithinCreditLimit()) return;
 
     setState(() {
@@ -1462,7 +1482,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 ),
               ),
               Switch(
-                value: _pointsRedeemed > 0,
+                // Read from the store, not a screen copy: a customer change
+                // drops the redemption there (LOY-1) and this must follow.
+                value: retailCartStore.loyaltyRedemption > 0,
                 activeColor: AppColors.warning,
                 onChanged: redeemable <= 0
                     ? null
@@ -1479,9 +1501,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             )) {
                           return;
                         }
-                        setState(() => _pointsRedeemed = on ? redeemable : 0);
                         retailCartStore.setLoyaltyRedemption(
-                          _pointsRedeemed.toDouble(),
+                          on ? redeemable.toDouble() : 0,
                         );
                       },
               ),

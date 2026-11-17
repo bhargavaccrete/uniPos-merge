@@ -179,6 +179,20 @@ class NotificationPresenter {
           channelId: NotificationChannels.appAlerts,
         );
 
+      // Captain's "Request Bill" (CAP-3): the order keeps its status, so this
+      // is how the cashier learns the table wants its bill.
+      case 'bill_requested':
+        final number = d['orderNumber'];
+        return NotificationView(
+          title: 'Bill Requested',
+          body: '${d['location'] ?? 'A table'}'
+              '${number != null ? ' · Order #$number' : ''} asked for the bill.',
+          severity: AlertSeverity.info,
+          icon: Icons.receipt_long_rounded,
+          route: NotificationRoutes.activeOrders,
+          channelId: NotificationChannels.orders,
+        );
+
       case 'app_update':
         return NotificationView(
           title: 'App Update Available',

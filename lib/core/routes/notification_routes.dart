@@ -39,4 +39,8 @@ class NotificationRoutes {
   /// Restaurant-only: retail has no licensing screen to land on.
   static String? get licensing =>
       AppConfig.isRetail ? null : RouteNames.restaurantLicensing;
+
+  /// Restaurant-only: Captain bill requests (retail has no Captain).
+  static String? get activeOrders =>
+      AppConfig.isRetail ? null : RouteNames.restaurantActiveOrders;
 }

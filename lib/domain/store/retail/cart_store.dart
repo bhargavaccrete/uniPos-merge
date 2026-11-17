@@ -1,5 +1,6 @@
 import 'package:mobx/mobx.dart';
 import 'package:billberrylite/data/models/common/categorymodel_300.dart';
+import 'package:billberrylite/data/models/common/customer_model_125.dart';
 import 'package:billberrylite/data/models/retail/hive_model/product_model_200.dart';
 import 'package:billberrylite/data/models/retail/hive_model/variante_model_201.dart';
 import 'package:uuid/uuid.dart';
@@ -190,6 +191,15 @@ abstract class _CartStore with Store {
   @action
   void setLoyaltyRedemption(double value) {
     loyaltyRedemption = value < 0 ? 0 : value;
+  }
+
+  /// Attach [customer] (null = walk-in) to the sale. Points belong to the
+  /// customer they were redeemed for, so a different customer drops the
+  /// redemption (LOY-1); picking the same customer again keeps it.
+  void selectSaleCustomer(Customer? customer) {
+    final previous = customerStore.selectedCustomer?.customerId;
+    customerStore.selectCustomer(customer);
+    if (customer?.customerId != previous) setLoyaltyRedemption(0);
   }
 
   /// Reset the bill inputs. Must run whenever we move to a different sale —

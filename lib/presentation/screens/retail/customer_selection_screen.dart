@@ -53,12 +53,12 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
   }
 
   void _selectCustomer(Customer customer) {
-    customerStore.selectCustomer(customer);
+    retailCartStore.selectSaleCustomer(customer);
     Navigator.pop(context, customer);
   }
 
   void _removeSelected() {
-    customerStore.selectCustomer(null);
+    retailCartStore.selectSaleCustomer(null);
     Navigator.pop(context, null);
   }
 

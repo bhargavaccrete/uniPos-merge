@@ -970,8 +970,29 @@ Future<Response> getCaptainActiveOrdersHandler(Request request) async {
 
 // ── Update Order Status ───────────────────────────────────────────────────────
 
+/// Captain's "Served" button: the only order status Captain may write.
+const String captainStatusServed = 'Served';
+
+/// Captain's "Request Bill" button. A signal to the cashier, not an order
+/// status: the order keeps its kitchen status, so it stays in Active Orders,
+/// on its table and in End of Day's open-order check (CAP-3).
+const String captainStatusBillRequested = 'Bill Requested';
+
+/// The statuses POS Active Orders shows (`OrderStore.activeOrders`). Captain
+/// may only act on an order still in one of them.
+const Set<String> _captainOpenOrderStatuses = {
+  'Processing',
+  'Cooking',
+  'Ready',
+  'Served',
+};
+
 /// PUT /captain/orders/:id/status
-/// Body: { "status": "Served" | "Running" | "Bill Requested" }
+/// Body: { "status": "Served" | "Bill Requested" }
+///
+/// Anything else is refused (N1): an unknown status such as "Completed" was
+/// saved as-is and dropped an unpaid order out of every active list, with no
+/// payment, void record or stock return.
 Future<Response> captainUpdateOrderStatusHandler(Request request, String orderId) async {
   try {
     final body = await request.readAsString();
@@ -985,10 +1006,60 @@ Future<Response> captainUpdateOrderStatusHandler(Request request, String orderId
       );
     }
 
+    if (newStatus != captainStatusServed &&
+        newStatus != captainStatusBillRequested) {
+      return Response.badRequest(
+        body: jsonEncode({
+          'success': false,
+          'error': 'Unsupported status "$newStatus". Captain can mark an '
+              'order Served or request the bill.',
+        }),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+
     final order = await HiveOrders.getOrderById(orderId);
     if (order == null) {
       return Response(404,
         body: jsonEncode({'success': false, 'error': 'Order not found'}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+
+    if (!_captainOpenOrderStatuses.contains(order.status)) {
+      return Response(409,
+        body: jsonEncode({
+          'success': false,
+          'error': 'This order is no longer open on the POS. Refresh orders.',
+        }),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+
+    if (newStatus == captainStatusBillRequested) {
+      await _bestEffort(() => notificationStore.raiseEvent(
+            eventCode: 'bill_requested',
+            subjectType: 'order',
+            subjectId: orderId,
+            data: {
+              'location': _orderLocationLabel(order.tableNo),
+              if (order.orderNumber != null) 'orderNumber': order.orderNumber,
+            },
+          ));
+      await _bestEffort(() async => broadcastEvent({
+            'type': 'BILL_REQUESTED',
+            'orderId': orderId,
+            'status': order.status,
+            'tableNo': order.tableNo,
+            'updatedBy': 'captain',
+          }));
+      return Response.ok(
+        jsonEncode({
+          'success': true,
+          'orderId': orderId,
+          'status': order.status,
+          'billRequested': true,
+        }),
         headers: {'Content-Type': 'application/json'},
       );
     }
