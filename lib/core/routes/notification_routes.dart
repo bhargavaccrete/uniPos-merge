@@ -1,5 +1,7 @@
 import 'package:billberrylite/core/config/app_config.dart';
 import 'package:billberrylite/core/routes/routes_name.dart';
+import 'package:billberrylite/presentation/screens/restaurant/start%20order/startorder.dart';
+import 'package:flutter/widgets.dart';
 
 /// Mode-aware destinations for notification taps.
 ///
@@ -43,4 +45,14 @@ class NotificationRoutes {
   /// Restaurant-only: Captain bill requests (retail has no Captain).
   static String? get activeOrders =>
       AppConfig.isRetail ? null : RouteNames.restaurantActiveOrders;
+
+  /// Opens a notification's destination. Active Orders reuses a Start Order
+  /// screen that is already showing, instead of stacking a second one.
+  static void open(NavigatorState navigator, String route) {
+    if (route == RouteNames.restaurantActiveOrders &&
+        Startorder.showActiveOrdersIfCurrent()) {
+      return;
+    }
+    navigator.pushNamed(route);
+  }
 }

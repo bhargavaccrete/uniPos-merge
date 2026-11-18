@@ -38,9 +38,10 @@ class AppConfig {
   /// so `licenseInfo` stays null and retail keeps the same open behaviour it has
   /// today (see `PlanEnforce._bypassed`).
   ///
-  /// **Flip to `false` once the backend serves retail entitlements.** Restaurant
-  /// is unaffected either way — the action is retail-only.
-  static const bool retailLicenseSkipForTesting = true;
+  /// Off: the backend serves retail entitlements (plan GTRTL), so a retail
+  /// device must activate a licence like restaurant does. Restaurant is
+  /// unaffected either way — the action is retail-only.
+  static const bool retailLicenseSkipForTesting = false;
 
   static const String _boxName = 'appConfigBox';
   static const String _businessModeKey = 'businessMode';

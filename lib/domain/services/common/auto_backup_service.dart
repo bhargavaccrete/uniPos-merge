@@ -12,6 +12,7 @@ import 'package:billberrylite/domain/store/common/notification_store.dart';
 // Unified backup service (works for both modes)
 import 'package:billberrylite/domain/services/common/unified_backup_service.dart';
 import 'package:billberrylite/domain/services/common/backup_encryption_service.dart';
+import 'package:billberrylite/domain/services/common/backup_storage_permission.dart';
 import 'package:billberrylite/core/plan/plan_enforcement.dart';
 import 'package:billberrylite/core/plan/mode_keys.dart';
 
@@ -220,6 +221,13 @@ class AutoBackupService {
     // is told (BKP-6), instead of believing it runs.
     if (!await BackupEncryptionService.hasPassword()) {
       await _recordFailure(noPasswordMessage);
+      return;
+    }
+
+    // Android 7–10 need storage permission for Downloads. A timer cannot ask,
+    // so the user is told instead (asked from the toggle / manual backup).
+    if (!await BackupStoragePermission.isGranted()) {
+      await _recordFailure(BackupStoragePermission.deniedMessage);
       return;
     }
 

@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 
 import 'package:billberrylite/domain/services/common/auto_backup_service.dart';
 import 'package:billberrylite/domain/services/common/backup_encryption_service.dart';
+import 'package:billberrylite/domain/services/common/backup_storage_permission.dart';
+import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/domain/services/common/device_id_service.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
@@ -402,6 +404,13 @@ class _DailyBackupReminderTileState extends State<DailyBackupReminderTile> {
       color: Colors.green,
       value: _enabled,
       onChanged: (v) async {
+        // Android 7–10: automatic backups need storage access, and the timer
+        // cannot ask, so ask now. Refusing still turns the setting on; the
+        // failure is then reported by the backup status and notification.
+        if (v && !await BackupStoragePermission.ensure()) {
+          NotificationService.instance
+              .showError(BackupStoragePermission.deniedMessage);
+        }
         await AutoBackupService.setAutoBackupEnabled(v);
         if (mounted) setState(() => _enabled = v);
       },

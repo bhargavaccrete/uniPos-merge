@@ -73,7 +73,13 @@ class _TableScreenState extends State<TableScreen> {
             onPressed: () async {
               final name = controller.text.trim();
               if (name.isEmpty) return;
-              await tableStore.addTable(TableModel(id: name));
+              final added = await tableStore.addTable(TableModel(id: name));
+              if (!added) {
+                // Dialog stays open so the name can be corrected.
+                NotificationService.instance.showError(
+                    tableStore.errorMessage ?? 'Could not add the table.');
+                return;
+              }
               if (ctx.mounted) Navigator.pop(ctx);
             },
           ),
@@ -264,7 +270,8 @@ class _TableScreenState extends State<TableScreen> {
                 Navigator.pop(ctx);
                 return;
               }
-              final exists = await tableStore.tableExists(newName);
+              final exists = tableStore.nameTaken(newName, exceptId: table.id) ||
+                  await tableStore.tableExists(newName);
               if (exists) {
                 if (ctx.mounted) {
                   NotificationService.instance.showError(

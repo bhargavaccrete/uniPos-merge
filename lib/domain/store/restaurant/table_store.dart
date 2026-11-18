@@ -82,9 +82,25 @@ abstract class _TableStore with Store {
     await loadTables();
   }
 
+  /// True when another table already uses [name] (spaces trimmed, case
+  /// ignored). [exceptId] is the table being renamed, so "t1" → "T1" is
+  /// allowed.
+  bool nameTaken(String name, {String? exceptId}) {
+    final wanted = name.trim().toLowerCase();
+    return tables.any((t) =>
+        t.id != exceptId && t.id.trim().toLowerCase() == wanted);
+  }
+
   @action
   Future<bool> addTable(TableModel table) async {
     try {
+      // The name is the table's storage key: a second "1" would overwrite the
+      // first one's record (a running table reset to Available) and one delete
+      // would then remove both tiles.
+      if (nameTaken(table.id) || await _repository.tableExists(table.id)) {
+        errorMessage = 'Table "${table.id}" already exists.';
+        return false;
+      }
       // Plan gate — table creation flag + table cap.
       if (!PlanEnforce.allows(EntKeys.billingTablesCreate)) {
         errorMessage = "Creating tables isn't available on your current plan.";

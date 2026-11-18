@@ -32,7 +32,9 @@ void returnToStartOrder(BuildContext context) {
   Route<dynamic>? existing;
   if (navigator.canPop()) {
     navigator.popUntil((route) {
-      if (route.settings.name == RouteNames.restaurantStartOrder) {
+      // An order notification opens Start Order under its own route name.
+      if (route.settings.name == RouteNames.restaurantStartOrder ||
+          route.settings.name == RouteNames.restaurantActiveOrders) {
         existing = route;
       }
       return existing != null || route.isFirst;
@@ -60,11 +62,35 @@ class Startorder extends StatefulWidget {
   final bool? isForAddingItem;
   final String? newOrderForTableId;
 
+  /// Tab to open on (0 Menu, 1 Orders, 2 Tables). An order notification opens
+  /// on Orders, inside the full screen, so the Menu/Tables tabs and the
+  /// Active/Past switch stay visible.
+  final int? initialTab;
+
+  static const int ordersTab = 1;
+
+  /// Order notification tapped while a Start Order screen is the current
+  /// screen: show its Orders tab on Active Orders instead of opening a second
+  /// Start Order on top. Returns false when none is current (the caller then
+  /// opens one). A Start Order with another screen above it (cart, payment)
+  /// is left alone, so unsaved work there is never popped away.
+  static bool showActiveOrdersIfCurrent() {
+    for (final s in _StartorderState._open.reversed) {
+      if (!s.mounted) continue;
+      if (ModalRoute.of(s.context)?.isCurrent ?? false) {
+        s._showActiveOrders();
+        return true;
+      }
+    }
+    return false;
+  }
+
   const Startorder({
     super.key,
     this.isForAddingItem,
     this.existingOrder,
     this.newOrderForTableId,
+    this.initialTab,
   });
 
   @override
@@ -87,9 +113,27 @@ class _StartorderState extends State<Startorder>
   /// rebuild used to do: re-read the cart, clear the search, scroll to top.
   int _menuRevisitTick = 0;
 
+  /// Mounted Start Order screens, newest last (see
+  /// [Startorder.showActiveOrdersIfCurrent]).
+  static final List<_StartorderState> _open = [];
+
+  /// Bumped to rebuild the Orders tab fresh, which puts it back on Active
+  /// Orders if Past Orders was showing.
+  int _ordersResetTick = 0;
+
+  void _showActiveOrders() {
+    setState(() => _ordersResetTick++);
+    if (tabController.index == Startorder.ordersTab) {
+      _refreshCurrentTab(); // the tab listener only fires on a change
+    } else {
+      tabController.animateTo(Startorder.ordersTab);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
+    _open.add(this);
     tabController = TabController(length: _tabCount, vsync: this);
 
     // Initialize state based on what was passed to the widget
@@ -98,6 +142,10 @@ class _StartorderState extends State<Startorder>
     } else if (widget.newOrderForTableId != null) {
       _tableIdForCurrentSession = widget.newOrderForTableId;
       tabController.index = 0; // Default to menu for a new order
+    } else if (widget.initialTab != null &&
+        widget.initialTab! >= 0 &&
+        widget.initialTab! < _tabCount) {
+      tabController.index = widget.initialTab!;
     }
 
     _previousTabIndex = tabController.index;
@@ -142,6 +190,7 @@ class _StartorderState extends State<Startorder>
 
   @override
   void dispose() {
+    _open.remove(this);
     tabController.dispose();
     super.dispose();
   }
@@ -486,7 +535,7 @@ class _StartorderState extends State<Startorder>
                       tabRevisitTick: _menuRevisitTick,
                     ),
                   ),
-                  Order(),
+                  Order(key: ValueKey(_ordersResetTick)),
                   if ((OrderSettings.enableDineIn &&
                       PlanEnforce.allows(EntKeys.billingTables)))
                     const TableScreen(),

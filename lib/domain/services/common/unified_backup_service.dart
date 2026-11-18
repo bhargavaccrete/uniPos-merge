@@ -14,6 +14,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:billberrylite/core/config/app_config.dart';
 import 'package:billberrylite/main.dart' show navigatorKey;
 import 'package:billberrylite/domain/services/common/backup_encryption_service.dart';
+import 'package:billberrylite/domain/services/common/backup_storage_permission.dart';
 import 'package:billberrylite/domain/services/restaurant/stock_journal.dart';
 import 'package:billberrylite/domain/services/retail/retail_checkout_commit.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
@@ -535,6 +536,13 @@ class UnifiedBackupService {
       return await _exportForWeb();
     }
 
+    // Android 7–10 need storage permission for Downloads. A manual backup asks
+    // (the user is on screen); the automatic one checks before calling here.
+    if (!automatic && !await BackupStoragePermission.ensure()) {
+      lastExportError = storagePermissionDeniedMessage;
+      return null;
+    }
+
     try {
       debugPrint("📦 Starting backup to Downloads (images: $includeImages)...");
 
@@ -557,6 +565,11 @@ class UnifiedBackupService {
   /// Shown when the plan does not include backups (BKP-6 K3).
   static const String backupNotInPlanMessage =
       'Backups are not included in your plan, so no backup was made.';
+
+  /// A manual backup on Android 7–10 when storage access was refused.
+  static const String storagePermissionDeniedMessage =
+      'Backup not saved: storage access was not allowed. Allow storage for '
+      'Bill Berry Lite and try again.';
 
   /// A clear reason for a backup that could not be made (BKP-6 K3): no
   /// password, no permission, no storage space, or the underlying error.

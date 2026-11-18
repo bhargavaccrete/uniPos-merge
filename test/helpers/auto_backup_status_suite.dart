@@ -20,6 +20,7 @@ import 'package:billberrylite/data/repositories/common/notification_repository.d
 import 'package:billberrylite/domain/services/common/auto_backup_retention.dart';
 import 'package:billberrylite/domain/services/common/auto_backup_service.dart';
 import 'package:billberrylite/domain/services/common/backup_encryption_service.dart';
+import 'package:billberrylite/domain/services/common/backup_storage_permission.dart';
 import 'package:billberrylite/domain/services/common/license_api_service.dart';
 import 'package:billberrylite/domain/services/common/unified_backup_service.dart';
 import 'package:billberrylite/domain/store/common/notification_store.dart';
@@ -92,6 +93,7 @@ void autoBackupStatusSuite({required String mode}) {
   });
 
   setUp(() async {
+    BackupStoragePermission.resetForTesting();
     UnifiedBackupService.afterBackupWriteForTesting = null;
     FlutterSecureStorage.setMockInitialValues({});
     await BackupEncryptionService.setPassword(pin);
@@ -112,6 +114,7 @@ void autoBackupStatusSuite({required String mode}) {
   });
 
   tearDownAll(() async {
+    BackupStoragePermission.resetForTesting();
     UnifiedBackupService.afterBackupWriteForTesting = null;
     await locator.reset();
     await Hive.close();
@@ -158,6 +161,53 @@ void autoBackupStatusSuite({required String mode}) {
     expect(AutoBackupService.status().lastError,
         AutoBackupService.noPasswordMessage);
     expect(failedEvents(), hasLength(1));
+  });
+
+  group('$mode: storage permission on Android 7–10', () {
+    var asked = 0;
+    void oldAndroid({required bool granted, bool grantOnAsk = false}) {
+      asked = 0;
+      BackupStoragePermission.isAndroidOverride = true;
+      BackupStoragePermission.sdkIntOverride = () async => 28;
+      BackupStoragePermission.isGrantedOverride = () async => granted;
+      BackupStoragePermission.requestOverride = () async {
+        asked++;
+        return grantOnAsk;
+      };
+    }
+
+    test('automatic backup without permission: told, never asks, no file',
+        () async {
+      oldAndroid(granted: false);
+      await hourlyCheck();
+      expect(asked, 0, reason: 'a timer cannot show a prompt');
+      expect(AutoBackupService.status().lastError,
+          BackupStoragePermission.deniedMessage);
+      expect(failedEvents(), hasLength(1));
+      expect(autoFiles(), isEmpty);
+      expect(await AutoBackupService.getLastBackupDate(), isNull,
+          reason: 'not marked done, so it is retried');
+    });
+
+    test('automatic backup with permission granted runs', () async {
+      oldAndroid(granted: true);
+      await hourlyCheck();
+      expect(AutoBackupService.status().lastError, isNull);
+      expect(autoFiles(), hasLength(1));
+    });
+
+    test('manual backup asks; refused gives a clear reason, allowed saves',
+        () async {
+      oldAndroid(granted: false);
+      expect(await UnifiedBackupService.exportToDownloads(), isNull);
+      expect(asked, 1);
+      expect(UnifiedBackupService.lastExportError,
+          UnifiedBackupService.storagePermissionDeniedMessage);
+
+      oldAndroid(granted: false, grantOnAsk: true);
+      expect(await UnifiedBackupService.exportToDownloads(), isNotNull);
+      expect(asked, 1);
+    });
   });
 
   testWidgets('$mode: the Backup screen shows last success and last failure',

@@ -47,7 +47,6 @@ import 'package:billberrylite/presentation/screens/common/notifications/notifica
 
 // Restaurant - Orders
 import 'package:billberrylite/presentation/screens/restaurant/start%20order/startorder.dart';
-import 'package:billberrylite/presentation/screens/restaurant/tabbar/activeorder.dart';
 import 'package:billberrylite/presentation/screens/restaurant/tabbar/pastorder.dart';
 import 'package:billberrylite/presentation/screens/restaurant/tabbar/orderDetails.dart';
 
@@ -170,8 +169,11 @@ class RestaurantRoutes {
       'startOrder',
       EntKeys.billing,
     ),
+    // Opened from order notifications. The full Start Order screen on its
+    // Orders tab, not the bare Active Orders body (no app bar, no Past Orders,
+    // no Menu/Tables tabs).
     RouteNames.restaurantActiveOrders: _guard(
-      const Activeorder(),
+      const Startorder(initialTab: Startorder.ordersTab),
       'startOrder',
       EntKeys.billing,
     ),

@@ -5,6 +5,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
+import 'package:billberrylite/core/routes/notification_routes.dart';
 import 'package:billberrylite/data/models/common/notification_presenter.dart';
 import 'package:billberrylite/main.dart' show navigatorKey;
 
@@ -199,11 +200,12 @@ class LocalNotificationService {
     if (route == null || route.isEmpty) return;
     final nav = navigatorKey.currentState;
     if (nav != null) {
-      nav.pushNamed(route);
+      NotificationRoutes.open(nav, route);
     } else {
-      WidgetsBinding.instance.addPostFrameCallback(
-        (_) => navigatorKey.currentState?.pushNamed(route),
-      );
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final later = navigatorKey.currentState;
+        if (later != null) NotificationRoutes.open(later, route);
+      });
     }
   }
 }
