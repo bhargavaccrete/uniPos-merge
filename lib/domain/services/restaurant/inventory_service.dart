@@ -1038,6 +1038,12 @@ class InventoryService {
   /// e.g., weightDisplay="10KG", stockUnit="kg" → returns 10
   ///        weightDisplay="500GM", stockUnit="kg" → returns 0.5
   ///        weightDisplay="2KG", stockUnit="gm" → returns 2000
+  /// [weightDisplay] ("750GM", "1.5KG") in [stockUnit] — the same reading a
+  /// sale's stock deduction uses, so a weighed line's price and its stock
+  /// deduction come from one weight.
+  static double weightInStockUnit(String weightDisplay, String stockUnit) =>
+      _parseWeightToStockUnit(weightDisplay, stockUnit);
+
   static double _parseWeightToStockUnit(String weightDisplay, String stockUnit) {
     final grams = _parseWeightFromDisplay(weightDisplay);
     final normalizedStockUnit = stockUnit.toUpperCase().replaceAll(' ', '');

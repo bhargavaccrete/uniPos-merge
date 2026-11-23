@@ -77,7 +77,13 @@ void main() {
 
     await Hive.box<Items>(HiveBoxNames.restaurantItems).put(
         'dish',
-        Items(id: 'dish', name: 'Dish', trackInventory: true,
+        Items(id: 'dish', name: 'Dish', price: 100, trackInventory: true,
+            stockQuantity: 100));
+    // Captain lines are priced from the menu (AND-04): every product a test
+    // orders must be on it.
+    await Hive.box<Items>(HiveBoxNames.restaurantItems).put(
+        'dish2',
+        Items(id: 'dish2', name: 'Dish 2', price: 100, trackInventory: true,
             stockQuantity: 100));
     await itemStore.loadItems();
   });

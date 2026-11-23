@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import '../../../../../core/di/service_locator.dart';
 import '../../../../../data/models/common/taxmodel_314.dart';
 import '../../../../../domain/services/restaurant/notification_service.dart';
+import '../../../../../domain/services/restaurant/restaurant_tax_assignment.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 
@@ -386,6 +387,17 @@ class _TaxSelectorSheetState extends State<TaxSelectorSheet> {
   }
 
   Future<void> _deleteTax(String taxId) async {
+    // A tax items still charge cannot be deleted (see Tax Settings).
+    await itemStore.ensureLoaded();
+    final used = RestaurantTaxAssignment.itemsUsing(taxId, itemStore.items);
+    if (used.isNotEmpty) {
+      NotificationService.instance.showError(
+        'Used by ${used.length} item(s). Remove it from them first '
+        '(Tax Settings → Apply Tax on Items → Remove Tax).',
+      );
+      return;
+    }
+    if (!mounted) return;
     final confirm = await showDialog<bool>(
       context: context,
       useRootNavigator: false, // see showTaxSelector

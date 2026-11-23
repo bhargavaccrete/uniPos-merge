@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show PlatformDispatcher;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -8,6 +9,10 @@ import 'package:billberrylite/core/config/app_config.dart';
 import 'package:billberrylite/core/init/hive_init.dart';
 import 'package:billberrylite/core/init/hive_safe_open.dart';
 import 'package:billberrylite/core/init/mode_services.dart';
+import 'package:billberrylite/core/init/release_logging.dart';
+import 'package:billberrylite/core/init/crash_reporting.dart';
+import 'package:billberrylite/core/plan/plan_gate.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:billberrylite/data/repositories/business_type_repository.dart';
 import 'package:billberrylite/presentation/screens/common/recovery/startup_recovery_screen.dart';
 import 'package:billberrylite/core/routes/app_routes.dart';
@@ -29,17 +34,34 @@ final appStore = AppStore();
 final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-void main() async {
+void main() {
+  // AND-34: no app logs in release builds. The outer zone also covers the
+  // error handlers below (runZonedGuarded's onError runs in this zone).
+  silenceDebugPrintInRelease();
+  runZoned(_main, zoneSpecification: releaseLogZone());
+}
+
+void _main() async {
   // 🔴 CRITICAL: Catch ALL errors to prevent white screen
   FlutterError.onError = (FlutterErrorDetails details) {
     print('🔴🔴🔴 FLUTTER ERROR CAUGHT 🔴🔴🔴');
     print('Exception: ${details.exception}');
     print('Stack trace: ${details.stack}');
     FlutterError.presentError(details);
+    CrashReporting.recordFlutterError(details);
   };
 
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
+
+    // Crashlytics before Hive, so a startup failure is reported too. Release
+    // builds on Android/iOS only; local, no network wait; never throws.
+    await CrashReporting.init();
+    // Async errors outside this zone. `false` keeps the default handling.
+    PlatformDispatcher.instance.onError = (error, stack) {
+      CrashReporting.recordError(error, stack, fatal: true);
+      return false;
+    };
 
     // Poppins is bundled locally (assets/fonts/, registered in pubspec.yaml)
     // so GoogleFonts.poppins() must never try to fetch it over the network —
@@ -61,11 +83,16 @@ void main() async {
         navigatorKey: navigatorKey,
         scaffoldMessengerKey: rootScaffoldMessengerKey,
       ));
+      // Reported after the Recovery screen is up (non-fatal).
+      CrashReporting.recordError(blocked, StackTrace.current,
+          fatal: false, reason: 'hive_startup_blocked');
       return;
     } catch (e, stackTrace) {
       print('🔴🔴🔴 INITIALIZATION ERROR 🔴🔴🔴');
       print('Error: $e');
       print('Stack trace: $stackTrace');
+      CrashReporting.recordError(e, stackTrace,
+          fatal: false, reason: 'startup_init_failed');
       runApp(ErrorApp(error: e.toString()));
       return;
     }
@@ -82,6 +109,7 @@ void main() async {
     print('🔴🔴🔴 ZONE ERROR CAUGHT 🔴🔴🔴');
     print('Error: $error');
     print('Stack trace: $stackTrace');
+    CrashReporting.recordError(error, stackTrace, fatal: true);
   });
 }
 
@@ -124,7 +152,9 @@ Future<void> _startAfterRecovery() async {
       await resetServiceLocator();
     }
     await _startServices();
-  } catch (e) {
+  } catch (e, stackTrace) {
+    CrashReporting.recordError(e, stackTrace,
+        fatal: false, reason: 'startup_after_recovery_failed');
     runApp(ErrorApp(error: e.toString()));
     return;
   }
@@ -160,6 +190,20 @@ Future<void> _openData() async {
   }
 }
 
+/// Safe metadata on crash reports: business mode, plan label and app version
+/// only (see [CrashReporting.setContext]). Never blocks startup.
+Future<void> _attachCrashContext() async {
+  if (!CrashReporting.isCollecting) return;
+  try {
+    final info = await PackageInfo.fromPlatform();
+    await CrashReporting.setContext(
+      businessMode: AppConfig.businessMode.name,
+      plan: PlanGate.planLabel,
+      appVersion: '${info.version}+${info.buildNumber}',
+    );
+  } catch (_) {}
+}
+
 /// Everything after the data is open. Never runs while a box is missing.
 Future<void> _startServices() async {
 
@@ -172,6 +216,7 @@ Future<void> _startServices() async {
   // Pre-load license cache so RestaurantGuard can check synchronously.
   await locator<LicenseStore>().loadCachedLicense();
   print('🔑 License cache loaded');
+  unawaited(_attachCrashContext());
 
   // Finish any Settle stock work a crash or force-close left unfinished,
   // before the first sale can touch the same items. Never throws; an entry

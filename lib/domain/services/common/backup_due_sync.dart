@@ -3,9 +3,9 @@ import 'package:billberrylite/data/models/common/notification_presenter.dart';
 import 'package:billberrylite/domain/services/common/auto_backup_service.dart';
 import 'package:billberrylite/domain/services/common/local_notification_service.dart';
 
-/// "Database Backup Needed": raised at startup when automatic backup is on and
-/// the last backup is 7 or more days old (or never happened); resolved
-/// otherwise. One implementation for both modes (BKP-6 K2) — Restaurant's
+/// "Database Backup Needed": raised at startup when the daily backup prompt
+/// is on and there has been no backup for 7 or more days (counted from the
+/// last backup, or from when the prompt was switched on); resolved otherwise. One implementation for both modes (BKP-6 K2) — Restaurant's
 /// original logic, moved here unchanged.
 class BackupDueSync {
   BackupDueSync._();
@@ -36,11 +36,9 @@ class BackupDueSync {
     }
   }
 
-  static Future<bool> backupOverdue() async {
-    final last = await AutoBackupService.getLastBackupDate();
-    if (last == null || last.isEmpty) return true;
-    final parsed = DateTime.tryParse(last);
-    if (parsed == null) return true;
-    return DateTime.now().difference(parsed).inDays >= 7;
-  }
+  /// Overdue exactly when the start-of-day prompt would insist (7+ days
+  /// since the last backup or since the prompt was switched on), so a fresh
+  /// install is not told "no backup in 7 days" on its first morning.
+  static Future<bool> backupOverdue() async =>
+      await AutoBackupService.currentPrompt() == DailyBackupPrompt.required;
 }

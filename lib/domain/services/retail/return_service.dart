@@ -12,6 +12,7 @@ import 'package:billberrylite/domain/services/retail/return_math.dart';
 import 'package:billberrylite/domain/services/retail/sale_return_reason.dart';
 import 'package:billberrylite/data/models/retail/hive_model/inventory_loss_model_178.dart';
 import 'package:billberrylite/util/common/loyalty_points.dart';
+import 'package:billberrylite/util/common/tax_split.dart';
 import 'package:uuid/uuid.dart';
 
 /// What a completed return actually did with the money.
@@ -140,6 +141,15 @@ class ReturnService {
     if (remaining.isEmpty) return false;
     return remaining.values.every((qty) => qty <= 0);
   }
+
+  /// [isFullyReturned] for a whole list: [sales] are already loaded, sale
+  /// lines are read once without copying the box. Synchronous on purpose —
+  /// the box is iterated with no await, so no write can land mid-scan.
+  Set<String> fullyReturnedSaleIds(Iterable<SaleModel> sales) =>
+      RetailReturnMath.fullyReturnedSaleIds(
+        sales: sales,
+        lines: saleItemRepository.saleItemsInStorageOrder(),
+      );
 
   /// True when some but not all of the sale has come back.
   Future<bool> isPartiallyReturned(String originalSaleId) async {
@@ -427,6 +437,8 @@ class ReturnService {
   }) {
     final now = DateTime.now().toIso8601String();
     final gst = figures.taxAmount;
+    // One split for the whole credit note, so CGST + SGST equals its GST.
+    final gstHalves = TaxSplit.halves(gst);
 
     // BLK-11: when part of the value cancelled an unpaid balance, record the
     // split as legs (negative, like the header) — the cash drawer and EOD read
@@ -461,8 +473,8 @@ class ReturnService {
       originalSaleId: original.saleId,
       totalTaxableAmount: -figures.totalTaxableAmount,
       totalGstAmount: -gst,
-      totalCgstAmount: -_half(gst),
-      totalSgstAmount: -_half(gst),
+      totalCgstAmount: -gstHalves.cgst,
+      totalSgstAmount: -gstHalves.sgst,
       grandTotal: -figures.totalAmount,
       // Carried from the sale being reversed so a reprint renders under the
       // rules it was charged under, not today's settings.
@@ -625,7 +637,6 @@ class ReturnService {
   }
 
   static double _r2(double v) => double.parse(v.toStringAsFixed(2));
-  static double _half(double v) => _r2(v / 2);
 }
 
 class _Settlement {

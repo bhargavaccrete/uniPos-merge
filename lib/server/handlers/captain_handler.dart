@@ -21,6 +21,7 @@ import '../../domain/services/common/local_notification_service.dart';
 import '../../data/models/common/notification_presenter.dart';
 import '../../core/routes/routes_name.dart';
 import '../../util/restaurant/restaurant_auth_helper.dart';
+import '../captain_line_pricing.dart';
 import '../websocket.dart';
 
 /// Human label for an order's location used in captain notifications.
@@ -80,6 +81,30 @@ const String _requestIdReusedError =
 
 void _pruneExpiredRequests() {
   _orderRequestCache.removeWhere((_, entry) => entry.isExpired);
+}
+
+/// [lines] priced from the POS's own menu ([CaptainLinePricing]). Variants
+/// and extras are read only when a line uses them.
+Future<List<CartItem>> _priceFromMenu(List<CartItem> lines) async {
+  await itemStore.ensureLoaded();
+  final needsVariants = lines.any((l) => (l.variantName ?? '').isNotEmpty);
+  final needsExtras = lines.any((l) => (l.extras ?? const []).isNotEmpty);
+  if (needsVariants && variantStore.variants.isEmpty) {
+    await variantStore.loadVariants();
+  }
+  if (needsExtras && extraStore.extras.isEmpty) {
+    await extraStore.loadExtras();
+  }
+  return CaptainLinePricing.reprice(
+    lines,
+    itemsById: {for (final i in itemStore.items) i.id: i},
+    variantNames: needsVariants
+        ? {for (final v in variantStore.variants) v.id: v.name}
+        : const {},
+    extrasById: needsExtras
+        ? {for (final e in extraStore.extras) e.Id: e}
+        : const {},
+  );
 }
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
@@ -308,14 +333,26 @@ Future<_GatedReply> _captainSendOrder(Map<String, dynamic> data) async {
     // P2: the request's `totalPrice` is accepted but never trusted — the POS
     // prices every Captain order itself (below).
 
-    final newItems = (data['items'] as List<dynamic>? ?? [])
+    final requested = (data['items'] as List<dynamic>? ?? [])
         .map((i) => CartItem.fromMap(i as Map<String, dynamic>))
         .toList();
 
-    if (newItems.isEmpty) {
+    if (requested.isEmpty) {
       return (
         response: _jsonResponse(
             400, {'success': false, 'error': 'No items provided'}),
+        afterCommit: null,
+      );
+    }
+
+    // AND-04/05: every line priced from the POS menu, quantities checked.
+    // A bad line refuses the request before anything is written.
+    final List<CartItem> newItems;
+    try {
+      newItems = await _priceFromMenu(requested);
+    } on CaptainLineRejected catch (e) {
+      return (
+        response: _jsonResponse(400, {'success': false, 'error': e.message}),
         afterCommit: null,
       );
     }

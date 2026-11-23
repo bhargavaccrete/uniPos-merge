@@ -19,6 +19,7 @@ import 'package:billberrylite/data/models/retail/hive_model/product_model_200.da
 import 'package:billberrylite/data/models/retail/hive_model/variante_model_201.dart';
 import 'package:billberrylite/data/repositories/common/notification_repository.dart';
 
+import 'package:billberrylite/domain/services/common/auto_backup_service.dart';
 import 'package:billberrylite/domain/services/retail/report_service.dart';
 import 'package:billberrylite/domain/services/retail/retail_notification_sync_service.dart';
 import 'package:billberrylite/domain/services/common/license_api_service.dart';
@@ -418,6 +419,15 @@ void main() {
       await backupState(enabled: true, last: DateTime.now());
       await sync();
       expect(due(), isEmpty);
+    });
+
+    test('fresh install (switched on, never backed up): no reminder yet',
+        () async {
+      await backupState(enabled: true);
+      await Hive.box(HiveBoxNames.appState)
+          .delete(AutoBackupService.promptSinceKey);
+      await sync();
+      expect(due(), isEmpty, reason: 'the 7 days start when switched on');
     });
 
     test('auto-backup off: no reminder (unchanged rule)', () async {

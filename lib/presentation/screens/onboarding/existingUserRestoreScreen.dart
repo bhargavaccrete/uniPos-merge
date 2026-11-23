@@ -336,17 +336,21 @@ class _ExistingUserRestoreScreenState extends State<ExistingUserRestoreScreen>
       // this always requires a fresh login after restoring.
       final loggedIn = await authService.initialize();
       if (!mounted) return;
+      // Setup screens below are removed, so Back never returns to them.
       if (loggedIn) {
-        Navigator.pushReplacementNamed(context, '/retail-billing');
+        Navigator.pushNamedAndRemoveUntil(
+            context, '/retail-billing', (_) => false);
       } else {
-        Navigator.pushReplacement(
+        Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (_) => const LoginScreen()),
+          (_) => false,
         );
       }
       return;
     }
-    Navigator.pushReplacementNamed(context, '/restaurant-home');
+    Navigator.pushNamedAndRemoveUntil(
+        context, '/restaurant-home', (_) => false);
   }
 
   @override

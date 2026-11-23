@@ -544,7 +544,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen>
                       minLength: 16,
                       ellipsis: true,
                     ),
-                    valueStyle: GoogleFonts.robotoMono(
+                    valueStyle: GoogleFonts.poppins(
                       fontSize: AppResponsive.smallFontSize(context),
                       color: AppColors.textSecondary,
                     ),

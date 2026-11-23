@@ -30,7 +30,6 @@ void main() {
 
   ModeStartupSteps realSessionSteps() => ModeStartupSteps(
         loadRetailSettings: () async {},
-        startAutoBackup: () {},
         startLocalNotifications: () async {},
         startPushNotifications: () async {},
       );
@@ -130,7 +129,6 @@ void main() {
     ModeServices.resetForTesting();
     ModeServices.steps = ModeStartupSteps(
       loadRetailSettings: () async {},
-        startAutoBackup: () {},
       loadRetailSession: () async {},
       validateRestoredShift: () async {},
       initRetailLifecycle: () => lifecycle++,

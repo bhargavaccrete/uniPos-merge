@@ -13,6 +13,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:billberrylite/core/config/app_config.dart';
 import 'package:billberrylite/main.dart' show navigatorKey;
+import 'package:billberrylite/domain/services/common/auto_backup_service.dart';
 import 'package:billberrylite/domain/services/common/backup_encryption_service.dart';
 import 'package:billberrylite/domain/services/common/backup_storage_permission.dart';
 import 'package:billberrylite/domain/services/restaurant/stock_journal.dart';
@@ -28,6 +29,7 @@ import 'package:billberrylite/presentation/widget/componets/common/app_text_fiel
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/presentation/screens/common/backup/restore_skipped_notice.dart';
 import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/pin_attempt_guard.dart';
 import 'package:billberrylite/data/models/common/business_type.dart';
 import 'package:billberrylite/data/models/common/business_details.dart';
 import 'package:billberrylite/models/tax_details.dart';
@@ -252,13 +254,16 @@ class _ImageJournal {
 /// This device's data taken just before a restore's first write.
 class _Snapshot {
   _Snapshot(this.data, this.itemImages, this.filePath,
-      {this.sha256, this.pin});
+      {this.sha256, this.pin, this.productImages = const {}});
 
   /// The export map (`_collectAllData`), detached through JSON.
   final Map<String, dynamic> data;
 
   /// Restaurant item image bytes, which the export map strips.
   final Map<String, Uint8List> itemImages;
+
+  /// Retail product image bytes (by productId), which the export map strips.
+  final Map<String, Uint8List> productImages;
 
   /// Encrypted copy on disk, or null (no PIN available, web, or failed).
   final String? filePath;
@@ -470,14 +475,22 @@ class UnifiedBackupService {
     'captain_pos_ip', 'captain_logged_in', 'captain_staff_id', 'is_captain_mode',
     // Session / auth state (re-established on login)
     'restaurant_is_logged_in', 'restaurant_login_type', 'restaurant_staff_role',
-    'restaurant_staff_name', 'restaurant_current_shift_id',
+    'restaurant_staff_name', 'restaurant_staff_id',
+    'restaurant_current_shift_id',
     'admin_session', 'admin_username', 'admin_session_timestamp',
     'admin_staff_id',
+    PinAttemptGuard.failuresKey, PinAttemptGuard.levelKey,
+    PinAttemptGuard.untilKey,
     // Transient / regenerated
     'last_backup_date', 'auto_backup_enabled', 'first_time_pos',
     'first_time_pos_v2', 'last_eod_date', 'retail_last_eod_date',
     'pendingEod_snoozed_date', 'dev_rsa_keypair_v1',
   };
+
+  /// Whether a SharedPreferences [key] is carried by backup and restore.
+  @visibleForTesting
+  static bool prefTravelsWithBackup(String key) =>
+      !_prefsDenylist.contains(key);
 
   /// ---------------------------
   /// 🔧 HELPER: Deep clean map for JSON serialization
@@ -523,10 +536,11 @@ class UnifiedBackupService {
   /// ---------------------------
   /// Automatically saves backup to Downloads folder
   /// Returns the file path or null if failed
-  /// [automatic]: an automatic backup — named `BillBerryLite_auto_<time>.zip`
-  /// so retention can tell it from a manual one (BKP-6). Same content/format.
+  /// [daily]: the start-of-day prompt's backup — named
+  /// `BillBerryLite_daily_<time>.zip` so retention can tell it from a manual
+  /// one (BKP-6). Same content/format.
   static Future<String?> exportToDownloads(
-      {bool includeImages = true, bool automatic = false}) async {
+      {bool includeImages = true, bool daily = false}) async {
     lastExportError = null;
     if (!PlanEnforce.allows(ModeKeys.dataBackup)) {
       lastExportError = backupNotInPlanMessage;
@@ -536,9 +550,9 @@ class UnifiedBackupService {
       return await _exportForWeb();
     }
 
-    // Android 7–10 need storage permission for Downloads. A manual backup asks
-    // (the user is on screen); the automatic one checks before calling here.
-    if (!automatic && !await BackupStoragePermission.ensure()) {
+    // Android 7–10 need storage permission for Downloads. Every backup here is
+    // started by the user, who is on screen, so it asks.
+    if (!await BackupStoragePermission.ensure()) {
       lastExportError = storagePermissionDeniedMessage;
       return null;
     }
@@ -550,16 +564,20 @@ class UnifiedBackupService {
       final data = await _collectCompleteBackup();
 
       // Create ZIP backup
-      return await _createZipBackup(data,
-          saveToDownloads: true,
-          includeImages: includeImages,
-          automatic: automatic);
+      return await _noteSaved(await _createZipBackup(data,
+          saveToDownloads: true, includeImages: includeImages, daily: daily));
     } catch (e, stackTrace) {
       debugPrint("❌ Auto-save backup failed: $e");
       debugPrint("Stack trace: $stackTrace");
       lastExportError ??= backupFailureMessage(e);
       return null;
     }
+  }
+
+  /// A saved and verified backup of any kind counts as today's backup.
+  static Future<String?> _noteSaved(String? path) async {
+    if (path != null) await AutoBackupService.recordBackupMade();
+    return path;
   }
 
   /// Shown when the plan does not include backups (BKP-6 K3).
@@ -680,7 +698,8 @@ class UnifiedBackupService {
       final data = await _collectCompleteBackup();
 
       // Create ZIP backup
-      return await _createZipBackup(data, customPath: folderPath);
+      return await _noteSaved(
+          await _createZipBackup(data, customPath: folderPath));
     } catch (e, stackTrace) {
       debugPrint("❌ Custom folder backup failed: $e");
       debugPrint("Stack trace: $stackTrace");
@@ -726,7 +745,8 @@ class UnifiedBackupService {
       final cacheDir = Directory('${appDir.path}/backup_share_cache');
       if (!cacheDir.existsSync()) cacheDir.createSync(recursive: true);
       _removeOldShareCopies(cacheDir);
-      return await _createZipBackup(data, customPath: cacheDir.path);
+      return await _noteSaved(
+          await _createZipBackup(data, customPath: cacheDir.path));
     } catch (e) {
       debugPrint("❌ exportToShare failed: $e");
       lastExportError ??= backupFailureMessage(e);
@@ -1615,7 +1635,13 @@ class UnifiedBackupService {
 
       // Products
       try {
-        exportMap["products"] = Hive.box<ProductModel>(HiveBoxNames.products).values.map((e) => e.toProduct()).toList();
+        // imageBytes stripped from JSON, as for restaurant items: each image
+        // is a retail_img_{productId} binary entry in the ZIP instead.
+        exportMap["products"] = Hive.box<ProductModel>(HiveBoxNames.products).values.map((e) {
+          final map = e.toProduct();
+          map.remove('imageBytes');
+          return map;
+        }).toList();
       } catch (e) {
         debugPrint("⚠️ Products box error: $e");
         exportMap["products"] = [];
@@ -2237,20 +2263,47 @@ class UnifiedBackupService {
     };
   }
 
+  /// Backups are written one at a time: a second one waits until the first
+  /// has finished. Two at once could otherwise delete each other's
+  /// temporary `.part` file and double the memory used.
+  static Future<void> _backupQueue = Future<void>.value();
+
+  static Future<T> _oneAtATime<T>(Future<T> Function() task) {
+    final run = _backupQueue.then((_) => task());
+    _backupQueue = run.then<void>((_) {}, onError: (_) {});
+    return run;
+  }
+
   /// ---------------------------
   /// 🔧 CREATE ZIP BACKUP
   /// ---------------------------
   static Future<String?> _createZipBackup(
-      Map<String, dynamic> data, {
-        bool saveToDownloads = false,
-        String? customPath,
-        bool includeImages = true,
-        // BKP-5: the restore snapshot when no device PIN is stored is locked
-        // with the PIN of the backup being restored. Same format.
-        String? passwordOverride,
-        // BKP-6: automatic backups get their own name for retention.
-        bool automatic = false,
-      }) async {
+    Map<String, dynamic> data, {
+    bool saveToDownloads = false,
+    String? customPath,
+    bool includeImages = true,
+    // BKP-5: the restore snapshot when no device PIN is stored is locked
+    // with the PIN of the backup being restored. Same format.
+    String? passwordOverride,
+    // BKP-6: the start-of-day prompt's backups get their own name for
+    // retention.
+    bool daily = false,
+  }) =>
+      _oneAtATime(() => _createZipBackupNow(data,
+          saveToDownloads: saveToDownloads,
+          customPath: customPath,
+          includeImages: includeImages,
+          passwordOverride: passwordOverride,
+          daily: daily));
+
+  static Future<String?> _createZipBackupNow(
+    Map<String, dynamic> data, {
+    required bool saveToDownloads,
+    required String? customPath,
+    required bool includeImages,
+    required String? passwordOverride,
+    required bool daily,
+  }) async {
     try {
       final appDir = await getApplicationDocumentsDirectory();
       final backupDir = Directory('${appDir.path}/temp_backup');
@@ -2284,13 +2337,31 @@ class UnifiedBackupService {
           int imgCount = 0;
           for (final item in itemBox.values) {
             if (item.imageBytes != null && item.imageBytes!.isNotEmpty) {
-              entries.add({'name': 'item_img_${item.id}', 'bytes': item.imageBytes!.toList()});
+              entries.add({'name': 'item_img_${item.id}', 'bytes': item.imageBytes!});
               imgCount++;
             }
           }
           if (imgCount > 0) debugPrint("📦 Added $imgCount item images to ZIP");
         } catch (e) {
           debugPrint("⚠️ Could not add item images: $e");
+        }
+      } else if (AppConfig.isRetail) {
+        try {
+          final productBox = Hive.box<ProductModel>(HiveBoxNames.products);
+          int imgCount = 0;
+          for (final product in productBox.values) {
+            final bytes = product.imageBytes;
+            if (bytes != null && bytes.isNotEmpty) {
+              entries.add({
+                'name': '$retailImagePrefix${product.productId}',
+                'bytes': bytes,
+              });
+              imgCount++;
+            }
+          }
+          if (imgCount > 0) debugPrint("📦 Added $imgCount product images to ZIP");
+        } catch (e) {
+          debugPrint("⚠️ Could not add product images: $e");
         }
       }
 
@@ -2334,7 +2405,7 @@ class UnifiedBackupService {
 
       // 6️⃣ Save ZIP to destination
       final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').substring(0, 19);
-      final suffix = automatic ? 'auto' : (isEncrypted ? 'encrypted' : 'backup');
+      final suffix = daily ? 'daily' : (isEncrypted ? 'encrypted' : 'backup');
       final fileName = 'BillBerryLite_${suffix}_$timestamp.zip';
 
       File outputFile;
@@ -2549,7 +2620,9 @@ class UnifiedBackupService {
     for (final f in entries) {
       final name = f['name'] as String;
 
-      if (name.startsWith('item_img_') || name.startsWith('prod_img_')) {
+      if (name.startsWith('item_img_') ||
+          name.startsWith('prod_img_') ||
+          name.startsWith(retailImagePrefix)) {
         images.add(f);
       } else if (name.toLowerCase() == 'data.json') {
         dataBytes = f['bytes'] as List<int>;
@@ -2587,12 +2660,68 @@ class UnifiedBackupService {
     for (final f in images) {
       final name = f['name'] as String;
       final bytes = f['bytes'] as List<int>;
+      final imgName = safeImageFileName(name);
+      if (imgName == null) {
+        debugPrint('Skipped unsafe backup image entry: $name');
+        continue;
+      }
       if (!productDir.existsSync()) productDir.createSync(recursive: true);
-      final imgName = name.startsWith('prod_img_')
-          ? name.replaceFirst('prod_img_', '')
-          : name;
       await journal.write(File('${productDir.path}/$imgName'), bytes);
     }
+  }
+
+  /// The file name a backup image entry is written under inside
+  /// `product_images`, or null when the entry name holds a folder path
+  /// (`../`, `/`) — export only ever writes plain names, so such an entry
+  /// can only come from a crafted file and must not leave the folder.
+  @visibleForTesting
+  static String? safeImageFileName(String entryName) {
+    final name = entryName.startsWith('prod_img_')
+        ? entryName.replaceFirst('prod_img_', '')
+        : entryName;
+    final base = p.basename(name);
+    if (base != name || base.isEmpty || base == '.' || base == '..') {
+      return null;
+    }
+    return base;
+  }
+
+  /// ZIP entry name prefix of a retail product image: `retail_img_{productId}`.
+  @visibleForTesting
+  static const String retailImagePrefix = 'retail_img_';
+
+  /// Puts each `retail_img_{productId}` entry back on its product map as
+  /// `imageBytes`, so `ProductModel.fromMap` restores it like an old-format
+  /// backup whose images sat inside data.json. Done in memory: retail images
+  /// are never written to disk. Returns the entries still to write to disk.
+  static List<Map<String, dynamic>> _mergeRetailImages(
+      Map<String, dynamic> data, List<Map<String, dynamic>> images) {
+    final retail = <String, List<int>>{};
+    final rest = <Map<String, dynamic>>[];
+    for (final f in images) {
+      final name = f['name'] as String;
+      if (name.startsWith(retailImagePrefix)) {
+        retail[name.substring(retailImagePrefix.length)] =
+            f['bytes'] as List<int>;
+      } else {
+        rest.add(f);
+      }
+    }
+    if (retail.isEmpty) return rest;
+
+    final section = data['data'] is Map ? data['data'] as Map : data;
+    final products = section['products'];
+    if (products is List) {
+      for (final product in products) {
+        if (product is! Map) continue;
+        final bytes = retail[product['productId']];
+        if (bytes != null) {
+          product['imageBytes'] =
+              bytes is Uint8List ? bytes : Uint8List.fromList(bytes);
+        }
+      }
+    }
+    return rest;
   }
 
   /// Sections the most recent `_collectAllData` could not export: each was
@@ -2904,6 +3033,10 @@ class UnifiedBackupService {
 
     _ensureRestoreModeAllowed(backupMode);
 
+    // Retail images go onto their product maps (validated and restored with
+    // them); only the rest are files to write.
+    final diskImages = _mergeRetailImages(data, images);
+
     await _ensureBoxesOpened(backupMode);
     final check = _RestoreRun(validateOnly: true);
     try {
@@ -2948,7 +3081,7 @@ class UnifiedBackupService {
       openBefore = RestoreRecordStore.read(docs);
     }
     _ImageJournal? journal;
-    if (!kIsWeb && images.isNotEmpty) {
+    if (!kIsWeb && diskImages.isNotEmpty) {
       journal = _ImageJournal(Directory(p.join(
           (await getApplicationDocumentsDirectory()).path,
           'restore_image_undo')));
@@ -2993,7 +3126,7 @@ class UnifiedBackupService {
 
     final run = _RestoreRun(validateOnly: false, tolerated: check.tolerated);
     try {
-      await _writeImageEntries(images, journal);
+      await _writeImageEntries(diskImages, journal);
       await _restoreAllData(data, backupMode, run: run);
       // Part of the restore itself: the restored data and the emptied journal
       // succeed together, or both go back to how they were. A failure here
@@ -3132,6 +3265,15 @@ class UnifiedBackupService {
         if (bytes != null && bytes.isNotEmpty) itemImages[item.id] = bytes;
       }
     }
+    final productImages = <String, Uint8List>{};
+    if (Hive.isBoxOpen(HiveBoxNames.products)) {
+      for (final product in Hive.box<ProductModel>(HiveBoxNames.products).values) {
+        final bytes = product.imageBytes;
+        if (bytes != null && bytes.isNotEmpty) {
+          productImages[product.productId] = bytes;
+        }
+      }
+    }
 
     String? filePath;
     String? fileSha;
@@ -3180,7 +3322,8 @@ class UnifiedBackupService {
       }
     }
     debugPrint("📦 Pre-restore snapshot taken (file: ${filePath ?? 'none'})");
-    return _Snapshot(data, itemImages, filePath, sha256: fileSha, pin: pin);
+    return _Snapshot(data, itemImages, filePath,
+        sha256: fileSha, pin: pin, productImages: productImages);
   }
 
   /// Puts the snapshot back through the same restore path, then re-exports
@@ -3193,6 +3336,7 @@ class UnifiedBackupService {
       final run = _RestoreRun(validateOnly: false, isRollback: true);
       await _restoreAllData(snapshot.data, backupMode, run: run);
       await _putBackItemImages(snapshot.itemImages);
+      await _putBackProductImages(snapshot.productImages);
       await _putBackStoreInfoPrefs(snapshot.data);
 
       final now =
@@ -3262,6 +3406,25 @@ class UnifiedBackupService {
       final bytes = item == null ? null : images[item.id];
       if (item != null && bytes != null) {
         batch[key] = item.copyWith(imageBytes: bytes);
+      }
+    }
+    if (batch.isNotEmpty) await box.putAll(batch);
+  }
+
+  /// Restores retail product image bytes, which the export map strips.
+  static Future<void> _putBackProductImages(
+      Map<String, Uint8List> images) async {
+    if (images.isEmpty || !Hive.isBoxOpen(HiveBoxNames.products)) return;
+    final box = Hive.box<ProductModel>(HiveBoxNames.products);
+    final batch = <dynamic, ProductModel>{};
+    for (final key in box.keys) {
+      final product = box.get(key);
+      final bytes = product == null ? null : images[product.productId];
+      if (product != null && bytes != null) {
+        // copyWith stamps updateAt with now unless given: keep the original,
+        // so the rolled-back product matches the snapshot exactly.
+        batch[key] =
+            product.copyWith(imageBytes: bytes, updateAt: product.updateAt);
       }
     }
     if (batch.isNotEmpty) await box.putAll(batch);

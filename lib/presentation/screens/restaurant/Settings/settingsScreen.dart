@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:billberrylite/core/config/tax_feature.dart';
 import 'package:billberrylite/core/plan/entitlement_keys.dart';
@@ -309,7 +309,7 @@ class _SettingsscreenState extends State<Settingsscreen> {
                 ),
 
                 // Developer tools never ship in a release build.
-                if (kDebugMode && _can('settings'))
+                if (!kReleaseMode && _can('settings'))
                   SettingsSection(
                     title: 'Developer',
                     icon: Icons.code_rounded,

@@ -1,6 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/di/service_locator.dart';
+import '../../../util/common/pin_attempt_guard.dart';
 import '../../../util/restaurant/restaurant_auth_helper.dart';
 import '../../../util/restaurant/restaurant_session.dart';
 
@@ -10,10 +11,14 @@ class AuthResult {
   final String? errorMessage;
   final String? username;
 
+  /// Set when PIN login is locked: how long until it can be tried again.
+  final Duration? retryAfter;
+
   AuthResult({
     required this.success,
     this.errorMessage,
     this.username,
+    this.retryAfter,
   });
 
   factory AuthResult.success(String username) => AuthResult(
@@ -24,6 +29,12 @@ class AuthResult {
   factory AuthResult.failure(String message) => AuthResult(
         success: false,
         errorMessage: message,
+      );
+
+  factory AuthResult.locked(Duration retryAfter) => AuthResult(
+        success: false,
+        errorMessage: PinAttemptGuard.lockedMessage(retryAfter),
+        retryAfter: retryAfter,
       );
 }
 
@@ -137,12 +148,17 @@ class AuthService {
       return AuthResult.failure('PIN is required');
     }
 
+    // Locked: refuse without checking the PIN, or a lock would not slow guessing.
+    final locked = await PinAttemptGuard.remainingLock();
+    if (locked != null) return AuthResult.locked(locked);
+
     final prefs = await SharedPreferences.getInstance();
     final storedHash = prefs.getString(RestaurantAuthHelper.adminPinKey);
 
     // 1. Admin (PIN = stored admin PIN)
     if (storedHash != null &&
         RestaurantAuthHelper.verifyPassword(trimmedPin, storedHash)) {
+      await PinAttemptGuard.recordSuccess();
       await _saveSession('Admin', staffId: null);
       _currentUsername = 'Admin';
       await RestaurantSession.saveAdminSession();
@@ -158,6 +174,7 @@ class AuthService {
         .firstOrNull;
 
     if (match != null) {
+      await PinAttemptGuard.recordSuccess();
       final name = '${match.firstName} ${match.lastName}'.trim();
       await _saveSession(name, staffId: match.id);
       _currentUsername = name;
@@ -166,6 +183,8 @@ class AuthService {
     }
 
     // 3. No match
+    final lock = await PinAttemptGuard.recordFailure();
+    if (lock != null) return AuthResult.locked(lock);
     return AuthResult.failure('Invalid PIN');
   }
 

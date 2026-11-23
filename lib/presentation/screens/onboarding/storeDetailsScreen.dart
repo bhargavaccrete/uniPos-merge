@@ -77,15 +77,23 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
   /// Loads the country list, plus the state/city lists for any values already
   /// saved on the store (edit / returning to this step), so dropdowns pre-fill.
   Future<void> _initLocationOptions() async {
-    final countries = await _location.countries();
-    final country = _countryController.text.trim();
-    final state = _stateController.text.trim();
-    final states = country.isNotEmpty
-        ? await _location.states(country)
-        : <String>[];
-    final cities = (country.isNotEmpty && state.isNotEmpty)
-        ? await _location.cities(country, state)
-        : <String>[];
+    final List<String> countries;
+    final List<String> states;
+    final List<String> cities;
+    try {
+      countries = await _location.countries();
+      final country = _countryController.text.trim();
+      final state = _stateController.text.trim();
+      states = country.isNotEmpty
+          ? await _location.states(country)
+          : <String>[];
+      cities = (country.isNotEmpty && state.isNotEmpty)
+          ? await _location.cities(country, state)
+          : <String>[];
+    } catch (e) {
+      debugPrint('Country list load failed: $e');
+      return;
+    }
     if (!mounted) return;
     setState(() {
       _countryOptions = countries;
@@ -938,6 +946,13 @@ class _StoreDetailsStepState extends State<StoreDetailsStep> {
                 ? null
                 : _countryController.text,
             options: _countryOptions,
+            ready: _countryOptions.isNotEmpty,
+            onBlocked: () {
+              NotificationService.instance.showInfo(
+                'Loading countries, please try again in a moment',
+              );
+              _initLocationOptions();
+            },
             onSelected: _onCountrySelected,
             validator: (v) =>
                 (v == null || v.trim().isEmpty) ? 'Country is required' : null,

@@ -155,7 +155,6 @@ void main() {
       // Startup (the real WF-3 session steps), before the POS opens.
       ModeServices.steps = ModeStartupSteps(
         loadRetailSettings: () async {},
-        startAutoBackup: () {},
         startLocalNotifications: () async {},
         startPushNotifications: () async {},
       );

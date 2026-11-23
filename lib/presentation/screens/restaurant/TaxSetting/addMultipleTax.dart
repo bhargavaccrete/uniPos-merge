@@ -9,9 +9,13 @@ import 'package:uuid/uuid.dart';
 
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/config/tax_feature.dart';
+import '../../../../core/config/tax_label_rule.dart';
 import '../../../../data/models/common/taxmodel_314.dart';
+import '../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
+import '../../../../domain/services/restaurant/restaurant_tax_assignment.dart';
 import '../../../widget/componets/common/app_empty_state.dart';
+import '../../../widget/componets/common/report_notice.dart';
 import '../../../widget/componets/common/app_text_field.dart';
 import '../../../widget/componets/common/primary_app_bar.dart';
 import 'apply_tax_screen.dart';
@@ -39,6 +43,7 @@ class _AddtaxState extends State<Addtax> {
   void initState() {
     super.initState();
     taxStore.loadTaxes();
+    itemStore.ensureLoaded();
   }
 
   @override
@@ -85,6 +90,33 @@ class _AddtaxState extends State<Addtax> {
       return;
     }
 
+    // A3: items carry the summed rate, so a changed % must reach them.
+    final oldPct = existingTax?.taxperecentage;
+    var affected = <Items>[];
+    if (existingTax != null &&
+        (oldPct == null || (oldPct - taxPercentage).abs() > 1e-9)) {
+      await itemStore.ensureLoaded();
+      affected = RestaurantTaxAssignment.itemsUsing(
+        existingTax.id,
+        itemStore.items,
+      );
+      if (affected.isNotEmpty) {
+        if (!mounted) return;
+        final confirmed = await showAppConfirmDialog(
+          context: context,
+          title: 'Change ${existingTax.taxname} to '
+              '${DecimalSettings.formatAmount(taxPercentage)}%?',
+          message:
+              '${affected.length} item(s) use this tax and will charge the new '
+              'rate on new orders. Saved orders and printed bills are not '
+              'changed.',
+          confirmLabel: 'Update',
+          icon: Icons.percent_rounded,
+        );
+        if (!confirmed) return;
+      }
+    }
+
     setState(() => _isSaving = true);
     try {
       bool success;
@@ -95,6 +127,13 @@ class _AddtaxState extends State<Addtax> {
           taxperecentage: taxPercentage,
         );
         success = await taxStore.updateTax(updatedTax);
+        if (success && affected.isNotEmpty) {
+          await _updateItemRates(
+            affected,
+            oldRate: (oldPct ?? 0) / 100.0,
+            newRate: taxPercentage / 100.0,
+          );
+        }
       } else {
         final newTax = Tax(
           id: Uuid().v4(),
@@ -127,17 +166,113 @@ class _AddtaxState extends State<Addtax> {
     await taxStore.deleteTax(id);
   }
 
+  /// Writes [ids]/[rate] to [item]; on a refused save the item keeps what it
+  /// had, in memory as on disk.
+  Future<bool> _saveTaxes(Items item, List<String>? ids, double? rate) async {
+    final oldIds = item.taxIds, oldRate = item.taxRate;
+    item.taxIds = ids;
+    item.taxRate = rate;
+    if (await itemStore.updateItem(item)) return true;
+    item.taxIds = oldIds;
+    item.taxRate = oldRate;
+    return false;
+  }
+
+  /// A3: [items] after their tax moved from [oldRate] to [newRate].
+  Future<void> _updateItemRates(
+    List<Items> items, {
+    required double oldRate,
+    required double newRate,
+  }) async {
+    final ratesAfter = RestaurantTaxAssignment.ratesById(taxStore.taxes);
+    var failed = 0;
+    for (final item in items) {
+      final rate = RestaurantTaxAssignment.rateAfterTaxEdit(
+        ids: item.taxIds,
+        currentRate: item.taxRate,
+        oldRate: oldRate,
+        newRate: newRate,
+        ratesAfter: ratesAfter,
+      );
+      if (!await _saveTaxes(item, item.taxIds, rate)) failed++;
+    }
+    if (failed > 0) {
+      NotificationService.instance.showError(
+        'Tax updated, but $failed item(s) could not be updated. '
+        'They are listed under tax review.',
+      );
+    }
+  }
+
   Future<void> _applyTaxToAllItems(String taxId, double taxPercentage) async {
     final rate = taxPercentage / 100.0;
+    final rates = RestaurantTaxAssignment.ratesById(taxStore.taxes);
 
-    for (final item in itemStore.items) {
-      // Adds the tax (max 2 per item); skips items already taxed / at the cap.
-      if (item.applyTax(taxId, rate)) {
-        await itemStore.updateItem(item);
+    for (final item in itemStore.items.toList()) {
+      final plan = RestaurantTaxAssignment.planApply(
+        currentIds: item.taxIds,
+        currentRate: item.taxRate,
+        taxId: taxId,
+        taxRate: rate,
+        rates: rates,
+      );
+      if (plan.outcome == TaxApplyOutcome.applied ||
+          plan.outcome == TaxApplyOutcome.linked) {
+        await _saveTaxes(item, plan.ids, plan.rate);
       }
     }
 
     NotificationService.instance.showSuccess('Tax applied to all items');
+  }
+
+  /// A5: the read-only list of items whose tax needs fixing.
+  void _showTaxReview(List<TaxReviewIssue> issues) {
+    showDialog<void>(
+      context: context,
+      useRootNavigator: false,
+      builder: (ctx) => AppDialogShell(
+        title: 'Items needing tax review',
+        subtitle: 'Open each item in Edit Item and set its tax again.',
+        accent: AppColors.warning,
+        icon: Icons.warning_amber_rounded,
+        body: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(ctx).size.height * 0.5,
+          ),
+          child: ListView.separated(
+            shrinkWrap: true,
+            itemCount: issues.length,
+            separatorBuilder: (_, _) => Divider(color: AppColors.divider),
+            itemBuilder: (_, i) => Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  issues[i].item.name,
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.bodyFontSize(ctx),
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                Text(
+                  issues[i].message,
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.smallFontSize(ctx),
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          appDialogPrimaryButton(
+            label: 'Close',
+            onPressed: () => Navigator.pop(ctx),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -187,13 +322,38 @@ class _AddtaxState extends State<Addtax> {
                     );
                   }
 
+                  final issues = RestaurantTaxAssignment.review(
+                    itemStore.items,
+                    allTax,
+                    splitsIntoComponents: TaxLabelRule.splitsIntoComponents,
+                  );
+                  final lead = issues.isEmpty ? 0 : 1;
+
                   return ListView.builder(
                     padding: EdgeInsets.all(
                       AppResponsive.largeSpacing(context),
                     ),
-                    itemCount: allTax.length,
+                    itemCount: allTax.length + lead,
                     itemBuilder: (context, index) {
-                      final tax = allTax[index];
+                      if (index < lead) {
+                        return Padding(
+                          padding: EdgeInsets.only(
+                            bottom: AppResponsive.mediumSpacing(context),
+                          ),
+                          child: InkWell(
+                            onTap: () => _showTaxReview(issues),
+                            borderRadius: BorderRadius.circular(
+                              AppResponsive.borderRadius(context),
+                            ),
+                            child: ReportNotice(
+                              message:
+                                  '${issues.length} item(s) need tax review. '
+                                  'Tap to see them.',
+                            ),
+                          ),
+                        );
+                      }
+                      final tax = allTax[index - lead];
                       return Container(
                         margin: EdgeInsets.only(
                           bottom: AppResponsive.getValue(
@@ -483,6 +643,18 @@ class _AddtaxState extends State<Addtax> {
   }
 
   void _showDeleteConfirmation(BuildContext context, String taxId) async {
+    // A4: deleting a tax items still charge would leave them charging a tax
+    // nobody can see or remove.
+    await itemStore.ensureLoaded();
+    final used = RestaurantTaxAssignment.itemsUsing(taxId, itemStore.items);
+    if (used.isNotEmpty) {
+      NotificationService.instance.showError(
+        'Used by ${used.length} item(s). Remove it from them first '
+        '(Apply Tax on Items → Remove Tax).',
+      );
+      return;
+    }
+    if (!context.mounted) return;
     final confirmed = await showAppConfirmDialog(
       context: context,
       title: 'Delete Tax?',

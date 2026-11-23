@@ -394,9 +394,12 @@ class EODService {
 
   static List<TaxSummary> _calculateTaxSummaries(List<PastOrderModel> orders) {
     final Map<String, TaxInfo> taxData = {};
+    // What this country calls the tax ("GST", "VAT", "Sales Tax", "Tax") —
+    // the row name is stored in the close record and cannot be re-rendered.
+    final taxLabel = TaxLabelRule.name;
 
     void add(double rate, double tax, double taxable) {
-      final taxKey = 'GST ${(rate * 100).toStringAsFixed(1)}%';
+      final taxKey = '$taxLabel ${(rate * 100).toStringAsFixed(1)}%';
       final existing = taxData[taxKey];
       if (existing != null) {
         existing.taxAmount += tax;
@@ -461,7 +464,7 @@ class EODService {
       }
 
       if (order.gstRate != null && order.gstAmount != null && order.gstRate! > 0) {
-        final taxKey = 'GST ${(order.gstRate! * 100).toStringAsFixed(1)}%';
+        final taxKey = '$taxLabel ${(order.gstRate! * 100).toStringAsFixed(1)}%';
 
         // Calculate proportional tax amount for partially refunded orders
         final orderRefundRatio = order.totalPrice > 0
@@ -817,7 +820,8 @@ class EODService {
         taxName: 'CGST',
         taxRate: 0.0, // Rate varies by product, so we'll show 0 for overall
         taxAmount: totalCgst,
-        taxableAmount: totalTaxableAmount / 2, // Half for CGST
+        // CGST and SGST are each levied on the WHOLE taxable value.
+        taxableAmount: totalTaxableAmount,
       ));
     }
 
@@ -827,7 +831,7 @@ class EODService {
         taxName: 'SGST',
         taxRate: 0.0,
         taxAmount: totalSgst,
-        taxableAmount: totalTaxableAmount / 2, // Half for SGST
+        taxableAmount: totalTaxableAmount,
       ));
     }
 

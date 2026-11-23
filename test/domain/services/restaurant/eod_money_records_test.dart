@@ -8,6 +8,8 @@ import 'package:billberrylite/core/config/app_config.dart';
 import 'package:billberrylite/core/constants/hive_box_names.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/core/init/hive_init.dart';
+import 'package:billberrylite/data/models/common/business_details.dart';
+import 'package:billberrylite/data/repositories/business_details_repository.dart';
 import 'package:billberrylite/data/models/restaurant/db/cartmodel_308.dart';
 import 'package:billberrylite/data/models/restaurant/db/cash_movement_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/eodmodel_317.dart';
@@ -289,6 +291,56 @@ void main() {
       await seed([past(total: 100)]);
       final r = await eod('B', actualCash: 100);
       expect(r.taxSummaries, isEmpty);
+    });
+
+    group('rows carry the country\'s tax name', () {
+      Future<void> setCountry(String country) async {
+        if (!Hive.isAdapterRegistered(4)) {
+          Hive.registerAdapter(BusinessDetailsAdapter());
+        }
+        await Hive.openBox<BusinessDetails>(HiveBoxNames.businessDetailsBox);
+        locator.registerLazySingleton<BusinessDetailsRepository>(
+            () => BusinessDetailsRepository());
+        await businessDetailsRepository
+            .save(BusinessDetails(storeName: 'T', country: country));
+      }
+
+      Future<Set<String>> names() async {
+        final items = [
+          makeCartItem(id: 'a', price: 100, quantity: 1, taxRate: 0.05),
+          makeCartItem(id: 'b', price: 200, quantity: 1, taxRate: 0.18),
+        ];
+        await seed([past(total: 341, subTotal: 300, gst: 41, items: items, gstRate: 0)]);
+        final r = await eod('B', actualCash: 341);
+        return {for (final t in r.taxSummaries) t.taxName};
+      }
+
+      test('India: GST', () async {
+        await setCountry('India');
+        expect(await names(), {'GST 5.0%', 'GST 18.0%'});
+      });
+
+      test('UK: VAT, never GST', () async {
+        await setCountry('United Kingdom');
+        expect(await names(), {'VAT 5.0%', 'VAT 18.0%'});
+      });
+
+      test('US: Sales Tax', () async {
+        await setCountry('United States');
+        expect(await names(), {'Sales Tax 5.0%', 'Sales Tax 18.0%'});
+      });
+
+      test('unlisted country: plain Tax', () async {
+        await setCountry('Brazil');
+        expect(await names(), {'Tax 5.0%', 'Tax 18.0%'});
+      });
+
+      test('older order with a stored rate: same country name', () async {
+        await setCountry('United Kingdom');
+        await seed([past(total: 105, subTotal: 100, gst: 5, gstRate: 0.05)]);
+        final r = await eod('B', actualCash: 105);
+        expect(r.taxSummaries.single.taxName, 'VAT 5.0%');
+      });
     });
   });
 }

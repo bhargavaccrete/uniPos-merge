@@ -41,9 +41,11 @@ class _Docs extends PathProviderPlatform with MockPlatformInterfaceMixin {
   Future<String?> getDownloadsPath() async => downloads;
 }
 
-/// BKP-6 for one business mode, on real files: automatic backup results and
-/// the `backup_failed` notification, retention after a verified backup only,
-/// clear reasons for manual failures, and share-cache clean-up.
+/// BKP-6 for one business mode, on real files: daily (start-of-day prompt)
+/// backup results and the `backup_failed` notification, retention after a
+/// verified backup only, any successful backup counting as today's, backups
+/// never overlapping, clear reasons for manual failures, and share-cache
+/// clean-up.
 void autoBackupStatusSuite({required String mode}) {
   TestWidgetsFlutterBinding.ensureInitialized();
   const pin = '246810';
@@ -62,7 +64,8 @@ void autoBackupStatusSuite({required String mode}) {
       .where((n) => n.startsWith(AutoBackupRetention.prefix))
       .toList();
   String autoName(DateTime t) =>
-      'BillBerryLite_auto_${t.toIso8601String().replaceAll(':', '-').substring(0, 19)}.zip';
+      'BillBerryLite_daily_${t.toIso8601String().replaceAll(':', '-').substring(0, 19)}.zip';
+  String today() => DateTime.now().toIso8601String().substring(0, 10);
 
   /// The write reads back wrong (BKP-11 verification fails).
   void breakTheWrite() => UnifiedBackupService.afterBackupWriteForTesting =
@@ -71,10 +74,8 @@ void autoBackupStatusSuite({required String mode}) {
         f.writeAsBytesSync(b.sublist(0, b.length ~/ 2), flush: true);
       };
 
-  Future<void> hourlyCheck() async {
-    await appState().delete('last_backup_date'); // not yet backed up today
-    await AutoBackupService.checkAndBackupForTesting();
-  }
+  /// The user taps "Backup Now" on the start-of-day prompt.
+  Future<String?> dailyBackup() => AutoBackupService.runDailyBackup();
 
   setUpAll(() async {
     GoogleFonts.config.allowRuntimeFetching = false;
@@ -99,6 +100,7 @@ void autoBackupStatusSuite({required String mode}) {
     await BackupEncryptionService.setPassword(pin);
     await appState().put('auto_backup_enabled', true);
     for (final k in [
+      'last_backup_date',
       'last_auto_backup_attempt',
       'last_auto_backup_success',
       'last_auto_backup_error',
@@ -123,11 +125,11 @@ void autoBackupStatusSuite({required String mode}) {
     } on FileSystemException {/* Windows handle release */}
   });
 
-  test('$mode: a failed automatic backup is recorded and raises ONE '
+  test('$mode: a failed daily backup is recorded and raises ONE '
       'notification; retries do not spam; the next success clears it',
       () async {
     breakTheWrite();
-    await hourlyCheck();
+    expect(await dailyBackup(), isNull);
     var s = AutoBackupService.status();
     expect(s.lastError, startsWith('Backup not saved'));
     expect(s.lastAttempt, isNotNull);
@@ -135,10 +137,12 @@ void autoBackupStatusSuite({required String mode}) {
     expect(failedEvents(), hasLength(1));
     expect(failedEvents().single.data, contains('Backup not saved'));
     expect(autoFiles(), isEmpty);
+    expect(await AutoBackupService.getLastBackupDate(), isNull,
+        reason: 'a failure is not today\'s backup');
 
-    await hourlyCheck();
-    await hourlyCheck();
-    expect(failedEvents(), hasLength(1), reason: 'hourly retries, one event');
+    await dailyBackup();
+    await dailyBackup();
+    expect(failedEvents(), hasLength(1), reason: 'retries, one event');
     expect(
         Hive.box<AppNotificationModel>(HiveBoxNames.appNotifications)
             .values
@@ -147,20 +151,60 @@ void autoBackupStatusSuite({required String mode}) {
         reason: 'not even a resolved duplicate');
 
     UnifiedBackupService.afterBackupWriteForTesting = null;
-    await hourlyCheck();
+    expect(await dailyBackup(), isNotNull);
     s = AutoBackupService.status();
     expect(s.lastError, isNull);
     expect(s.lastSuccess, isNotNull);
     expect(failedEvents(), isEmpty, reason: 'resolved by the success');
     expect(autoFiles(), hasLength(1));
+    expect(await AutoBackupService.getLastBackupDate(), today());
   });
 
-  test('$mode: switched on without a backup PIN — told, not silent', () async {
+  test('$mode: no backup PIN — told, not silent', () async {
     FlutterSecureStorage.setMockInitialValues({});
-    await hourlyCheck();
+    expect(await dailyBackup(), isNull);
     expect(AutoBackupService.status().lastError,
         AutoBackupService.noPasswordMessage);
     expect(failedEvents(), hasLength(1));
+  });
+
+  test('$mode: a MANUAL backup counts as today\'s backup and clears the last '
+      'daily failure', () async {
+    breakTheWrite();
+    await dailyBackup();
+    expect(failedEvents(), hasLength(1));
+
+    UnifiedBackupService.afterBackupWriteForTesting = null;
+    expect(await UnifiedBackupService.exportToDownloads(includeImages: false),
+        isNotNull);
+    final s = AutoBackupService.status();
+    expect(s.lastError, isNull);
+    expect(s.lastSuccess, isNotNull);
+    expect(failedEvents(), isEmpty);
+    expect(await AutoBackupService.getLastBackupDate(), today());
+    expect(autoFiles(), isEmpty, reason: 'a manual backup is not a daily one');
+  });
+
+  test('$mode: two backups at once never break each other (one at a time)',
+      () async {
+    Future<String?>? second;
+    UnifiedBackupService.afterBackupWriteForTesting = (part) async {
+      if (second != null) return;
+      // While the first backup's temporary file exists, a second starts.
+      second = UnifiedBackupService.exportToDownloads(includeImages: false);
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      expect(part.existsSync(), isTrue,
+          reason: 'the second backup must not delete this .part file');
+    };
+    final first = await dailyBackup();
+    final other = await second!;
+    expect(first, isNotNull);
+    expect(other, isNotNull);
+    expect(File(first!).existsSync(), isTrue);
+    expect(File(other!).existsSync(), isTrue);
+    expect(AutoBackupService.status().lastError, isNull);
+    expect(
+        downloads.listSync().where((f) => f.path.endsWith('.part')), isEmpty);
   });
 
   group('$mode: storage permission on Android 7–10', () {
@@ -176,22 +220,22 @@ void autoBackupStatusSuite({required String mode}) {
       };
     }
 
-    test('automatic backup without permission: told, never asks, no file',
-        () async {
+    test('daily backup asks; refused gives a clear reason, no file, not '
+        'marked done', () async {
       oldAndroid(granted: false);
-      await hourlyCheck();
-      expect(asked, 0, reason: 'a timer cannot show a prompt');
+      expect(await dailyBackup(), isNull);
+      expect(asked, 1, reason: 'the user is on screen, so it asks');
       expect(AutoBackupService.status().lastError,
-          BackupStoragePermission.deniedMessage);
+          UnifiedBackupService.storagePermissionDeniedMessage);
       expect(failedEvents(), hasLength(1));
       expect(autoFiles(), isEmpty);
       expect(await AutoBackupService.getLastBackupDate(), isNull,
-          reason: 'not marked done, so it is retried');
+          reason: 'not marked done, so the prompt asks again');
     });
 
-    test('automatic backup with permission granted runs', () async {
+    test('daily backup with permission granted runs', () async {
       oldAndroid(granted: true);
-      await hourlyCheck();
+      expect(await dailyBackup(), isNotNull);
       expect(AutoBackupService.status().lastError, isNull);
       expect(autoFiles(), hasLength(1));
     });
@@ -225,7 +269,7 @@ void autoBackupStatusSuite({required String mode}) {
   });
 
   test('$mode: a failed backup never prunes; a verified one prunes old '
-      'automatic backups only', () async {
+      'daily backups only', () async {
     final today = DateTime.now();
     final old = [
       for (var i = 1; i <= 60; i++)
@@ -240,11 +284,11 @@ void autoBackupStatusSuite({required String mode}) {
     }
 
     breakTheWrite();
-    await hourlyCheck();
+    await dailyBackup();
     expect(autoFiles(), hasLength(60), reason: 'failure: nothing pruned');
 
     UnifiedBackupService.afterBackupWriteForTesting = null;
-    await hourlyCheck();
+    await dailyBackup();
     final left = downloads.listSync().map((f) => p.basename(f.path)).toSet();
     expect(left, contains('BillBerryLite_encrypted_2025-01-01T09-00-00.zip'));
     expect(left, contains('my notes.txt'));
@@ -279,7 +323,7 @@ void autoBackupStatusSuite({required String mode}) {
           journal: const [],
         ));
     try {
-      await hourlyCheck();
+      await dailyBackup();
       expect(File(protectedPath).existsSync(), isTrue);
     } finally {
       await RestoreRecordStore.close(docs.path, 'test');

@@ -32,7 +32,6 @@ void wizardCompletionSuite({required String mode}) {
     ModeServices.steps = ModeStartupSteps(
       loadRestaurantSettings: () async => ran.add('restaurantSettings'),
       initRestaurantLifecycle: () => ran.add('lifecycle'),
-      startAutoBackup: () => ran.add('autoBackup'),
       startLanServer: () => ran.add('lanServer'),
       loadRetailSettings: () async => ran.add('retailSettings'),
       loadRetailSession: () async => ran.add('retailSession'),
@@ -82,11 +81,10 @@ void wizardCompletionSuite({required String mode}) {
     expect(
       ran,
       mode == 'retail'
-          ? ['retailSettings', 'retailSession', 'validateShift', 'retailLifecycle', 'autoBackup', 'localNotifications', 'push']
+          ? ['retailSettings', 'retailSession', 'validateShift', 'retailLifecycle', 'localNotifications', 'push']
           : [
               'restaurantSettings',
               'lifecycle',
-              'autoBackup',
               'lanServer',
               'localNotifications',
               'push',
@@ -95,6 +93,6 @@ void wizardCompletionSuite({required String mode}) {
 
     // Anything that calls it again (e.g. a later startup path) adds nothing.
     await ModeServices.start();
-    expect(ran, hasLength(mode == 'retail' ? 7 : 6));
+    expect(ran, hasLength(mode == 'retail' ? 6 : 5));
   });
 }

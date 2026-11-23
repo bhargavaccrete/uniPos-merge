@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -6,6 +7,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'package:billberrylite/data/models/common/notification_presenter.dart';
 import 'package:billberrylite/domain/services/common/local_notification_service.dart';
+import 'package:billberrylite/firebase_options.dart';
 import 'package:billberrylite/main.dart' show navigatorKey;
 
 /// Handles messages that arrive while the app is **backgrounded or terminated**.
@@ -19,7 +21,7 @@ import 'package:billberrylite/main.dart' show navigatorKey;
 /// processed (extend below if/when we send data-only pushes).
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp();
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   // Intentionally minimal — see doc comment above.
 }
 
@@ -53,46 +55,74 @@ class FirebaseMessagingService {
   Future<void> init() async {
     if (!_supported || _ready) return;
 
-    // Reads credentials from android/app/google-services.json on Android.
-    await Firebase.initializeApp();
+    // Usually already started by CrashReporting.init() at app start.
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(
+          options: DefaultFirebaseOptions.currentPlatform);
+    }
 
     final messaging = FirebaseMessaging.instance;
 
-    // Register the background/terminated handler before wiring foreground.
-    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-
-    // iOS needs an explicit prompt; Android's is handled on first resume.
-    if (Platform.isIOS) {
-      await messaging.requestPermission();
-    }
-
-    // Let iOS show heads-up alerts while the app is foregrounded.
-    await messaging.setForegroundNotificationPresentationOptions(
-      alert: true,
-      badge: true,
-      sound: true,
+    await runSetup(
+      prepare: () async {
+        // Register the background/terminated handler before wiring foreground.
+        FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+        // iOS needs an explicit prompt; Android's is handled on first resume.
+        if (Platform.isIOS) await messaging.requestPermission();
+        // Let iOS show heads-up alerts while the app is foregrounded.
+        await messaging.setForegroundNotificationPresentationOptions(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+      },
+      listen: () {
+        // TODO: forward the refreshed token to your backend when one exists.
+        messaging.onTokenRefresh.listen((t) => _token = t);
+        // Foreground messages: render via the local-notifications plugin so
+        // the user actually sees them (the OS suppresses tray notifications).
+        FirebaseMessaging.onMessage.listen(_showForeground);
+        // App opened by tapping a notification while backgrounded.
+        FirebaseMessaging.onMessageOpenedApp.listen(_handleTap);
+      },
+      fetchToken: messaging.getToken,
+      onToken: (t) => _token = t,
+      // App cold-started by tapping a notification while terminated.
+      handleInitialMessage: () async {
+        final initial = await messaging.getInitialMessage();
+        if (initial != null) _handleTap(initial);
+      },
     );
-
-    _token = await messaging.getToken();
-    debugPrint('📲 FCM token: $_token');
-    messaging.onTokenRefresh.listen((t) {
-      _token = t;
-      debugPrint('📲 FCM token refreshed: $t');
-      // TODO: forward the refreshed token to your backend when one exists.
-    });
-
-    // Foreground messages: render via the local-notifications plugin so the
-    // user actually sees them (the OS suppresses tray notifications here).
-    FirebaseMessaging.onMessage.listen(_showForeground);
-
-    // App opened by tapping a notification while backgrounded.
-    FirebaseMessaging.onMessageOpenedApp.listen(_handleTap);
-
-    // App cold-started by tapping a notification while terminated.
-    final initial = await messaging.getInitialMessage();
-    if (initial != null) _handleTap(initial);
-
     _ready = true;
+  }
+
+  /// AND-24: the setup order. Everything that needs no network — handlers
+  /// and the foreground / tap / token-refresh listeners — is wired first, so
+  /// an offline start can never leave push half set up. The token, which
+  /// needs the network, is fetched in the background: this never waits for
+  /// it, and a failure is ignored (the refresh listener delivers it later).
+  @visibleForTesting
+  static Future<void> runSetup({
+    required Future<void> Function() prepare,
+    required void Function() listen,
+    required Future<String?> Function() fetchToken,
+    required void Function(String? token) onToken,
+    required Future<void> Function() handleInitialMessage,
+  }) async {
+    try {
+      await prepare();
+    } catch (e) {
+      debugPrint('⚠️ Push preparation failed (listeners still wired): $e');
+    }
+    listen();
+    unawaited(fetchToken().then(onToken).catchError((Object e) {
+      debugPrint('⚠️ Push token not available yet (offline?): $e');
+    }));
+    try {
+      await handleInitialMessage();
+    } catch (e) {
+      debugPrint('⚠️ Initial notification not read: $e');
+    }
   }
 
   void _showForeground(RemoteMessage message) {

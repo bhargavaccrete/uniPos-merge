@@ -35,7 +35,16 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   String _selectedFilter = 'all'; // all, today, dateRange, cash, card, upi
 
   final ReturnService _returnService = ReturnService();
-  final Map<String, bool> _returnedSalesCache = {};
+
+  /// Sales whose every unit has come back (RETURNED badge). Rebuilt on every
+  /// [_loadSales] — opening, Reload, and coming back from Sale Detail.
+  Set<String> _fullyReturned = {};
+
+  /// Rows actually listed, kept in step with [_filteredSales]. Returns are
+  /// excluded — they're shown as a RETURNED badge on the original sale
+  /// instead. Previously the list rendered them as zero-height placeholders,
+  /// so the "Total Sales" count included rows nobody could see.
+  List<SaleModel> _visibleSales = [];
 
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
@@ -54,12 +63,10 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
     super.dispose();
   }
 
-  /// Rows actually listed. Returns are excluded — they're shown as a RETURNED
-  /// badge on the original sale instead. Previously the list rendered them as
-  /// zero-height placeholders, so the "Total Sales" count included rows nobody
-  /// could see.
-  List<SaleModel> get _visibleSales =>
-      _filteredSales.where((s) => !(s.isReturn ?? false)).toList();
+  void _setFiltered(List<SaleModel> sales) {
+    _filteredSales = sales;
+    _visibleSales = sales.where((s) => !(s.isReturn ?? false)).toList();
+  }
 
   double get _totalRevenue =>
       _filteredSales.fold<double>(0, (sum, sale) => sum + sale.totalAmount);
@@ -73,19 +80,18 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
       _filteredSales.where((s) => s.isReturn ?? false).length;
 
   Future<void> _loadSales() async {
-    setState(() {
-      _isLoading = true;
-      _returnedSalesCache.clear();
-    });
+    setState(() => _isLoading = true);
 
     try {
       final sales = await saleStore.getAllSales();
       sales.sort((a, b) => b.date.compareTo(a.date));
+      final fullyReturned = _returnService.fullyReturnedSaleIds(sales);
 
       if (!mounted) return;
       setState(() {
         _sales = sales;
-        _filteredSales = sales;
+        _fullyReturned = fullyReturned;
+        _setFiltered(sales);
         _isLoading = false;
       });
     } catch (e) {
@@ -154,7 +160,7 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
       }).toList();
     }
 
-    _filteredSales = result;
+    _setFiltered(result);
   }
 
   void _onSearchChanged(String value) {
@@ -238,15 +244,6 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
       default:
         return Icons.payment_rounded;
     }
-  }
-
-  Future<bool> _checkIfReturned(String saleId) async {
-    if (_returnedSalesCache.containsKey(saleId)) {
-      return _returnedSalesCache[saleId]!;
-    }
-    final isReturned = await _returnService.isFullyReturned(saleId);
-    _returnedSalesCache[saleId] = isReturned;
-    return isReturned;
   }
 
   // ==================== BUILD ====================
@@ -628,10 +625,9 @@ class _SalesHistoryScreenState extends State<SalesHistoryScreen> {
   Widget _buildSaleCard(SaleModel sale) {
     final paymentColor = _getPaymentColor(sale.paymentType);
 
-    return FutureBuilder<bool>(
-      future: _checkIfReturned(sale.saleId),
-      builder: (context, snapshot) {
-        final isReturned = snapshot.data ?? false;
+    return Builder(
+      builder: (context) {
+        final isReturned = _fullyReturned.contains(sale.saleId);
 
         final radius = AppResponsive.smallBorderRadius(context);
 

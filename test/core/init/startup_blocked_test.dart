@@ -90,8 +90,8 @@ void main() {
       'StockJournal.recoverAll()',
       'VoidOrderCommit.recoverAll()',
       'RetailCheckoutCommit.recoverAll()',
-      // WF-6: settings, lifecycle, auto-backup, LAN server and notifications
-      // now run inside the shared once-only step (checked below).
+      // WF-6: settings, lifecycle, LAN server and notifications now run
+      // inside the shared once-only step (checked below).
       'ModeServices.start()',
     ]) {
       final at = code.indexOf(later);
@@ -102,7 +102,6 @@ void main() {
         .where((l) => !l.trimLeft().startsWith('//'))
         .join('\n');
     for (final step in [
-      'AutoBackupService.initialize()',
       'startServer()',
       'loadRetailStartupSettings',
       'LocalNotificationService.instance.init()',
@@ -112,6 +111,9 @@ void main() {
       expect(code.contains(step), isFalse,
           reason: '$step must only run through ModeServices (once only)');
     }
+    expect(modeServices.contains('AutoBackupService') || code.contains('AutoBackupService'),
+        isFalse,
+        reason: 'no backup runs at startup — the daily prompt asks for it');
     for (final bypass in [
       'HiveInit.init()',
       'AppConfig.init()',

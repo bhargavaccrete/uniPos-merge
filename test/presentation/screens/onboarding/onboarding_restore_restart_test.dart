@@ -42,6 +42,8 @@ void main() {
       'registerBusinessDependencies(',
       '_goToDashboard()',
       'pushReplacement',
+      'pushAndRemoveUntil',
+      'pushNamedAndRemoveUntil',
     ]) {
       expect(body.contains(staleContinuation), isFalse,
           reason: '$staleContinuation would continue on stale in-memory state');

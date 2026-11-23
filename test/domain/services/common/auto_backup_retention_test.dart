@@ -5,13 +5,17 @@ import 'package:path/path.dart' as p;
 
 import 'package:billberrylite/domain/services/common/auto_backup_retention.dart';
 
-/// BKP-6 K4: 14 daily + 8 weekly AUTOMATIC backups are kept; manual backups
-/// and anything not exactly an automatic backup's name are never touched.
+/// BKP-6 K4: 14 daily + 8 weekly DAILY (start-of-day prompt) backups are
+/// kept; manual backups and anything not exactly a daily backup's name are
+/// never touched. Files of the former automatic backup age out the same way.
 void main() {
   String auto(DateTime t, [int? n]) {
     final s = t.toIso8601String().replaceAll(':', '-').substring(0, 19);
-    return 'BillBerryLite_auto_$s${n == null ? '' : '-$n'}.zip';
+    return 'BillBerryLite_daily_$s${n == null ? '' : '-$n'}.zip';
   }
+
+  String legacy(DateTime t) =>
+      'BillBerryLite_auto_${t.toIso8601String().replaceAll(':', '-').substring(0, 19)}.zip';
 
   /// One automatic backup a day at 09:00 for [days] days ending [end].
   List<String> daily(DateTime end, int days) => [
@@ -29,14 +33,29 @@ void main() {
           isNotNull);
       for (final other in [
         'BillBerryLite_encrypted_2026-11-16T09-00-00.zip', // manual
+        'BillBerryLite_daily_2026-11-16T09-00-00.zip.part',
+        'BillBerryLite_daily_2026-11-16.zip',
+        'Copy of BillBerryLite_daily_2026-11-16T09-00-00.zip',
+        'BillBerryLite_daily_2026-02-31T09-00-00.zip', // impossible date
         'BillBerryLite_auto_2026-11-16T09-00-00.zip.part',
-        'BillBerryLite_auto_2026-11-16.zip',
-        'Copy of BillBerryLite_auto_2026-11-16T09-00-00.zip',
-        'BillBerryLite_auto_2026-02-31T09-00-00.zip', // impossible date
         'notes.txt',
       ]) {
         expect(AutoBackupRetention.stampOf(other), isNull, reason: other);
       }
+    });
+
+    test('former automatic backups are recognised, so they age out too', () {
+      expect(AutoBackupRetention.stampOf(legacy(DateTime(2026, 11, 16, 9))),
+          DateTime(2026, 11, 16, 9));
+      final names = [
+        ...daily(end, 14),
+        for (var i = 1; i <= 70; i++) // 10 weeks
+          legacy(DateTime(2026, 11, 2 - i, 9)), // older than the 14 days
+      ];
+      final drop = AutoBackupRetention.toDelete(names);
+      expect(names.toSet().difference(drop), hasLength(14 + 8));
+      expect(drop.every((n) => n.startsWith(AutoBackupRetention.legacyPrefix)),
+          isTrue);
     });
   });
 

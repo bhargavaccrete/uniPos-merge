@@ -38,8 +38,10 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
     final monthName = _monthName(_selectedMonth.month);
     final year = _selectedMonth.year;
 
-    final font = await PdfGoogleFonts.poppinsRegular();
-    final boldFont = await PdfGoogleFonts.poppinsBold();
+    final font =
+        pw.Font.ttf(await rootBundle.load('assets/fonts/Poppins-Regular.ttf'));
+    final boldFont =
+        pw.Font.ttf(await rootBundle.load('assets/fonts/Poppins-Bold.ttf'));
 
     final fallbackFonts = <pw.Font>[];
     for (final path in const [

@@ -26,6 +26,7 @@ import 'package:billberrylite/domain/services/common/unified_backup_service.dart
 import 'package:billberrylite/domain/store/restaurant/license_store.dart';
 
 import 'backup_box_registry.dart';
+import 'sign_in_fixture.dart';
 
 class _Docs extends PathProviderPlatform with MockPlatformInterfaceMixin {
   _Docs(this.docs, this.downloads);
@@ -62,7 +63,7 @@ class _RecordingPicker extends FilePicker {
   }
 }
 
-/// M6b: every backup operation (download, folder, share, restore, automatic
+/// M6b: every backup operation (download, folder, share, restore, daily
 /// backup, start-of-day prompt) asks THIS mode's data-backup entitlement.
 void backupEntitlementSuite({required String mode}) {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -101,6 +102,7 @@ void backupEntitlementSuite({required String mode}) {
     await openBoxesFor(mode, Directory(docs.path));
     await AppConfig.box.put('isSetupComplete', true);
     await BackupEncryptionService.setPassword('246810');
+    await signInForTest(); // the admin — the prompt is for Admin / Manager
     locator.registerSingleton<LicenseStore>(LicenseStore(LicenseApiService()));
     FilePicker.platform = picker = _RecordingPicker();
   });
@@ -128,11 +130,19 @@ void backupEntitlementSuite({required String mode}) {
     expect(ModeKeys.dataBackup, ownKey);
   });
 
-  test('$mode: automatic backup is OFF by default', () async {
+  test('$mode: the daily backup prompt is OFF by default', () async {
     licensedWith(ownKey);
     expect(await AutoBackupService.isAutoBackupEnabled(), isFalse);
-    await AutoBackupService.checkAndBackupForTesting();
-    expect(backupsIn(downloads), isEmpty, reason: 'not switched on');
+    expect(await AutoBackupService.currentPrompt(), DailyBackupPrompt.none);
+    expect(backupsIn(downloads), isEmpty);
+  });
+
+  test('$mode: switching the prompt on makes no backup by itself', () async {
+    licensedWith(ownKey);
+    await AutoBackupService.setAutoBackupEnabled(true);
+    expect(await AutoBackupService.isAutoBackupEnabled(), isTrue);
+    expect(backupsIn(downloads), isEmpty, reason: 'only the setting changes');
+    expect(await AutoBackupService.getLastBackupDate(), isNull);
   });
 
   test('$mode: licensed with only the OTHER mode\'s key — every backup '
@@ -143,18 +153,14 @@ void backupEntitlementSuite({required String mode}) {
         isNull);
     expect(await UnifiedBackupService.exportToShare(), isNull);
     await Hive.box(HiveBoxNames.appState).put('auto_backup_enabled', true);
-    var started = false;
-    void watch() => started = started || AutoBackupService.isBackingUp.value;
-    AutoBackupService.isBackingUp.addListener(watch);
-    await AutoBackupService.checkAndBackupForTesting();
-    AutoBackupService.isBackingUp.removeListener(watch);
-    expect(started, isFalse,
-        reason: 'the hourly check stops at its own plan gate');
+    expect(await AutoBackupService.runDailyBackup(), isNull);
+    expect(AutoBackupService.status().lastError,
+        UnifiedBackupService.backupNotInPlanMessage);
     expect(backupsIn(downloads), isEmpty);
   });
 
   test('$mode: licensed with only its OWN key — download, folder and share '
-      'backups are made; automatic backup runs', () async {
+      'backups are made; the daily backup runs', () async {
     licensedWith(ownKey);
     expect(await UnifiedBackupService.exportToDownloads(includeImages: false),
         isNotNull);
@@ -166,10 +172,11 @@ void backupEntitlementSuite({required String mode}) {
     for (final f in downloads.listSync()) {
       f.deleteSync(recursive: true);
     }
+    await Hive.box(HiveBoxNames.appState).delete('last_backup_date');
     await Hive.box(HiveBoxNames.appState).put('auto_backup_enabled', true);
-    await AutoBackupService.checkAndBackupForTesting();
+    expect(await AutoBackupService.runDailyBackup(), isNotNull);
     expect(backupsIn(downloads), hasLength(1),
-        reason: 'the hourly check made today\'s backup');
+        reason: 'Backup Now made today\'s backup');
     expect(await AutoBackupService.getLastBackupDate(),
         DateTime.now().toIso8601String().substring(0, 10));
   });
@@ -196,8 +203,13 @@ void backupEntitlementSuite({required String mode}) {
   // Prompt tests last: the prompt shows at most once per process.
   testWidgets('$mode: start-of-day prompt — refused with the OTHER key, shown '
       'with its OWN key', (tester) async {
-    await tester.runAsync(() => Hive.box(HiveBoxNames.appState)
-        .put('auto_backup_enabled', true));
+    await tester.runAsync(() async {
+      final box = Hive.box(HiveBoxNames.appState);
+      await box.put('auto_backup_enabled', true);
+      // Switched on today (real I/O belongs in runAsync, not in the prompt).
+      await box.put(AutoBackupService.promptSinceKey,
+          DateTime.now().toIso8601String().substring(0, 10));
+    });
     Future<void> showPrompt() async {
       await tester.pumpWidget(MaterialApp(
         home: Scaffold(body: Builder(builder: (c) => TextButton(
@@ -220,5 +232,144 @@ void backupEntitlementSuite({required String mode}) {
     licensedWith(ownKey);
     await showPrompt();
     expect(find.text('Back Up Data'), findsOneWidget);
+  });
+
+  group('$mode: start-of-day prompt rules', () {
+    String daysAgo(int d) => DateTime.now()
+        .subtract(Duration(days: d))
+        .toIso8601String()
+        .substring(0, 10);
+
+    Future<void> showPromptWith(WidgetTester tester,
+        {required bool enabled, String? lastBackup, String? since}) async {
+      licensedWith(ownKey);
+      StartOfDayBackupPrompt.resetForTesting();
+      await tester.runAsync(() async {
+        final box = Hive.box(HiveBoxNames.appState);
+        await box.put('auto_backup_enabled', enabled);
+        if (lastBackup == null) {
+          await box.delete('last_backup_date');
+        } else {
+          await box.put('last_backup_date', lastBackup);
+        }
+        if (since == null) {
+          await box.delete(AutoBackupService.promptSinceKey);
+        } else {
+          await box.put(AutoBackupService.promptSinceKey, since);
+        }
+      });
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(body: Builder(builder: (c) => TextButton(
+              onPressed: () => StartOfDayBackupPrompt.show(c),
+              child: const Text('home'),
+            ))),
+      ));
+      await tester.tap(find.text('home'));
+      for (var i = 0; i < 20; i++) {
+        await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 20)));
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+    }
+
+    tearDown(StartOfDayBackupPrompt.resetForTesting);
+
+    testWidgets('last backup 1–6 days ago: Backup Now and Skip Today',
+        (tester) async {
+      await showPromptWith(tester, enabled: true, lastBackup: daysAgo(3));
+      expect(find.text('Back Up Data'), findsOneWidget);
+      expect(find.text('Backup Now'), findsOneWidget);
+      expect(find.text('Skip Today'), findsOneWidget);
+    });
+
+    testWidgets('7 days without a backup: Backup Now only, back cannot close it',
+        (tester) async {
+      await showPromptWith(tester, enabled: true, lastBackup: daysAgo(7));
+      expect(find.text(StartOfDayBackupPrompt.requiredMessage), findsOneWidget);
+      expect(find.text('Backup Now'), findsOneWidget);
+      expect(find.text('Skip Today'), findsNothing);
+      await tester.binding.handlePopRoute();
+      await tester.pump();
+      expect(find.text('Back Up Data'), findsOneWidget,
+          reason: 'the back button cannot dismiss the required prompt');
+    });
+
+    testWidgets('fresh install (never backed up): Backup Now and Skip Today',
+        (tester) async {
+      // Switched on today — what setAutoBackupEnabled / currentPrompt store.
+      await showPromptWith(tester, enabled: true, since: daysAgo(0));
+      expect(find.text('Back Up Data'), findsOneWidget);
+      expect(find.text('Skip Today'), findsOneWidget);
+      expect(find.text(StartOfDayBackupPrompt.requiredMessage), findsNothing);
+    });
+
+    testWidgets('never backed up, switched on 7+ days ago: required',
+        (tester) async {
+      await showPromptWith(tester, enabled: true, since: daysAgo(8));
+      expect(find.text('Skip Today'), findsNothing);
+      expect(find.text('Backup Now'), findsOneWidget);
+    });
+
+    testWidgets('setting off: no prompt, even after 7+ days', (tester) async {
+      await showPromptWith(tester, enabled: false, lastBackup: daysAgo(30));
+      expect(find.text('Back Up Data'), findsNothing);
+    });
+
+    testWidgets('already backed up today: no prompt', (tester) async {
+      await showPromptWith(tester, enabled: true, lastBackup: daysAgo(0));
+      expect(find.text('Back Up Data'), findsNothing);
+    });
+  });
+
+  group('$mode: start-of-day prompt — who is asked', () {
+    tearDown(() async {
+      StartOfDayBackupPrompt.resetForTesting();
+      await signInForTest(); // back to the admin for the other tests
+    });
+
+    Future<void> showAs(WidgetTester tester, String? role) async {
+      licensedWith(ownKey);
+      StartOfDayBackupPrompt.resetForTesting();
+      await tester.runAsync(() async {
+        await signInForTest(role: role);
+        final box = Hive.box(HiveBoxNames.appState);
+        await box.put('auto_backup_enabled', true);
+        await box.delete('last_backup_date');
+        await box.put(AutoBackupService.promptSinceKey,
+            DateTime.now().toIso8601String().substring(0, 10));
+      });
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(body: Builder(builder: (c) => TextButton(
+              onPressed: () => StartOfDayBackupPrompt.show(c),
+              child: const Text('home'),
+            ))),
+      ));
+      await tester.tap(find.text('home'));
+      for (var i = 0; i < 20; i++) {
+        await tester.runAsync(
+            () => Future<void>.delayed(const Duration(milliseconds: 20)));
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+    }
+
+    testWidgets('Admin is asked', (tester) async {
+      await showAs(tester, null);
+      expect(find.text('Back Up Data'), findsOneWidget);
+    });
+
+    testWidgets('Manager is asked', (tester) async {
+      await showAs(tester, 'Manager');
+      expect(find.text('Back Up Data'), findsOneWidget);
+    });
+
+    testWidgets('Cashier is NOT asked', (tester) async {
+      await showAs(tester, 'Cashier');
+      expect(find.text('Back Up Data'), findsNothing);
+    });
+
+    testWidgets('Waiter is NOT asked', (tester) async {
+      await showAs(tester, 'Waiter');
+      expect(find.text('Back Up Data'), findsNothing);
+    });
   });
 }

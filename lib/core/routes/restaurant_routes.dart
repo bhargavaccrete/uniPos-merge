@@ -23,7 +23,6 @@ import 'package:billberrylite/presentation/screens/common/attendance/staff_atten
 import 'package:billberrylite/presentation/screens/common/attendance/attendance_report_screen.dart';
 import 'package:billberrylite/presentation/screens/restaurant/import/bulk_import_screen.dart';
 import 'package:billberrylite/presentation/screens/restaurant/tabbar/order.dart';
-import 'package:billberrylite/presentation/widget/componets/restaurant/componets/import/test_data_screen.dart';
 
 // Core Screens
 import 'package:billberrylite/presentation/screens/onboarding/splashScreen.dart';
@@ -537,7 +536,6 @@ class RestaurantRoutes {
       'settings',
       EntKeys.settings,
     ),
-    RouteNames.restaurantTestData: _guard(const TestDataScreen(), 'settings'),
     RouteNames.restaurantBulkImport: _guard(
       const RestaurantBulkImportScreen(),
       'settings',

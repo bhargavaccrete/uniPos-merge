@@ -768,9 +768,13 @@ abstract class _SetupWizardStore with Store {
     try{
       final ImagePicker picker = ImagePicker();
 
+      // Same cap as every other logo picker (ImagePickerService.pickLogoImage):
+      // a full-size phone photo decodes to ~48 MB and was stored as-is.
       final XFile ? image = await picker.pickImage(
           source: ImageSource.gallery,
-          imageQuality: 50
+          imageQuality: 85,
+          maxWidth: 800,
+          maxHeight: 800,
       );
       if(image != null){
         final bytes = await image.readAsBytes();

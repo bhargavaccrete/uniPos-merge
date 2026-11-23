@@ -108,10 +108,23 @@ void main() {
   });
 
   var seq = 0;
+  // Captain lines are priced from the menu (AND-04), so each price/tax pair
+  // is its own menu item, put on the menu by [send] before the request.
   CartItem dish(double price, int qty, {double? taxRate, String? id}) =>
       makeCartItem(
-          id: id ?? 'l${seq++}', productId: 'dish', title: 'Dish', price: price,
-          quantity: qty, taxRate: taxRate);
+          id: id ?? 'l${seq++}', productId: 'dish-$price-${taxRate ?? 0}',
+          title: 'Dish', price: price, quantity: qty, taxRate: taxRate);
+
+  Future<void> onMenu(List<CartItem> lines) async {
+    final box = Hive.box<Items>(HiveBoxNames.restaurantItems);
+    for (final l in lines) {
+      await box.put(
+          l.productId,
+          Items(id: l.productId, name: 'Dish', price: l.price,
+              taxRate: l.taxRate, trackInventory: true, stockQuantity: 100));
+    }
+    await itemStore.loadItems();
+  }
 
   Future<void> persist(OrderModel o) async {
     await Hive.box<OrderModel>(HiveBoxNames.restaurantOrders).put(o.id, o);
@@ -155,6 +168,7 @@ void main() {
 
   Future<(int, Map<String, dynamic>)> send(List<CartItem> lines,
       {String? orderId, double clientTotal = 0}) async {
+    await onMenu(lines);
     final response = await captainSendOrderHandler(Request(
       'POST',
       Uri.parse('http://localhost/captain/send-order'),

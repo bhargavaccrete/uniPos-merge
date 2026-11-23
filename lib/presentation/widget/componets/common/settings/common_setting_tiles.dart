@@ -5,8 +5,6 @@ import 'package:intl/intl.dart';
 
 import 'package:billberrylite/domain/services/common/auto_backup_service.dart';
 import 'package:billberrylite/domain/services/common/backup_encryption_service.dart';
-import 'package:billberrylite/domain/services/common/backup_storage_permission.dart';
-import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/domain/services/common/device_id_service.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
@@ -398,28 +396,22 @@ class _DailyBackupReminderTileState extends State<DailyBackupReminderTile> {
   @override
   Widget build(BuildContext context) {
     return SettingsSwitchTile(
-      title: 'Daily Backup Reminder',
-      subtitle: 'Show backup prompt at the start of each day',
+      title: 'Daily Backup Prompt',
+      subtitle: 'Ask to back up at the start of each day',
       icon: Icons.backup_rounded,
       color: Colors.green,
       value: _enabled,
       onChanged: (v) async {
-        // Android 7–10: automatic backups need storage access, and the timer
-        // cannot ask, so ask now. Refusing still turns the setting on; the
-        // failure is then reported by the backup status and notification.
-        if (v && !await BackupStoragePermission.ensure()) {
-          NotificationService.instance
-              .showError(BackupStoragePermission.deniedMessage);
-        }
+        // Only the setting changes; the prompt asks on the next Home visit.
+        setState(() => _enabled = v);
         await AutoBackupService.setAutoBackupEnabled(v);
-        if (mounted) setState(() => _enabled = v);
       },
     );
   }
 }
 
-/// BKP-6: read-only status of automatic backups — the last success and, when
-/// the last attempt failed, when and why.
+/// BKP-6: read-only backup status — the last successful backup of any kind
+/// and, when the last daily backup failed, when and why.
 class AutoBackupStatusTile extends StatelessWidget {
   const AutoBackupStatusTile({super.key});
 
@@ -430,7 +422,7 @@ class AutoBackupStatusTile extends StatelessWidget {
     final failed = s.lastError != null;
     return SettingsNavTile(
       key: const Key('autoBackupStatus'),
-      title: 'Automatic Backup Status',
+      title: 'Backup Status',
       icon: failed ? Icons.cloud_off_rounded : Icons.history_rounded,
       color: failed ? AppColors.danger : AppColors.success,
       trailing: const SizedBox.shrink(),
@@ -438,7 +430,7 @@ class AutoBackupStatusTile extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(s.lastSuccess == null
-              ? 'No automatic backup yet'
+              ? 'No backup yet'
               : 'Last successful: ${fmt.format(s.lastSuccess!)}'),
           if (failed)
             Text(

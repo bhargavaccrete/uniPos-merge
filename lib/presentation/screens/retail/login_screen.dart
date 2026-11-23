@@ -7,6 +7,7 @@ import 'package:billberrylite/util/images.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/restaurant/componets/Button.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/util/common/pin_attempt_guard.dart';
 
 import 'home_screen.dart';
 
@@ -20,7 +21,7 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen> with PinLockoutCountdown {
   final _formKey = GlobalKey<FormState>();
   final _pinController = TextEditingController();
 
@@ -33,6 +34,7 @@ class _LoginScreenState extends State<LoginScreen> {
   void initState() {
     super.initState();
     _checkDefaultCredentials();
+    loadPinLock();
   }
 
   Future<void> _checkDefaultCredentials() async {
@@ -47,6 +49,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _handleLogin() async {
+    if (isPinLocked) return;
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -70,6 +73,11 @@ class _LoginScreenState extends State<LoginScreen> {
           _errorMessage = result.errorMessage;
           _isLoading = false;
         });
+        if (result.retryAfter != null) {
+          _errorMessage = null;
+          _pinController.clear();
+          startPinLockCountdown(result.retryAfter);
+        }
       }
     } catch (e) {
       if (!mounted) return;
@@ -82,6 +90,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final errorText = isPinLocked
+        ? PinAttemptGuard.lockedMessage(pinLockRemaining!)
+        : _errorMessage;
+    final canSubmit = !_isLoading && !isPinLocked;
     return Scaffold(
       backgroundColor: AppColors.white,
       body: SafeArea(
@@ -164,7 +176,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       SizedBox(height: AppResponsive.height(context, 0.05)),
 
                       // Error Message
-                      if (_errorMessage != null) ...[
+                      if (errorText != null) ...[
                         Container(
                           width: double.infinity,
                           padding: EdgeInsets.all(
@@ -189,7 +201,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                               Expanded(
                                 child: Text(
-                                  _errorMessage!,
+                                  errorText,
                                   style: GoogleFonts.poppins(
                                     color: Colors.red.shade700,
                                     fontSize: AppResponsive.getValue(
@@ -211,7 +223,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       AppTextField(
                         controller: _pinController,
                         autofocus: true,
-                        enabled: !_isLoading,
+                        enabled: canSubmit,
                         label: 'PIN',
                         hint: 'Enter your PIN',
                         icon: Icons.lock_outline_rounded,
@@ -224,7 +236,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         maxLength: 6,
                         textInputAction: TextInputAction.done,
                         onFieldSubmitted: (_) {
-                          if (!_isLoading) _handleLogin();
+                          if (canSubmit) _handleLogin();
                         },
                         suffixIcon: IconButton(
                           icon: Icon(
@@ -254,8 +266,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       CommonButton(
                         width: double.infinity,
                         height: AppResponsive.height(context, 0.065),
-                        onTap: _isLoading ? () {} : _handleLogin,
-                        bgcolor: _isLoading ? Colors.grey : AppColors.primary,
+                        onTap: canSubmit ? _handleLogin : () {},
+                        bgcolor: canSubmit ? AppColors.primary : Colors.grey,
                         child: _isLoading
                             ? const SizedBox(
                                 height: 24,

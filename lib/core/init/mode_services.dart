@@ -1,8 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import 'package:billberrylite/core/config/app_config.dart';
 import 'package:billberrylite/core/init/retail_startup.dart';
-import 'package:billberrylite/domain/services/common/auto_backup_service.dart';
 import 'package:billberrylite/domain/services/common/firebase_messaging_service.dart';
 import 'package:billberrylite/domain/services/common/local_notification_service.dart';
 import 'package:billberrylite/domain/services/common/notification_sync.dart';
@@ -20,7 +21,6 @@ import 'package:billberrylite/util/restaurant/staticswitch.dart';
 class ModeStartupSteps {
   final Future<void> Function() loadRestaurantSettings;
   final void Function() initRestaurantLifecycle;
-  final void Function() startAutoBackup;
   final void Function() startLanServer;
   final Future<void> Function() loadRetailSettings;
 
@@ -37,7 +37,6 @@ class ModeStartupSteps {
   const ModeStartupSteps({
     this.loadRestaurantSettings = _loadRestaurantSettings,
     this.initRestaurantLifecycle = RestaurantSession.initLifecycle,
-    this.startAutoBackup = _startAutoBackup,
     this.startLanServer = _startLanServer,
     this.loadRetailSettings = loadRetailStartupSettings,
     this.loadRetailSession = RestaurantSession.load,
@@ -71,9 +70,6 @@ class ModeStartupSteps {
     ]);
   }
 
-  // Runs hourly, triggers daily backups.
-  static void _startAutoBackup() => AutoBackupService.initialize();
-
   // Captain/KDS clients connect to :9090 on launch, so it binds before
   // anything slower (notifications) runs. Fire-and-forget.
   static void _startLanServer() {
@@ -97,7 +93,8 @@ class ModeStartupSteps {
 
 /// WF-6: everything startup does for the business mode, after the data is
 /// open and the service locator is built — settings, the Restaurant session
-/// lifecycle, auto-backup, the LAN server, notifications.
+/// lifecycle, the LAN server, notifications. (No backup runs at startup: the
+/// daily backup is asked for by the start-of-day prompt.)
 ///
 /// Called by `main.dart` at startup and when the setup wizard finishes (the
 /// mode was not set when the app started, so startup skipped all of it).
@@ -132,15 +129,13 @@ class ModeServices {
     }
     _startedFor = mode;
 
-    // Same order as startup always used (settings, lifecycle, auto-backup,
-    // LAN server; then notifications, deliberately last).
+    // Same order as startup always used (settings, lifecycle, LAN server;
+    // then notifications, deliberately last).
     debugPrint('⚙️  Step 6/7: Loading app settings...');
     if (mode == BusinessMode.restaurant) {
       await steps.loadRestaurantSettings();
       steps.initRestaurantLifecycle(); // pause/resume handling for auto-logout
       debugPrint('   ✅ Restaurant settings loaded');
-      steps.startAutoBackup();
-      debugPrint('   ✅ Auto-backup service initialized');
       steps.startLanServer();
     } else {
       // WF-3: the session file too, before the first sale can read the shift.
@@ -148,10 +143,6 @@ class ModeServices {
       await steps.validateRestoredShift();
       steps.initRetailLifecycle(); // pause/resume handling for auto-logout
       debugPrint('   ✅ Retail settings loaded');
-      // M6a: the same hourly check Restaurant runs (at most one backup a day,
-      // only when the user switched it on — off by default).
-      steps.startAutoBackup();
-      debugPrint('   ✅ Auto-backup service initialized');
     }
 
     // Shared by restaurant and retail. Both wrapped so a failure (exact-alarm
@@ -167,12 +158,13 @@ class ModeServices {
     }
     // Firebase Cloud Messaging (push). After local notifications: foreground
     // pushes are rendered through that plugin's channels. No-op on
-    // desktop/web (no google-services config there).
-    try {
-      await steps.startPushNotifications();
-      debugPrint('   ✅ Firebase push notifications ready');
-    } catch (e) {
-      debugPrint('   ⚠️  Firebase messaging init failed (non-fatal): $e');
-    }
+    // desktop/web (no google-services config there). AND-24: started, not
+    // awaited — startup (and the first screen) never waits for Firebase or
+    // the network; a failure is logged and never reaches startup.
+    unawaited(Future<void>.sync(steps.startPushNotifications).then(
+      (_) => debugPrint('   ✅ Firebase push notifications ready'),
+      onError: (Object e) =>
+          debugPrint('   ⚠️  Firebase messaging init failed (non-fatal): $e'),
+    ));
   }
 }

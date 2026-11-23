@@ -7,15 +7,33 @@ import 'package:billberrylite/domain/services/common/unified_backup_service.dart
 import 'package:billberrylite/domain/services/common/notification_service.dart';
 import 'package:billberrylite/core/plan/plan_enforcement.dart';
 import 'package:billberrylite/core/plan/mode_keys.dart';
+import 'package:billberrylite/util/restaurant/restaurant_session.dart';
 
 /// Shows the start-of-day backup prompt if a backup hasn't been done today.
 /// Call from the welcome/home screen after the day is started.
+///
+/// This is the only daily backup: nothing is backed up in the background.
+/// After [AutoBackupService.requiredAfterDays] days without a backup the
+/// prompt has no "Skip Today". With the setting off, no prompt is shown.
 ///
 /// Usage:
 ///   await StartOfDayBackupPrompt.show(context);
 class StartOfDayBackupPrompt {
   /// Prevents the dialog from showing more than once per app session.
   static bool _shownThisSession = false;
+
+  static const String requiredMessage =
+      'No backup for 7 days. Please back up your data now.';
+
+  @visibleForTesting
+  static void resetForTesting() => _shownThisSession = false;
+
+  /// The signed-in role may open Backup & Restore: the same two keys the
+  /// Settings screens check (`settings` for the screen, `dataBackup` for the
+  /// tile) — Admin and Manager in both modes.
+  static bool get roleMaySeePrompt =>
+      RestaurantSession.canAccess('settings') &&
+      RestaurantSession.canAccess('dataBackup');
 
   /// Returns immediately if today's backup already exists OR the prompt was
   /// already shown this session (prevents re-triggering on every home navigation).
@@ -25,14 +43,13 @@ class StartOfDayBackupPrompt {
     // Plan gate — no backup prompt when the data_backup module isn't granted.
     if (!PlanEnforce.allows(ModeKeys.dataBackup)) return;
 
-    // Respect the Daily Backup Reminder toggle in Settings
-    final isEnabled = await AutoBackupService.isAutoBackupEnabled();
-    if (!isEnabled) return;
+    // Only the people who can open Backup & Restore (Admin and Manager) are
+    // asked; a Cashier or Waiter goes straight to work.
+    if (!roleMaySeePrompt) return;
 
-    // Skip if today's backup is already done
-    final lastBackup = await AutoBackupService.getLastBackupDate();
-    final today = DateTime.now().toIso8601String().substring(0, 10);
-    if (lastBackup == today) return;
+    // Setting off, or today's backup already done → nothing to ask.
+    final kind = await AutoBackupService.currentPrompt();
+    if (kind == DailyBackupPrompt.none) return;
 
     _shownThisSession = true; // Block any re-entrant calls before going async
 
@@ -42,7 +59,10 @@ class StartOfDayBackupPrompt {
     final hasPassword = password != null && password.isNotEmpty;
 
     if (!context.mounted) return;
-    final doBackup = await _showPromptDialog(context, isEncrypted: hasPassword, password: password);
+    final doBackup = await _showPromptDialog(context,
+        isEncrypted: hasPassword,
+        password: password,
+        required: kind == DailyBackupPrompt.required);
     if (doBackup != true || !context.mounted) return;
 
     // Backups are always encrypted — prompt to set a password if none exists.
@@ -56,7 +76,8 @@ class StartOfDayBackupPrompt {
   // Prompt Dialog
   // ---------------------------------------------------------------------------
 
-  static Future<bool?> _showPromptDialog(BuildContext context, {required bool isEncrypted, String? password}) {
+  static Future<bool?> _showPromptDialog(BuildContext context,
+      {required bool isEncrypted, String? password, required bool required}) {
     return showDialog<bool>(
       context: context,
       barrierDismissible: false,
@@ -64,7 +85,10 @@ class StartOfDayBackupPrompt {
         bool obscurePassword = true;
         return StatefulBuilder(
         builder: (ctx, setState) {
-          return AlertDialog(
+          // Required: the back button cannot dismiss it either.
+          return PopScope(
+            canPop: !required,
+            child: AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         contentPadding: EdgeInsets.zero,
         content: Column(
@@ -100,7 +124,9 @@ class StartOfDayBackupPrompt {
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
               child: Text(
-                "It's a new day! Would you like to back up your data before starting service?",
+                required
+                    ? requiredMessage
+                    : "It's a new day! Would you like to back up your data before starting service?",
                 style: GoogleFonts.poppins(fontSize: 13, color: Colors.grey.shade700),
               ),
             ),
@@ -186,16 +212,18 @@ class StartOfDayBackupPrompt {
             const Divider(height: 1),
             Row(
               children: [
-                Expanded(
-                  child: TextButton(
-                    onPressed: () => Navigator.pop(ctx, false),
-                    child: Text(
-                      'Skip Today',
-                      style: GoogleFonts.poppins(color: Colors.grey.shade600),
+                if (!required) ...[
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: Text(
+                        'Skip Today',
+                        style: GoogleFonts.poppins(color: Colors.grey.shade600),
+                      ),
                     ),
                   ),
-                ),
-                Container(width: 1, height: 48, color: Colors.grey.shade200),
+                  Container(width: 1, height: 48, color: Colors.grey.shade200),
+                ],
                 Expanded(
                   child: TextButton(
                     onPressed: () => Navigator.pop(ctx, true),
@@ -212,6 +240,7 @@ class StartOfDayBackupPrompt {
             ),
           ],
         ),
+            ),
           );
         },
         );
@@ -268,11 +297,8 @@ class StartOfDayBackupPrompt {
       ),
     );
 
-    // Run the actual backup
-    String? filePath;
-    try {
-      filePath = await UnifiedBackupService.exportToDownloads();
-    } catch (_) {}
+    // Run the daily backup (records the result and prunes old daily backups).
+    final filePath = await AutoBackupService.runDailyBackup();
 
     if (!context.mounted) return;
 
@@ -280,14 +306,12 @@ class StartOfDayBackupPrompt {
     Navigator.of(context, rootNavigator: true).pop();
 
     if (filePath != null) {
-      // Mark today as backed up (no second backup run)
-      await AutoBackupService.markTodayAsBackedUp();
       NotificationService.instance.showSuccess('Backup saved successfully!');
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            UnifiedBackupService.lastExportError ??
+            AutoBackupService.status().lastError ??
                 'Backup failed. You can retry from the drawer menu.',
             style: GoogleFonts.poppins(),
           ),

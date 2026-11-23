@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../data/models/common/staffModel_310.dart';
+
 /// Shared password hashing utility for restaurant auth.
 /// Uses SHA-256 + a fixed salt (matches retail pattern).
 class RestaurantAuthHelper {
@@ -31,6 +33,32 @@ class RestaurantAuthHelper {
     }
     // Plaintext fallback — migration path
     return entered == stored;
+  }
+
+  static const String reloginToChangePinMessage =
+      'Please log in again to change your PIN.';
+
+  /// The staff record a logged-in staff member may change their own PIN on.
+  ///
+  /// Only the record with [staffId] (the logged-in staff member) is checked —
+  /// never every staff member, or a current PIN that matched a colleague would
+  /// change the colleague's PIN.
+  static ({StaffModel? staff, String? error}) staffForOwnPinChange({
+    required String? staffId,
+    required Iterable<StaffModel> staff,
+    required String currentPin,
+  }) {
+    if (staffId == null || staffId.isEmpty) {
+      return (staff: null, error: reloginToChangePinMessage);
+    }
+    final me = staff.where((s) => s.id == staffId).firstOrNull;
+    if (me == null || !me.isActive) {
+      return (staff: null, error: reloginToChangePinMessage);
+    }
+    if (!verifyPassword(currentPin.trim(), me.pinNo.trim())) {
+      return (staff: null, error: 'Current PIN is incorrect');
+    }
+    return (staff: me, error: null);
   }
 
   /// First-run admin PIN, used when nothing has been stored yet.

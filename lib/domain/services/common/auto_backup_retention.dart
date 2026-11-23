@@ -3,34 +3,38 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
-/// BKP-6 retention for AUTOMATIC backups only.
+/// BKP-6 retention for DAILY backups only (the start-of-day prompt's).
 ///
-/// Automatic backups are named `BillBerryLite_auto_<yyyy-MM-ddTHH-mm-ss>.zip`
-/// (optionally `-<n>` when two land in the same second). A file that does not
-/// match that pattern exactly — every manual backup, anything renamed, any
-/// other file — is never touched.
+/// Daily backups are named `BillBerryLite_daily_<yyyy-MM-ddTHH-mm-ss>.zip`
+/// (optionally `-<n>` when two land in the same second). Files named
+/// `BillBerryLite_auto_…` by the former automatic backup are treated the same,
+/// so they age out too. A file that does not match exactly — every manual
+/// backup, anything renamed, any other file — is never touched.
 ///
 /// Kept, all others pruned:
-/// * the newest automatic backup of each of the 14 most recent days that
+/// * the newest daily backup of each of the 14 most recent days that
 ///   have one ("daily");
-/// * the newest automatic backup of each of the 8 most recent weeks
+/// * the newest daily backup of each of the 8 most recent weeks
 ///   (Monday-based) OLDER than those days ("weekly" recovery points, so a
 ///   backup taken before a silent problem survives for about 10 weeks);
 /// * the newest verified backup and any path in `protected`, always.
 ///
-/// Pruning runs only after a new automatic backup was written AND verified.
+/// Pruning runs only after a new daily backup was written AND verified.
 class AutoBackupRetention {
   AutoBackupRetention._();
 
   static const int dailyToKeep = 14;
   static const int weeklyToKeep = 8;
-  static const String prefix = 'BillBerryLite_auto_';
+  static const String prefix = 'BillBerryLite_daily_';
+
+  /// Name of the former automatic backups (pruned like daily ones).
+  static const String legacyPrefix = 'BillBerryLite_auto_';
 
   static final RegExp _name = RegExp(
-      r'^BillBerryLite_auto_(\d{4})-(\d{2})-(\d{2})T(\d{2})-(\d{2})-(\d{2})(?:-(\d+))?\.zip$');
+      r'^BillBerryLite_(?:daily|auto)_(\d{4})-(\d{2})-(\d{2})T(\d{2})-(\d{2})-(\d{2})(?:-(\d+))?\.zip$');
 
-  /// The time in an automatic backup's name, or null when [fileName] is not
-  /// exactly an automatic backup's name.
+  /// The time in a daily backup's name, or null when [fileName] is not
+  /// exactly a daily (or former automatic) backup's name.
   static DateTime? stampOf(String fileName) {
     final m = _name.firstMatch(fileName);
     if (m == null) return null;

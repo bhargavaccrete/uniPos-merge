@@ -3,6 +3,8 @@ plugins {
     id("kotlin-android")
     // The Google services Gradle plugin (processes google-services.json for Firebase).
     id("com.google.gms.google-services")
+    // Firebase Crashlytics (release crash reports).
+    id("com.google.firebase.crashlytics")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }

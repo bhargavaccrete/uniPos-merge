@@ -186,7 +186,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         } catch (e) {
           debugPrint('Could not finish sale ${pending.invoiceNumber}: $e');
         }
-      }();
+        }();
     }
     _discountController.removeListener(_syncDiscountToStore);
     _discountController.dispose();

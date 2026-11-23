@@ -248,11 +248,13 @@ class _SetupWizardScreenState extends State<SetupWizardScreen>
       if (mounted) {
         Navigator.pop(context); // dismiss loading indicator
 
+        // Setup is finished: the walkthrough / user-selection screens below
+        // are removed too, so Back on the dashboard never returns to setup.
         if (AppConfig.isRestaurant) {
           if (hasPendingKey) {
             // Hand off activation to the success screen — it fires the API
             // and shows the result before the user reaches the dashboard.
-            Navigator.pushReplacement(
+            Navigator.pushAndRemoveUntil(
               context,
               MaterialPageRoute(
                 builder: (_) =>
@@ -262,11 +264,13 @@ class _SetupWizardScreenState extends State<SetupWizardScreen>
                       businessSubtype: _store.businessSubtypeCode,
                     ),
               ),
+              (_) => false,
             );
           } else {
-            Navigator.pushReplacement(
+            Navigator.pushAndRemoveUntil(
               context,
               MaterialPageRoute(builder: (_) => const AdminWelcome()),
+              (_) => false,
             );
           }
         } else {
@@ -275,7 +279,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen>
           // otherwise the device reaches the dashboard with no manifest and
           // every gate silently bypassed.
           if (hasPendingKey) {
-            Navigator.pushReplacement(
+            Navigator.pushAndRemoveUntil(
               context,
               MaterialPageRoute(
                 builder: (_) =>
@@ -285,9 +289,11 @@ class _SetupWizardScreenState extends State<SetupWizardScreen>
                       businessSubtype: _store.businessSubtypeCode,
                     ),
               ),
+              (_) => false,
             );
           } else {
-            Navigator.pushReplacementNamed(context, RouteNames.retailMenu);
+            Navigator.pushNamedAndRemoveUntil(
+                context, RouteNames.retailMenu, (_) => false);
           }
         }
       }
