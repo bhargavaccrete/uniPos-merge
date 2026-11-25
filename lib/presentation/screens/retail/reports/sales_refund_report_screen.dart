@@ -35,6 +35,12 @@ class SalesRefundReportScreen extends StatelessWidget {
     return d == null ? iso : DateFormat('dd MMM yyyy, hh:mm a').format(d);
   }
 
+  /// Real 12-hour date-time cell; the PDF prints the same text as [_dateTime].
+  Object _dateTimeCell(String iso) {
+    final d = DateTime.tryParse(iso);
+    return d == null ? iso : ExportDateTime(d);
+  }
+
   double _sum(List<Map<String, dynamic>> rows, String key) =>
       rows.fold<double>(0, (s, r) => s + ((r[key] as num?) ?? 0).toDouble());
 
@@ -147,6 +153,10 @@ class SalesRefundReportScreen extends StatelessWidget {
           ],
         );
       },
+      // All / Current page / Date range by the return sale's createdAt (the
+      // loader's filter). Exchange legs stay out of the money totals.
+      rangedExport: true,
+      exportRowDate: (r) => DateTime.tryParse(r['date'] as String? ?? ''),
       exportData: (rows) {
         final plain = rows.where((r) => !(r['isExchange'] as bool)).toList();
 
@@ -176,9 +186,9 @@ class SalesRefundReportScreen extends StatelessWidget {
             final originalDate = r['originalSaleDate'] as String?;
             return [
               r['returnSaleId'],
-              _dateTime(r['date'] as String),
+              _dateTimeCell(r['date'] as String),
               r['originalSaleId'] ?? '',
-              originalDate == null ? '' : _dateTime(originalDate),
+              originalDate == null ? '' : _dateTimeCell(originalDate),
               r['daysToReturn'] ?? '',
               r['customerName'],
               r['returnReasonLabel'],
@@ -186,12 +196,12 @@ class SalesRefundReportScreen extends StatelessWidget {
               _method(r),
               (r['isExchange'] as bool) ? 'Exchange' : 'Refund',
               exportQty((r['totalItems'] as num).toDouble()),
-              ReportExportService.formatCurrency(r['subtotal'] as double),
-              ReportExportService.formatCurrency(r['discountAmount'] as double),
-              ReportExportService.formatCurrency(r['taxAmount'] as double),
-              ReportExportService.formatCurrency(r['refundValue'] as double),
-              ReportExportService.formatCurrency(r['appliedToDue'] as double),
-              ReportExportService.formatCurrency(r['paidOut'] as double),
+              ExportMoney(r['subtotal'] as double),
+              ExportMoney(r['discountAmount'] as double),
+              ExportMoney(r['taxAmount'] as double),
+              ExportMoney(r['refundValue'] as double),
+              ExportMoney(r['appliedToDue'] as double),
+              ExportMoney(r['paidOut'] as double),
               r['exchangeGroupId'] ?? '',
               r['staffName'],
             ];

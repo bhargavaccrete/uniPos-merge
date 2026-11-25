@@ -74,9 +74,12 @@ class PurchaseReturnReportScreen extends StatelessWidget {
         return [
           ReportSummaryCard(
             title: 'Returns',
-            value: '${rows.length}',
+            // Same rows as the units beside it — cancelled returns are named
+            // separately rather than counted as returns that went back.
+            value: '${returned.length}',
             subtitle:
-                '${formatQty(returned.fold<double>(0, (s, r) => s + (r['totalQty'] as num).toDouble()))} units',
+                '${formatQty(returned.fold<double>(0, (s, r) => s + (r['totalQty'] as num).toDouble()))} units'
+                '${rows.length > returned.length ? ' · ${rows.length - returned.length} cancelled' : ''}',
             icon: Icons.assignment_return_rounded,
             color: AppColors.primary,
           ),
@@ -126,6 +129,10 @@ class PurchaseReturnReportScreen extends StatelessWidget {
           ),
         ],
       ),
+      // All / Current page / Date range by returnDate (the loader's filter).
+      // The summary still leaves cancelled returns out of the value total.
+      rangedExport: true,
+      exportRowDate: (r) => DateTime.tryParse(r['returnDate'] as String? ?? ''),
       exportData: (rows) => ReportExportData(
         headers: const [
           'Return Number',
@@ -146,16 +153,14 @@ class PurchaseReturnReportScreen extends StatelessWidget {
                 r['supplierName'],
                 r['grnNumber'],
                 r['poNumber'],
-                _date(r['returnDate'] as String),
+                ReportExportService.isoDateCell(r['returnDate'] as String),
                 exportQty((r['totalQty'] as num).toDouble()),
-                ReportExportService.formatCurrency(r['totalAmount'] as double),
+                ExportMoney(r['totalAmount'] as double),
                 r['statusDisplay'],
                 r['creditNoteNumber'] ?? '',
                 r['creditNoteAmount'] == null
                     ? ''
-                    : ReportExportService.formatCurrency(
-                        r['creditNoteAmount'] as double,
-                      ),
+                    : ExportMoney(r['creditNoteAmount'] as double),
               ],
             )
             .toList(),

@@ -361,7 +361,8 @@ class _ProfitReportScreenState extends State<ProfitReportScreen>
         ),
         _buildCard(
           'Items Sold',
-          '${_overallReport!['itemCount']}',
+          formatQty(
+              (_overallReport!['unitsSold'] as num?)?.toDouble() ?? 0),
           Icons.inventory,
           Colors.purple,
         ),

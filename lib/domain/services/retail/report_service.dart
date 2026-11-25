@@ -3,6 +3,8 @@
 
 
 import 'package:billberrylite/core/config/tax_label_rule.dart';
+import 'package:billberrylite/domain/services/retail/return_service.dart';
+import 'package:billberrylite/data/models/retail/hive_model/inventory_loss_model_178.dart';
 import 'package:billberrylite/util/common/tax_split.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/core/config/tax_feature.dart';
@@ -668,8 +670,8 @@ class ReportService {
             'totalDiscount': 0.0,
             'totalTax': 0.0,
             'gstRates': <double>{},
-            'firstSold': soldAt,
-            'lastSold': soldAt,
+            'firstSold': sign > 0 ? soldAt : null,
+            'lastSold': sign > 0 ? soldAt : null,
           },
         );
 
@@ -683,7 +685,8 @@ class ReportService {
         final rate = item.gstRate;
         if (rate != null) (stat['gstRates'] as Set<double>).add(rate);
 
-        if (soldAt != null) {
+        // Forward lines only, like lineCount: a refund date is not a sale date.
+        if (soldAt != null && sign > 0) {
           final first = stat['firstSold'] as DateTime?;
           final last = stat['lastSold'] as DateTime?;
           if (first == null || soldAt.isBefore(first)) stat['firstSold'] = soldAt;
@@ -1300,10 +1303,33 @@ class ReportService {
     DateTime? startDate,
     DateTime? endDate,
   }) async {
-    final all = await saleStore.getCreditSales();
-    return all
-        .where((sale) => _withinRange(sale.createdAt, startDate, endDate))
-        .toList();
+    // Forward sales only. A return's effect on what is owed is already applied
+    // to its original sale's dueAmount (ReturnService), so listing returns here
+    // too netted some of them twice and others not at all, depending on how
+    // each refund was paid out.
+    final window = await _salesInWindow(startDate, endDate);
+    // Newest first, then sale id — the same deterministic order the repository
+    // read this replaces gave, so equal timestamps never shuffle between loads.
+    return window.forward.where(_soldOnCredit).toList()
+      ..sort((a, b) {
+        final byDate = b.createdAt.compareTo(a.createdAt);
+        return byDate != 0 ? byDate : a.saleId.compareTo(b.saleId);
+      });
+  }
+
+  /// True when credit was extended at checkout: a full pay-later sale, or a
+  /// short-paid one. Judged on the checkout tender legs, which collections
+  /// never rewrite — `hasDue` alone would drop a part-paid sale from the
+  /// report once its balance is collected.
+  static bool _soldOnCredit(SaleModel sale) {
+    if (sale.paymentType == ReturnService.dueLegMethod) return true;
+    var tendered = 0.0;
+    for (final leg in sale.paymentList) {
+      final method = leg['method'] as String?;
+      if (method == ReturnService.dueLegMethod) return true;
+      tendered += (leg['amount'] as num?)?.toDouble() ?? 0;
+    }
+    return sale.hasDue || tendered < sale.totalAmount - 0.009;
   }
 
   /// Credit collections for a period — the Collections tab.
@@ -1382,7 +1408,7 @@ class ReportService {
                 'sgst': 0.0,
                 'totalGst': 0.0,
               });
-      rateRow['itemCount'] += sign;
+      if (sign > 0) rateRow['itemCount'] += 1;
       rateRow['taxableAmount'] += taxable;
       rateRow['totalGst'] += gst;
 
@@ -1419,7 +1445,7 @@ class ReportService {
                 'sgst': 0.0,
                 'totalGst': 0.0,
               });
-      categoryRow['itemCount'] += sign;
+      if (sign > 0) categoryRow['itemCount'] += 1;
       categoryRow['taxableAmount'] += taxable;
       categoryRow['totalGst'] += gst;
     }
@@ -1551,10 +1577,12 @@ class ReportService {
     double totalCost = 0.0;
     var unknownCostLines = 0;
     double unknownCostRevenue = 0.0;
+    double unitsSold = 0.0;
 
     for (final (:item, :sign) in lines) {
       final revenue = _netRevenueOf(item) * sign;
       totalRevenue += revenue;
+      unitsSold += item.qty * sign;
 
       final unitCost = _unitCostOf(item, liveCost);
       if (unitCost == null) {
@@ -1577,6 +1605,8 @@ class ReportService {
       'profitMargin': profitMargin,
       // Sale-item LINES in the window, not units sold.
       'itemCount': lines.length,
+      // Units, returns netted — what the "Items Sold" card shows.
+      'unitsSold': unitsSold,
       'unknownCostLines': unknownCostLines,
       'unknownCostRevenue': unknownCostRevenue,
     };
@@ -1909,7 +1939,9 @@ class ReportService {
       }
 
       final day = dailyProfits[dayKey]!;
-      day['totalSales'] += sign;
+      // A count of bills, not money: a return is not minus one sale. Its money
+      // still nets through revenue and cost below.
+      if (sign > 0) day['totalSales'] += 1;
       day['totalRevenue'] += saleRevenue;
       day['totalCost'] += saleCost;
       day['totalProfit'] += saleRevenue - saleCost;
@@ -2107,9 +2139,10 @@ class ReportService {
             entry(c.supplierId, c.supplierName).recovered += c.totalAmount;
           }
         case SupplierClaimStatus.rejected:
-          // A written-off rejection is counted through its loss row instead, so
-          // the same value never lands in `absorbed` twice.
-          if (!c.isLossRecorded && _withinRange(c.resolvedAt, start, end)) {
+          // Absorbed on the REJECTION date, written off or not. Its write-off
+          // loss rows are skipped below, so the value lands once and a later
+          // write-off never moves it out of an already-reported month.
+          if (_withinRange(c.resolvedAt, start, end)) {
             entry(c.supplierId, c.supplierName).absorbed += c.totalAmount;
           }
       }
@@ -2119,6 +2152,8 @@ class ReportService {
       // Only losses raised from a receipt are purchase damage; a stock
       // adjustment loss has no GRN and belongs to inventory, not purchasing.
       if (l.grnId == null) continue;
+      // Already counted on its claim's rejection date above.
+      if (l.source == InventoryLossSource.claimRejected) continue;
       final supplierId = l.supplierId;
       if (supplierId == null) continue;
       if (!_withinRange(l.recordedAt, start, end)) continue;

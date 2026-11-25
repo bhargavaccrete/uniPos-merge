@@ -293,11 +293,19 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
     );
   }
 
+  /// All / Current page over the list the screen pages through (no row date,
+  /// so no range). The summary counts exactly the exported rows; for All that
+  /// is the same list, so the figures are unchanged.
   Future<void> _export() async {
-    await ReportExportService.showExportDialog(
+    await ReportExportService.showRangedExportDialog<Map<String, dynamic>>(
       context: context,
       fileName: 'low_stock_alert',
       reportTitle: 'Low Stock Alert',
+      items: _reportData,
+      dateOf: (_) => null,
+      currentPage: _currentPage,
+      rowsPerPage: _rowsPerPage,
+      unit: 'variants',
       headers: const [
         'Product',
         'Variant',
@@ -307,9 +315,7 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
         'Cost Price',
         'MRP',
       ],
-      data: _reportData
-          .map(
-            (r) => [
+      rowOf: (r) => [
               r['productName'],
               r['variantLabel'] ?? '',
               r['barcode'] ?? '',
@@ -317,23 +323,18 @@ class _LowStockReportScreenState extends State<LowStockReportScreen> {
               // which calls toString() — stops printing "3.0".
               exportQty((r['currentStock'] as num).toDouble()),
               exportQty((r['reorderPoint'] as num).toDouble()),
+              // Unpriced variants stay blank, as before.
               r['costPrice'] == null
                   ? ''
-                  : ReportExportService.formatCurrency(
-                      (r['costPrice'] as num).toDouble(),
-                    ),
+                  : ExportMoney((r['costPrice'] as num).toDouble()),
               r['mrp'] == null
                   ? ''
-                  : ReportExportService.formatCurrency(
-                      (r['mrp'] as num).toDouble(),
-                    ),
+                  : ExportMoney((r['mrp'] as num).toDouble()),
             ],
-          )
-          .toList(),
-      summary: {
+      summaryOf: (selected) => {
         'Threshold': '≤ $_threshold',
-        'Variants Flagged': _reportData.length,
-        'Out of Stock': _reportData.where((r) => _stockOf(r) <= 0).length,
+        'Variants Flagged': selected.length,
+        'Out of Stock': selected.where((r) => _stockOf(r) <= 0).length,
         'Generated': ReportExportService.formatDateTime(DateTime.now()),
       },
     );

@@ -184,20 +184,27 @@ class RestaurantPurchaseOrderStatusReportScreen extends StatelessWidget {
               (r) => [
                 r['poNumber'],
                 r['supplierName'],
-                _date(r['createdAt'] as String?),
-                _date(r['expectedDeliveryDate'] as String?),
+                ReportExportService.isoDateCell(r['createdAt'] as String?),
+                ReportExportService.isoDateCell(
+                    r['expectedDeliveryDate'] as String?),
+                // Quantities stay quantities.
                 exportQty((r['orderedQty'] as num).toDouble()),
                 exportQty((r['receivedQty'] as num).toDouble()),
                 exportQty((r['remainingQty'] as num).toDouble()),
-                ReportExportService.formatCurrency(
-                    (r['estimatedTotal'] as num).toDouble()),
-                ReportExportService.formatCurrency(
-                    (r['receivedValue'] as num).toDouble()),
+                ExportMoney((r['estimatedTotal'] as num).toDouble()),
+                ExportMoney((r['receivedValue'] as num).toDouble()),
               ],
             )
             .toList(),
         summary: poStatusExportSummary(rows),
       ),
+      // Opt-in: All / Current page. A date range only on Completed (by
+      // createdAt, the field its loader filters on); Pending and Partially
+      // Received are "outstanding now", not a period question.
+      rangedExport: true,
+      exportRowDate: _isPeriodQuestion
+          ? (r) => DateTime.tryParse((r['createdAt'] as String?) ?? '')
+          : null,
     );
   }
 }

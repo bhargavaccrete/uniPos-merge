@@ -515,14 +515,14 @@ class _ComparisonReportViewState extends State<ComparisonReportView> {
       ],
       [
         'Total Amount',
-        ReportExportService.formatCurrency(data.previousAmount),
-        ReportExportService.formatCurrency(data.currentAmount),
+        ExportMoney(data.previousAmount),
+        ExportMoney(data.currentAmount),
         data.amountGrowth.label,
       ],
       [
         'Average Order Value',
-        ReportExportService.formatCurrency(data.previousAOV),
-        ReportExportService.formatCurrency(data.currentAOV),
+        ExportMoney(data.previousAOV),
+        ExportMoney(data.currentAOV),
         '-'
       ],
       [

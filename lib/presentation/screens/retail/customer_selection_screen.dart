@@ -391,15 +391,26 @@ class _CustomerSelectionScreenState extends State<CustomerSelectionScreen> {
         ),
       ),
       // Same placement and shape as the Customers list screen's add action.
-      floatingActionButton: FloatingActionButton(
-        onPressed: _showAddCustomerDialog,
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.white,
-        tooltip: 'Add Customer',
-        child: const Icon(Icons.person_add_alt_1_rounded),
+      // Hidden while the empty state shows: its centred Add button is the one
+      // add control there.
+      floatingActionButton: Observer(
+        builder: (_) => _showsEmptyState
+            ? const SizedBox.shrink()
+            : FloatingActionButton(
+                onPressed: _showAddCustomerDialog,
+                backgroundColor: AppColors.primary,
+                foregroundColor: AppColors.white,
+                tooltip: 'Add Customer',
+                child: const Icon(Icons.person_add_alt_1_rounded),
+              ),
       ),
     );
   }
+
+  /// Mirrors the body's two empty states (no recents / no search results).
+  bool get _showsEmptyState => _searchController.text.isEmpty
+      ? customerStore.recentCustomers.isEmpty
+      : customerStore.filteredCustomers.isEmpty;
 
   /// Who is currently on the bill, with the only way to take them off.
   Widget _buildSelectedBanner(Customer customer) {

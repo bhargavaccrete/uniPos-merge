@@ -22,6 +22,7 @@ import '../../../../widget/componets/common/report_summary_card.dart';
 import '../../../../../data/models/restaurant/db/pastordermodel_313.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/domain/services/common/report_export_service.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Reports/report_export_rows.dart';
 import 'package:billberrylite/util/restaurant/report_history_window.dart';
 
 class Totalsales extends StatefulWidget {
@@ -186,55 +187,22 @@ class _SalesDataViewState extends State<SalesDataView> {
       return;
     }
 
-    final headers = [
-      'Date',
-      'Invoice',
-      'Customer',
-      'Payment',
-      'Type',
-      'Status',
-      'Amount',
-    ];
-
-    // Prepare data rows — FULLY_REFUNDED already excluded during filtering
-    final data = _filteredOrders.map((order) {
-      final netAmount = order.totalPrice - (order.refundAmount ?? 0.0);
-      final String statusLabel;
-      switch (order.orderStatus) {
-        case 'PARTIALLY_REFUNDED':
-          statusLabel = 'Partial Refund';
-          break;
-        default:
-          statusLabel = 'Completed';
-      }
-      return [
-        ReportExportService.formatDateTime(order.orderAt),
-        order.billNumber != null ? 'INV ${order.billNumber}' : '#${(order.id.length > 8 ? order.id.substring(0, 8) : order.id)}',
-        order.customerName,
-        order.paymentDisplay.isNotEmpty ? order.paymentDisplay : 'N/A',
-        order.orderType ?? 'N/A',
-        statusLabel,
-        ReportExportService.formatCurrency(netAmount),
-      ];
-    }).toList();
-
-    // Prepare summary
+    // All / Current page / Date range over the already-filtered orders
+    // (FULLY_REFUNDED already excluded during filtering).
     final periodName = _getPeriodDisplayName();
-    final summary = {
-      'Report Period': periodName,
-      'Total Orders': _totalOrdersCount.toString(),
-      'Total Sales': ReportExportService.formatCurrency(_totalSales),
-      'Generated': ReportExportService.formatDateTime(DateTime.now()),
-    };
-
-    // Show export dialog
-    await ReportExportService.showExportDialog(
+    await ReportExportService.showRangedExportDialog<PastOrderModel>(
       context: context,
       fileName: 'total_sales_${widget.period.name.toLowerCase()}_${DateFormat('yyyyMMdd').format(DateTime.now())}',
       reportTitle: 'Total Sales Report - $periodName',
-      headers: headers,
-      data: data,
-      summary: summary,
+      headers: RestaurantReportExports.totalSalesHeaders,
+      items: _filteredOrders,
+      rowOf: RestaurantReportExports.totalSalesRow,
+      dateOf: (o) => o.orderAt,
+      summaryOf: (rows) =>
+          RestaurantReportExports.totalSalesSummary(rows, periodName),
+      currentPage: _currentPage,
+      rowsPerPage: _rowsPerPage,
+      unit: 'orders',
     );
   }
 

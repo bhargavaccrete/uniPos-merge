@@ -5,6 +5,7 @@ import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/data/models/restaurant/db/item_cancellation_model_134.dart';
 import 'package:billberrylite/data/repositories/restaurant/item_cancellation_repository.dart';
 import 'package:billberrylite/domain/services/common/report_export_service.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Reports/report_export_rows.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
@@ -280,34 +281,19 @@ class _ItemCancellationReportState extends State<ItemCancellationReport> {
       NotificationService.instance.showError('No data to export');
       return;
     }
-    final headers = ['Date & Time', 'Item', 'Qty', 'Amount', 'Reason', 'Staff', 'KOT'];
-    final data = _filtered
-        .map((r) => [
-              ReportExportService.formatDateTime(r.timestamp),
-              r.variantName != null && r.variantName!.isNotEmpty
-                  ? '${r.itemName} (${r.variantName})'
-                  : r.itemName,
-              r.quantity.toString(),
-              ReportExportService.formatCurrency(r.amount),
-              r.reason,
-              r.staffName ?? '—',
-              r.kotNumber?.toString() ?? '—',
-            ])
-        .toList();
-    final summary = {
-      'Total Cancellations': _totalCount.toString(),
-      'Total Items Qty': _totalQty.toString(),
-      'Total Amount': ReportExportService.formatCurrency(_totalAmount),
-      'Top Reason': _topReason,
-      'Generated': ReportExportService.formatDateTime(DateTime.now()),
-    };
-    await ReportExportService.showExportDialog(
+    // All / Current page / Date range over the already-filtered records.
+    await ReportExportService.showRangedExportDialog<ItemCancellationModel>(
       context: context,
       fileName: 'item_cancellations_${DateFormat('yyyyMMdd').format(DateTime.now())}',
       reportTitle: 'Item Cancellation Report',
-      headers: headers,
-      data: data,
-      summary: summary,
+      headers: RestaurantReportExports.cancellationHeaders,
+      items: _filtered,
+      rowOf: RestaurantReportExports.cancellationRow,
+      dateOf: (r) => r.timestamp,
+      summaryOf: RestaurantReportExports.cancellationSummary,
+      currentPage: _currentPage,
+      rowsPerPage: _rowsPerPage,
+      unit: 'cancellations',
     );
   }
 }

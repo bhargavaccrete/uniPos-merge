@@ -260,33 +260,34 @@ class _CategoryDataViewState extends State<CategoryDataView> {
       return;
     }
 
-    // Prepare headers
-    final headers = ['Category Name', 'Items Sold', 'Total Revenue'];
-
-    // Prepare data rows
-    final data = _filteredData.map((category) => [
-      category.categoryName,
-      category.totalItemsSold.toString(),
-      ReportExportService.formatCurrency(category.totalRevenue),
-    ]).toList();
-
     final periodName = _getPeriodDisplayName();
-    final summary = {
-      'Report Period': periodName,
-      'Total Categories': _totalCategories.toString(),
-      'Total Items Sold': _totalItemsSold.toString(),
-      'Total Revenue': ReportExportService.formatCurrency(_totalRevenue),
-      'Generated': ReportExportService.formatDateTime(DateTime.now()),
-    };
-
-    // Show export dialog
-    await ReportExportService.showExportDialog(
+    // All filtered categories / Current page. Rows are per-category totals,
+    // so no date range. The summary is built from exactly the exported rows,
+    // so it follows the search box too.
+    await ReportExportService.showRangedExportDialog<CategoryReportData>(
       context: context,
       fileName: 'sales_by_category_${widget.period.name.toLowerCase()}_${DateFormat('yyyyMMdd').format(DateTime.now())}',
       reportTitle: 'Sales by Category - $periodName',
-      headers: headers,
-      data: data,
-      summary: summary,
+      headers: const ['Category Name', 'Items Sold', 'Total Revenue'],
+      items: _filteredData,
+      rowOf: (category) => [
+        category.categoryName,
+        category.totalItemsSold.toString(),
+        ExportMoney(category.totalRevenue),
+      ],
+      dateOf: (_) => null,
+      summaryOf: (rows) => {
+        'Report Period': periodName,
+        'Total Categories': rows.length.toString(),
+        'Total Items Sold':
+            rows.fold<int>(0, (s, c) => s + c.totalItemsSold).toString(),
+        'Total Revenue': ReportExportService.formatCurrency(
+            rows.fold<double>(0.0, (s, c) => s + c.totalRevenue)),
+        'Generated': ReportExportService.formatDateTime(DateTime.now()),
+      },
+      currentPage: _currentPage,
+      rowsPerPage: _rowsPerPage,
+      unit: 'categories',
     );
   }
 

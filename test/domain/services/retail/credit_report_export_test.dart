@@ -4,6 +4,7 @@ import 'package:billberrylite/data/models/common/customer_model_125.dart';
 import 'package:billberrylite/data/models/retail/hive_model/credit_payment_model_218.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
 import 'package:billberrylite/data/repositories/retail/credit_payment_repository.dart';
+import 'package:billberrylite/domain/services/common/report_export_service.dart';
 import 'package:billberrylite/domain/services/retail/credit_report_export.dart';
 
 /// CREDIT REPORTS EXPORT — the shape of the three files.
@@ -125,7 +126,7 @@ void main() {
       expect(row[1], 'abcdef-123456-7890-abcd');
     });
 
-    test('money columns are formatted, and paid + due reconcile to total',
+    test('money columns are numeric cells, and paid + due reconcile to total',
         () async {
       final export = CreditReportExport.creditSales(
         sales: [sale('S-1', total: 500, paid: 200)],
@@ -134,9 +135,11 @@ void main() {
       );
 
       final row = export.rows.single;
-      expect(row[5], contains('500'));
-      expect(row[6], contains('200'));
-      expect(row[7], contains('300'));
+      double money(Object? cell) => (cell as ExportMoney).value;
+      expect(money(row[5]), 500);
+      expect(money(row[6]), 200);
+      expect(money(row[7]), 300);
+      expect(money(row[6]) + money(row[7]), money(row[5]));
     });
 
     test('a missing customer id exports as blank, not "null"', () async {
@@ -198,6 +201,73 @@ void main() {
   });
 
   // ── Collections ──────────────────────────────────────────────────────────
+
+  group('date-range selection (R2)', () {
+    final d1 = DateTime(2026, 11, 1, 10);
+    final d2 = DateTime(2026, 11, 5, 18);
+    final d3 = DateTime(2026, 11, 9, 9);
+
+    test('collections: a narrower range is re-bucketed, write-offs excluded',
+        () async {
+      final all = [
+        payment('P-1', amount: 500, rawDate: d1.toIso8601String()),
+        payment('P-2',
+            amount: 900, isWriteOff: true, rawDate: d2.toIso8601String()),
+        payment('P-3', amount: 200, mode: 'upi', rawDate: d2.toIso8601String()),
+        payment('P-4', amount: 700, rawDate: d3.toIso8601String()),
+      ];
+      final selected = ReportExportService.selectForExport(
+        all,
+        scope: ExportScope.dateRange,
+        from: DateTime(2026, 11, 5),
+        to: DateTime(2026, 11, 5),
+        dateOf: (p) => DateTime.tryParse(p.date),
+      );
+      final export = CreditReportExport.collections(
+        payments: selected,
+        buckets: CreditPaymentRepository.bucketCollections(selected),
+        period: 'All time',
+      );
+
+      expect(export.rows, hasLength(2), reason: 'write-off still listed');
+      expect(export.summary['Total Collections'],
+          ReportExportService.formatCurrency(200),
+          reason: 'only the UPI collection counts; the 900 write-off does not');
+    });
+
+    test('credit sales: the selected total is Σ totalAmount of those sales, '
+        'and All is the screen total unchanged', () async {
+      final all = [
+        sale('S-1', total: 500, rawDate: d1.toIso8601String()),
+        sale('S-2', total: 300, rawDate: d2.toIso8601String()),
+        sale('S-3', total: 250, rawDate: d3.toIso8601String()),
+      ];
+      // The screen's own formula (credit_reports_screen _loadData).
+      double total(List<SaleModel> s) =>
+          s.fold<double>(0, (sum, x) => sum + x.totalAmount);
+
+      final everything = ReportExportService.selectForExport(all,
+          scope: ExportScope.all);
+      expect(identical(everything, all), isTrue);
+
+      final ranged = ReportExportService.selectForExport(
+        all,
+        scope: ExportScope.dateRange,
+        from: DateTime(2026, 11, 5),
+        to: DateTime(2026, 11, 9),
+        dateOf: (s) => DateTime.tryParse(s.createdAt),
+      );
+      final export = CreditReportExport.creditSales(
+        sales: ranged,
+        totalCreditSales: total(ranged),
+        period: 'All time',
+      );
+      expect(export.rows.map((r) => r[1]), ['S-2', 'S-3']);
+      expect(export.summary['Transactions'], 2);
+      expect(export.summary['Total Credit Sales'],
+          ReportExportService.formatCurrency(550));
+    });
+  });
 
   group('collections export', () {
     test('the Type column names what a spreadsheet cannot otherwise see',

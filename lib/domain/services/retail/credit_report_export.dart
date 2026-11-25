@@ -55,12 +55,12 @@ class CreditReportExport {
           // screen, the other to trace it back to the record.
           sale.displayNumber,
           sale.saleId,
-          at == null ? sale.date : ReportExportService.formatDateTime(at),
+          at == null ? sale.date : ExportDateTime(at),
           sale.customerId ?? '',
           sale.statusDisplayText,
-          ReportExportService.formatCurrency(sale.totalAmount),
-          ReportExportService.formatCurrency(sale.paidAmount),
-          ReportExportService.formatCurrency(sale.dueAmount),
+          ExportMoney(sale.totalAmount),
+          ExportMoney(sale.paidAmount),
+          ExportMoney(sale.dueAmount),
         ];
       }).toList(),
       summary: {
@@ -113,14 +113,16 @@ class CreditReportExport {
       rows: payments.map((p) {
         final at = DateTime.tryParse(p.date);
         return <dynamic>[
-          at == null ? p.date : ReportExportService.formatDateTime(at),
+          at == null ? p.date : ExportDateTime(at),
           rowType(p),
           p.paymentModeDisplayText,
           p.customerId,
           p.saleId,
           p.referenceId ?? '',
           p.note ?? '',
-          ReportExportService.formatCurrency(p.amount),
+          // Numeric on every row; the Type column says which rows are money
+          // collected (summary totals still exclude write-offs/adjustments).
+          ExportMoney(p.amount),
         ];
       }).toList(),
       summary: {
@@ -168,7 +170,7 @@ class CreditReportExport {
           c.name ?? '',
           c.phone ?? '',
           c.customerId,
-          ReportExportService.formatCurrency(c.creditBalance),
+          ExportMoney(c.creditBalance),
           '${share.toStringAsFixed(1)}%',
         ];
       }).toList(),

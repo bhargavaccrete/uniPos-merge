@@ -89,18 +89,29 @@ class _EODReportsListScreenState extends State<EODReportsListScreen> {
     }
   }
 
+  /// All / Custom date range over the closes the period chip shows (the list
+  /// is not paged, so no page option). The builder sums exactly the closes it
+  /// is given, so the summary always matches the exported rows.
   Future<void> _export() async {
-    final export = EodHistoryExport.list(
-      reports: _visibleReports,
-      period: _periodLabel,
-    );
-    await ReportExportService.showExportDialog(
+    final visible = _visibleReports;
+    await ReportExportService.showRangedExportDialog<EndOfDayReport>(
       context: context,
       fileName: 'eod_history',
       reportTitle: 'End of Day History',
-      headers: export.headers,
-      data: export.rows,
-      summary: export.summary,
+      headers: EodHistoryExport.listHeaders,
+      items: visible,
+      dateOf: (r) => r.date,
+      exportOf: (selected) {
+        final export = EodHistoryExport.list(
+          reports: selected,
+          period: _periodLabel,
+        );
+        return (data: export.rows, summary: export.summary);
+      },
+      currentPage: 0,
+      rowsPerPage: visible.length + 1,
+      unit: 'closes',
+      dateLabel: 'Close date',
     );
   }
 

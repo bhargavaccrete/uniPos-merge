@@ -357,19 +357,32 @@ class _CreditSalesTabState extends State<_CreditSalesTab> {
   /// Exports the rows the tab is showing — not a re-query, so the file can
   /// never cover a different period than the screen above it. The summary
   /// reads the same two figures the cards do.
+  ///
+  /// All / Custom date range (the list is not paged). The range uses
+  /// `createdAt`, the field the loader filters on. The total is the same sum
+  /// `_loadData` makes (Σ totalAmount over the listed sales), taken over the
+  /// selected sales — for All that is the card's figure exactly.
   Future<void> _export() async {
-    final export = CreditReportExport.creditSales(
-      sales: _creditSales,
-      totalCreditSales: _totalCreditSales,
-      period: _periodLabel(widget.dateFilter),
-    );
-    await ReportExportService.showExportDialog(
+    await ReportExportService.showRangedExportDialog<SaleModel>(
       context: context,
       fileName: 'credit_sales',
       reportTitle: 'Credit Sales',
-      headers: export.headers,
-      data: export.rows,
-      summary: export.summary,
+      headers: CreditReportExport.creditSalesHeaders,
+      items: _creditSales,
+      dateOf: (s) => DateTime.tryParse(s.createdAt),
+      exportOf: (selected) {
+        final export = CreditReportExport.creditSales(
+          sales: selected,
+          totalCreditSales: identical(selected, _creditSales)
+              ? _totalCreditSales
+              : selected.fold<double>(0, (sum, s) => sum + s.totalAmount),
+          period: _periodLabel(widget.dateFilter),
+        );
+        return (data: export.rows, summary: export.summary);
+      },
+      currentPage: 0,
+      rowsPerPage: _creditSales.length + 1,
+      unit: 'sales',
     );
   }
 
@@ -675,19 +688,31 @@ class _CollectionsTabState extends State<_CollectionsTab> {
 
   /// Exports the rows on screen, with the summary bucketed from the very map
   /// the cards render — so the file cannot disagree with them.
+  ///
+  /// All / Custom date range by payment date (the loader's filter; the list is
+  /// not paged). A narrower selection is re-bucketed with the same
+  /// `bucketCollections`, so write-offs and return adjustments stay excluded.
   Future<void> _export() async {
-    final export = CreditReportExport.collections(
-      payments: _payments,
-      buckets: _collectionByMode,
-      period: _periodLabel(widget.dateFilter),
-    );
-    await ReportExportService.showExportDialog(
+    await ReportExportService.showRangedExportDialog<CreditPaymentModel>(
       context: context,
       fileName: 'credit_collections',
       reportTitle: 'Credit Collections',
-      headers: export.headers,
-      data: export.rows,
-      summary: export.summary,
+      headers: CreditReportExport.collectionsHeaders,
+      items: _payments,
+      dateOf: (p) => DateTime.tryParse(p.date),
+      exportOf: (selected) {
+        final export = CreditReportExport.collections(
+          payments: selected,
+          buckets: identical(selected, _payments)
+              ? _collectionByMode
+              : CreditPaymentRepository.bucketCollections(selected),
+          period: _periodLabel(widget.dateFilter),
+        );
+        return (data: export.rows, summary: export.summary);
+      },
+      currentPage: 0,
+      rowsPerPage: _payments.length + 1,
+      unit: 'rows',
     );
   }
 

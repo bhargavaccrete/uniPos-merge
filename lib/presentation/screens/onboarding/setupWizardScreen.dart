@@ -14,7 +14,7 @@ import 'package:billberrylite/presentation/screens/onboarding/taxSetupStep.dart'
 import 'package:billberrylite/presentation/screens/onboarding/paymentSetupStep.dart';
 import 'package:billberrylite/presentation/screens/onboarding/staffSetupStep.dart';
 import 'package:billberrylite/presentation/screens/onboarding/securitySetupStep.dart';
-import 'package:billberrylite/core/plan/entitlement_keys.dart';
+import 'package:billberrylite/core/plan/mode_keys.dart';
 import 'package:billberrylite/core/plan/plan_enforcement.dart';
 import 'package:billberrylite/presentation/screens/onboarding/license_activated_screen.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
@@ -711,7 +711,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen>
 
       // Tax Setup — settings module; hidden when the plan excludes it, or when the
       // business answered "Not Registered" on Store Details (taxEnabled == false).
-      if (PlanEnforce.allows(EntKeys.settings) && _store.taxEnabled)
+      if (PlanEnforce.allows(ModeKeys.settings) && _store.taxEnabled)
         SlideTransition(
           position: _slideAnimation,
           child: FadeTransition(
@@ -744,7 +744,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen>
       ),
 
       // Payment Methods — settings module; hidden when the plan excludes it.
-      if (PlanEnforce.allows(EntKeys.settings))
+      if (PlanEnforce.allows(ModeKeys.settings))
         SlideTransition(
           position: _slideAnimation,
           child: FadeTransition(
@@ -757,7 +757,7 @@ class _SetupWizardScreenState extends State<SetupWizardScreen>
         ),
 
       // Staff Setup — users module; hidden on single-user plans (users:false).
-      if (PlanEnforce.allows(EntKeys.users))
+      if (PlanEnforce.allows(ModeKeys.users))
         SlideTransition(
           position: _slideAnimation,
           child: FadeTransition(
@@ -1199,7 +1199,7 @@ class SetupStep {
         description: 'Verify your email and activate your license',
         estimatedTime: '2 min',
       ),
-      if (PlanEnforce.allows(EntKeys.settings) && store.taxEnabled)
+      if (PlanEnforce.allows(ModeKeys.settings) && store.taxEnabled)
         const SetupStep(
           title: 'Tax Setup',
           icon: Icons.receipt,
@@ -1212,14 +1212,14 @@ class SetupStep {
         description: 'Add your products and categories',
         estimatedTime: '3 min',
       ),
-      if (PlanEnforce.allows(EntKeys.settings))
+      if (PlanEnforce.allows(ModeKeys.settings))
         const SetupStep(
           title: 'Payment Methods',
           icon: Icons.payment,
           description: 'Setup payment acceptance methods',
           estimatedTime: '1 min',
         ),
-      if (PlanEnforce.allows(EntKeys.users))
+      if (PlanEnforce.allows(ModeKeys.users))
         const SetupStep(
           title: 'Staff Setup',
           icon: Icons.people,

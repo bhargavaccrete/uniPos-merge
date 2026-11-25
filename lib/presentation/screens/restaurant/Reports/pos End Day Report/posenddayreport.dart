@@ -5,6 +5,7 @@ import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/data/models/restaurant/db/eodmodel_317.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/domain/services/common/report_export_service.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Reports/report_export_rows.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
@@ -122,79 +123,26 @@ class _PosenddayreportState extends State<Posenddayreport> {
       return;
     }
 
-    final headers = [
-      'Date',
-      'Total Sales',
-      'Discount',
-      'Opening Balance',
-      'Closing Balance',
-      'Actual Cash',
-      'Difference',
-      'Cash Payment',
-      'Card Payment',
-      'Online Payment',
-    ];
-
-    final data = filteredReports.map((report) {
-      double cashAmount = 0.0;
-      double cardAmount = 0.0;
-      double onlineAmount = 0.0;
-
-      // FIX 2: Use += to accumulate; = would discard earlier entries of the same type.
-      for (var payment in report.paymentSummaries) {
-        if (payment.paymentType.toLowerCase() == 'cash') {
-          cashAmount += payment.totalAmount;
-        } else if (payment.paymentType.toLowerCase() == 'card') {
-          cardAmount += payment.totalAmount;
-        } else if (payment.paymentType.toLowerCase() == 'online' ||
-            payment.paymentType.toLowerCase() == 'upi') {
-          onlineAmount += payment.totalAmount;
-        }
-      }
-
-      return [
-        // FIX 1: Model has no closingDate — replaced with report date and totalSales.
-        ReportExportService.formatDateTime(report.date),
-        ReportExportService.formatCurrency(report.totalSales),
-        ReportExportService.formatCurrency(report.totalDiscount),
-        ReportExportService.formatCurrency(report.openingBalance),
-        ReportExportService.formatCurrency(report.closingBalance),
-        ReportExportService.formatCurrency(
-          report.cashReconciliation.actualCash,
-        ),
-        ReportExportService.formatCurrency(
-          report.cashReconciliation.difference,
-        ),
-        ReportExportService.formatCurrency(cashAmount),
-        ReportExportService.formatCurrency(cardAmount),
-        ReportExportService.formatCurrency(onlineAmount),
-      ];
-    }).toList();
-
-    final totalOpening = _totalOpeningBalance;
-    final totalClosing = _totalClosingBalance;
-
-    String periodDisplay = _selectedDate != null
+    final periodDisplay = _selectedDate != null
         ? DateFormat('dd MMM yyyy').format(_selectedDate!)
         : 'All Dates';
 
-    final summary = {
-      'Report Period': periodDisplay,
-      'Total Reports': filteredReports.length.toString(),
-      'Total Discount': ReportExportService.formatCurrency(_totalDiscount),
-      'Total Opening Balance': ReportExportService.formatCurrency(totalOpening),
-      'Total Closing Balance': ReportExportService.formatCurrency(totalClosing),
-      'Generated': ReportExportService.formatDateTime(DateTime.now()),
-    };
-
-    await ReportExportService.showExportDialog(
+    // All / Current page / Date range over the already-filtered End Day
+    // reports (one day, or All Dates), by the stored End Day date.
+    await ReportExportService.showRangedExportDialog<EndOfDayReport>(
       context: context,
       fileName:
           'eod_reports_${_selectedDate != null ? DateFormat('yyyyMMdd').format(_selectedDate!) : 'all'}_${DateFormat('yyyyMMdd').format(DateTime.now())}',
       reportTitle: 'End of Day Reports - $periodDisplay',
-      headers: headers,
-      data: data,
-      summary: summary,
+      headers: RestaurantReportExports.endDayHeaders,
+      items: filteredReports,
+      rowOf: RestaurantReportExports.endDayRow,
+      dateOf: (r) => r.date,
+      summaryOf: (rows) =>
+          RestaurantReportExports.endDaySummary(rows, periodDisplay),
+      currentPage: _currentPage,
+      rowsPerPage: _rowsPerPage,
+      unit: 'reports',
     );
   }
 

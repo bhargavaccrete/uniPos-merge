@@ -224,23 +224,25 @@ class RestaurantGRNReportScreen extends StatelessWidget {
                 r['grnNumber'],
                 r['poNumber'],
                 r['supplierName'],
-                _date(r['receivedDate'] as String),
+                ReportExportService.isoDateCell(r['receivedDate'] as String),
                 r['invoiceNumber'] ?? '',
+                // Quantities stay quantities.
                 exportQty((r['orderedQty'] as num).toDouble()),
                 exportQty((r['receivedQty'] as num).toDouble()),
                 exportQty((r['acceptedQty'] as num).toDouble()),
                 exportQty((r['damagedQty'] as num).toDouble()),
-                ReportExportService.formatCurrency(
-                    (r['billedValue'] as num).toDouble()),
-                ReportExportService.formatCurrency(
-                    (r['acceptedValue'] as num).toDouble()),
-                ReportExportService.formatCurrency(
-                    (r['damagedValue'] as num).toDouble()),
+                ExportMoney((r['billedValue'] as num).toDouble()),
+                ExportMoney((r['acceptedValue'] as num).toDouble()),
+                ExportMoney((r['damagedValue'] as num).toDouble()),
               ],
             )
             .toList(),
         summary: grnReportExportSummary(rows),
       ),
+      // Opt-in: All / Current page / Date range by receivedDate — the field
+      // the loader filters on.
+      rangedExport: true,
+      exportRowDate: (r) => DateTime.tryParse(r['receivedDate'] as String),
     );
   }
 }

@@ -22,6 +22,7 @@ import '../../../../widget/componets/common/report_summary_card.dart';
 import '../../../../../data/models/restaurant/db/pastordermodel_313.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/domain/services/common/report_export_service.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Reports/report_export_rows.dart';
 import 'package:billberrylite/util/restaurant/report_history_window.dart';
 
 class DiscountOrderReport extends StatefulWidget {
@@ -69,8 +70,6 @@ class DiscountDataView extends StatefulWidget {
 class _DiscountDataViewState extends State<DiscountDataView> {
   List<PastOrderModel> _filteredOrders = [];
   double _totalDiscountAmount = 0.0;
-  double _totalSubtotal = 0.0;
-  double _totalNetAmount = 0.0;
   int _totalOrdersCount = 0;
   double _averageDiscount = 0.0;
   bool _isLoading = true;
@@ -119,8 +118,6 @@ class _DiscountDataViewState extends State<DiscountDataView> {
           _filteredOrders = [];
           _totalOrdersCount = 0;
           _totalDiscountAmount = 0.0;
-          _totalSubtotal = 0.0;
-          _totalNetAmount = 0.0;
           _averageDiscount = 0.0;
           _currentPage = 0;
           _isLoading = false;
@@ -137,8 +134,6 @@ class _DiscountDataViewState extends State<DiscountDataView> {
 
     final List<PastOrderModel> results = [];
     double discountSum = 0.0;
-    double subtotalSum = 0.0;
-    double netAmountSum = 0.0;
 
     // Plan data-scope: clamp the visible history window (reports.history_limit_days).
     final cutoff = ReportHistoryWindow.cutoff;
@@ -156,8 +151,6 @@ class _DiscountDataViewState extends State<DiscountDataView> {
 
       results.add(order);
       discountSum += order.Discount ?? 0.0;
-      subtotalSum += order.subTotal ?? 0.0;
-      netAmountSum += order.totalPrice - (order.refundAmount ?? 0.0);
     }
 
     results.sort((a, b) => (b.orderAt ?? DateTime(0)).compareTo(a.orderAt ?? DateTime(0)));
@@ -166,8 +159,6 @@ class _DiscountDataViewState extends State<DiscountDataView> {
       _filteredOrders = results;
       _totalOrdersCount = results.length;
       _totalDiscountAmount = discountSum;
-      _totalSubtotal = subtotalSum;
-      _totalNetAmount = netAmountSum;
       _averageDiscount = _totalOrdersCount > 0 ? discountSum / _totalOrdersCount : 0.0;
       _currentPage = 0;
       _isLoading = false;
@@ -180,52 +171,21 @@ class _DiscountDataViewState extends State<DiscountDataView> {
       return;
     }
 
-    final headers = [
-      'Date',
-      'Invoice',
-      'Customer',
-      'Payment',
-      'Type',
-      'Original',
-      'Discount',
-      'Final'
-    ];
-
-    final data = _filteredOrders.map((order) {
-      final discount = order.Discount ?? 0.0;
-      final netTotal = order.totalPrice - (order.refundAmount ?? 0.0);
-      final original = netTotal + discount;
-      return [
-        ReportExportService.formatDateTime(order.orderAt),
-        order.billNumber != null ? 'INV ${order.billNumber}' : '#${(order.id.length > 8 ? order.id.substring(0, 8) : order.id)}',
-        order.customerName.isNotEmpty ? order.customerName : 'Guest',
-        order.paymentmode ?? 'N/A',
-        order.orderType ?? 'N/A',
-        ReportExportService.formatCurrency(original),
-        ReportExportService.formatCurrency(discount),
-        ReportExportService.formatCurrency(netTotal),
-      ];
-    }).toList();
-
+    // All / Current page / Date range over the already-filtered orders.
     final periodDisplay = _getPeriodDisplayName();
-
-    final summary = {
-      'Report Period': periodDisplay,
-      'Total Orders': _totalOrdersCount.toString(),
-      'Total Subtotal': ReportExportService.formatCurrency(_totalSubtotal),
-      'Total Discount': ReportExportService.formatCurrency(_totalDiscountAmount),
-      'Total Amount': ReportExportService.formatCurrency(_totalNetAmount),
-      'Average Discount': ReportExportService.formatCurrency(_averageDiscount),
-      'Generated': ReportExportService.formatDateTime(DateTime.now()),
-    };
-
-    await ReportExportService.showExportDialog(
+    await ReportExportService.showRangedExportDialog<PastOrderModel>(
       context: context,
       fileName: 'discount_orders_${widget.period.name.toLowerCase()}_${DateFormat('yyyyMMdd').format(DateTime.now())}',
       reportTitle: 'Discount Orders Report - $periodDisplay',
-      headers: headers,
-      data: data,
-      summary: summary,
+      headers: RestaurantReportExports.discountHeaders,
+      items: _filteredOrders,
+      rowOf: RestaurantReportExports.discountRow,
+      dateOf: (o) => o.orderAt,
+      summaryOf: (rows) =>
+          RestaurantReportExports.discountSummary(rows, periodDisplay),
+      currentPage: _currentPage,
+      rowsPerPage: _rowsPerPage,
+      unit: 'orders',
     );
   }
 

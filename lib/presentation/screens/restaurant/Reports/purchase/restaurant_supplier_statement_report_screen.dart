@@ -357,17 +357,14 @@ class _RestaurantSupplierStatementReportScreenState
           .map(
             (r) => [
               r['supplierName'],
-              ReportExportService.formatCurrency((r['b0_30'] as num).toDouble()),
-              ReportExportService.formatCurrency(
-                  (r['b31_60'] as num).toDouble()),
-              ReportExportService.formatCurrency(
-                  (r['b61_90'] as num).toDouble()),
-              ReportExportService.formatCurrency(
-                  (r['b90plus'] as num).toDouble()),
-              ReportExportService.formatCurrency(
-                  (r['closing'] as num).toDouble()),
-              _date(r['oldestOpen'] as String?),
-              r['oldestDays'],
+              // Same ageing values as before — only the cell type changes.
+              ExportMoney((r['b0_30'] as num).toDouble()),
+              ExportMoney((r['b31_60'] as num).toDouble()),
+              ExportMoney((r['b61_90'] as num).toDouble()),
+              ExportMoney((r['b90plus'] as num).toDouble()),
+              ExportMoney((r['closing'] as num).toDouble()),
+              ReportExportService.isoDateCell(r['oldestOpen'] as String?),
+              r['oldestDays'], // days, not money
             ],
           )
           .toList(),
@@ -518,16 +515,15 @@ class _RestaurantSupplierStatementReportScreenState
       data: rows
           .map(
             (r) => [
-              _date(r['date'] as String?),
+              ReportExportService.isoDateCell(r['date'] as String?),
               r['typeDisplay'],
               r['docNumber'] ?? '',
               r['description'] ?? '',
               r['isBroughtForward'] == true
                   ? ''
-                  : ReportExportService.formatCurrency(
-                      (r['amount'] as num).toDouble()),
-              ReportExportService.formatCurrency(
-                  (r['balanceAfter'] as num).toDouble()),
+                  : ExportMoney((r['amount'] as num).toDouble()),
+              // The same running balance the statement computed.
+              ExportMoney((r['balanceAfter'] as num).toDouble()),
             ],
           )
           .toList(),

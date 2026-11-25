@@ -46,6 +46,10 @@ class ModeKeys {
   static String get usersMax =>
       AppConfig.isRetail ? RetailEntKeys.usersMax : EntKeys.usersMax;
 
+  // ── Settings module (setup wizard: Tax, Payment, backup password) ─────────
+  static String get settings =>
+      AppConfig.isRetail ? RetailEntKeys.settings : EntKeys.settings;
+
   // ── Shift lifecycle ───────────────────────────────────────────────────────
   // Read by the auto-start/auto-close logic, which is the same code on both
   // dashboards. The attendance and staff-report keys deliberately have NO

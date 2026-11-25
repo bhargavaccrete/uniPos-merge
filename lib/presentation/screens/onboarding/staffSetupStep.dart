@@ -11,7 +11,7 @@ import 'package:billberrylite/data/models/common/staffModel_310.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/di/service_locator.dart';
-import 'package:billberrylite/core/plan/entitlement_keys.dart';
+import 'package:billberrylite/core/plan/mode_keys.dart';
 import 'package:billberrylite/core/plan/entitlements.dart';
 import 'package:billberrylite/domain/store/restaurant/license_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -202,7 +202,7 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
     // (activation now happens at the Verify Email step, before this one).
     final lic = locator<LicenseStore>();
     if (!lic.licenseBypassed && Entitlements.instance.hasManifest) {
-      if (!Entitlements.instance.can(EntKeys.users)) {
+      if (!Entitlements.instance.can(ModeKeys.users)) {
         NotificationService.instance.showError(
           'Your plan does not include staff management.',
         );
@@ -210,7 +210,7 @@ class _StaffSetupStepState extends State<StaffSetupStep> {
       }
       // TODO(backend): confirm whether users.max INCLUDES the admin/owner.
       // Currently caps the staff list at users.max (admin not counted).
-      final maxUsers = Entitlements.instance.limit(EntKeys.usersMax);
+      final maxUsers = Entitlements.instance.limit(ModeKeys.usersMax);
       if (maxUsers > 0 && _staffMembers.length >= maxUsers) {
         NotificationService.instance.showError(
           'Your plan allows up to $maxUsers staff. Upgrade to add more.',

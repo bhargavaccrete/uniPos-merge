@@ -141,6 +141,11 @@ class DamagedItemsReportScreen extends StatelessWidget {
           ],
         );
       },
+      // All / Current page / Date range by the GRN receivedDate the loader
+      // filters on.
+      rangedExport: true,
+      exportRowDate: (r) =>
+          DateTime.tryParse(r['receivedDate'] as String? ?? ''),
       exportData: (rows) => ReportExportData(
         headers: const [
           'Product',
@@ -162,16 +167,13 @@ class DamagedItemsReportScreen extends StatelessWidget {
                 r['supplierName'],
                 r['grnNumber'],
                 r['poNumber'],
-                _date(r['receivedDate'] as String),
+                ReportExportService.isoDateCell(r['receivedDate'] as String),
                 exportQty((r['damagedQty'] as num).toDouble()),
+                // Unpriced lines stay blank, as before.
                 r['costPrice'] == null
                     ? ''
-                    : ReportExportService.formatCurrency(
-                        r['costPrice'] as double,
-                      ),
-                ReportExportService.formatCurrency(
-                  r['damagedAmount'] as double,
-                ),
+                    : ExportMoney(r['costPrice'] as double),
+                ExportMoney(r['damagedAmount'] as double),
                 r['handlingDisplay'],
               ],
             )

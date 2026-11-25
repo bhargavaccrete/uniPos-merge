@@ -113,7 +113,7 @@ class _ShiftReportScreenState extends State<ShiftReportScreen> {
       'Net Revenue',
       'Status',
     ];
-    final data = shifts.map((s) {
+    List<dynamic> rowOf(ShiftModel s) {
       final shiftEnd = s.endTime ?? DateTime.now();
       final shiftExp = expenses
           .where(
@@ -124,37 +124,48 @@ class _ShiftReportScreenState extends State<ShiftReportScreen> {
           .fold<double>(0.0, (sum, e) => sum + e.amount);
       return <dynamic>[
         s.staffName,
-        DateFormat('dd MMM yyyy').format(s.startTime),
+        ExportDate(s.startTime),
         DateFormat('HH:mm').format(s.startTime),
         s.endTime != null ? DateFormat('HH:mm').format(s.endTime!) : '-',
         '${s.duration.inHours}h ${s.duration.inMinutes.remainder(60)}m',
         s.orderCount,
-        s.totalSales,
-        shiftExp,
-        s.totalSales - shiftExp,
+        ExportMoney(s.totalSales),
+        ExportMoney(shiftExp),
+        ExportMoney(s.totalSales - shiftExp),
         s.isOpen ? 'Active' : 'Closed',
       ];
-    }).toList();
+    }
 
-    final totalSales = shifts.fold<double>(0.0, (sum, s) => sum + s.totalSales);
-    final totalOrders = shifts.fold<int>(0, (sum, s) => sum + s.orderCount);
-    final totalMins = shifts.fold<int>(
-      0,
-      (sum, s) => sum + s.duration.inMinutes,
-    );
+    // Same totals as before, for exactly the shifts exported.
+    Map<String, dynamic> summaryOf(List<ShiftModel> rows) {
+      final totalSales = rows.fold<double>(0.0, (sum, s) => sum + s.totalSales);
+      final totalOrders = rows.fold<int>(0, (sum, s) => sum + s.orderCount);
+      final totalMins = rows.fold<int>(
+        0,
+        (sum, s) => sum + s.duration.inMinutes,
+      );
+      return {
+        'Total Shifts': '${rows.length}',
+        'Total Orders': '$totalOrders',
+        'Total Sales': '$currency${DecimalSettings.formatAmount(totalSales)}',
+        'Total Hours': '${totalMins ~/ 60}h ${totalMins.remainder(60)}m',
+      };
+    }
 
-    await ReportExportService.showExportDialog(
+    // All filtered shifts / Custom date range (by shift start, the field the
+    // screen filters on). The list is not paginated, so no page option.
+    await ReportExportService.showRangedExportDialog<ShiftModel>(
       context: context,
       fileName: 'shift_report',
       reportTitle: 'Shift Report',
       headers: headers,
-      data: data,
-      summary: {
-        'Total Shifts': '${shifts.length}',
-        'Total Orders': '$totalOrders',
-        'Total Sales': '$currency${DecimalSettings.formatAmount(totalSales)}',
-        'Total Hours': '${totalMins ~/ 60}h ${totalMins.remainder(60)}m',
-      },
+      items: shifts,
+      rowOf: rowOf,
+      dateOf: (s) => s.startTime,
+      summaryOf: summaryOf,
+      currentPage: 0,
+      rowsPerPage: shifts.length + 1,
+      unit: 'shifts',
     );
   }
 

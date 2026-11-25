@@ -6,6 +6,7 @@ import 'package:billberrylite/data/models/restaurant/db/eodmodel_317.dart';
 import 'package:billberrylite/data/models/restaurant/db/pastordermodel_313.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/domain/services/common/report_export_service.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Reports/report_export_rows.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
@@ -201,39 +202,22 @@ class _PaymentModeDataViewState extends State<PaymentModeDataView> {
       return;
     }
 
-    final headers = [
-      'Date & Time',
-      'Invoice',
-      'Payment Mode',
-      'Amount',
-    ];
-
-    final data = _filteredOrders.map((order) => [
-      ReportExportService.formatDateTime(order.orderAt!),
-      _invoiceOf(order),
-      PaymentModeSummary.methodLabel(order),
-      ReportExportService.formatCurrency(_netAmountOf(order)),
-    ]).toList();
-
+    // All / Current page / Date range over the already-filtered orders. The
+    // per-method summary is re-aggregated for exactly the exported orders.
     final periodDisplay = _getPeriodDisplayName();
-
-    final summary = <String, String>{
-      'Report Period': periodDisplay,
-      'Total Collected': ReportExportService.formatCurrency(_totalCollected),
-      'Total Transactions': _totalTransactions.toString(),
-      for (final s in _summaries)
-        s.paymentType:
-            '${ReportExportService.formatCurrency(s.totalAmount)} (${s.transactionCount} txns, ${s.percentage.toStringAsFixed(1)}%)',
-      'Generated': ReportExportService.formatDateTime(DateTime.now()),
-    };
-
-    await ReportExportService.showExportDialog(
+    await ReportExportService.showRangedExportDialog<PastOrderModel>(
       context: context,
       fileName: 'payment_mode_${widget.period.name.toLowerCase()}_${DateFormat('yyyyMMdd').format(DateTime.now())}',
       reportTitle: 'Sales by Payment Mode - $periodDisplay',
-      headers: headers,
-      data: data,
-      summary: summary,
+      headers: RestaurantReportExports.paymentModeHeaders,
+      items: _filteredOrders,
+      rowOf: RestaurantReportExports.paymentModeRow,
+      dateOf: (o) => o.orderAt,
+      summaryOf: (rows) =>
+          RestaurantReportExports.paymentModeSummary(rows, periodDisplay),
+      currentPage: _currentPage,
+      rowsPerPage: _rowsPerPage,
+      unit: 'orders',
     );
   }
 

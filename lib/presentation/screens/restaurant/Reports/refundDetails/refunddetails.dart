@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/domain/services/common/report_export_service.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Reports/report_export_rows.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
@@ -188,56 +189,23 @@ class _RefundDataViewState extends State<RefundDataView> {
       return;
     }
 
-    // Prepare headers
-    final headers = [
-      'Date & Time',
-      'Bill #',
-      'Customer',
-      'Payment Method',
-      'Order Type',
-      'Refund Amount',
-      'Refunded By',
-      'Reason'
-    ];
-
-    // Prepare data rows
-    final data = _refundedOrders.map((order) {
-      String reason = '';
-      if (order.refundReason != null && order.refundReason!.isNotEmpty) {
-        final lines = order.refundReason!.split('\n');
-        reason = lines.isNotEmpty ? lines.last.trim() : '';
-      }
-
-      return [
-        ReportExportService.formatDateTime(order.refundedAt),
-        order.billNumber?.toString() ?? order.id.substring(0, 8),
-        order.customerName ?? 'Guest',
-        order.paymentmode ?? 'N/A',
-        order.orderType ?? 'N/A',
-        ReportExportService.formatCurrency(order.refundAmount ?? 0.0),
-        order.refundedBy ?? '—',
-        reason,
-      ];
-    }).toList();
-
-    // Prepare summary
+    // All / Current page / Date range over the already-filtered refunds.
+    // The range is by REFUND date — the same field the screen filters on.
     final periodName = _getPeriodDisplayName();
-    final summary = {
-      'Report Period': periodName,
-      'Total Refunds': _totalRefundCount.toString(),
-      'Total Refund Amount': ReportExportService.formatCurrency(_totalRefundAmount),
-      'Most Common Reason': _mostCommonReason,
-      'Generated': ReportExportService.formatDateTime(DateTime.now()),
-    };
-
-    // Show export dialog
-    await ReportExportService.showExportDialog(
+    await ReportExportService.showRangedExportDialog<PastOrderModel>(
       context: context,
       fileName: 'refund_details_${widget.period.name.toLowerCase()}_${DateFormat('yyyyMMdd').format(DateTime.now())}',
       reportTitle: 'Refund Details - $periodName',
-      headers: headers,
-      data: data,
-      summary: summary,
+      headers: RestaurantReportExports.refundHeaders,
+      items: _refundedOrders,
+      rowOf: RestaurantReportExports.refundRow,
+      dateOf: (o) => o.refundedAt,
+      summaryOf: (rows) =>
+          RestaurantReportExports.refundSummary(rows, periodName),
+      currentPage: _currentPage,
+      rowsPerPage: _rowsPerPage,
+      unit: 'refunds',
+      dateLabel: 'Refund date',
     );
   }
 

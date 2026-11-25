@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
-import 'package:billberrylite/core/plan/entitlement_keys.dart';
+import 'package:billberrylite/core/plan/mode_keys.dart';
 import 'package:billberrylite/core/plan/plan_enforcement.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
@@ -73,7 +73,7 @@ class _SecuritySetupStepState extends State<SecuritySetupStep> {
     }
     // Backup password is only collected when the plan includes backups
     // (settings module). Otherwise skip its policy check entirely.
-    if (!PlanEnforce.allows(EntKeys.settings)) return null;
+    if (!PlanEnforce.allows(ModeKeys.settings)) return null;
     // Shared backup-password policy (same rules in Settings + export gate).
     return BackupEncryptionService.validatePassword(
       _pwdController.text.trim(),
@@ -128,7 +128,7 @@ class _SecuritySetupStepState extends State<SecuritySetupStep> {
       if (!saved) throw StateError('admin PIN was not stored');
       // Only set a backup password when the plan includes backups; otherwise
       // it's collected lazily later (ensureBackupPassword) if the plan is upgraded.
-      if (PlanEnforce.allows(EntKeys.settings)) {
+      if (PlanEnforce.allows(ModeKeys.settings)) {
         await BackupEncryptionService.setPassword(_pwdController.text.trim());
       }
     } catch (e) {
@@ -199,11 +199,11 @@ class _SecuritySetupStepState extends State<SecuritySetupStep> {
                     keyboardType: TextInputType.number,
                     maxLength: 6,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    textInputAction: PlanEnforce.allows(EntKeys.settings)
+                    textInputAction: PlanEnforce.allows(ModeKeys.settings)
                         ? TextInputAction.next
                         : TextInputAction.done,
                     onFieldSubmitted: (_) {
-                      if (PlanEnforce.allows(EntKeys.settings)) {
+                      if (PlanEnforce.allows(ModeKeys.settings)) {
                         FocusScope.of(context).requestFocus(_pwdFocusNode);
                       } else {
                         _onContinue();
@@ -212,7 +212,7 @@ class _SecuritySetupStepState extends State<SecuritySetupStep> {
                   ),
 
                   // Backup Password section — only when the plan includes backups.
-                  if (PlanEnforce.allows(EntKeys.settings)) ...[
+                  if (PlanEnforce.allows(ModeKeys.settings)) ...[
                     SizedBox(height: AppResponsive.largeSpacing(context)),
 
                     // ── Backup password ──
@@ -386,7 +386,7 @@ class _SecuritySetupStepState extends State<SecuritySetupStep> {
         ),
         const SizedBox(height: 4),
         Text(
-          PlanEnforce.allows(EntKeys.settings)
+          PlanEnforce.allows(ModeKeys.settings)
               ? 'Set an admin login PIN and a password that encrypts your backups.'
               : 'Set an admin login PIN for this device.',
           style: GoogleFonts.poppins(

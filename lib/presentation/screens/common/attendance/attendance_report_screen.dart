@@ -3,6 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/data/models/common/attendance_model.dart';
+import 'package:billberrylite/data/models/common/staffModel_310.dart';
+import 'package:billberrylite/domain/services/common/attendance_report_calc.dart';
+import 'package:intl/intl.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:pdf/pdf.dart';
@@ -18,6 +21,7 @@ import 'package:billberrylite/presentation/widget/componets/common/report_empty_
 import 'package:billberrylite/presentation/widget/componets/common/report_export_button.dart';
 import 'package:billberrylite/presentation/widget/componets/common/report_summary_card.dart';
 import 'package:billberrylite/presentation/widget/componets/common/report_summary_row.dart';
+import 'attendance_export_dialog.dart';
 import 'staff_attendance_detail_screen.dart';
 
 class AttendanceReportScreen extends StatefulWidget {
@@ -240,62 +244,52 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
     });
   }
 
-  // Operating days between two dates, inclusive. Restaurants run 7 days a week,
-  // so every calendar day counts as a working day (not just Mon–Fri).
-  int _workingDaysInPeriod(DateTime start, DateTime end) {
-    int count = 0;
-    var d = DateTime(start.year, start.month, start.day);
-    final last = DateTime(end.year, end.month, end.day);
-    while (!d.isAfter(last)) {
-      count++;
-      d = d.add(const Duration(days: 1));
+  // ── Calculations: ONE shared helper (AttendanceReportCalc) for the cards,
+  // the staff list, Print and both exports — Restaurant and Retail alike.
+
+  String _staffKey(StaffModel s) => '${s.firstName} ${s.lastName}'.trim();
+
+  /// Role by name over ALL staff, first match wins (the old `firstOrNull`).
+  Map<String, String> get _staffRoles {
+    final roles = <String, String>{};
+    for (final s in staffStore.staff) {
+      roles.putIfAbsent(_staffKey(s), () => s.isCashier);
     }
-    return count;
+    return roles;
   }
 
-  // All unique staff names
-  List<String> get _staffNames {
-    // Include all active staff from staffStore so absent staff show up
-    final fromRecords = _records.map((r) => r.staffName).toSet();
-    final fromStore = staffStore.staff
-        .where((s) => s.isActive)
-        .map((s) => '${s.firstName} ${s.lastName}'.trim())
-        .toSet();
-    return {...fromRecords, ...fromStore}.toList()..sort();
-  }
+  AttendanceReportCalc _calcFor(
+    List<AttendanceModel> records,
+    DateTime from,
+    DateTime periodEnd,
+  ) =>
+      AttendanceReportCalc(
+        records: records,
+        from: from,
+        periodEnd: periodEnd,
+        // Active staff are listed even with no records, so absences show.
+        activeStaffNames:
+            staffStore.staff.where((s) => s.isActive).map(_staffKey),
+        staffRoles: _staffRoles,
+      );
 
-  int _presentDays(String name) {
-    // Count unique dates this staff has records for in this month
-    return _records
-        .where((r) => r.staffName == name)
-        .map((r) => r.date)
-        .toSet()
-        .length;
-  }
+  /// The month on screen.
+  AttendanceReportCalc get _calc => _calcFor(
+        _records,
+        _selectedMonth,
+        AttendanceReportCalc.monthPeriodEnd(_selectedMonth, DateTime.now()),
+      );
 
-  int _totalMinutes(String name) {
-    final now = DateTime.now();
-    return _records.where((r) => r.staffName == name).fold(0, (s, r) {
-      if (r.totalMinutes != null) return s + r.totalMinutes!;
-      if (!r.isOpen) return s;
-      final gross = now.difference(r.clockIn).inMinutes;
-      final breaks =
-          (r.breakTotalMinutes ?? 0) +
-          (r.isOnBreak && r.breakStartTime != null
-              ? now.difference(r.breakStartTime!).inMinutes
-              : 0);
-      final active = gross - breaks;
-      return s + (active < 0 ? 0 : active);
-    });
-  }
+  int _workingDaysInPeriod(DateTime start, DateTime end) =>
+      AttendanceReportCalc.workingDaysBetween(start, end);
 
-  String _fmtMins(int mins) {
-    final h = mins ~/ 60;
-    final m = mins % 60;
-    if (h == 0 && m == 0) return '0m';
-    if (h == 0) return '${m}m';
-    return '${h}h ${m}m';
-  }
+  List<String> get _staffNames => _calc.staffNames;
+
+  int _presentDays(String name) => _calc.presentDays(name);
+
+  int _totalMinutes(String name) => _calc.totalMinutes(name);
+
+  String _fmtMins(int mins) => AttendanceReportCalc.fmtMins(mins);
 
   String _monthName(int m) {
     const months = [
@@ -315,57 +309,71 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
     return months[m - 1];
   }
 
+  /// Period + layout first (the month on screen is the default), then the
+  /// standard Excel / PDF dialog. A custom range re-reads attendance for
+  /// exactly those dates with the same loader the screen uses.
   Future<void> _doExport(BuildContext context) async {
-    final allStaff = _staffNames;
-    final isCurrentMonth =
-        _selectedMonth.year == DateTime.now().year &&
-        _selectedMonth.month == DateTime.now().month;
-    final periodEnd = isCurrentMonth
-        ? DateTime.now()
-        : DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0);
-    final workingDays = _workingDaysInPeriod(_selectedMonth, periodEnd);
-
-    final headers = [
-      'Staff Name',
-      'Role',
-      'Days Present',
-      'Days Absent',
-      'Total Hours',
-    ];
-    final data = allStaff.map((name) {
-      final presentDays = _presentDays(name);
-      final absentDays = (workingDays - presentDays).clamp(0, workingDays);
-      final totalMins = _totalMinutes(name);
-      final staffModel = staffStore.staff
-          .where((s) => '${s.firstName} ${s.lastName}'.trim() == name)
-          .firstOrNull;
-      final role =
-          staffModel?.isCashier ??
-          (_records.where((r) => r.staffName == name).firstOrNull?.staffRole ??
-              '');
-      return <dynamic>[
-        name,
-        role,
-        presentDays,
-        absentDays,
-        _fmtMins(totalMins),
-      ];
-    }).toList();
-
-    await ReportExportService.showExportDialog(
-      context: context,
-      fileName:
-          'attendance_${_monthName(_selectedMonth.month)}_${_selectedMonth.year}',
-      reportTitle:
-          'Monthly Attendance — ${_monthName(_selectedMonth.month)} ${_selectedMonth.year}',
-      headers: headers,
-      data: data,
-      summary: {
-        'Month': '${_monthName(_selectedMonth.month)} ${_selectedMonth.year}',
-        'Total Staff': '${allStaff.length}',
-        'Working Days': '$workingDays',
-      },
+    final choice = await AttendanceExportDialog.show(
+      context,
+      month: _selectedMonth,
     );
+    if (choice == null || !context.mounted) return;
+
+    final List<AttendanceModel> records;
+    final DateTime periodEnd;
+    final String periodKey;
+    final String periodLabel;
+    final String fileTag;
+    if (choice.isMonth) {
+      records = _records;
+      periodEnd = AttendanceReportCalc.monthPeriodEnd(
+        _selectedMonth,
+        DateTime.now(),
+      );
+      periodKey = 'Month';
+      periodLabel =
+          '${_monthName(_selectedMonth.month)} ${_selectedMonth.year}';
+      fileTag = '${_monthName(_selectedMonth.month)}_${_selectedMonth.year}';
+    } else {
+      final to = choice.to;
+      records = await attendanceStore.getRecordsBetweenDates(
+        choice.from,
+        DateTime(to.year, to.month, to.day, 23, 59, 59),
+      );
+      if (!context.mounted) return;
+      periodEnd = to;
+      periodKey = 'Period';
+      final fmt = DateFormat('dd MMM yyyy');
+      periodLabel = '${fmt.format(choice.from)} – ${fmt.format(to)}';
+      fileTag = '${DateFormat('yyyyMMdd').format(choice.from)}-'
+          '${DateFormat('yyyyMMdd').format(to)}';
+    }
+
+    final calc = _calcFor(records, choice.from, periodEnd);
+    final title = choice.isMonth
+        ? 'Monthly Attendance — $periodLabel'
+        : 'Attendance — $periodLabel';
+
+    if (choice.dayWise) {
+      final rows = calc.dayRows();
+      await ReportExportService.showExportDialog(
+        context: context,
+        fileName: 'attendance_daywise_$fileTag',
+        reportTitle: '$title (Day-wise)',
+        headers: AttendanceReportCalc.dayHeaders,
+        data: rows,
+        summary: calc.dayBlock(periodLabel, rows),
+      );
+    } else {
+      await ReportExportService.showExportDialog(
+        context: context,
+        fileName: 'attendance_$fileTag',
+        reportTitle: title,
+        headers: AttendanceReportCalc.summaryHeaders,
+        data: calc.summaryRows(),
+        summary: calc.summaryBlock(periodKey, periodLabel),
+      );
+    }
   }
 
   @override
@@ -518,14 +526,8 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
     final absentDays = (workingDays - presentDays).clamp(0, workingDays);
     final totalMins = _totalMinutes(name);
 
-    // Role from staff store or first record
-    final staffModel = staffStore.staff
-        .where((s) => '${s.firstName} ${s.lastName}'.trim() == name)
-        .firstOrNull;
-    final role =
-        staffModel?.isCashier ??
-        (_records.where((r) => r.staffName == name).firstOrNull?.staffRole ??
-            '');
+    // Role from staff store or first record (shared rule).
+    final role = _calc.roleOf(name);
 
     final staffRecords = _records.where((r) => r.staffName == name).toList();
 

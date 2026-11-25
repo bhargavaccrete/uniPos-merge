@@ -243,19 +243,21 @@ class _ClosingReportViewState extends State<ClosingReportView> {
     final dataRows = <List<dynamic>>[];
 
     // Add financial summary
-    dataRows.add(['Opening Balance', ReportExportService.formatCurrency(_totalOpeningBalance)]);
-    dataRows.add(['Total Sales', ReportExportService.formatCurrency(_totalSales)]);
-    dataRows.add(['Total Discount', ReportExportService.formatCurrency(_totalDiscount)]);
-    dataRows.add(['Total Expenses', ReportExportService.formatCurrency(_totalExpenses)]);
-    dataRows.add(['Net Amount', ReportExportService.formatCurrency(_totalSales - _totalExpenses)]);
-    dataRows.add(['Closing Balance', ReportExportService.formatCurrency(_totalClosingBalance)]);
+    // Amounts are real money cells; the values (incl. opening/closing
+    // balances) are the same precomputed figures as before.
+    dataRows.add(['Opening Balance', ExportMoney(_totalOpeningBalance)]);
+    dataRows.add(['Total Sales', ExportMoney(_totalSales)]);
+    dataRows.add(['Total Discount', ExportMoney(_totalDiscount)]);
+    dataRows.add(['Total Expenses', ExportMoney(_totalExpenses)]);
+    dataRows.add(['Net Amount', ExportMoney(_totalSales - _totalExpenses)]);
+    dataRows.add(['Closing Balance', ExportMoney(_totalClosingBalance)]);
     dataRows.add(['', '']); // Empty row separator
 
     // Add order breakdown
     for (var entry in _orderTypeTotals.entries) {
       dataRows.add([
         '${entry.key} Orders (${_orderTypeCounts[entry.key] ?? 0} count)',
-        ReportExportService.formatCurrency(entry.value)
+        ExportMoney(entry.value)
       ]);
     }
     dataRows.add(['', '']); // Empty row separator
@@ -264,7 +266,7 @@ class _ClosingReportViewState extends State<ClosingReportView> {
     for (var entry in _paymentTypeTotals.entries) {
       dataRows.add([
         '${entry.key} Payments',
-        ReportExportService.formatCurrency(entry.value)
+        ExportMoney(entry.value)
       ]);
     }
 

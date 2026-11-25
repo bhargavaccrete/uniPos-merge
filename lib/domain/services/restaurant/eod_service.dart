@@ -726,6 +726,9 @@ class EODService {
         .getProfitReport(startDate: startTime, endDate: endTime);
     final totalCost = (profit['totalCost'] as num).toDouble();
     final grossProfit = (profit['grossProfit'] as num).toDouble();
+    final unknownCostLines = (profit['unknownCostLines'] as num).toInt();
+    final unknownCostRevenue =
+        (profit['unknownCostRevenue'] as num).toDouble();
 
     // ==================== CUSTOMER OUTSTANDING ====================
     // A position at close, not a movement during the day.
@@ -757,6 +760,8 @@ class EODService {
       upiCollections: collections['upi'] ?? 0.0,
       totalCost: totalCost,
       grossProfit: grossProfit,
+      unknownCostLines: unknownCostLines,
+      unknownCostRevenue: unknownCostRevenue,
       customersWithDue: customersWithCredit.length,
       totalOutstanding: totalOutstanding,
       cashWithdrawn: cashWithdrawn,

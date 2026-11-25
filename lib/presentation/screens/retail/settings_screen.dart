@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_mobx/flutter_mobx.dart';
 import 'package:billberrylite/core/config/tax_feature.dart';
@@ -18,7 +18,7 @@ import 'package:billberrylite/presentation/screens/retail/payment_methods_screen
 import 'package:billberrylite/presentation/screens/retail/settings/invoice_numbering_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/settings/printer_connection_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/settings/printer_settings_screen.dart';
-import 'package:billberrylite/presentation/screens/retail/simple_product_fields_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/settings/retail_test_data_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/store_info_settings_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/tax_settings_screen.dart';
 import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
@@ -241,24 +241,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   if (_can('catalogEdit')) ...[
                     SettingsNavTile(
                       title: 'Product Attributes',
-                      subtitle: 'Manage global attributes (Color, Size, etc.)',
+                      subtitle:
+                          'Attributes, variants and simple product fields',
                       icon: Icons.tune,
                       color: const Color(0xFF9C27B0),
                       onTap: () => _open(
                         const AttributesScreen(),
                         entKey: RetailEntKeys.catalog,
                         featureName: 'Product Attributes',
-                      ),
-                    ),
-                    SettingsNavTile(
-                      title: 'Simple Product Fields',
-                      subtitle: 'Choose the fields shown on simple products',
-                      icon: Icons.checklist_rtl,
-                      color: const Color(0xFF3F51B5),
-                      onTap: () => _open(
-                        const SimpleProductFieldsScreen(),
-                        entKey: RetailEntKeys.catalog,
-                        featureName: 'Simple Product Fields',
                       ),
                     ),
                   ],
@@ -337,6 +327,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 icon: Icons.info_outline_rounded,
                 children: [DeviceIdTile()],
               ),
+
+              // Debug builds only — never compiled into a release menu.
+              if (!kReleaseMode && _can('settings'))
+                SettingsSection(
+                  title: 'Developer',
+                  icon: Icons.science_outlined,
+                  children: [
+                    SettingsNavTile(
+                      title: 'Retail Test Data',
+                      subtitle: 'Create a test dataset (debug builds only)',
+                      icon: Icons.science_outlined,
+                      color: AppColors.warning,
+                      onTap: () => _open(const RetailTestDataScreen()),
+                    ),
+                  ],
+                ),
             ],
           ),
         ),

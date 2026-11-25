@@ -25,7 +25,7 @@ import '../../../domain/store/retail/attribute_store.dart';
 import '../../../util/common/app_responsive.dart';
 import '../../../presentation/widget/componets/common/app_text_field.dart';
 import '../../../presentation/widget/componets/common/app_dialog.dart';
-import 'package:billberrylite/presentation/screens/retail/simple_product_fields_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/attributes_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/import_product/bulk_import_screen.dart';
 import 'package:billberrylite/presentation/screens/restaurant/import/restaurant_bulk_import_service.dart';
 import 'package:billberrylite/presentation/screens/restaurant/import/bulk_import_screen.dart';
@@ -3792,13 +3792,13 @@ class _AddProductScreenState extends State<AddProductScreen>
     );
   }
 
-  /// Opens the shared Simple Product Fields configurator, then re-resolves the
+  /// Opens Product Attributes (where simple product fields are set), then re-resolves the
   /// list. Values and controllers for fields the user just removed are dropped
   /// so a deleted field can't still be written onto the default variant.
   Future<void> _openSimpleFieldSettings() async {
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const SimpleProductFieldsScreen()),
+      MaterialPageRoute(builder: (_) => const AttributesScreen()),
     );
     if (!mounted) return;
 
@@ -6000,7 +6000,7 @@ class _AddProductScreenState extends State<AddProductScreen>
                 onPressed: widget.onNext,
                 icon: const Icon(Icons.arrow_forward),
                 label: Text(
-                  'Next: Payment Setup',
+                  'Next',
                   style: GoogleFonts.poppins(
                     fontSize: AppResponsive.buttonFontSize(context),
                     fontWeight: FontWeight.w600,

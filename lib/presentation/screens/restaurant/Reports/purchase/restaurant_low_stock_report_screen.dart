@@ -64,7 +64,8 @@ class _RestaurantLowStockReportScreenState
   }
 
   void _export(List<Map<String, dynamic>> rows) {
-    ReportExportService.showExportDialog(
+    // All flagged items / Current page. Stock as of now, so no date range.
+    ReportExportService.showRangedExportDialog<Map<String, dynamic>>(
       context: context,
       fileName: 'restaurant_low_stock',
       reportTitle: 'Low Stock Report',
@@ -77,25 +78,25 @@ class _RestaurantLowStockReportScreenState
         'Cost',
         'Status',
       ],
-      data: rows
-          .map(
-            (r) => [
-              r['itemName'],
-              r['variantName'] ?? '',
-              exportQty((r['currentStock'] as num).toDouble()),
-              exportQty((r['reorderPoint'] as num).toDouble()),
-              r['unit'],
-              ReportExportService.formatCurrency(
-                  (r['costPrice'] as num).toDouble()),
-              r['isOut'] == true ? 'Out of Stock' : 'Low',
-            ],
-          )
-          .toList(),
-      summary: {
-        'Items Flagged': rows.length,
-        'Out of Stock': rows.where((r) => r['isOut'] == true).length,
-        'Made to Order': rows.where((r) => r['isMadeToOrder'] == true).length,
+      items: rows,
+      rowOf: (r) => [
+        r['itemName'],
+        r['variantName'] ?? '',
+        exportQty((r['currentStock'] as num).toDouble()), // quantity
+        exportQty((r['reorderPoint'] as num).toDouble()), // quantity
+        r['unit'],
+        ExportMoney((r['costPrice'] as num).toDouble()),
+        r['isOut'] == true ? 'Out of Stock' : 'Low',
+      ],
+      dateOf: (_) => null,
+      summaryOf: (sel) => {
+        'Items Flagged': sel.length,
+        'Out of Stock': sel.where((r) => r['isOut'] == true).length,
+        'Made to Order': sel.where((r) => r['isMadeToOrder'] == true).length,
       },
+      currentPage: _page,
+      rowsPerPage: _rowsPerPage,
+      unit: 'items',
     );
   }
 

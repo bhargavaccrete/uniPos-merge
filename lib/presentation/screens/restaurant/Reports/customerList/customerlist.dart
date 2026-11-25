@@ -366,45 +366,50 @@ class _CustomerListReportState extends State<CustomerListReport> {
       'Registration Date',
     ];
 
-    final data = _filteredData
-        .map(
-          (customer) => [
-            customer.srNo.toString(),
-            customer.name,
-            customer.phone,
-            customer.totalOrders.toString(),
-            ReportExportService.formatCurrency(customer.totalSpent),
-            customer.lastOrderDate != null
-                ? ReportExportService.formatDate(customer.lastOrderDate!)
-                : 'Never',
-            customer.registrationDate != null
-                ? ReportExportService.formatDate(customer.registrationDate!)
-                : '-',
-          ],
-        )
-        .toList();
+    // Same formulas as the screen's totals (active = at least one order),
+    // over exactly the exported rows — so they also follow the search box.
+    Map<String, dynamic> summaryOf(List<CustomerReportData> rows) {
+      final total = rows.length;
+      final active = rows.where((c) => c.totalOrders > 0).length;
+      final revenue = rows.fold<double>(0.0, (s, c) => s + c.totalSpent);
+      final avgSpent = total > 0 ? revenue / total : 0.0;
+      return {
+        'Total Customers': total.toString(),
+        'Active Customers':
+            '$active (${((active / total) * 100).toStringAsFixed(1)}%)',
+        'Total Revenue': ReportExportService.formatCurrency(revenue),
+        'Avg Spent/Customer': ReportExportService.formatCurrency(avgSpent),
+        'Generated': ReportExportService.formatDateTime(DateTime.now()),
+      };
+    }
 
-    final avgSpent = _totalCustomers > 0
-        ? _totalRevenue / _totalCustomers
-        : 0.0;
-
-    final summary = {
-      'Total Customers': _totalCustomers.toString(),
-      'Active Customers':
-          '$_activeCustomers (${((_activeCustomers / _totalCustomers) * 100).toStringAsFixed(1)}%)',
-      'Total Revenue': ReportExportService.formatCurrency(_totalRevenue),
-      'Avg Spent/Customer': ReportExportService.formatCurrency(avgSpent),
-      'Generated': ReportExportService.formatDateTime(DateTime.now()),
-    };
-
-    await ReportExportService.showExportDialog(
+    // All filtered customers / Current page. Rows are per-customer totals,
+    // so no date range.
+    await ReportExportService.showRangedExportDialog<CustomerReportData>(
       context: context,
       fileName:
           'customer_list_${DateFormat('yyyyMMdd').format(DateTime.now())}',
       reportTitle: 'Customer List Report',
       headers: headers,
-      data: data,
-      summary: summary,
+      items: _filteredData,
+      rowOf: (customer) => [
+        customer.srNo.toString(),
+        customer.name,
+        customer.phone, // stays text
+        customer.totalOrders.toString(),
+        ExportMoney(customer.totalSpent),
+        customer.lastOrderDate != null
+            ? ExportDate(customer.lastOrderDate!)
+            : 'Never',
+        customer.registrationDate != null
+            ? ExportDate(customer.registrationDate!)
+            : '-',
+      ],
+      dateOf: (_) => null,
+      summaryOf: summaryOf,
+      currentPage: _currentPage,
+      rowsPerPage: _rowsPerPage,
+      unit: 'customers',
     );
   }
 

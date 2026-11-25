@@ -82,6 +82,8 @@ void main() {
     String paymentType = 'credit',
     double paid = 0,
     DateTime? at,
+    bool isReturn = false,
+    String? paymentListJson,
   }) async {
     final iso = (at ?? day).toIso8601String();
     await Hive.box<SaleModel>(HiveBoxNames.sales).put(
@@ -102,6 +104,8 @@ void main() {
         grandTotal: total,
         paidAmount: paid,
         dueAmount: total - paid,
+        isReturn: isReturn,
+        paymentListJson: paymentListJson,
       ),
     );
   }
@@ -342,6 +346,103 @@ void main() {
       await seedSale('S-1', total: 500, paid: 200);
 
       expect((await sales.getCreditSales()).single.dueAmount, 300.0);
+    });
+  });
+
+  // ── Credit Sales TAB (ReportService) ─────────────────────────────────────
+  // The tab lists every sale where credit was extended at checkout: a full
+  // pay-later sale OR a short-paid one. It used the repository's
+  // `paymentType == 'credit'` read, which missed short-paid sales (stored
+  // under their main tender) and listed some returns but not others.
+
+  group('credit sales tab', () {
+    Future<List<String>> tabIds() async =>
+        (await ReportService().getCreditSalesReport(
+                startDate: windowStart, endDate: windowEnd))
+            .map((s) => s.saleId)
+            .toList();
+
+    test('a short-paid cash sale is listed with its due', () async {
+      // ₹1,000 bill, ₹600 cash taken, ₹400 left on the customer.
+      await seedSale('S-SHORT',
+          total: 1000,
+          paymentType: 'cash',
+          paid: 600,
+          paymentListJson: '[{"method":"cash","amount":600.0}]');
+
+      final tab = await ReportService()
+          .getCreditSalesReport(startDate: windowStart, endDate: windowEnd);
+      expect(tab.map((s) => s.saleId), ['S-SHORT']);
+      expect(tab.single.dueAmount, 400.0);
+    });
+
+    test('a short-paid sale stays listed after its balance is collected',
+        () async {
+      // Collection rewrites paid/due, never the checkout legs.
+      await seedSale('S-SETTLED',
+          total: 1000,
+          paymentType: 'cash',
+          paid: 1000,
+          paymentListJson: '[{"method":"cash","amount":600.0}]');
+
+      expect(await tabIds(), ['S-SETTLED']);
+    });
+
+    test('a fully paid sale is not listed, change given or not', () async {
+      await seedSale('S-PAID',
+          total: 1000,
+          paymentType: 'cash',
+          paid: 1000,
+          paymentListJson: '[{"method":"cash","amount":1000.0}]');
+      // Tendered ₹1,200 on a ₹1,000 bill — change, not credit.
+      await seedSale('S-CHANGE',
+          total: 1000,
+          paymentType: 'cash',
+          paid: 1000,
+          paymentListJson: '[{"method":"cash","amount":1200.0}]');
+      // A sale written before tender legs were stored.
+      await seedSale('S-LEGACY', total: 500, paymentType: 'upi', paid: 500);
+
+      expect(await tabIds(), isEmpty);
+    });
+
+    test('a split sale with a credit leg is listed', () async {
+      await seedSale('S-SPLIT',
+          total: 1000,
+          paymentType: 'split',
+          paid: 300,
+          paymentListJson:
+              '[{"method":"cash","amount":300.0},{"method":"credit","amount":700.0}]');
+
+      expect(await tabIds(), ['S-SPLIT']);
+    });
+
+    test('returns are never listed, however they were refunded', () async {
+      await seedSale('S-1', total: 1000);
+      // Whole return against the balance: stored with the 'credit' due leg.
+      await seedSale('R-DUE',
+          total: -1000,
+          paymentType: 'credit',
+          isReturn: true,
+          paymentListJson: '[{"method":"credit","amount":-1000.0}]');
+      // Split return: part against the balance, part refunded in cash.
+      await seedSale('R-SPLIT',
+          total: -500,
+          paymentType: 'cash',
+          isReturn: true,
+          paymentListJson:
+              '[{"method":"credit","amount":-200.0},{"method":"cash","amount":-300.0}]');
+
+      expect(await tabIds(), ['S-1']);
+    });
+
+    test('newest first, then sale id, with the window applied', () async {
+      await seedSale('S-3', total: 100, at: day);
+      await seedSale('S-1', total: 100, at: day);
+      await seedSale('S-NEW', total: 100, at: day.add(const Duration(hours: 2)));
+      await seedSale('S-OUT', total: 100, at: windowEnd);
+
+      expect(await tabIds(), ['S-NEW', 'S-1', 'S-3']);
     });
   });
 

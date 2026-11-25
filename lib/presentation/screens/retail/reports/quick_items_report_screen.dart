@@ -32,6 +32,14 @@ class QuickItemsReportScreen extends StatelessWidget {
     return d == null ? iso : DateFormat('dd MMM yyyy').format(d);
   }
 
+  /// Real date cell; same text as [_date] in the PDF, and the same '—' /
+  /// stored-text fallbacks.
+  Object _dateCell(String? iso) {
+    if (iso == null) return '—';
+    final d = DateTime.tryParse(iso);
+    return d == null ? iso : ExportDate(d);
+  }
+
   double _sum(List<Map<String, dynamic>> rows, String key) =>
       rows.fold<double>(0, (s, r) => s + ((r[key] as num?) ?? 0).toDouble());
 
@@ -133,6 +141,9 @@ class QuickItemsReportScreen extends StatelessWidget {
           DataCell(Text(_date(row['lastSold'] as String?))),
         ],
       ),
+      // All / Current page only: grouped per typed name (first/last sold are
+      // spans, not one row date). "% of Sales" stays against the full period.
+      rangedExport: true,
       exportData: (rows) => ReportExportData(
         headers: const [
           'Item',
@@ -153,14 +164,15 @@ class QuickItemsReportScreen extends StatelessWidget {
                 r['itemName'],
                 r['lineCount'],
                 exportQty((r['totalQuantity'] as num).toDouble()),
-                ReportExportService.formatCurrency(r['avgPrice'] as double),
+                ExportMoney(r['avgPrice'] as double),
                 _rates(r),
-                ReportExportService.formatCurrency(r['totalDiscount'] as double),
-                ReportExportService.formatCurrency(r['totalTax'] as double),
-                ReportExportService.formatCurrency(r['totalRevenue'] as double),
+                ExportMoney(r['totalDiscount'] as double),
+                ExportMoney(r['totalTax'] as double),
+                ExportMoney(r['totalRevenue'] as double),
+                // A percentage, not money: stays text as before.
                 '${(r['shareOfRevenuePct'] as num).toStringAsFixed(1)}%',
-                _date(r['firstSold'] as String?),
-                _date(r['lastSold'] as String?),
+                _dateCell(r['firstSold'] as String?),
+                _dateCell(r['lastSold'] as String?),
               ],
             )
             .toList(),

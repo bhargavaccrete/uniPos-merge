@@ -177,20 +177,23 @@ class RestaurantPurchaseReturnReportScreen extends StatelessWidget {
                 r['supplierName'],
                 r['grnNumber'],
                 r['poNumber'],
-                _date(r['returnDate'] as String),
-                exportQty((r['totalQty'] as num).toDouble()),
-                ReportExportService.formatCurrency(
-                    (r['totalAmount'] as num).toDouble()),
+                ReportExportService.isoDateCell(r['returnDate'] as String),
+                exportQty((r['totalQty'] as num).toDouble()), // quantity
+                ExportMoney((r['totalAmount'] as num).toDouble()),
                 r['statusDisplay'],
                 r['creditNoteNumber'] ?? '',
-                ReportExportService.formatCurrency(
-                    (r['creditNoteAmount'] as num).toDouble()),
-                _date(r['creditNoteDate'] as String?),
+                ExportMoney((r['creditNoteAmount'] as num).toDouble()),
+                ReportExportService.isoDateCell(
+                    r['creditNoteDate'] as String?),
               ],
             )
             .toList(),
         summary: purchaseReturnExportSummary(rows),
       ),
+      // Opt-in: All / Current page / Date range by returnDate — the field the
+      // loader filters on (the credit date is a separate event).
+      rangedExport: true,
+      exportRowDate: (r) => DateTime.tryParse(r['returnDate'] as String),
     );
   }
 }

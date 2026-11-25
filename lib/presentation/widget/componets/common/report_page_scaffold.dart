@@ -96,6 +96,16 @@ class ReportPageScaffold extends StatefulWidget {
   /// with `(null, null)`.
   final bool showDateRange;
 
+  /// Opt-in: export through the ranged dialog (All filtered / Current page /
+  /// Custom date range) instead of the plain format dialog. Off by default,
+  /// so every screen that does not set it exports exactly as before.
+  final bool rangedExport;
+
+  /// With [rangedExport]: each row's date for the Custom date range option
+  /// (the same field [loader] filters on). Null — or a function returning
+  /// null — hides the date range option, leaving All / Current page.
+  final DateTime? Function(Map<String, dynamic> row)? exportRowDate;
+
   const ReportPageScaffold({
     super.key,
     required this.title,
@@ -113,6 +123,8 @@ class ReportPageScaffold extends StatefulWidget {
     this.exportData,
     required this.exportFileName,
     this.showDateRange = true,
+    this.rangedExport = false,
+    this.exportRowDate,
   });
 
   @override
@@ -194,7 +206,46 @@ class _ReportPageScaffoldState extends State<ReportPageScaffold> {
     return '${fmt.format(_customStart!)} - ${fmt.format(_customEnd!)}';
   }
 
+  String get _exportFileName =>
+      '${widget.exportFileName}_'
+      '${widget.showDateRange ? _period.name.toLowerCase() : 'all'}_'
+      '${DateFormat('yyyyMMdd').format(DateTime.now())}';
+
+  Map<String, dynamic> _wrapSummary(Map<String, dynamic> summary) => {
+        'Report Period': widget.showDateRange ? _periodLabel : 'All time',
+        ...summary,
+        'Generated': ReportExportService.formatDateTime(DateTime.now()),
+      };
+
+  /// Opt-in ranged export: the selection only narrows the rows already on
+  /// screen; rows and summary are rebuilt by [exportData] from exactly the
+  /// selected rows.
+  Future<void> _rangedExport() async {
+    final build = widget.exportData;
+    if (build == null) return;
+    final all = build(_rows);
+    if (all.rows.isEmpty) return;
+
+    await ReportExportService.showRangedExportDialog<Map<String, dynamic>>(
+      context: context,
+      fileName: _exportFileName,
+      reportTitle: widget.title,
+      headers: all.headers,
+      items: _rows,
+      dateOf: widget.exportRowDate ?? (_) => null,
+      exportOf: (selected) {
+        final p = identical(selected, _rows) ? all : build(selected);
+        return (data: p.rows, summary: _wrapSummary(p.summary));
+      },
+      currentPage: _currentPage,
+      rowsPerPage: _rowsPerPage,
+      unit: widget.rowUnit,
+    );
+  }
+
   Future<void> _export() async {
+    if (widget.rangedExport) return _rangedExport();
+
     final payload = widget.exportData?.call(_rows);
     if (payload == null || payload.rows.isEmpty) return;
 

@@ -54,7 +54,13 @@ class PurchaseSummaryReportScreen extends StatelessWidget {
         // so it subsumes `orderCount`.
         final counts = data['countByStatus'] as Map<String, int>;
         final hasOrders = counts.values.any((c) => c > 0);
-        if (!hasOrders && (data['receiptCount'] as int) == 0) {
+        // Recovery is dated by its own event, so a quiet month can still hold
+        // a credit note or a rejected claim worth showing.
+        final hasRecovery =
+            ((data['damagedValue'] as num?)?.toDouble() ?? 0) != 0;
+        if (!hasOrders &&
+            (data['receiptCount'] as int) == 0 &&
+            !hasRecovery) {
           return [];
         }
         return [data];
@@ -102,38 +108,13 @@ class PurchaseSummaryReportScreen extends StatelessWidget {
             ['Suppliers', d['supplierCount']],
             ['Units Ordered', exportQty((d['orderedQty'] as num).toDouble())],
             ['Units Received', exportQty((d['receivedQty'] as num).toDouble())],
-            [
-              'Ordered Value',
-              ReportExportService.formatCurrency(d['orderedValue'] as double),
-            ],
-            [
-              'Received Value',
-              ReportExportService.formatCurrency(d['receivedValue'] as double),
-            ],
-            [
-              'Expected Recovery',
-              ReportExportService.formatCurrency(
-                d['damagedExpected'] as double,
-              ),
-            ],
-            [
-              'Recovered',
-              ReportExportService.formatCurrency(
-                d['damagedRecovered'] as double,
-              ),
-            ],
-            [
-              'Damaged Absorbed',
-              ReportExportService.formatCurrency(
-                d['damagedAbsorbed'] as double,
-              ),
-            ],
-            [
-              'Outstanding Value',
-              ReportExportService.formatCurrency(
-                d['outstandingValue'] as double,
-              ),
-            ],
+            // Money rows are numeric ₹ cells; count and unit rows stay plain.
+            ['Ordered Value', ExportMoney(d['orderedValue'] as double)],
+            ['Received Value', ExportMoney(d['receivedValue'] as double)],
+            ['Expected Recovery', ExportMoney(d['damagedExpected'] as double)],
+            ['Recovered', ExportMoney(d['damagedRecovered'] as double)],
+            ['Damaged Absorbed', ExportMoney(d['damagedAbsorbed'] as double)],
+            ['Outstanding Value', ExportMoney(d['outstandingValue'] as double)],
             for (final entry in counts.entries)
               ['${_statusLabels[entry.key] ?? entry.key} orders', entry.value],
           ],

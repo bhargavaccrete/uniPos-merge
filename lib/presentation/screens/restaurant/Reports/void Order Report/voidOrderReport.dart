@@ -20,6 +20,7 @@ import '../../tabbar/orderDetails.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import '../../../../../util/restaurant/refund_state.dart';
 import 'package:billberrylite/domain/services/common/report_export_service.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Reports/report_export_rows.dart';
 import 'package:billberrylite/util/restaurant/report_history_window.dart';
 
 enum VoidOrderPeriod { Today, ThisWeek, Month, Year, Custom }
@@ -84,19 +85,9 @@ class VoidOrderDataView extends StatefulWidget {
 }
 
 class _VoidOrderDataViewState extends State<VoidOrderDataView> {
-  String _getRefundStatusText(PastOrderModel order) {
-    final state = RefundInfo.state(order);
-    switch (state) {
-      case RefundState.full:
-        return 'Fully Refunded';
-      case RefundState.partial:
-        return 'Partially Refunded';
-      case RefundState.none:
-        final pm = order.paymentmode ?? '';
-        final isPaidVoid = pm.isNotEmpty && pm != 'N/A';
-        return isPaidVoid ? 'Refund Pending' : '—';
-    }
-  }
+  // One definition, shared with the export rows.
+  String _getRefundStatusText(PastOrderModel order) =>
+      RestaurantReportExports.voidRefundStatus(order);
 
   Color _getRefundStatusColor(PastOrderModel order) {
     final state = RefundInfo.state(order);
@@ -895,49 +886,22 @@ class _VoidOrderDataViewState extends State<VoidOrderDataView> {
       return;
     }
 
-    // Prepare headers
-    final headers = [
-      'Bill #',
-      'Date & Time',
-      'Customer',
-      'Payment Method',
-      'Amount',
-      'Refund Status',
-      'Voided By',
-      'Reason',
-    ];
-
-    // Prepare data rows
-    final data = _voidOrders.map((order) => [
-      order.billNumber?.toString() ?? order.id.substring(0, 8),
-      ReportExportService.formatDateTime(order.orderAt),
-      order.customerName ?? 'Guest',
-      order.paymentmode ?? 'N/A',
-      ReportExportService.formatCurrency(order.totalPrice ?? 0.0),
-      _getRefundStatusText(order),
-      order.voidedBy ?? '—',
-      order.voidReason ?? '—',
-    ]).toList();
-
-    // Prepare summary
+    // All / Current page / Date range over the already-filtered void orders
+    // (whatever month/year/custom the screen applied).
     final periodName = _getPeriodDisplayName();
-    final summary = {
-      'Report Period': periodName,
-      'Total Void Orders': _totalVoidCount.toString(),
-      'Total Void Amount': ReportExportService.formatCurrency(_totalVoidAmount),
-      'Average Void Amount': ReportExportService.formatCurrency(_averageVoidAmount),
-      'Top Void Reason': _mostCommonReason,
-      'Generated': ReportExportService.formatDateTime(DateTime.now()),
-    };
-
-    // Show export dialog
-    await ReportExportService.showExportDialog(
+    await ReportExportService.showRangedExportDialog<PastOrderModel>(
       context: context,
       fileName: 'void_orders_${widget.period.name.toLowerCase()}_${DateFormat('yyyyMMdd').format(DateTime.now())}',
       reportTitle: 'Void Orders Report - $periodName',
-      headers: headers,
-      data: data,
-      summary: summary,
+      headers: RestaurantReportExports.voidHeaders,
+      items: _voidOrders,
+      rowOf: RestaurantReportExports.voidRow,
+      dateOf: (o) => o.orderAt,
+      summaryOf: (rows) =>
+          RestaurantReportExports.voidSummary(rows, periodName),
+      currentPage: _currentPage,
+      rowsPerPage: _rowsPerPage,
+      unit: 'orders',
     );
   }
 

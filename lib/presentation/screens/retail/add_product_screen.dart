@@ -18,7 +18,7 @@ import 'package:billberrylite/domain/services/retail/simple_product_fields_servi
 import 'package:billberrylite/domain/services/retail/variant_attribute_mapper.dart';
 import 'package:billberrylite/presentation/screens/retail/category_management_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/scanner_screen.dart';
-import 'package:billberrylite/presentation/screens/retail/simple_product_fields_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/attributes_screen.dart';
 import 'package:billberrylite/presentation/widget/retail/bundle_builder_widget.dart';
 import 'package:billberrylite/presentation/widget/retail/product_attribute_selector.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
@@ -416,14 +416,14 @@ class _AddProductScreenState extends State<AddProductScreen> {
     setState(() => _simpleFields = fields);
   }
 
-  /// Opens the shared Simple Product Fields configurator, then re-resolves the
+  /// Opens Product Attributes (where simple product fields are set), then re-resolves the
   /// list. Controllers for fields the user removed are disposed; their values
   /// already stop being saved, since [_mapFieldValues] only reads
   /// [_simpleFields].
   Future<void> _openSimpleFieldSettings() async {
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const SimpleProductFieldsScreen()),
+      MaterialPageRoute(builder: (_) => const AttributesScreen()),
     );
     if (!mounted) return;
 
@@ -1729,7 +1729,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
             const SizedBox(height: 4),
             Text(
               'For details you record just this once. Fields you use on every '
-              'product belong in Settings → Simple Product Fields.',
+              'product belong in Settings → Product Attributes.',
               style: GoogleFonts.poppins(
                 fontSize: AppResponsive.captionFontSize(context),
                 color: AppColors.textSecondary,
