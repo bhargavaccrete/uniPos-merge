@@ -211,7 +211,9 @@ class AppSettings {
   static bool get showItemImage => values["Item Image"] ?? true;
   static bool get showItemPrice => values["Item Price"] ?? true;
   // static bool get showDefaultItemImage => values["Item Default Image"] ?? false;
-  static bool get roundOff => values["Round Off"] ?? true;
+  // `values` always holds every default key, so this fallback is never hit; it
+  // matches the stored default (OFF) so the code states the real behaviour.
+  static bool get roundOff => values["Round Off"] ?? false;
 
   /// The round-off step in force right now, 0 when rounding is off. Stamped on
   /// a settled order so a reprint rounds the way the bill was rounded.

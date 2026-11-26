@@ -4,6 +4,7 @@ import 'package:billberrylite/data/models/retail/hive_model/credit_payment_model
 import 'package:billberrylite/data/repositories/retail/credit_payment_repository.dart';
 import 'package:billberrylite/data/repositories/common/customer_repository.dart';
 import 'package:billberrylite/data/repositories/retail/sale_repository.dart';
+import 'package:billberrylite/domain/services/retail/retail_day_gate.dart';
 import 'package:uuid/uuid.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 
@@ -131,6 +132,10 @@ abstract class _CreditStore with Store {
   // ==================== RECEIVE PAYMENT ====================
 
   /// Receive payment from customer (FIFO - oldest invoices first)
+  /// Collections in progress, by customer (SALE-7). Two at once would both
+  /// read the same balance and both apply it.
+  final Set<String> _collecting = {};
+
   @action
   Future<CreditPaymentResult> receivePayment({
     required String customerId,
@@ -139,8 +144,39 @@ abstract class _CreditStore with Store {
     String? referenceId,
     String? note,
   }) async {
+    if (!_collecting.add(customerId)) {
+      return CreditPaymentResult.failure(
+          'A payment for this customer is already being recorded.');
+    }
+    try {
+      return await _receivePayment(
+        customerId: customerId,
+        amount: amount,
+        paymentMode: paymentMode,
+        referenceId: referenceId,
+        note: note,
+      );
+    } finally {
+      _collecting.remove(customerId);
+    }
+  }
+
+  Future<CreditPaymentResult> _receivePayment({
+    required String customerId,
+    required double amount,
+    required String paymentMode,
+    String? referenceId,
+    String? note,
+  }) async {
     if (amount <= 0) {
       return CreditPaymentResult.failure('Invalid payment amount');
+    }
+
+    // BLK-16: with no day open the collection falls outside every End of
+    // Day; while one is pending the drawer refuses the Cash In row.
+    final dayBlock = await RetailDayGate.check();
+    if (dayBlock != null) {
+      return CreditPaymentResult.failure(RetailDayGate.messageFor(dayBlock));
     }
 
     // Get customer
@@ -157,6 +193,40 @@ abstract class _CreditStore with Store {
     final salesWithDue = await _saleRepository.getCustomerSalesWithDue(customerId);
     if (salesWithDue.isEmpty) {
       return CreditPaymentResult.failure('No invoices with due amount found');
+    }
+
+    // What this settlement collects: the amount, capped at what the invoices
+    // still owe — exactly what the FIFO loop below applies.
+    final totalDue =
+        salesWithDue.fold<double>(0.0, (sum, sale) => sum + sale.dueAmount);
+    final toCollect = amount < totalDue ? amount : totalDue;
+
+    // Cash collected against credit physically lands in the drawer, but it is
+    // not a sale — so it never appeared in the expected-cash figure, and every
+    // day with a cash collection closed with a false overage. Recording it as a
+    // Cash In movement puts it through the drawer's existing totals and gives
+    // it its own line in the log.
+    //
+    // One movement for the whole settlement, not one per invoice: the customer
+    // handed over a single amount.
+    //
+    // Written FIRST (BLK-16): the drawer can refuse it, and a refusal after
+    // the invoices and balance had moved left money collected with no Cash In
+    // row. Refused here, nothing else is written.
+    if (toCollect > 0 && paymentMode.toLowerCase().trim() == 'cash') {
+      final recorded = await cashMovementStore.addMovement(
+        type: 'in',
+        amount: toCollect,
+        reason: 'Credit collection',
+        note: customer.name ?? customerId,
+      );
+      if (!recorded) {
+        return CreditPaymentResult.failure(
+          'The cash could not be recorded, so nothing was collected. '
+          '${cashMovementStore.errorMessage ?? ''}'
+              .trim(),
+        );
+      }
     }
 
     double remainingPayment = amount;
@@ -218,24 +288,6 @@ abstract class _CreditStore with Store {
       customerId,
       -collected, // Negative to decrease balance
     );
-
-    // Cash collected against credit physically lands in the drawer, but it is
-    // not a sale — so it never appeared in the expected-cash figure, and every
-    // day with a cash collection closed with a false overage. Recording it as a
-    // Cash In movement puts it through the drawer's existing totals and gives
-    // it its own line in the log.
-    //
-    // One movement for the whole settlement, not one per invoice: the customer
-    // handed over a single amount, and `collected` is what actually landed
-    // (`amount` may exceed the total due).
-    if (collected > 0 && paymentMode.toLowerCase().trim() == 'cash') {
-      await cashMovementStore.addMovement(
-        type: 'in',
-        amount: collected,
-        reason: 'Credit collection',
-        note: customer.name ?? customerId,
-      );
-    }
 
     // Reload data
     await loadData();

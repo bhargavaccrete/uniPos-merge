@@ -1,16 +1,13 @@
+import 'package:flutter/foundation.dart';
 import 'package:mobx/mobx.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:billberrylite/core/di/service_locator.dart';
-import 'package:billberrylite/data/models/restaurant/db/restaurant_supplier_ledger_entry_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/restaurant_purchase_order_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/restaurant_purchase_order_item_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/restaurant_grn_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/restaurant_grn_item_model.dart';
-import 'package:billberrylite/data/models/restaurant/db/stock_movement_model.dart';
-import 'package:billberrylite/data/repositories/restaurant/stock_movement_repository.dart';
-import 'package:billberrylite/domain/services/restaurant/day_management_service.dart';
-import 'package:billberrylite/util/restaurant/restaurant_session.dart';
+import 'package:billberrylite/domain/services/restaurant/restaurant_grn_receiving.dart';
 
 part 'restaurant_purchase_order_store.g.dart';
 
@@ -39,6 +36,68 @@ typedef GRNReceiptLine = ({
   String? damagedHandling,
 });
 
+/// Purchase-order rules that need no store state — kept outside the MobX
+/// store so they are reachable as plain statics (a static on the private
+/// _RestaurantPurchaseOrderStore is not visible through the public alias).
+class RestaurantPORules {
+  RestaurantPORules._();
+
+  /// Shown when a receipt for the same PO is already being saved (S-06).
+  static const String receiptInProgressMessage =
+      'This receipt is already being saved.';
+
+  /// Why an item with variants cannot be on a purchase order (BLK-18).
+  static String variantItemMessage(String itemName) =>
+      '$itemName has variants. Its stock is kept per variant, which a purchase '
+      'order cannot record — adjust it in Manage Inventory instead.';
+
+  /// Refuses a PO that contains an item with variants: PO and GRN lines carry
+  /// no variant, so receiving it would add stock nothing sells from.
+  static void refuseVariantItems(List<PurchaseOrderLine> lines) {
+    for (final line in lines) {
+      final item = itemStore.getItemById(line.itemId);
+      if (item != null && item.hasVariants) {
+        throw StateError(variantItemMessage(item.name));
+      }
+    }
+  }
+
+  /// Tolerance for comparing received against ordered — quantities are
+  /// doubles (goods by weight), and three receipts of 3.5 against 10.5 sum to
+  /// 10.499999999999998. Same value as retail's `_qtyEpsilon`.
+  static const double _qtyEpsilon = 1e-6;
+
+  /// The PO's status after a receipt, decided PER LINE — retail's
+  /// `_updatePOStatusAfterGRN` rule.
+  ///
+  /// Comparing the PO's summed totals let a surplus on one line cover a
+  /// shortage on another: A 10 / B 10 received as A 15 / B 5 summed to 20 of
+  /// 20 and closed the order with five B never delivered — and a completed PO
+  /// can no longer be received against. Over-receipt still satisfies its OWN
+  /// line (`>=`). A cancelled order stays cancelled; an order with no lines or
+  /// nothing ordered never auto-completes (`0 >= 0`).
+  static RestaurantPOStatus statusAfterReceipt(RestaurantPurchaseOrderModel po) {
+    if (po.statusEnum == RestaurantPOStatus.cancelled) return po.statusEnum;
+
+    final lines = restaurantPurchaseOrderItemRepository.getItemsByPOId(po.poId);
+    final totalOrdered = lines.fold<double>(0, (sum, l) => sum + l.orderedQty);
+    if (lines.isEmpty || totalOrdered <= 0) return po.statusEnum;
+
+    var allSatisfied = true;
+    var anyReceived = false;
+    for (final line in lines) {
+      final received =
+          restaurantGrnItemRepository.getTotalReceivedQtyForPOItem(line.poItemId);
+      if (received > 0) anyReceived = true;
+      if (received < line.orderedQty - _qtyEpsilon) allSatisfied = false;
+    }
+
+    if (allSatisfied) return RestaurantPOStatus.completed;
+    if (anyReceived) return RestaurantPOStatus.partiallyReceived;
+    return po.statusEnum;
+  }
+}
+
 /// Restaurant-scoped Purchase Order / GRN pipeline store — mirrors retail's
 /// `PurchaseOrderStore` but scoped to `Items`/no-variant world (see
 /// docs/inventory_recipe_system_plan.md §6). Confirming a GRN is the one
@@ -48,9 +107,6 @@ class RestaurantPurchaseOrderStore = _RestaurantPurchaseOrderStore
     with _$RestaurantPurchaseOrderStore;
 
 abstract class _RestaurantPurchaseOrderStore with Store {
-  final StockMovementRepository _stockMovementRepository =
-      StockMovementRepository();
-
   // ==================== OBSERVABLES ====================
 
   // NOTE: suppliers are NOT mirrored here. This store used to keep its own
@@ -109,6 +165,9 @@ abstract class _RestaurantPurchaseOrderStore with Store {
     String? notes,
     required List<PurchaseOrderLine> lines,
   }) async {
+    // BLK-18: before anything is written.
+    RestaurantPORules.refuseVariantItems(lines);
+
     try {
       isLoading = true;
       errorMessage = null;
@@ -192,6 +251,8 @@ abstract class _RestaurantPurchaseOrderStore with Store {
     // Belt and braces: a draft can't have receipts today (confirmGRN needs
     // canReceive), so this only fires on data written by an older build.
     if (restaurantGrnRepository.getGRNsByPOId(poId).isNotEmpty) return null;
+    // BLK-18: before anything is written.
+    RestaurantPORules.refuseVariantItems(lines);
 
     try {
       isLoading = true;
@@ -278,8 +339,14 @@ abstract class _RestaurantPurchaseOrderStore with Store {
   // ==================== GOODS RECEIVING (GRN) ====================
 
   /// Confirms a goods receipt against [poId] — the ONLY place raw-material
-  /// stock increments (mirrors retail's `confirmGRN`, but atomic here: it
-  /// creates and saves the GRN + its items AND moves stock in one action).
+  /// stock increments.
+  ///
+  /// Saves the GRN header as a DRAFT and its lines, then hands it to
+  /// [RestaurantGrnReceiving.complete] (stock once per line, supplier payable,
+  /// damaged-goods documents, and only then confirmed + PO status). A stop
+  /// part-way leaves the draft for [resumeInterruptedReceipts]. A second
+  /// confirm for the same PO while one is running is refused with a
+  /// [StateError] — a double tap cannot save the receipt twice.
   ///
   /// Note: the GRN's own id is generated by [RestaurantGRNModel.create], but
   /// its NUMBER is minted here from the repository's shared
@@ -297,6 +364,11 @@ abstract class _RestaurantPurchaseOrderStore with Store {
     String? invoiceNumber,
     required List<GRNReceiptLine> lines,
   }) async {
+    // Claimed synchronously, before any await, so a second call arriving
+    // while this one runs always sees it.
+    if (!_receivingPoIds.add(poId)) {
+      throw StateError(RestaurantPORules.receiptInProgressMessage);
+    }
     try {
       isLoading = true;
       errorMessage = null;
@@ -315,6 +387,8 @@ abstract class _RestaurantPurchaseOrderStore with Store {
       final totalAmount = lines.fold<double>(
           0, (sum, l) => sum + (l.receivedQty * (l.costPrice ?? 0)));
 
+      // A DRAFT until every step below has run — a draft counts nowhere (PO
+      // completion reads confirmed receipts only) and is what a resume finds.
       final grn = RestaurantGRNModel.create(
         grnNumber: await restaurantGrnRepository.generateGRNNumber(),
         poId: poId,
@@ -325,17 +399,14 @@ abstract class _RestaurantPurchaseOrderStore with Store {
         totalOrderedQty: totalOrderedQty,
         totalReceivedQty: totalReceivedQty,
         totalAmount: totalAmount,
-        status: RestaurantGRNStatus.confirmed,
+        status: RestaurantGRNStatus.draft,
         notes: notes,
         invoiceNumber: invoiceNumber,
       );
-
-      final staffName =
-          RestaurantSession.staffName ?? RestaurantSession.effectiveRole;
-      final sessionId = await DayManagementService.getCurrentSessionId();
+      await restaurantGrnRepository.saveGRN(grn);
+      _checkpoint('afterDraftHeader');
 
       final grnItems = <RestaurantGRNItemModel>[];
-
       for (final line in lines) {
         final grnItem = RestaurantGRNItemModel.create(
           grnId: grn.grnId,
@@ -351,87 +422,64 @@ abstract class _RestaurantPurchaseOrderStore with Store {
         );
         await restaurantGrnItemRepository.saveItem(grnItem);
         grnItems.add(grnItem);
-
-        if (line.acceptedQty <= 0) continue;
-
-        final item = itemStore.getItemById(line.itemId);
-        if (item == null) continue;
-
-        // Through the store so the ObservableList entry is replaced and MobX
-        // sees the receipt; stock and cost go in one write so neither can
-        // clobber the other. Re-resolves internally, so two GRN lines for the
-        // same item compound instead of both starting from `item`.
-        final newStock = await itemStore.applyStockDelta(
-          itemId: line.itemId,
-          delta: line.acceptedQty,
-          lastPurchaseCost: line.costPrice,
-        );
-
-        await _stockMovementRepository.saveMovement(StockMovementModel(
-          id: _uuid.v4(),
-          timestamp: DateTime.now(),
-          itemId: item.id,
-          variantId: null,
-          itemName: item.name,
-          type: 'in',
-          quantity: line.acceptedQty,
-          balanceAfter: newStock,
-          reason: 'Purchase ($poNumber)',
-          unit: item.unit ?? 'pcs',
-          staffName: staffName,
-          sessionId: sessionId,
-        ));
       }
+      _checkpoint('afterLines');
 
-      await restaurantGrnRepository.saveGRN(grn);
-
-      // Accrue the GRN's full received value as a payable against the
-      // supplier — mirrors retail's GRN confirm, which bills the supplier for
-      // the invoice regardless of what's later returned/claimed. Purchase
-      // returns and supplier claims credit this balance back down when their
-      // own credit events land (see RestaurantDamagedGoodsStore).
-      //
-      // Routed through RestaurantSupplierStore.recordBalanceMovement — the one
-      // sanctioned path — so the movement also lands in the supplier's ledger
-      // instead of silently changing a number nothing explains.
-      if (totalAmount > 0) {
-        await restaurantSupplierStore.recordBalanceMovement(
-          supplierId: supplierId,
-          amount: totalAmount,
-          type: RestaurantSupplierLedgerType.purchase,
-          description: 'Goods received',
-          docNumber: grn.grnNumber,
-          docId: grn.grnId,
-          date: grn.receivedDate,
-        );
+      // Stock (once per line), supplier payable, damaged-goods documents,
+      // then confirmed + the PO status (BLK-17) — see RestaurantGrnReceiving.
+      try {
+        await RestaurantGrnReceiving.complete(grn, lines: grnItems);
+      } finally {
+        await loadPurchaseOrders();
+        await loadGRNs();
       }
-
-      // Roll the receiving progress up to the PO's status.
-      final po = restaurantPurchaseOrderRepository.getPurchaseOrderById(poId);
-      if (po != null) {
-        final totalReceivedForPO =
-            restaurantGrnRepository.getTotalReceivedQtyForPO(poId);
-
-        RestaurantPOStatus newStatus;
-        if (totalReceivedForPO >= po.totalItems) {
-          newStatus = RestaurantPOStatus.completed;
-        } else if (totalReceivedForPO > 0) {
-          newStatus = RestaurantPOStatus.partiallyReceived;
-        } else {
-          newStatus = po.statusEnum;
-        }
-
-        final updatedPO = po.copyWith(status: newStatus.name);
-        await restaurantPurchaseOrderRepository.savePurchaseOrder(updatedPO);
-      }
-
-      await loadPurchaseOrders();
-      await loadGRNs();
 
       return grnItems;
     } finally {
+      _receivingPoIds.remove(poId);
       isLoading = false;
     }
+  }
+
+  /// POs with a confirm running — see [confirmGRN].
+  final Set<String> _receivingPoIds = {};
+
+  /// A header/lines checkpoint for fault-injection tests; the later ones live
+  /// in [RestaurantGrnReceiving].
+  void _checkpoint(String name) => RestaurantGrnReceiving.checkpoint(name);
+
+  /// Finishes every receipt a stop left as a DRAFT (see
+  /// [RestaurantGrnReceiving]). Returns how many were completed. Never
+  /// throws: one that fails again stays a draft for the next attempt. Cheap
+  /// when there are none. Run at startup and when the purchase screens open.
+  Future<int> resumeInterruptedReceipts() async {
+    final drafts = restaurantGrnRepository
+        .getAllGRNs()
+        .where((g) =>
+            g.statusEnum == RestaurantGRNStatus.draft &&
+            !RestaurantGrnReceiving.isCompleting(g.grnId))
+        .toList();
+    if (drafts.isEmpty) return 0;
+
+    var done = 0;
+    try {
+      await itemStore.ensureLoaded();
+    } catch (e) {
+      debugPrint('GRN resume: items not loaded: $e');
+      return 0;
+    }
+    for (final grn in drafts) {
+      try {
+        if (await RestaurantGrnReceiving.complete(grn)) done++;
+      } catch (e) {
+        debugPrint('GRN resume failed for ${grn.grnNumber}: $e');
+      }
+    }
+    if (done > 0) {
+      await loadPurchaseOrders();
+      await loadGRNs();
+    }
+    return done;
   }
 
   // ==================== COMPUTED ====================

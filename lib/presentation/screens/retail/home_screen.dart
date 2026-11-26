@@ -14,6 +14,7 @@ import 'package:billberrylite/presentation/widget/componets/common/dashboard_men
 import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
 
 import 'package:billberrylite/presentation/screens/retail/product_management_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/inventory_hub_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/customer_list_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/reports_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/stock_alerts_screen.dart';
@@ -32,11 +33,13 @@ import 'package:billberrylite/presentation/screens/retail/damaged_goods_hub_scre
 import 'package:billberrylite/presentation/screens/retail/sales_history_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/cash_drawer_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/settings_screen.dart';
+import 'package:billberrylite/presentation/screens/common/plan/usage_limit_screen.dart';
 import 'package:billberrylite/core/plan/plan_guard.dart';
 import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
 import 'package:billberrylite/presentation/widget/componets/common/money_scope.dart';
 import 'package:billberrylite/util/common/quantity_format.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
+import 'package:billberrylite/domain/services/common/start_of_day_backup_prompt.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -52,7 +55,13 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadStoreName();
-    _startShiftIfNeeded();
+    final shiftCheck = _startShiftIfNeeded();
+    // M6a: as on the Restaurant home, after the day/shift checks — the
+    // prompt has its own plan, setting and once-a-day guards.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await shiftCheck;
+      if (mounted) await StartOfDayBackupPrompt.show(context);
+    });
   }
 
   /// Open (or restore) this staff member's shift on dashboard load.
@@ -758,6 +767,25 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ),
+      // Stock tasks (takes, kits, bundles, alerts) in one place — they used to
+      // be app-bar icons on the Products tab only.
+      if (RestaurantSession.canAccess('inventory'))
+        DashboardMenuCard(
+          icon: Icons.warehouse_rounded,
+          title: 'Inventory',
+          color: Colors.lightGreen.shade700,
+          onTap: _gated(
+            context,
+            RetailEntKeys.inventory,
+            'Inventory',
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const InventoryHubScreen(),
+              ),
+            ),
+          ),
+        ),
       if (RestaurantSession.canAccess('customers'))
         DashboardMenuCard(
           icon: Icons.people_rounded,
@@ -925,6 +953,17 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
+      // Read-only plan info, never plan-gated — same rule as restaurant's tile.
+      if (RestaurantSession.canAccess('settings'))
+        DashboardMenuCard(
+          icon: Icons.insights_rounded,
+          title: 'Usage & Limits',
+          color: Colors.cyan,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const UsageLimitScreen()),
+          ),
+        ),
       // Deliberately carries NO permission: every role must be able to end
       // their own session in one tap. It used to live inside Settings, whose
       // sensitive tiles are Manager-only — burying the only sign-out behind a

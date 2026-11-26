@@ -48,8 +48,7 @@ class VariantPickerDialog extends StatefulWidget {
 class _VariantPickerDialogState extends State<VariantPickerDialog> {
   final AttributeStore _attributeStore = attributeStore;
 
-  // Selected attribute values for filtering
-  // Key: attributeId, Value: selected valueId
+  // Key: normalised attribute name, Value: normalised selected value
   final Map<String, String?> _selectedFilters = {};
 
   // All unique attribute-value pairs from variants
@@ -65,112 +64,63 @@ class _VariantPickerDialogState extends State<VariantPickerDialog> {
     _filteredVariants = widget.variants;
   }
 
+  // Groups are keyed by the normalised attribute name, so the same attribute
+  // stored as both an id pair and a free-text pair collapses into one group.
+  static String _norm(String s) => s.trim().toLowerCase();
+
+  Map<String, String> _descriptorsOf(VarianteModel variant) => {
+        for (final e in _attributeStore.attributesOf(variant).entries)
+          _norm(e.key): e.value,
+      };
+
   void _buildAttributeOptions() {
     _attributeOptions = {};
 
-    // Extract all unique attribute-value combinations from variants
     for (final variant in widget.variants) {
-      // From attributeValueIds (WooCommerce-style)
-      if (variant.attributeValueIds != null) {
-        for (final entry in variant.attributeValueIds!.entries) {
-          final attributeId = entry.key;
-          final valueId = entry.value;
-
-          final attribute = _attributeStore.getAttributeById(attributeId);
-          final value = _attributeStore.getValueById(valueId);
-
-          if (attribute != null && value != null) {
-            _attributeOptions.putIfAbsent(attributeId, () => []);
-            if (!_attributeOptions[attributeId]!.any((v) => v.valueId == valueId)) {
-              _attributeOptions[attributeId]!.add(AttributeValueInfo(
-                attributeId: attributeId,
-                attributeName: attribute.name,
-                valueId: valueId,
-                value: value.value,
-                colorCode: value.colorCode,
-              ));
-            }
-          }
-        }
-      }
-
-      // From legacy fields (size, color, weight)
-      // _addLegacyAttribute('size', 'Size', variant.size);
-      // _addLegacyAttribute('color', 'Color', variant.color);
-      // _addLegacyAttribute('weight', 'Weight', variant.weight);
-
-      // From custom attributes
-      if (variant.customAttributes != null) {
-        for (final entry in variant.customAttributes!.entries) {
-          _addLegacyAttribute(
-            entry.key.toLowerCase(),
-            entry.key,
-            entry.value,
-          );
-        }
-      }
+      _attributeStore.attributesOf(variant).forEach((name, value) {
+        final key = _norm(name);
+        final options = _attributeOptions.putIfAbsent(key, () => []);
+        if (options.any((v) => _norm(v.value) == _norm(value))) return;
+        options.add(AttributeValueInfo(
+          attributeId: key,
+          attributeName: name,
+          valueId: _norm(value),
+          value: value,
+          colorCode: _colorCodeFor(name, value),
+        ));
+      });
     }
 
-    // Initialize filters (all null = no filter)
-    for (final attributeId in _attributeOptions.keys) {
-      _selectedFilters[attributeId] = null;
+    for (final key in _attributeOptions.keys) {
+      _selectedFilters[key] = null;
     }
   }
 
-  void _addLegacyAttribute(String id, String name, String? value) {
-    if (value == null || value.isEmpty) return;
-
-    _attributeOptions.putIfAbsent(id, () => []);
-    if (!_attributeOptions[id]!.any((v) => v.value == value)) {
-      _attributeOptions[id]!.add(AttributeValueInfo(
-        attributeId: id,
-        attributeName: name,
-        valueId: value, // Use value as ID for legacy
-        value: value,
-      ));
+  String? _colorCodeFor(String attributeName, String value) {
+    final attribute = _attributeStore.getAttributeByName(attributeName);
+    if (attribute == null) return null;
+    final wanted = _norm(value);
+    for (final v in _attributeStore.getValues(attribute.attributeId)) {
+      if (_norm(v.value) == wanted) return v.colorCode;
     }
+    return null;
   }
 
-  void _updateFilters(String attributeId, String? valueId) {
+  void _updateFilters(String attributeKey, String? valueId) {
     setState(() {
-      _selectedFilters[attributeId] = valueId;
+      _selectedFilters[attributeKey] = valueId;
       _applyFilters();
     });
   }
 
   void _applyFilters() {
     _filteredVariants = widget.variants.where((variant) {
+      final descriptors = _descriptorsOf(variant);
       for (final entry in _selectedFilters.entries) {
-        final attributeId = entry.key;
-        final selectedValueId = entry.value;
-
-        if (selectedValueId == null) continue; // No filter for this attribute
-
-        // Check WooCommerce-style attributeValueIds
-        if (variant.attributeValueIds != null) {
-          final variantValueId = variant.attributeValueIds![attributeId];
-          if (variantValueId == selectedValueId) continue;
-        }
-
-        // Check legacy fields
-        String? variantValue;
-        // if (attributeId == 'size') variantValue = variant.size;
-        // if (attributeId == 'color') variantValue = variant.color;
-        // if (attributeId == 'weight') variantValue = variant.weight;
-
-        // Check custom attributes
-        if (variant.customAttributes != null) {
-          for (final ca in variant.customAttributes!.entries) {
-            if (ca.key.toLowerCase() == attributeId) {
-              variantValue = ca.value;
-              break;
-            }
-          }
-        }
-
-        if (variantValue == selectedValueId) continue;
-
-        return false; // Doesn't match filter
+        final selected = entry.value;
+        if (selected == null) continue;
+        final value = descriptors[entry.key];
+        if (value == null || _norm(value) != selected) return false;
       }
       return true;
     }).toList();

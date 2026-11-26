@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/presentation/screens/retail/retail_day_guard.dart';
 import 'package:flutter/services.dart';
 import 'package:billberrylite/util/common/quantity_format.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -225,6 +226,9 @@ class _ExchangeScreenState extends State<ExchangeScreen> {
       );
       return;
     }
+
+    // BLK-16: an exchange needs an open day (offers Start Day when none is).
+    if (!await ensureRetailDayOpen(context) || !mounted) return;
 
     final confirmed = await showAppConfirmDialog(
       context: context,

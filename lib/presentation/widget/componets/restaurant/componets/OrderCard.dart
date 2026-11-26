@@ -116,6 +116,10 @@ class OrderCard extends StatelessWidget {
   final VoidCallback? onPrintKot;
   final VoidCallback? onPrintBill;
   final Color? color;
+
+  /// Whether the void (delete) action is shown — false for a role that may
+  /// not void (BLK-14: Waiter).
+  final bool canVoid;
   const OrderCard({
     super.key,
     required this.order,
@@ -125,6 +129,7 @@ class OrderCard extends StatelessWidget {
     this.onPrintKot,
     this.onPrintBill,
     this.color,
+    this.canVoid = true,
   });
 
   /// Separator between item names on the summary line.
@@ -433,6 +438,7 @@ class OrderCard extends StatelessWidget {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
+                      if (canVoid) ...[
                       SizedBox(width: AppResponsive.smallSpacing(context)),
 
                       InkWell(
@@ -450,6 +456,7 @@ class OrderCard extends StatelessWidget {
                           ),
                         ),
                       ),
+                      ],
                     ],
                   ),
                 ],

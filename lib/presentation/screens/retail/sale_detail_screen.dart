@@ -309,6 +309,12 @@ class _SaleDetailScreenState extends State<SaleDetailScreen> {
   Widget _exchangeButton() {
     return ElevatedButton.icon(
       onPressed: () async {
+        // ExchangeService refuses this too; say so before any choices are made.
+        if (_hasOutstanding) {
+          NotificationService.instance
+              .showInfo(ExchangeService.unpaidBalanceMessage);
+          return;
+        }
         final result = await Navigator.push(
           context,
           MaterialPageRoute(

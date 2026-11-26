@@ -26,6 +26,7 @@ import 'package:billberrylite/domain/store/common/customer_store.dart';
 import 'package:billberrylite/domain/store/restaurant/cash_movement_store.dart';
 import 'package:billberrylite/domain/store/retail/product_store.dart';
 import 'package:billberrylite/domain/store/retail/sale_store.dart';
+import '../../../helpers/open_retail_day_fixture.dart';
 
 /// `ReturnService` — settlement, stock and the repeat-return guard.
 ///
@@ -58,6 +59,8 @@ void main() {
     await Hive.openBox<CreditPaymentModel>(HiveBoxNames.creditPayments);
     await Hive.openBox<CashMovementModel>(HiveBoxNames.restaurantCashMovements);
     await Hive.openBox(HiveBoxNames.dayManagementBox);
+    // BLK-16: returns, exchanges and collections need an open day.
+    await openRetailDayForTest();
     await Hive.openBox(HiveBoxNames.appCounters);
 
     locator.registerLazySingleton<SaleStore>(() => SaleStore());
@@ -511,6 +514,36 @@ void main() {
       expect(await service.canReturnSale('S1'), isTrue);
     });
 
+    test('AND-28: the list check agrees with isFullyReturned for every sale',
+        () async {
+      await seedVariant(stock: 20);
+      await seedSale(saleId: 'S1', qty: 3); // partly returned
+      await seedSale(saleId: 'S2'); // fully returned in one go
+      await seedSale(saleId: 'S3', qty: 2); // fully returned in two parts
+      await seedSale(saleId: 'S4', qty: 2); // never returned
+
+      await service.processPartialReturn(
+          originalSaleId: 'S1', itemsToReturn: {'v1': 1}, refundMethod: 'cash');
+      await service.processFullReturn(originalSaleId: 'S2', refundMethod: 'cash');
+      await service.processPartialReturn(
+          originalSaleId: 'S3', itemsToReturn: {'v1': 1}, refundMethod: 'cash');
+      await service.processPartialReturn(
+          originalSaleId: 'S3', itemsToReturn: {'v1': 1}, refundMethod: 'cash');
+
+      final sales = await saleStore.getAllSales();
+      final listed = service.fullyReturnedSaleIds(sales);
+      expect(listed, {'S2', 'S3'});
+      for (final s in sales) {
+        if (s.isReturn ?? false) {
+          expect(listed.contains(s.saleId), isFalse,
+              reason: 'a return document is never badged');
+          continue;
+        }
+        expect(listed.contains(s.saleId), await service.isFullyReturned(s.saleId),
+            reason: s.saleId);
+      }
+    });
+
     test('a return document cannot itself be returned', () async {
       await seedVariant();
       await seedSale();
@@ -568,6 +601,86 @@ void main() {
 
       // Without this a reprinted credit note renders under today's settings.
       expect(box.get(rtnId)!.isTaxInclusive, isTrue);
+    });
+  });
+
+  // ==========================================================================
+  group('credit note CGST + SGST', () {
+    /// One unit at [taxable] + [gst], exclusive.
+    Future<void> seedOddSale(double taxable, double gst) async {
+      final now = DateTime.now().toIso8601String();
+      final total = double.parse((taxable + gst).toStringAsFixed(2));
+      await Hive.box<SaleModel>(HiveBoxNames.sales).put(
+        'S1',
+        SaleModel(
+          saleId: 'S1',
+          totalItems: 1,
+          subtotal: taxable,
+          discountAmount: 0,
+          taxAmount: gst,
+          totalAmount: total,
+          paymentType: 'cash',
+          date: now,
+          createdAt: now,
+          updatedAt: now,
+          totalTaxableAmount: taxable,
+          totalGstAmount: gst,
+          grandTotal: total,
+          paidAmount: total,
+          dueAmount: 0,
+          status: SaleStatus.paid,
+        ),
+      );
+      await Hive.box<SaleItemModel>(HiveBoxNames.saleItems).put(
+        'S1-L1',
+        SaleItemModel.fromCalculated(
+          saleId: 'S1',
+          varianteId: 'v1',
+          productId: 'p1',
+          productName: 'Test Item',
+          price: taxable,
+          qty: 1,
+          discountAmount: 0,
+          gstRate: 5,
+          taxableAmount: taxable,
+          gstAmount: gst,
+          total: total,
+          costPrice: 10,
+        ),
+      );
+    }
+
+    test('an odd-paisa GST splits so the halves add up to it', () async {
+      await seedVariant();
+      await seedOddSale(30.60, 1.53);
+
+      final rtnId = await service.processFullReturn(
+        originalSaleId: 'S1',
+        refundMethod: 'cash',
+      );
+      final note = readSale(rtnId);
+
+      // The refund and GST are what they always were.
+      expect(note.totalAmount, closeTo(-32.13, 0.001));
+      expect(note.totalGstAmount, closeTo(-1.53, 0.001));
+      // Was -0.77 twice (= -1.54). Now one half is a paisa less.
+      expect(note.totalCgstAmount, closeTo(-0.77, 0.001));
+      expect(note.totalSgstAmount, closeTo(-0.76, 0.001));
+      expect(note.totalCgstAmount! + note.totalSgstAmount!,
+          closeTo(note.totalGstAmount!, 0.0001));
+    });
+
+    test('an even GST still splits into two equal halves', () async {
+      await seedVariant();
+      await seedSale();
+
+      final rtnId = await service.processFullReturn(
+        originalSaleId: 'S1',
+        refundMethod: 'cash',
+      );
+      final note = readSale(rtnId);
+      expect(note.totalCgstAmount, closeTo(-9, 0.001));
+      expect(note.totalSgstAmount, closeTo(-9, 0.001));
     });
   });
 }

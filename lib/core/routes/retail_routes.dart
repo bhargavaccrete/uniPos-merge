@@ -33,7 +33,7 @@ import 'package:billberrylite/presentation/screens/common/attendance/staff_atten
 import 'package:billberrylite/presentation/screens/common/attendance/attendance_report_screen.dart';
 import 'package:billberrylite/presentation/screens/common/shift/shift_report_screen.dart';
 import 'package:billberrylite/presentation/screens/common/shift/staff_performance_screen.dart';
-import 'package:billberrylite/presentation/screens/retail/backup_screen.dart';
+import 'package:billberrylite/presentation/screens/common/backup/backup_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/auth/retail_guard.dart';
 import 'package:billberrylite/core/plan/retail_entitlement_keys.dart';
 
@@ -85,7 +85,7 @@ class RetailRoutes {
     RouteNames.addProduct: _guard(
       const AddProductScreen(),
       'catalogEdit',
-      RetailEntKeys.catalog,
+      RetailEntKeys.catalogProducts,
     ),
     RouteNames.categories: _guard(
       const CategoryManagementScreen(),

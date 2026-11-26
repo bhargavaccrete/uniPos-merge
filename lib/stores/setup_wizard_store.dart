@@ -11,10 +11,12 @@ import 'package:billberrylite/core/config/app_config.dart';
 import 'package:billberrylite/core/constants/retail_store_types.dart';
 import 'package:billberrylite/core/constants/restaurant_store_types.dart';
 import 'package:billberrylite/core/init/hive_init.dart';
+import 'package:billberrylite/core/init/mode_services.dart';
 import 'package:billberrylite/core/di/service_locator.dart' as sl;
 import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
 import 'package:billberrylite/domain/services/retail/store_type_attribute_defaults_service.dart';
 import 'package:billberrylite/domain/services/common/device_id_service.dart';
+import 'package:billberrylite/domain/services/common/license_api_service.dart';
 
 part 'setup_wizard_store.g.dart';
 
@@ -531,8 +533,10 @@ abstract class _SetupWizardStore with Store {
   }
 
   @action
-  Future<void> saveBusinessType() async {
-    if (selectedBusinessTypeId == null || selectedBusinessTypeName == null) return;
+  Future<bool> saveBusinessType() async {
+    if (selectedBusinessTypeId == null || selectedBusinessTypeName == null) {
+      return true;
+    }
 
     isLoading = true;
     try {
@@ -561,15 +565,17 @@ abstract class _SetupWizardStore with Store {
           ),
         );
       }
+      return true;
     } catch (e) {
       errorMessage = 'Failed to save business type: $e';
+      return false;
     } finally {
       isLoading = false;
     }
   }
 
   @action
-  Future<void> saveBusinessDetails() async {
+  Future<bool> saveBusinessDetails() async {
     isLoading = true;
     try {
       final details = BusinessDetails(
@@ -610,8 +616,10 @@ abstract class _SetupWizardStore with Store {
         email: email.isNotEmpty ? email : null,
         gstNumber: gstin.isNotEmpty ? gstin : null,
       );
+      return true;
     } catch (e) {
       errorMessage = 'Failed to save business details: $e';
+      return false;
     } finally {
       isLoading = false;
     }
@@ -639,7 +647,7 @@ abstract class _SetupWizardStore with Store {
   }
 
   @action
-  Future<void> saveTaxDetails() async {
+  Future<bool> saveTaxDetails() async {
     isLoading = true;
     try {
       // Named tax rates themselves live in the shared TaxStore (see
@@ -655,8 +663,10 @@ abstract class _SetupWizardStore with Store {
         notes: taxNotes,
       );
       await _taxDetailsRepo.save(details);
+      return true;
     } catch (e) {
       errorMessage = 'Failed to save tax details: $e';
+      return false;
     } finally {
       isLoading = false;
     }
@@ -681,11 +691,10 @@ abstract class _SetupWizardStore with Store {
       // This is critical - must happen before navigating to POS screen
       await _registerBusinessDependencies(mode);
 
-      // 4. Save business type to Hive
-      await saveBusinessType();
-
-      // 5. Save tax details
-      await saveTaxDetails();
+      // 4–5. Both swallow their own errors, so check the result — otherwise
+      // setup is marked complete with a missing record.
+      if (!await saveBusinessType()) throw StateError(errorMessage!);
+      if (!await saveTaxDetails()) throw StateError(errorMessage!);
 
       // 6. Save business details with setup complete flag
       final details = BusinessDetails(
@@ -733,6 +742,17 @@ abstract class _SetupWizardStore with Store {
       // 9. Mark setup complete in AppConfig
       await AppConfig.setSetupComplete(true);
 
+      // 10. WF-6: the mode was not set when the app started, so startup ran
+      // none of the mode's services (settings, Restaurant session lifecycle,
+      // auto-backup, LAN server, notifications). Start them now, before the
+      // wizard navigates on — once per process. Setup itself is saved; a
+      // failure here only means they start at the next launch.
+      try {
+        await ModeServices.start();
+      } catch (e) {
+        debugPrint('Setup wizard: mode services not started — $e');
+      }
+
       isSetupComplete = true;
     } catch (e) {
       errorMessage = 'Failed to complete setup: $e';
@@ -748,9 +768,13 @@ abstract class _SetupWizardStore with Store {
     try{
       final ImagePicker picker = ImagePicker();
 
+      // Same cap as every other logo picker (ImagePickerService.pickLogoImage):
+      // a full-size phone photo decodes to ~48 MB and was stored as-is.
       final XFile ? image = await picker.pickImage(
           source: ImageSource.gallery,
-          imageQuality: 50
+          imageQuality: 85,
+          maxWidth: 800,
+          maxHeight: 800,
       );
       if(image != null){
         final bytes = await image.readAsBytes();
@@ -825,6 +849,8 @@ abstract class _SetupWizardStore with Store {
         'customername': storeName,
         'businesstype': businessTypeCode,
         'businesssubtype': businessSubtypeCode,
+        'businesscategory':
+            LicenseApiService.businessCategoryFor(businessTypeCode),
         'ownername': ownerName,
         'contactperson': ownerName,
         'email': email,

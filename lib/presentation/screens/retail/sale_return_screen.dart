@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:billberrylite/presentation/screens/retail/retail_day_guard.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/util/common/quantity_format.dart';
 import 'package:billberrylite/util/common/short_ref.dart';
@@ -228,6 +229,9 @@ class _SaleReturnScreenState extends State<SaleReturnScreen> {
         : 'Refund ${formatMoney(split.refunded)} via '
               '${_refundMethod.toUpperCase()}. Stock goes back in. '
               'This cannot be undone.';
+
+    // BLK-16: a refund needs an open day (offers Start Day when none is).
+    if (!await ensureRetailDayOpen(context) || !mounted) return;
 
     final confirmed = await showAppConfirmDialog(
       context: context,

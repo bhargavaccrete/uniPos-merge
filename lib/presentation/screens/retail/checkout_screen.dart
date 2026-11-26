@@ -1,4 +1,7 @@
 import 'package:billberrylite/domain/services/retail/line_discount_service.dart';
+import 'package:billberrylite/domain/services/retail/checkout_customer_posting.dart';
+import 'package:billberrylite/domain/services/retail/checkout_sale_lines.dart';
+import 'package:billberrylite/domain/services/retail/loyalty_redemption_check.dart';
 import 'package:flutter/material.dart';
 import 'package:billberrylite/util/restaurant/restaurant_session.dart';
 import 'package:billberrylite/util/common/short_ref.dart';
@@ -14,7 +17,7 @@ import 'package:billberrylite/data/models/common/customer_model_125.dart';
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
 import 'package:billberrylite/domain/services/retail/gst_service.dart';
 import 'package:billberrylite/domain/services/retail/retail_billing_service.dart';
-import 'package:billberrylite/domain/services/retail/inventory_service.dart';
+import 'package:billberrylite/domain/services/retail/retail_checkout_commit.dart';
 import 'package:billberrylite/domain/services/retail/store_settings_service.dart';
 import 'package:billberrylite/presentation/screens/retail/customer_selection_screen.dart';
 import 'package:billberrylite/presentation/widget/componets/common/split_payment_widget.dart';
@@ -74,6 +77,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   List<SaleItemModel> _committedItems = const [];
   bool _committedIsCredit = false;
 
+  /// The committed sale's persisted work (BLK-13B): customer steps, stock,
+  /// cart — each exactly once, finished by a retry, by leaving the screen,
+  /// or by startup recovery after a crash.
+  RetailCheckoutEntry? _committedEntry;
+
+  /// Set synchronously by the first tap, before any await (SALE-1): a second
+  /// tap arriving while the first is still checking stock or limits returns
+  /// at once instead of creating a second sale.
+  bool _submitting = false;
+
   // Split payment state
   List<PaymentEntry> _paymentEntries = [];
   double _totalPaid = 0;
@@ -110,9 +123,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         : _selectedDiscountReason;
   }
 
-  /// Loyalty points the customer is redeeming on this bill (1 point = 1 unit).
-  int _pointsRedeemed = 0;
-
   /// Collect less than the bill now and put the balance on the customer's
   /// account. Requires a customer, same as a full Pay Later.
   bool _allowPartialPayment = false;
@@ -131,7 +141,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   bool get _canSubmitPayment {
     if (_isProcessing) return false;
     if (!_allowPartialPayment) return _isPaymentValid;
-    return _totalPaid > 0 && customerStore.selectedCustomer != null;
+    return _totalPaid > 0 &&
+        customerStore.selectedCustomer != null &&
+        // R7: amounts adding up to more than the bill are refused here too.
+        !PaymentAllocation.exceedsBill(_paymentEntries, _grandTotal);
   }
 
   @override
@@ -142,7 +155,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     // the store still held the discount — the bill and the input disagreeing.
     final existing = retailCartStore.discountValue;
     _discountController.text = existing > 0 ? _trimZeros(existing) : '0';
-    _pointsRedeemed = retailCartStore.loyaltyRedemption.round();
 
     // From here on, keep the store in step with the field.
     _discountController.addListener(_syncDiscountToStore);
@@ -164,17 +176,18 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     // cart in the background, so the same cart can never be checked out again
     // as a second sale. Deduction is idempotent per sale.
     final pending = _committedSale;
-    if (pending != null) {
-      final items = cartStore.items.toList();
+    final entry = _committedEntry;
+    if (pending != null && entry != null) {
       () async {
         try {
-          await RetailInventoryService.deductStockForSale(items,
-              saleId: pending.saleId);
-          await cartStore.clearCartAndSave();
+          // Whatever is still pending for the saved sale — once only. If this
+          // fails too, the journal entry stays for startup recovery.
+          await RetailCheckoutCommit.finish(entry,
+              clearCart: cartStore.clearCartAndSave);
         } catch (e) {
           debugPrint('Could not finish sale ${pending.invoiceNumber}: $e');
         }
-      }();
+        }();
     }
     _discountController.removeListener(_syncDiscountToStore);
     _discountController.dispose();
@@ -259,13 +272,28 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     return false;
   }
 
-  Future<void> _processCreditSale() async {
+  /// Runs [body] for the first tap only; later taps return at once until it
+  /// has finished (SALE-1).
+  Future<void> _oneAtATime(Future<void> Function() body) async {
+    if (_submitting) return;
+    _submitting = true;
+    try {
+      await body();
+    } finally {
+      _submitting = false;
+    }
+  }
+
+  Future<void> _processCreditSale() => _oneAtATime(_runCreditSale);
+
+  Future<void> _runCreditSale() async {
     if (_isProcessing) return;
     if (_committedSale != null) return _resumeCommittedSale();
 
     // Plan gate — daily bill cap (a credit sale is still a bill).
     if (!await _withinDailyBillCap()) return;
     if (!await _hasStockForCheckout()) return;
+    if (!await _loyaltyRedemptionStillValid()) return;
 
     // Require customer for credit sales
     if (customerStore.selectedCustomer == null) {
@@ -405,7 +433,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         // How much of discountAmount came from individual lines. Lets a reprint
         // split "Item Discounts" from "Bill Discount" without re-deriving.
         lineDiscountTotal: bill.lineDiscountTotal,
-        loyaltyPointsUsed: _pointsRedeemed,
+        // R8: the points the bill actually applied, never the request.
+        loyaltyPointsUsed: bill.loyaltyRedemption.floor(),
         roundOff: bill.roundOff,
         isTaxInclusive: bill.isTaxInclusive,
         taxEnabled: TaxFeature.enabled,
@@ -415,19 +444,32 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         shiftId: RestaurantSession.currentShiftId,
       );
 
-      // Update customer credit balance
-      await customerStore.updateAfterCreditSale(customerId, bill.grandTotal);
-      if (_pointsRedeemed > 0) {
-        await customerStore.redeemCustomerPoints(customerId, _pointsRedeemed);
-      }
+      // The customer's credit balance and points move only AFTER the sale is
+      // saved (BLK-13), in _finishCommittedSale — a failed save used to leave
+      // them already moved, and the retry moved them again.
+      final posting = CheckoutCustomerPosting.creditSale(
+        customerId: customerId,
+        grandTotal: bill.grandTotal,
+        // R8: deduct the points the bill applied, never more.
+        pointsRedeemed: bill.loyaltyRedemption.floor(),
+      );
 
-      // Save sale and items through the store. From here on the sale EXISTS:
-      // anything that fails below is finished by a retry, never re-created.
+      // The work is journaled BEFORE the sale is written (BLK-13B), then the
+      // sale is saved. From here on the sale EXISTS: anything that fails
+      // below is finished by a retry or by recovery, never re-created.
       final saleItems = await _buildSaleItems(saleId, bill);
-      await saleStore.addSaleWithItems(sale, saleItems);
+      final entry = await RetailCheckoutCommit.begin(
+        saleId: saleId,
+        invoiceNumber: invoiceNumber,
+        tabId: cartStore.activeTabId,
+        lines: cartStore.items.toList(),
+        posting: posting,
+      );
+      await RetailCheckoutCommit.saveSale(entry, sale, saleItems);
       _committedSale = sale;
       _committedItems = saleItems;
       _committedIsCredit = true;
+      _committedEntry = entry;
 
       await _finishCommittedSale();
     } catch (e) {
@@ -488,67 +530,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  /// Persist the sale lines exactly as the engine computed them.
-  ///
-  /// The per-item taxable amount and discount share must come from [bill],
-  /// not from the cart row: a cart row's taxable amount is computed at add-time
-  /// and knows nothing about an order-level discount applied later. Reading it
-  /// back here is what used to store an inflated tax base on every invoice.
-  ///
-  /// The variant's cost is read here and frozen onto the line. Profit reports
-  /// used to look up the variant's live `costPrice` instead, so a supplier
-  /// price change re-wrote the profit on sales that had already been settled.
+  /// Sale lines from the shared helper — the same code the debug test-data
+  /// generator uses, so the two can never drift.
   Future<List<SaleItemModel>> _buildSaleItems(
     String saleId,
     RetailBill bill,
-  ) async {
-    // One lookup per distinct variant in the basket, not per report row.
-    final costByVariantId = <String, double?>{};
-    for (final line in bill.lines) {
-      final variantId = line.item.variantId;
-      if (costByVariantId.containsKey(variantId)) continue;
-      final variant = await productStore.getVariantById(variantId);
-      costByVariantId[variantId] = variant?.costPrice;
-    }
-
-    return bill.lines.map((line) {
-      final cartItem = line.item;
-      return SaleItemModel.fromCalculated(
-        saleId: saleId,
-        varianteId: cartItem.variantId,
-        productId: cartItem.productId,
-        productName: cartItem.productName,
-        attributes: cartItem.attributes,
-        price: cartItem.price,
-        qty: cartItem.qty,
-        discountAmount: line.discountAmount,
-        gstRate: line.gstRatePercent,
-        taxableAmount: line.taxableAmount,
-        gstAmount: line.gstAmount,
-        total: line.total,
-        barcode: cartItem.barcode,
-        hsnCode: cartItem.hsnCode,
-        costPrice: costByVariantId[cartItem.variantId],
-        // Price-override audit. `price` above is already the charged figure, so
-        // these only carry WHAT the catalogue said and WHY it changed — without
-        // them a settled sale's squeezed margin is unexplainable.
-        originalPrice: cartItem.originalPrice,
-        overrideReason: cartItem.overrideReason,
-        overrideNote: cartItem.overrideNote,
-        // Line-discount audit. The AMOUNT comes from the engine, not the cart
-        // row: a discount larger than the line is capped there, and persisting
-        // the uncapped figure would print a receipt that does not reconcile.
-        // `discountAmount` above stays the TOTAL (line + bill share).
-        lineDiscountType: cartItem.lineDiscountType,
-        lineDiscountValue: cartItem.lineDiscountValue,
-        lineDiscountAmount: line.lineDiscountAmount > 0
-            ? line.lineDiscountAmount
-            : null,
-        lineDiscountReason: cartItem.lineDiscountReason,
-        lineDiscountNote: cartItem.lineDiscountNote,
-      );
-    }).toList();
-  }
+  ) =>
+      CheckoutSaleLines.build(saleId, bill);
 
   /// Everything after a sale is saved: stock, cart, receipt. Shared by both
   /// paths and by a retry, so it must be safe to run again for the same sale —
@@ -556,20 +544,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   /// writes a sale or touches the customer.
   Future<void> _finishCommittedSale() async {
     final sale = _committedSale!;
-    await RetailInventoryService.deductStockForSale(
-      cartStore.items,
-      saleId: sale.saleId,
-    );
-
     // Store customer before clearing
     final customer = customerStore.selectedCustomer;
-    await cartStore.clearCartAndSave();
+
+    // The customer's account, the stock and the cart — each step already done
+    // by an earlier try is skipped, so a retry never charges credit or points
+    // twice nor deducts twice.
+    await RetailCheckoutCommit.finish(_committedEntry!,
+        clearCart: cartStore.clearCartAndSave);
 
     final saleItems = _committedItems;
     final isCredit = _committedIsCredit;
     _committedSale = null;
     _committedItems = const [];
     _committedIsCredit = false;
+    _committedEntry = null;
 
     if (isCredit) creditStore.loadData();
 
@@ -606,6 +595,27 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
   }
 
+  /// R6: a partial payment puts the unpaid balance on the customer's account,
+  /// so it obeys the same credit limit as Pay Later — before anything is
+  /// written or an invoice number is taken.
+  Future<bool> _balanceWithinCreditLimit() async {
+    final customer = customerStore.selectedCustomer;
+    final balance = _balanceDue;
+    if (!_allowPartialPayment || customer == null || balance <= 0) return true;
+    if (await customerStore.canMakeCreditPurchase(customer.customerId, balance)) {
+      return true;
+    }
+    final available = await customerStore.getAvailableCredit(customer.customerId);
+    if (mounted) {
+      NotificationService.instance.showError(
+        'Credit limit exceeded. Available credit: '
+        '${CurrencyHelper.currentSymbol}'
+        '${available.toStringAsFixed(DecimalSettings.precision)}',
+      );
+    }
+    return false;
+  }
+
   /// Last stock check before a sale is written — see
   /// `CartStore.checkoutShortfalls`. Runs before an invoice number is minted,
   /// so a refused cart burns nothing.
@@ -625,17 +635,42 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     return false;
   }
 
+  /// LOY-1: the points this bill applies must belong to the customer on it,
+  /// who must still hold them (read from storage, not the picked copy). Runs
+  /// before an invoice number is minted. A refused redemption is removed so
+  /// the cashier sees the corrected total before taking payment again.
+  Future<bool> _loyaltyRedemptionStillValid() async {
+    final problem = await LoyaltyRedemptionCheck.atCommit(
+      points: _bill.loyaltyRedemption.floor(),
+      customerId: customerStore.selectedCustomer?.customerId,
+      lookup: customerStore.getCustomerById,
+    );
+    if (problem == null) return true;
+    retailCartStore.setLoyaltyRedemption(0);
+    if (mounted) {
+      NotificationService.instance.showError(
+        '$problem The points were removed from this bill — check the total '
+        'and payment, then try again.',
+      );
+    }
+    return false;
+  }
+
   String _unfinishedSaleMessage(Object e) =>
       'Sale ${_committedSale!.invoiceNumber} is saved, but finishing it '
       'failed: $e. Tap again to finish it — it will not be recorded twice.';
 
-  Future<void> _processCheckout() async {
+  Future<void> _processCheckout() => _oneAtATime(_runCheckout);
+
+  Future<void> _runCheckout() async {
     if (_isProcessing) return;
     if (_committedSale != null) return _resumeCommittedSale();
 
     // Plan gate — daily bill cap, checked before we start processing.
     if (!await _withinDailyBillCap()) return;
     if (!await _hasStockForCheckout()) return;
+    if (!await _loyaltyRedemptionStillValid()) return;
+    if (!await _balanceWithinCreditLimit()) return;
 
     setState(() {
       _isProcessing = true;
@@ -677,7 +712,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         // How much of discountAmount came from individual lines. Lets a reprint
         // split "Item Discounts" from "Bill Discount" without re-deriving.
         lineDiscountTotal: bill.lineDiscountTotal,
-        loyaltyPointsUsed: _pointsRedeemed,
+        // R8: the points the bill actually applied, never the request.
+        loyaltyPointsUsed: bill.loyaltyRedemption.floor(),
         roundOff: bill.roundOff,
         isTaxInclusive: bill.isTaxInclusive,
         taxEnabled: TaxFeature.enabled,
@@ -690,32 +726,38 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         shiftId: RestaurantSession.currentShiftId,
       );
 
-      // Update customer purchase data if customer is selected
-      if (customerStore.selectedCustomer != null) {
-        final customerId = customerStore.selectedCustomer!.customerId;
-        if (_pointsRedeemed > 0) {
-          await customerStore.redeemCustomerPoints(customerId, _pointsRedeemed);
-        }
-        // An unpaid balance is credit — put it on the customer's account so it
-        // shows up in credit reports and can be collected later.
-        if (sale.dueAmount > 0) {
-          await customerStore.updateAfterCreditSale(customerId, sale.dueAmount);
-        }
-        final points = LoyaltyPoints.earnedFor(bill.grandTotal);
-        await customerStore.updateAfterPurchase(
-          customerId,
-          bill.grandTotal,
-          points,
-        );
-      }
+      // The customer's purchase data moves only AFTER the sale is saved
+      // (BLK-13), in _finishCommittedSale. An unpaid balance is credit — put
+      // on the customer's account so it shows up in credit reports and can be
+      // collected later.
+      final selected = customerStore.selectedCustomer;
+      final posting = selected == null
+          ? null
+          : CheckoutCustomerPosting.paidSale(
+              customerId: selected.customerId,
+              // R8: deduct the points the bill applied, never more.
+              pointsRedeemed: bill.loyaltyRedemption.floor(),
+              dueAmount: sale.dueAmount,
+              grandTotal: bill.grandTotal,
+              pointsEarned: LoyaltyPoints.earnedFor(bill.grandTotal),
+            );
 
-      // Persist the header and its lines through the store, in one action.
+      // Journal the work BEFORE the sale is written (BLK-13B), then persist
+      // the header and its lines through the store.
       final saleItems = await _buildSaleItems(saleId, bill);
-      await saleStore.addSaleWithItems(sale, saleItems);
+      final entry = await RetailCheckoutCommit.begin(
+        saleId: saleId,
+        invoiceNumber: invoiceNumber,
+        tabId: cartStore.activeTabId,
+        lines: cartStore.items.toList(),
+        posting: posting,
+      );
+      await RetailCheckoutCommit.saveSale(entry, sale, saleItems);
       // The sale EXISTS from here: a failure below is finished by a retry.
       _committedSale = sale;
       _committedItems = saleItems;
       _committedIsCredit = false;
+      _committedEntry = entry;
 
       await _finishCommittedSale();
     } catch (e) {
@@ -1337,8 +1379,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           isTaxInclusive: retailCartStore.isTaxInclusive,
           discountType: retailCartStore.discountType,
           discountValue: retailCartStore.discountValue,
-        ).grandTotal;
-        final redeemable = available.clamp(0, billBefore.floor()).toInt();
+        );
+        // R8: capped at what points can actually take off — not the total
+        // with tax — so a customer never gives up points worth more than
+        // the bill came down by.
+        final redeemable = RetailBillingService.redeemablePoints(
+          billBefore: billBefore,
+          available: available,
+        );
 
         return Container(
           padding: AppResponsive.cardPadding(context),
@@ -1381,7 +1429,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 ),
               ),
               Switch(
-                value: _pointsRedeemed > 0,
+                // Read from the store, not a screen copy: a customer change
+                // drops the redemption there (LOY-1) and this must follow.
+                value: retailCartStore.loyaltyRedemption > 0,
                 activeColor: AppColors.warning,
                 onChanged: redeemable <= 0
                     ? null
@@ -1398,9 +1448,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             )) {
                           return;
                         }
-                        setState(() => _pointsRedeemed = on ? redeemable : 0);
                         retailCartStore.setLoyaltyRedemption(
-                          _pointsRedeemed.toDouble(),
+                          on ? redeemable.toDouble() : 0,
                         );
                       },
               ),

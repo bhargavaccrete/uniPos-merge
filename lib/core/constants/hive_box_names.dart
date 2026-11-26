@@ -160,6 +160,10 @@ class HiveBoxNames {
   /// Retail expenses box
   static const String retailExpense = 'expenseBox';
 
+  /// Retail sales saved but not yet finished (RetailCheckoutCommit). Untyped —
+  /// plain maps, no adapter. Device-local crash recovery: never backed up.
+  static const String retailCheckoutJournal = 'retailCheckoutJournal';
+
   // ==================== RESTAURANT BOXES ====================
 
   /// Restaurant menu items box
@@ -214,6 +218,10 @@ class HiveBoxNames {
 
   /// Stock movement log (manual stock add/remove with reason + history)
   static const String restaurantStockMovements = 'stockMovementsBox';
+
+  /// Pending Settle stock work (StockJournal). Untyped — plain maps, no
+  /// adapter. Device-local: never exported, cleared on restore.
+  static const String restaurantStockJournal = 'restaurantStockJournal';
 
   /// Cash handover records (2-step shift handover between staff)
   static const String restaurantCashHandovers = 'cashHandoversBox';
@@ -344,9 +352,13 @@ class HiveBoxNames {
     retailEOD,
     retailExpenseCategory,
     retailExpense,
+    retailCheckoutJournal,
     tax,
     shift,
     attendance,
+    restaurantSessions,
+    restaurantCashMovements,
+    restaurantStockMovements,
   ];
 
   /// All restaurant box names (for bulk operations like clearing/backup)
@@ -371,6 +383,7 @@ class HiveBoxNames {
     shift,
     restaurantCashMovements,
     restaurantStockMovements,
+    restaurantStockJournal,
     restaurantCashHandovers,
     restaurantPrinters,
     restaurantSessions,
@@ -404,5 +417,9 @@ class HiveBoxNames {
     paymentMethods,
     dayManagementBox,
     appNotifications,
+    appCounters,
+    restaurantPrinters,
+    shift,
+    attendance,
   ];
 }

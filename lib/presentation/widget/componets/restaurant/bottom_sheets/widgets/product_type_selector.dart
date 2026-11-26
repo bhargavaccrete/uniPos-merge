@@ -50,17 +50,17 @@ class ProductTypeSelector extends StatelessWidget {
   static const List<ProductTypeOption> options = [
     (
       type: ProductType.finishedGood,
-      icon: Icons.inventory_2_rounded,
-      color: AppColors.info,
-      label: 'Finished Good',
-      desc: 'Ready to sell as-is',
-    ),
-    (
-      type: ProductType.recipeBased,
       icon: Icons.lunch_dining_rounded,
       color: AppColors.accent,
-      label: 'Recipe-Based',
-      desc: 'Assembled from a recipe when sold',
+      label: 'Finished',
+      desc: 'Sold on the menu — made to order or in advance',
+    ),
+    (
+      type: ProductType.semiFinished,
+      icon: Icons.soup_kitchen_rounded,
+      color: AppColors.secondary,
+      label: 'Semi-Finished',
+      desc: 'Prepped in batches or bought in',
     ),
     (
       type: ProductType.rawMaterial,
@@ -70,39 +70,44 @@ class ProductTypeSelector extends StatelessWidget {
       desc: 'Ingredient — bought & stocked',
     ),
     (
-      type: ProductType.semiFinished,
-      icon: Icons.soup_kitchen_rounded,
-      color: AppColors.secondary,
-      label: 'Semi-Finished',
-      desc: 'Prepped in batches',
+      type: ProductType.tradeItem,
+      icon: Icons.inventory_2_rounded,
+      color: AppColors.info,
+      label: 'Trade Item',
+      desc: 'Bought & resold as-is',
     ),
   ];
 
   @override
   Widget build(BuildContext context) {
     final effective = ProductType.effective(selectedType);
-    final hasRecipe = ProductType.hasRecipe(effective);
+    final hasRecipe = ProductType.canHaveRecipe(effective);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        LayoutBuilder(
-          builder: (context, constraints) {
-            const gap = 10.0;
-            final cardWidth = (constraints.maxWidth - gap) / 2;
-            return Wrap(
-              spacing: gap,
-              runSpacing: gap,
-              children: options
-                  .map(
-                    (o) => SizedBox(
-                      width: cardWidth,
-                      child: _card(context, o, effective),
+        // Rows of two, each card stretched to its row's tallest, so a
+        // one-line description doesn't leave a shorter card.
+        Column(
+          children: [
+            for (var i = 0; i < options.length; i += 2) ...[
+              if (i > 0) const SizedBox(height: 10),
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(child: _card(context, options[i], effective)),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: i + 1 < options.length
+                          ? _card(context, options[i + 1], effective)
+                          : const SizedBox.shrink(),
                     ),
-                  )
-                  .toList(),
-            );
-          },
+                  ],
+                ),
+              ),
+            ],
+          ],
         ),
         if (showRecipeHint && hasRecipe) ...[
           SizedBox(height: AppResponsive.mediumSpacing(context)),
@@ -132,8 +137,8 @@ class ProductTypeSelector extends StatelessWidget {
                 SizedBox(width: AppResponsive.smallSpacing(context)),
                 Expanded(
                   child: Text(
-                    'Save the item first, then open it to build its recipe '
-                    '(ingredients, yield & live food cost).',
+                    'Optional: after saving, build its recipe (ingredients, '
+                    'yield & live food cost) from Inventory › Recipes.',
                     style: GoogleFonts.poppins(
                       fontSize: AppResponsive.captionFontSize(context),
                       color: AppColors.textPrimary,

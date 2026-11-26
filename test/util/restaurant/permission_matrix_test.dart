@@ -73,9 +73,7 @@ void main() {
         'suppliers',
         'purchase',
         'dataBackup',
-        'billingOverride',
-        'billingDiscount',
-        'billingExchange',
+        'viewCostPrice',
       ]) {
         expect(RestaurantSession.canAccess(key), isFalse,
             reason: 'retail Cashier must NOT have "$key"');
@@ -91,6 +89,11 @@ void main() {
         'cashDrawer',
         'endDay',
         'attendance',
+        // Counter money actions: a Cashier overrides, discounts and exchanges
+        // (each with a mandatory reason / the return rules), but sees no cost.
+        'billingOverride',
+        'billingDiscount',
+        'billingExchange',
       ]) {
         expect(RestaurantSession.canAccess(key), isTrue,
             reason: 'retail Cashier must keep "$key"');
@@ -129,6 +132,7 @@ void main() {
         'billingOverride',
         'billingDiscount',
         'billingExchange',
+        'viewCostPrice',
       ]) {
         expect(RestaurantSession.canAccess(key), isTrue,
             reason: 'Manager is full access — "$key" must pass');
@@ -211,6 +215,26 @@ void main() {
       expect(RestaurantSession.canAccess('startOrder'), isTrue);
       for (final key in const ['manageMenu', 'customers', 'inventory']) {
         expect(RestaurantSession.canAccess(key), isFalse);
+      }
+    });
+
+    // BLK-14: refunds and voids move money — Admin, Manager and Cashier may,
+    // a Waiter may not.
+    test('refund and void: Admin, Manager and Cashier yes', () async {
+      for (final role in const [null, 'Manager', 'Cashier']) {
+        await signInAs(role);
+        for (final key in const ['refund', 'void']) {
+          expect(RestaurantSession.canAccess(key), isTrue,
+              reason: '${role ?? 'Admin'} must be able to "$key"');
+        }
+      }
+    });
+
+    test('refund and void: Waiter no', () async {
+      await signInAs('Waiter');
+      for (final key in const ['refund', 'void']) {
+        expect(RestaurantSession.canAccess(key), isFalse,
+            reason: 'a Waiter must not "$key"');
       }
     });
   });

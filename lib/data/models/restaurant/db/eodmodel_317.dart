@@ -115,6 +115,16 @@ class EndOfDayReport extends HiveObject{
   @HiveField(28, defaultValue: 0.0)
   final double cashWithdrawn;
 
+  /// Sale lines in the day with no known cost (retail). Their revenue sits in
+  /// [grossProfit] at 100% margin, so the close must say so — same warning
+  /// the Profit report shows. Older closes read back 0.
+  @HiveField(29, defaultValue: 0)
+  final int unknownCostLines;
+
+  /// Ex-tax revenue of [unknownCostLines].
+  @HiveField(30, defaultValue: 0.0)
+  final double unknownCostRevenue;
+
   /// What stayed in the drawer, and therefore the next day's opening float.
   ///
   /// Derived from the COUNTED cash, not [closingBalance] — the latter is the
@@ -174,6 +184,8 @@ class EndOfDayReport extends HiveObject{
     this.customersWithDue = 0,
     this.totalOutstanding = 0,
     this.cashWithdrawn = 0,
+    this.unknownCostLines = 0,
+    this.unknownCostRevenue = 0,
   });
 
   Map<String, dynamic> toMap() {
@@ -207,6 +219,8 @@ class EndOfDayReport extends HiveObject{
       'customersWithDue': customersWithDue,
       'totalOutstanding': totalOutstanding,
       'cashWithdrawn': cashWithdrawn,
+      'unknownCostLines': unknownCostLines,
+      'unknownCostRevenue': unknownCostRevenue,
     };
   }
 
@@ -241,6 +255,8 @@ class EndOfDayReport extends HiveObject{
       customersWithDue: map['customersWithDue'] ?? 0,
       totalOutstanding: (map['totalOutstanding'] ?? 0).toDouble(),
       cashWithdrawn: (map['cashWithdrawn'] ?? 0).toDouble(),
+      unknownCostLines: (map['unknownCostLines'] ?? 0).toInt(),
+      unknownCostRevenue: (map['unknownCostRevenue'] ?? 0).toDouble(),
     );
   }
 

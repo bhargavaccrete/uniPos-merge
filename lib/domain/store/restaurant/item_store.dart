@@ -9,6 +9,12 @@ import '../../services/restaurant/low_stock_sync_service.dart';
 
 part 'item_store.g.dart';
 
+/// Runs inside an item's stock queue with the balance before and after,
+/// ahead of the write ([_ItemStore.applyStockDelta]). A typedef so the MobX
+/// generator keeps the parameter nullable — an inline nullable function type
+/// loses its `?` in generated code.
+typedef StockWriteHook = Future<void> Function(double before, double after);
+
 class ItemStore = _ItemStore with _$ItemStore;
 
 abstract class _ItemStore with Store {
@@ -361,12 +367,18 @@ abstract class _ItemStore with Store {
   /// Persistence happens before the in-memory swap, so a failed write never
   /// reports a balance that was not stored; the item is re-read from storage
   /// and the error rethrown. Returns 0 when the item (or variant) is absent.
+  ///
+  /// [beforePersist] runs inside this item's queue with the balance before
+  /// and after, ahead of the stock write; if it throws, nothing is written.
+  /// StockJournal records both there, so a crash can be resolved later. Not
+  /// called when the item or variant is absent.
   @action
   Future<double> applyStockDelta({
     required String itemId,
     String? variantId,
     required double delta,
     double? lastPurchaseCost,
+    StockWriteHook? beforePersist,
   }) async {
     // Queued synchronously, before any await, so a caller arriving mid-write
     // always lines up behind this one.
@@ -376,6 +388,7 @@ abstract class _ItemStore with Store {
           variantId: variantId,
           delta: delta,
           lastPurchaseCost: lastPurchaseCost,
+          beforePersist: beforePersist,
         ));
     // A failed mutation must not block the ones queued behind it.
     final tail = run.then<void>((_) {}, onError: (Object _, StackTrace _) {});
@@ -402,6 +415,7 @@ abstract class _ItemStore with Store {
     String? variantId,
     required double delta,
     double? lastPurchaseCost,
+    StockWriteHook? beforePersist,
   }) async {
     final current = getItemById(itemId);
     if (current == null) return 0;
@@ -442,6 +456,8 @@ abstract class _ItemStore with Store {
         lastEditedTime: DateTime.now(),
       );
     }
+
+    await beforePersist?.call(newBalance - delta, newBalance);
 
     try {
       await _repository.updateItem(updated);

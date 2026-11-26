@@ -1,5 +1,9 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show compute, debugPrint;
 import 'package:flutter/services.dart' show rootBundle;
+
+List<dynamic> _decodeCountries(String jsonStr) =>
+    jsonDecode(jsonStr) as List<dynamic>;
 
 /// Loads the bundled country → state → city dataset (shipped by the
 /// `country_state_city_picker` package as an asset) and exposes clean,
@@ -18,11 +22,23 @@ class CountryStateCityData {
       'packages/country_state_city_picker/lib/assets/country.json';
 
   List<dynamic>? _raw;
+  Future<void>? _loading;
 
-  Future<void> _ensureLoaded() async {
-    if (_raw != null) return;
-    final jsonStr = await rootBundle.loadString(_assetPath);
-    _raw = jsonDecode(jsonStr) as List<dynamic>;
+  // ~7.8 MB of JSON: decoded off the UI thread, shared by concurrent callers,
+  // and retried on the next call if it fails.
+  Future<void> _ensureLoaded() {
+    if (_raw != null) return Future.value();
+    return _loading ??= () async {
+      try {
+        final jsonStr = await rootBundle.loadString(_assetPath, cache: false);
+        _raw = await compute(_decodeCountries, jsonStr);
+      } catch (e) {
+        debugPrint('Country data load failed: $e');
+        rethrow;
+      } finally {
+        _loading = null;
+      }
+    }();
   }
 
   /// All country names, sorted & de-duplicated.

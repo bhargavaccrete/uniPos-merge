@@ -5,6 +5,7 @@ import 'package:billberrylite/domain/store/retail/stock_alert_store.dart';
 import 'package:billberrylite/core/routes/notification_routes.dart';
 import 'package:billberrylite/data/models/common/notification_presenter.dart';
 import 'package:billberrylite/data/models/retail/hive_model/variante_model_201.dart';
+import 'package:billberrylite/domain/services/common/backup_due_sync.dart';
 import 'package:billberrylite/domain/services/common/local_notification_service.dart';
 import 'package:billberrylite/domain/services/retail/expiry_alert_service.dart';
 import 'package:billberrylite/domain/services/retail/expiry_status.dart';
@@ -61,20 +62,25 @@ class RetailNotificationSyncService {
       _debounce = null;
       // Unawaited on purpose: a notification refresh must never delay or
       // fail a stock write.
-      runStartupChecks().catchError((_) {});
+      runStartupChecks(backupDue: false).catchError((_) {});
     });
   }
 
   /// [asOf] and [warningDays] exist for tests — production always uses now / 7.
+  /// [backupDue]: the 7-day backup reminder (BKP-6 K2) belongs to startup and
+  /// the notifications screen, not to every stock write.
   static Future<void> runStartupChecks({
     DateTime? asOf,
     int warningDays = kExpiryWarningDays,
+    bool backupDue = true,
   }) async {
     // The catalogue hydrates asynchronously from ProductStore's constructor;
     // without this a cold start concludes nothing is low or expiring.
     await productStore.ensureLoaded();
     await _syncLowStock();
     await _syncExpiry(asOf: asOf, warningDays: warningDays);
+    // Same check and reminder as Restaurant, from the shared helper.
+    if (backupDue) await BackupDueSync.sync(remindAt: _nextMorning());
   }
 
   // ==================== LOW STOCK ====================

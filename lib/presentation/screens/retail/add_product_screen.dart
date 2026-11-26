@@ -18,7 +18,7 @@ import 'package:billberrylite/domain/services/retail/simple_product_fields_servi
 import 'package:billberrylite/domain/services/retail/variant_attribute_mapper.dart';
 import 'package:billberrylite/presentation/screens/retail/category_management_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/scanner_screen.dart';
-import 'package:billberrylite/presentation/screens/retail/simple_product_fields_screen.dart';
+import 'package:billberrylite/presentation/screens/retail/attributes_screen.dart';
 import 'package:billberrylite/presentation/widget/retail/bundle_builder_widget.dart';
 import 'package:billberrylite/presentation/widget/retail/product_attribute_selector.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
@@ -332,6 +332,11 @@ class _AddProductScreenState extends State<AddProductScreen> {
   // configured never loses in-progress edits — see [_buildBundleBuilderFor].
   String _stockMode = 'standard'; // 'standard' | 'bundle' | 'repack'
 
+  /// A bundle sells from its components and holds no stock of its own, so the
+  /// Stock boxes are hidden and every variant is saved at 0. Hidden, not
+  /// cleared — switching back to Standard brings the typed values back.
+  bool get _isBundleMode => _stockMode == 'bundle';
+
   /// Sell on even at zero stock. Mirrors restaurant's
   /// `Items.allowOrderWhenOutOfStock`; the only escape from the cart's
   /// zero-stock refusal.
@@ -411,14 +416,14 @@ class _AddProductScreenState extends State<AddProductScreen> {
     setState(() => _simpleFields = fields);
   }
 
-  /// Opens the shared Simple Product Fields configurator, then re-resolves the
+  /// Opens Product Attributes (where simple product fields are set), then re-resolves the
   /// list. Controllers for fields the user removed are disposed; their values
   /// already stop being saved, since [_mapFieldValues] only reads
   /// [_simpleFields].
   Future<void> _openSimpleFieldSettings() async {
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const SimpleProductFieldsScreen()),
+      MaterialPageRoute(builder: (_) => const AttributesScreen()),
     );
     if (!mounted) return;
 
@@ -524,10 +529,15 @@ class _AddProductScreenState extends State<AddProductScreen> {
   Future<void> _updateProduct() async {
     if (!_formKey.currentState!.validate()) return;
     if (!PlanGuard.allowedOr(
-      context,
-      RetailEntKeys.catalogProductsEdit,
-      featureName: 'Edit Products',
-    )) {
+          context,
+          RetailEntKeys.catalogProducts,
+          featureName: 'Products',
+        ) ||
+        !PlanGuard.allowedOr(
+          context,
+          RetailEntKeys.catalogProductsEdit,
+          featureName: 'Edit Products',
+        )) {
       return;
     }
 
@@ -745,7 +755,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
         );
         return;
       }
-      if (variant.stockController.text.trim().isEmpty) {
+      if (!_isBundleMode && variant.stockController.text.trim().isEmpty) {
         NotificationService.instance.showError(
           'Please enter stock for all variants',
         );
@@ -884,6 +894,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
           isDecimalQuantity: _isDecimalQuantity,
           unit: _unit,
           expiryDate: _expiryDate?.toIso8601String(),
+          stockQty: _isBundleMode ? 0 : null,
         ),
       );
       // The generated variant's own varianteId was already used as its
@@ -923,8 +934,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
           costPrice: variantData.costPriceController.text.trim().isEmpty
               ? null
               : double.tryParse(variantData.costPriceController.text.trim()),
-          stockQty:
-              double.tryParse(variantData.stockController.text.trim()) ?? 0,
+          stockQty: _isBundleMode
+              ? 0
+              : double.tryParse(variantData.stockController.text.trim()) ?? 0,
           taxRate: taxRate,
           taxId: _selectedTaxId,
           isDecimalQuantity: _isDecimalQuantity,
@@ -1589,23 +1601,24 @@ class _AddProductScreenState extends State<AddProductScreen> {
               ),
             ],
           ),
-          SizedBox(height: AppResponsive.mediumSpacing(context)),
-
-          Row(
-            children: [
-              Expanded(
-                child: _buildTextField(
-                  controller: variant.stockController,
-                  label: _isDecimalQuantity ? 'Stock* ($_unit)' : 'Stock*',
-                  hint: '0',
-                  keyboardType: _qtyKeyboard,
-                  inputFormatters: _activeQtyFormatters,
+          if (!_isBundleMode) ...[
+            SizedBox(height: AppResponsive.mediumSpacing(context)),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildTextField(
+                    controller: variant.stockController,
+                    label: _isDecimalQuantity ? 'Stock* ($_unit)' : 'Stock*',
+                    hint: '0',
+                    keyboardType: _qtyKeyboard,
+                    inputFormatters: _activeQtyFormatters,
+                  ),
                 ),
-              ),
-              SizedBox(width: AppResponsive.mediumSpacing(context)),
-              const Expanded(child: SizedBox()),
-            ],
-          ),
+                SizedBox(width: AppResponsive.mediumSpacing(context)),
+                const Expanded(child: SizedBox()),
+              ],
+            ),
+          ],
 
           // Custom Attributes Section
           SizedBox(height: AppResponsive.largeSpacing(context)),
@@ -1716,7 +1729,7 @@ class _AddProductScreenState extends State<AddProductScreen> {
             const SizedBox(height: 4),
             Text(
               'For details you record just this once. Fields you use on every '
-              'product belong in Settings → Simple Product Fields.',
+              'product belong in Settings → Product Attributes.',
               style: GoogleFonts.poppins(
                 fontSize: AppResponsive.captionFontSize(context),
                 color: AppColors.textSecondary,
@@ -2761,13 +2774,15 @@ class _AddProductScreenState extends State<AddProductScreen> {
               ),
               SizedBox(width: AppResponsive.smallSpacing(context)),
               Expanded(
-                child: _buildTextField(
-                  controller: _defaultStockController,
-                  label: _isDecimalQuantity ? 'Stock ($_unit)' : 'Stock',
-                  hint: '0',
-                  keyboardType: _qtyKeyboard,
-                  inputFormatters: _activeQtyFormatters,
-                ),
+                child: _isBundleMode
+                    ? const SizedBox()
+                    : _buildTextField(
+                        controller: _defaultStockController,
+                        label: _isDecimalQuantity ? 'Stock ($_unit)' : 'Stock',
+                        hint: '0',
+                        keyboardType: _qtyKeyboard,
+                        inputFormatters: _activeQtyFormatters,
+                      ),
               ),
             ],
           ),
@@ -2812,7 +2827,9 @@ class _AddProductScreenState extends State<AddProductScreen> {
     final costPrice = double.tryParse(_defaultCostController.text);
     final sellingPrice = double.tryParse(_defaultPriceController.text);
     final mrp = double.tryParse(_defaultMrpController.text);
-    final stock = double.tryParse(_defaultStockController.text);
+    final stock = _isBundleMode
+        ? null
+        : double.tryParse(_defaultStockController.text);
 
     if (costPrice == null && sellingPrice == null) {
       NotificationService.instance.showWarning(
@@ -3009,21 +3026,23 @@ class _AddProductScreenState extends State<AddProductScreen> {
                   },
                 ),
               ),
-              SizedBox(width: AppResponsive.smallSpacing(context)),
-              Expanded(
-                child: _buildVariantTextField(
-                  key: 'stock_$index',
-                  value: variant.stockQty.toString(),
-                  label: _isDecimalQuantity ? 'Stock ($_unit)' : 'Stock',
-                  inputFormatters: _activeQtyFormatters,
-                  onChanged: (value) {
-                    _updateGeneratedVariant(
-                      index,
-                      stockQty: double.tryParse(value),
-                    );
-                  },
+              if (!_isBundleMode) ...[
+                SizedBox(width: AppResponsive.smallSpacing(context)),
+                Expanded(
+                  child: _buildVariantTextField(
+                    key: 'stock_$index',
+                    value: variant.stockQty.toString(),
+                    label: _isDecimalQuantity ? 'Stock ($_unit)' : 'Stock',
+                    inputFormatters: _activeQtyFormatters,
+                    onChanged: (value) {
+                      _updateGeneratedVariant(
+                        index,
+                        stockQty: double.tryParse(value),
+                      );
+                    },
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
           SizedBox(height: AppResponsive.smallSpacing(context)),

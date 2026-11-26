@@ -250,7 +250,11 @@ class _RawMaterialTile extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
-                  Row(
+                  // Wraps "Last cost" to its own line when both don't fit
+                  // beside the status badge.
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 2,
                     children: [
                       Text(
                         'Stock: ${_formatStock(item.stockQuantity, showDecimals)} $unit',
@@ -260,7 +264,6 @@ class _RawMaterialTile extends StatelessWidget {
                         ),
                       ),
                       if (item.lastPurchaseCost != null) ...[
-                        const SizedBox(width: 10),
                         Text(
                           'Last cost: ${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(item.lastPurchaseCost!)}',
                           style: GoogleFonts.poppins(

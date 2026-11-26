@@ -13,15 +13,23 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:billberrylite/core/config/app_config.dart';
 import 'package:billberrylite/main.dart' show navigatorKey;
+import 'package:billberrylite/domain/services/common/auto_backup_service.dart';
 import 'package:billberrylite/domain/services/common/backup_encryption_service.dart';
+import 'package:billberrylite/domain/services/common/backup_storage_permission.dart';
+import 'package:billberrylite/domain/services/restaurant/stock_journal.dart';
+import 'package:billberrylite/domain/services/retail/retail_checkout_commit.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/core/plan/plan_enforcement.dart';
-import 'package:billberrylite/core/plan/entitlement_keys.dart';
+import 'package:billberrylite/core/plan/mode_keys.dart';
 import 'package:billberrylite/core/constants/hive_box_names.dart';
 import 'package:billberrylite/core/init/hive_init.dart';
+import 'package:billberrylite/core/init/restore_record.dart';
+import 'package:crypto/crypto.dart' show sha256;
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
+import 'package:billberrylite/presentation/screens/common/backup/restore_skipped_notice.dart';
 import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/pin_attempt_guard.dart';
 import 'package:billberrylite/data/models/common/business_type.dart';
 import 'package:billberrylite/data/models/common/business_details.dart';
 import 'package:billberrylite/models/tax_details.dart';
@@ -47,6 +55,7 @@ import 'package:billberrylite/data/models/restaurant/db/cash_handover_model.dart
 import 'package:billberrylite/data/models/common/customer_model_125.dart';
 import 'package:billberrylite/data/models/restaurant/db/saved_printer_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/session_model.dart';
+import 'package:billberrylite/data/models/restaurant/db/item_cancellation_model_134.dart';
 import 'package:billberrylite/data/models/common/attendance_model.dart';
 
 // Shared models
@@ -117,16 +126,281 @@ import 'package:billberrylite/data/models/restaurant/db/restaurant_stock_take_it
 // Serialises data map to JSON string in a background isolate.
 String _jsonEncodeMap(Map<String, dynamic> data) => jsonEncode(data);
 
+/// A decoded backup file: its data map plus the image entries still to write.
+typedef _DecodedBackup = ({
+  Map<String, dynamic> data,
+  List<Map<String, dynamic>> images,
+});
+
+/// One pass over a backup: the validate-only pass or the real write pass.
+///
+/// The validate pass records which boxes the restore tolerates as unreadable
+/// (their step swallows the error); the write pass leaves those boxes as they
+/// are instead of emptying them. Every box write goes through [write], so the
+/// first failure, even one an existing try/catch would swallow, is kept and
+/// stops all later writes.
+class _RestoreRun {
+  _RestoreRun({
+    required this.validateOnly,
+    Map<String, String>? tolerated,
+    this.isRollback = false,
+  }) : tolerated = tolerated ?? {};
+
+  final bool validateOnly;
+  final bool isRollback;
+
+  /// Box name → backup key of sections the restore could not read.
+  final Map<String, String> tolerated;
+
+  Object? writeFailure;
+
+  /// BKP-9: device settings (`localPrefs`, `secureCreds`) that could not be
+  /// restored; reported with the skipped sections.
+  final List<String> unrestoredSettings = [];
+
+  /// BKP-9: steps after the writes that did not finish (user-facing labels).
+  final List<String> postRestoreWarnings = [];
+
+  bool isTolerated(String boxName) => tolerated.containsKey(boxName);
+
+  /// Validate pass: runs [read]; on failure remembers the box, then rethrows
+  /// so the surrounding step behaves exactly as the restore would.
+  T parse<T>(String boxName, String key, T Function() read) {
+    try {
+      return read();
+    } catch (_) {
+      if (validateOnly) tolerated[boxName] = key;
+      rethrow;
+    }
+  }
+
+  /// Write pass: runs one box's writes. [body] returns the record count the
+  /// box must hold afterwards (null = not checked). A throw or a wrong count
+  /// is kept as [writeFailure]; once set, later writes are skipped.
+  Future<void> write(
+      String key, Box box, Future<int?> Function() body) async {
+    if (writeFailure != null) return;
+    try {
+      final expected = await body();
+      if (expected != null && box.length != expected) {
+        throw StateError(
+            '"$key" holds ${box.length} records after writing $expected');
+      }
+      final inject = isRollback
+          ? UnifiedBackupService.failRollbackWritingKeyForTesting
+          : UnifiedBackupService.failWritingKeyForTesting;
+      if (inject == key) {
+        throw StateError('injected write failure on "$key"');
+      }
+      final kill = isRollback
+          ? UnifiedBackupService.killDuringRollbackAfterKeyForTesting
+          : UnifiedBackupService.killAfterWritingKeyForTesting;
+      if (kill == key) throw SimulatedProcessKill('after writing "$key"');
+    } on SimulatedProcessKill catch (e) {
+      // Test only: the process "dies" here. Every later write is skipped and
+      // the kill surfaces as-is, without a rollback.
+      writeFailure = e;
+    } catch (e) {
+      writeFailure = StateError('Writing "$key" failed: $e');
+    }
+  }
+}
+
+/// Restore image writes, made undoable: every file the restore overwrites is
+/// first copied to an undo folder, every file it creates is recorded.
+class _ImageJournal {
+  _ImageJournal(this.undoDir);
+
+  final Directory undoDir;
+  final Map<String, String?> _undo = {}; // target path → saved copy (null = new)
+
+  Future<void> write(File target, List<int> bytes) async {
+    if (!_undo.containsKey(target.path)) {
+      if (target.existsSync()) {
+        if (!undoDir.existsSync()) undoDir.createSync(recursive: true);
+        final copy = File(p.join(undoDir.path, '${_undo.length}'));
+        await target.copy(copy.path);
+        _undo[target.path] = copy.path;
+      } else {
+        _undo[target.path] = null;
+      }
+    }
+    target
+      ..createSync(recursive: true)
+      ..writeAsBytesSync(bytes);
+  }
+
+  /// Puts every overwritten file back and deletes every created one.
+  Future<void> revert() async {
+    for (final entry in _undo.entries) {
+      final target = File(entry.key);
+      final saved = entry.value;
+      if (saved == null) {
+        if (target.existsSync()) target.deleteSync();
+      } else {
+        await File(saved).copy(target.path);
+      }
+    }
+    discard();
+  }
+
+  /// The restore succeeded: the saved originals are no longer needed.
+  void discard() {
+    if (undoDir.existsSync()) undoDir.deleteSync(recursive: true);
+    _undo.clear();
+  }
+}
+
+/// This device's data taken just before a restore's first write.
+class _Snapshot {
+  _Snapshot(this.data, this.itemImages, this.filePath,
+      {this.sha256, this.pin, this.productImages = const {}});
+
+  /// The export map (`_collectAllData`), detached through JSON.
+  final Map<String, dynamic> data;
+
+  /// Restaurant item image bytes, which the export map strips.
+  final Map<String, Uint8List> itemImages;
+
+  /// Retail product image bytes (by productId), which the export map strips.
+  final Map<String, Uint8List> productImages;
+
+  /// Encrypted copy on disk, or null (no PIN available, web, or failed).
+  final String? filePath;
+
+  /// SHA-256 of [filePath] (BKP-5).
+  final String? sha256;
+
+  /// Which PIN locks [filePath] (BKP-5).
+  final SnapshotPin? pin;
+}
+
+/// A restore that failed after it had started writing.
+class RestoreFailedException implements Exception {
+  RestoreFailedException({
+    required this.cause,
+    required this.dataRolledBack,
+    this.journalRestored = true,
+    this.snapshotPath,
+    this.unrestoredJournal,
+    this.unrestoredJournalEntries = const {},
+  });
+
+  final Object cause;
+
+  /// The business data was put back AND re-checked equal to the snapshot.
+  final bool dataRolledBack;
+
+  /// Every pending-work journal entry from before the restore was put back
+  /// AND re-checked.
+  final bool journalRestored;
+
+  /// Both: the device is exactly as it was before the restore.
+  bool get rolledBack => dataRolledBack && journalRestored;
+
+  /// Encrypted copy of the data from just before the restore, if one exists.
+  final String? snapshotPath;
+
+  /// The pending-work journal that could not be put back, or null.
+  final String? unrestoredJournal;
+
+  /// Its entries as they were before the restore (kept for diagnosis).
+  final Map<dynamic, dynamic> unrestoredJournalEntries;
+
+  String get userMessage {
+    final copy = snapshotPath == null
+        ? ''
+        : '\n\nA protected copy of your data from just before the restore is '
+            'saved inside the app at:\n$snapshotPath';
+    final journalName = unrestoredJournal ?? 'pending-work journal';
+    final pending = journalRestored
+        ? ''
+        : '\n\n${unrestoredJournalEntries.length} entries of unfinished stock '
+            'work in the $journalName could not be put back.';
+    if (dataRolledBack && journalRestored) {
+      return 'The backup could not be fully restored, so your previous data was '
+          'put back and checked. Nothing from the backup was kept.$copy';
+    }
+    if (dataRolledBack) {
+      return 'The backup could not be fully restored. Your business data was '
+          'put back and checked, and nothing from the backup was kept.'
+          '$pending Please contact support before selling or adjusting '
+          'stock.$copy';
+    }
+    return 'The backup could not be fully restored, and your previous data '
+        'could NOT be fully put back. Please stop using the app and contact '
+        'support before entering new data.$pending$copy';
+  }
+
+  @override
+  String toString() => 'RestoreFailedException(rolledBack: $rolledBack, '
+      'dataRolledBack: $dataRolledBack, journalRestored: $journalRestored, '
+      '${journalRestored ? '' : 'journal not restored: $unrestoredJournal '
+          '(${unrestoredJournalEntries.length} entries), '}$cause)';
+}
+
+/// BKP-11: a backup file that was written but could not be read back and
+/// opened. No file is left under the backup's name.
+class BackupVerificationException implements Exception {
+  const BackupVerificationException(this.detail);
+
+  final String detail;
+
+  String get message =>
+      'Backup not saved: the file could not be checked after writing '
+      '($detail). No backup file was kept. Check that there is free storage '
+      'space and try again.';
+
+  @override
+  String toString() => message;
+}
+
+/// BKP-9: a restore refused before anything was written, because sections
+/// holding money, stock, ledgers or numbering could not be read.
+class RestoreRefusedException implements Exception {
+  RestoreRefusedException(this.sections);
+
+  /// The unreadable critical sections (backup keys), sorted.
+  final List<String> sections;
+
+  String get message =>
+      'This backup was not restored: these sections could not be read: '
+      '${sections.join(', ')}. Nothing on this device was changed.';
+
+  @override
+  String toString() => message;
+}
+
 // Decodes a password-protected (WinZip-AES) ZIP → file entries (CPU-heavy, runs
 // in an isolate). [password] decrypts each entry's content.
 List<Map<String, dynamic>> _decodeZipInIsolate((List<int>, String?) args) {
   final (zipBytes, password) = args;
-  final archive = ZipDecoder().decodeBytes(zipBytes, password: password);
-  return archive
-      .where((f) => f.content != null)
-      .map((f) => {'name': f.name, 'bytes': f.content as List<int>})
-      .toList();
+  try {
+    final archive = ZipDecoder().decodeBytes(zipBytes, password: password);
+    return archive
+        .where((f) => f.content != null)
+        .map((f) => {'name': f.name, 'bytes': f.content as List<int>})
+        .toList();
+  } catch (e) {
+    // 4e-1: the WinZip-AES entry authentication code did not match. Reached
+    // only past the password check, so the contents are damaged.
+    if ('$e'.contains(archiveMacMismatchError)) {
+      throw StateError(innerIntegrityFailure);
+    }
+    rethrow;
+  }
 }
+
+/// The `archive` package's error when a WinZip-AES entry's authentication
+/// code does not match its contents (pinned by test).
+@visibleForTesting
+const String archiveMacMismatchError = "macs don't match";
+
+/// Marker carried out of the decode isolate for that failure.
+@visibleForTesting
+const String innerIntegrityFailure = 'bbl-inner-integrity-failure';
+
+bool _isInnerIntegrityFailure(Object e) => '$e'.contains(innerIntegrityFailure);
 
 // Encodes entries into a password-protected (WinZip-AES) ZIP. The file LIST is
 // visible, but every entry's CONTENT is AES-encrypted — opening/extracting any
@@ -150,6 +424,45 @@ class UnifiedBackupService {
       'This backup is not encrypted and cannot be restored. '
       'Only password-protected backups are supported.';
 
+  /// BKP-11: the file's own bytes show it is incomplete; no password can
+  /// open it, so the user is not asked for one.
+  static const String backupDamagedMessage =
+      'This backup file is damaged or incomplete (it may not have finished '
+      'saving or copying), so it cannot be opened with any password. Try '
+      'another backup file.';
+
+  /// BKP-11: decryption failed on a file that looks complete. The format has
+  /// no checksum, so a wrong password and a damaged file look the same.
+  static const String backupWrongPasswordMessage =
+      'Wrong password, or the backup file is damaged — cannot open backup.';
+
+  /// 4e-1: the password was right, but the contents failed their integrity
+  /// check (the WinZip-AES authentication code).
+  static const String backupIntegrityFailedMessage =
+      'This backup file is damaged: part of its contents failed the integrity '
+      'check, so it cannot be restored. The password was accepted. Try '
+      'another backup file.';
+
+  /// The message for a failure decoding the zip inside a backup.
+  static String _innerDecodeMessage(Object e, String otherwise) =>
+      _isInnerIntegrityFailure(e) ? backupIntegrityFailedMessage : otherwise;
+
+  /// Refuses an encrypted backup whose bytes show it is incomplete.
+  static void _refuseTruncatedBlob(List<int> bytes) {
+    if (BackupEncryptionService.isTruncatedBlob(bytes)) {
+      throw Exception(backupDamagedMessage);
+    }
+  }
+
+  /// Decrypts the outer layer of an encrypted backup, or throws the message
+  /// that matches the failure.
+  static Uint8List _openProtectedBlob(Uint8List bytes, String password) {
+    _refuseTruncatedBlob(bytes);
+    final zip = BackupEncryptionService.decryptBytes(bytes, password);
+    if (zip == null) throw Exception(backupWrongPasswordMessage);
+    return zip;
+  }
+
   /// SharedPreferences keys NEVER backed up or restored — device-bound
   /// (device id / license / printers / captain net config) or session/transient.
   /// Restoring these to another device would break licensing/printing.
@@ -162,14 +475,22 @@ class UnifiedBackupService {
     'captain_pos_ip', 'captain_logged_in', 'captain_staff_id', 'is_captain_mode',
     // Session / auth state (re-established on login)
     'restaurant_is_logged_in', 'restaurant_login_type', 'restaurant_staff_role',
-    'restaurant_staff_name', 'restaurant_current_shift_id',
+    'restaurant_staff_name', 'restaurant_staff_id',
+    'restaurant_current_shift_id',
     'admin_session', 'admin_username', 'admin_session_timestamp',
     'admin_staff_id',
+    PinAttemptGuard.failuresKey, PinAttemptGuard.levelKey,
+    PinAttemptGuard.untilKey,
     // Transient / regenerated
     'last_backup_date', 'auto_backup_enabled', 'first_time_pos',
     'first_time_pos_v2', 'last_eod_date', 'retail_last_eod_date',
     'pendingEod_snoozed_date', 'dev_rsa_keypair_v1',
   };
+
+  /// Whether a SharedPreferences [key] is carried by backup and restore.
+  @visibleForTesting
+  static bool prefTravelsWithBackup(String key) =>
+      !_prefsDenylist.contains(key);
 
   /// ---------------------------
   /// 🔧 HELPER: Deep clean map for JSON serialization
@@ -215,32 +536,98 @@ class UnifiedBackupService {
   /// ---------------------------
   /// Automatically saves backup to Downloads folder
   /// Returns the file path or null if failed
-  static Future<String?> exportToDownloads({bool includeImages = true}) async {
-    if (!PlanEnforce.allows(EntKeys.dataBackup)) return null;
+  /// [daily]: the start-of-day prompt's backup — named
+  /// `BillBerryLite_daily_<time>.zip` so retention can tell it from a manual
+  /// one (BKP-6). Same content/format.
+  static Future<String?> exportToDownloads(
+      {bool includeImages = true, bool daily = false}) async {
+    lastExportError = null;
+    if (!PlanEnforce.allows(ModeKeys.dataBackup)) {
+      lastExportError = backupNotInPlanMessage;
+      return null;
+    }
     if (kIsWeb) {
       return await _exportForWeb();
+    }
+
+    // Android 7–10 need storage permission for Downloads. Every backup here is
+    // started by the user, who is on screen, so it asks.
+    if (!await BackupStoragePermission.ensure()) {
+      lastExportError = storagePermissionDeniedMessage;
+      return null;
     }
 
     try {
       debugPrint("📦 Starting backup to Downloads (images: $includeImages)...");
 
       // Collect all data
-      final data = await _collectAllData();
+      final data = await _collectCompleteBackup();
 
       // Create ZIP backup
-      return await _createZipBackup(data, saveToDownloads: true, includeImages: includeImages);
+      return await _noteSaved(await _createZipBackup(data,
+          saveToDownloads: true, includeImages: includeImages, daily: daily));
     } catch (e, stackTrace) {
       debugPrint("❌ Auto-save backup failed: $e");
       debugPrint("Stack trace: $stackTrace");
+      lastExportError ??= backupFailureMessage(e);
       return null;
     }
+  }
+
+  /// A saved and verified backup of any kind counts as today's backup.
+  static Future<String?> _noteSaved(String? path) async {
+    if (path != null) await AutoBackupService.recordBackupMade();
+    return path;
+  }
+
+  /// Shown when the plan does not include backups (BKP-6 K3).
+  static const String backupNotInPlanMessage =
+      'Backups are not included in your plan, so no backup was made.';
+
+  /// A manual backup on Android 7–10 when storage access was refused.
+  static const String storagePermissionDeniedMessage =
+      'Backup not saved: storage access was not allowed. Allow storage for '
+      'Bill Berry Lite and try again.';
+
+  /// A clear reason for a backup that could not be made (BKP-6 K3): no
+  /// password, no permission, no storage space, or the underlying error.
+  /// Messages of the verified write (BKP-11) and of an incomplete export are
+  /// already specific and are kept as they are.
+  @visibleForTesting
+  static String backupFailureMessage(Object e) {
+    if (e is BackupVerificationException) return e.message;
+    final text = '$e';
+    if (text.contains('No backup password set')) {
+      return 'No backup password is set, so the backup could not be '
+          'encrypted and was not made. Set a backup password first.';
+    }
+    if (e is FileSystemException) {
+      final code = e.osError?.errorCode;
+      final os = (e.osError?.message ?? '').toLowerCase();
+      final where = e.path == null || e.path!.isEmpty ? '' : ' (${e.path})';
+      // ENOSPC 28 (Android/Linux), ERROR_DISK_FULL 112 / HANDLE_DISK_FULL 39
+      // (Windows).
+      if (code == 28 || code == 112 || code == 39 ||
+          os.contains('no space') || os.contains('not enough space') ||
+          e.message.toLowerCase().contains('no space')) {
+        return 'Backup not saved: there is not enough free storage space$where.';
+      }
+      // EACCES 13 / EPERM 1 (Android/Linux), ERROR_ACCESS_DENIED 5 (Windows).
+      if (e is PathAccessException || code == 13 || code == 1 || code == 5) {
+        return 'Backup not saved: the app is not allowed to write to this '
+            'location$where.';
+      }
+      return 'Backup not saved: the file could not be written$where '
+          '(${e.osError?.message ?? e.message}).';
+    }
+    return 'Backup not saved: ${text.replaceFirst('Exception: ', '')}';
   }
 
   /// Web-only: serialize backup to JSON, zip it and trigger browser download.
   static Future<String?> _exportForWeb() async {
     try {
       debugPrint("📦 Web backup: collecting data...");
-      final data = await _collectAllData();
+      final data = await _collectCompleteBackup();
       final jsonString = jsonEncode(data);
 
       // Encryption is mandatory — never write plaintext on web either.
@@ -295,7 +682,11 @@ class UnifiedBackupService {
   /// Saves backup to user-selected folder
   /// Returns the file path or null if failed
   static Future<String?> exportToCustomFolder(String folderPath) async {
-    if (!PlanEnforce.allows(EntKeys.dataBackup)) return null;
+    lastExportError = null;
+    if (!PlanEnforce.allows(ModeKeys.dataBackup)) {
+      lastExportError = backupNotInPlanMessage;
+      return null;
+    }
     if (kIsWeb) {
       return await _exportForWeb();
     }
@@ -304,14 +695,35 @@ class UnifiedBackupService {
       debugPrint("📦 Starting backup to custom folder: $folderPath");
 
       // Collect all data
-      final data = await _collectAllData();
+      final data = await _collectCompleteBackup();
 
       // Create ZIP backup
-      return await _createZipBackup(data, customPath: folderPath);
+      return await _noteSaved(
+          await _createZipBackup(data, customPath: folderPath));
     } catch (e, stackTrace) {
       debugPrint("❌ Custom folder backup failed: $e");
       debugPrint("Stack trace: $stackTrace");
+      lastExportError ??= backupFailureMessage(e);
       return null;
+    }
+  }
+
+  /// Temporary share copies older than this are removed before a new one is
+  /// written (BKP-6 K5). Only `backup_share_cache/` is touched.
+  static const Duration shareCopyMaxAge = Duration(hours: 24);
+
+  static void _removeOldShareCopies(Directory cacheDir) {
+    try {
+      final cutoff = DateTime.now().subtract(shareCopyMaxAge);
+      for (final f in cacheDir.listSync().whereType<File>()) {
+        final name = p.basename(f.path);
+        if (!name.startsWith('BillBerryLite_') || !name.endsWith('.zip')) {
+          continue;
+        }
+        if (f.lastModifiedSync().isBefore(cutoff)) f.deleteSync();
+      }
+    } catch (e) {
+      debugPrint("⚠️ Old share copies not removed: $e");
     }
   }
 
@@ -321,16 +733,23 @@ class UnifiedBackupService {
   /// Saves backup to app cache then shares it via the system share sheet.
   /// On web, triggers a browser download instead.
   static Future<String?> exportToShare() async {
-    if (!PlanEnforce.allows(EntKeys.dataBackup)) return null;
+    lastExportError = null;
+    if (!PlanEnforce.allows(ModeKeys.dataBackup)) {
+      lastExportError = backupNotInPlanMessage;
+      return null;
+    }
     if (kIsWeb) return await _exportForWeb();
     try {
-      final data = await _collectAllData();
+      final data = await _collectCompleteBackup();
       final appDir = await getApplicationDocumentsDirectory();
       final cacheDir = Directory('${appDir.path}/backup_share_cache');
       if (!cacheDir.existsSync()) cacheDir.createSync(recursive: true);
-      return await _createZipBackup(data, customPath: cacheDir.path);
+      _removeOldShareCopies(cacheDir);
+      return await _noteSaved(
+          await _createZipBackup(data, customPath: cacheDir.path));
     } catch (e) {
       debugPrint("❌ exportToShare failed: $e");
+      lastExportError ??= backupFailureMessage(e);
       return null;
     }
   }
@@ -341,7 +760,7 @@ class UnifiedBackupService {
   /// Imports backup file and automatically detects mode.
   /// Shows a password dialog if the backup is encrypted.
   static Future<bool> importData(BuildContext context) async {
-    if (!PlanEnforce.allows(EntKeys.dataBackup)) return false;
+    if (!PlanEnforce.allows(ModeKeys.dataBackup)) return false;
     try {
       debugPrint("📦 Starting import process...");
 
@@ -382,27 +801,25 @@ class UnifiedBackupService {
   static Future<bool> _importFromRawBytes(
       BuildContext context, Uint8List rawBytes, String fileName) async {
     try {
-      Map<String, dynamic> data;
-
       if (fileName.toLowerCase().endsWith('.json')) {
         // Plain-JSON backups are unencrypted — rejected.
         throw Exception(_unencryptedMsg);
       }
 
+      // BKP-11: an incomplete file is refused before asking for a password.
+      _refuseTruncatedBlob(rawBytes);
       final String? password = await _showPasswordDialog(context);
       if (password == null) throw Exception("Restore cancelled: no password");
 
       List<Map<String, dynamic>> entries;
       if (BackupEncryptionService.isEncryptedBlob(rawBytes)) {
         // New protected backup: decrypt the outer layer first
-        final decryptedZip = BackupEncryptionService.decryptBytes(rawBytes, password);
-        if (decryptedZip == null) {
-          throw Exception("Wrong password — cannot open backup");
-        }
+        final decryptedZip = _openProtectedBlob(rawBytes, password);
         try {
           entries = _decodeZipInIsolate((decryptedZip.toList(), password));
-        } catch (_) {
-          throw Exception("Wrong password or corrupted backup entries");
+        } catch (e) {
+          throw Exception(_innerDecodeMessage(
+              e, "Wrong password or corrupted backup entries"));
         }
       } else {
         // Legacy backup: check if plain
@@ -411,19 +828,19 @@ class UnifiedBackupService {
         }
         try {
           entries = _decodeZipInIsolate((rawBytes.toList(), password));
-        } catch (_) {
-          throw Exception("Wrong password — cannot open backup");
+        } catch (e) {
+          throw Exception(_innerDecodeMessage(e, backupWrongPasswordMessage));
         }
       }
 
-      data = await _restoreEntries(entries, password);
-
-      final backupMode = _detectModeFromBackup(data);
-      debugPrint("📦 Web import: detected mode = $backupMode");
-      await _ensureBoxesOpened(backupMode);
-      await _restoreAllData(data, backupMode);
+      final decoded = await _decodeEntries(entries, password);
+      await _restoreDecodedBackup(decoded.data, images: decoded.images);
       debugPrint("✅ Web import completed!");
       return true;
+    } on RestoreFailedException catch (e) {
+      debugPrint("❌ Web import failed while writing: $e");
+      await promptRestartAfterFailedRestore(e);
+      return false;
     } catch (e, st) {
       debugPrint("❌ Web import failed: $e\n$st");
       _showImportError(context, e);
@@ -434,7 +851,11 @@ class UnifiedBackupService {
   /// ---------------------------
   /// ✅ IMPORT FROM FILE PATH
   /// ---------------------------
-  static Future<bool> importFromFilePath(BuildContext context, String filePath) async {
+  /// [password]: already entered and checked by the caller (M4 startup
+  /// recovery validates the file before moving damaged data aside); null
+  /// asks for it in the usual dialog.
+  static Future<bool> importFromFilePath(BuildContext context, String filePath,
+      {String? password, bool fromRecovery = false}) async {
     try {
       final file = File(filePath);
       debugPrint("📦 Importing from file: $filePath");
@@ -447,27 +868,28 @@ class UnifiedBackupService {
       final extension = p.extension(file.path).toLowerCase();
       debugPrint("📦 File extension: $extension");
 
-      Map<String, dynamic> data;
-
       if (extension == '.json') {
         // Plain-JSON backups are unencrypted — rejected.
         throw Exception(_unencryptedMsg);
-      } else {
-        // Pass a password dialog as the provider for encrypted backups
-        data = await _extractZipBackup(
-          file,
-          passwordProvider: () => _showPasswordDialog(context),
-        );
       }
-
-      final backupMode = _detectModeFromBackup(data);
-      debugPrint("📦 Detected backup mode: $backupMode");
-
-      await _ensureBoxesOpened(backupMode);
-      await _restoreAllData(data, backupMode);
+      // Pass a password dialog as the provider for encrypted backups
+      String? usedPassword;
+      final decoded = await _extractZipBackup(
+        file,
+        passwordProvider: () async =>
+            usedPassword = password ?? await _showPasswordDialog(context),
+      );
+      await _restoreDecodedBackup(decoded.data,
+          images: decoded.images,
+          password: usedPassword,
+          source: fromRecovery ? RestoreSource.recovery : RestoreSource.normal);
 
       debugPrint("✅ Import completed successfully!");
       return true;
+    } on RestoreFailedException catch (e) {
+      debugPrint("❌ Import failed while writing: $e");
+      await promptRestartAfterFailedRestore(e);
+      return false;
     } catch (e, stackTrace) {
       debugPrint("❌ Import from file path failed: $e");
       debugPrint("Stack trace: $stackTrace");
@@ -534,6 +956,61 @@ class UnifiedBackupService {
         ),
       ),
     );
+  }
+
+  /// ---------------------------
+  /// 🔧 RESTART AFTER A SUCCESSFUL RESTORE
+  /// ---------------------------
+  /// A restore rewrites Hive and SharedPreferences (and may switch the business
+  /// mode) underneath stores, notifiers and DI that were loaded at startup —
+  /// none of which reload. Closing the app is the one way every surface comes
+  /// back reading the restored data, so EVERY restore entry point ends here.
+  ///
+  /// Web cannot `exit`, so it asks the user to reopen the tab instead.
+  static Future<void> promptRestartAfterRestore() async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    final ctx = navigatorKey.currentContext;
+    if (ctx == null || !ctx.mounted) return;
+    // BKP-9: success is claimed only when nothing was skipped and every
+    // post-restore step finished.
+    final content = restoreResultContent(
+      skipped: lastRestoreSkippedSections,
+      postRestoreWarnings: lastRestorePostRestoreWarnings,
+      web: kIsWeb,
+    );
+    await showAppInfoDialog(
+      context: ctx,
+      title: content.title,
+      message: content.message,
+      buttonLabel: kIsWeb ? 'OK' : 'Close App',
+      accent: content.hasWarnings ? AppColors.warning : AppColors.success,
+      icon: content.hasWarnings
+          ? Icons.warning_amber_rounded
+          : Icons.check_circle_rounded,
+    );
+    if (!kIsWeb) exit(0);
+  }
+
+  /// A restore that failed after it started writing. The app's in-memory
+  /// stores no longer match the database either way, so it must restart.
+  static Future<void> promptRestartAfterFailedRestore(
+      RestoreFailedException failure) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    final ctx = navigatorKey.currentContext;
+    if (ctx != null && ctx.mounted) {
+      await showAppInfoDialog(
+        context: ctx,
+        title: 'Restore Failed',
+        message: '${failure.userMessage}\n\n'
+            '${kIsWeb ? 'Close this tab and open the app again.' : 'The app will now close. Please open it again.'}',
+        buttonLabel: kIsWeb ? 'OK' : 'Close App',
+        accent: failure.rolledBack ? AppColors.warning : AppColors.danger,
+        icon: failure.rolledBack
+            ? Icons.restore_rounded
+            : Icons.error_outline_rounded,
+      );
+    }
+    if (!kIsWeb) exit(0);
   }
 
   /// ---------------------------
@@ -703,13 +1180,36 @@ class UnifiedBackupService {
     }
   }
 
+  /// Test seams over the private export/restore steps; no behaviour of their own.
+  @visibleForTesting
+  static Future<Map<String, dynamic>> collectAllDataForTesting() =>
+      _collectAllData();
+
+  @visibleForTesting
+  static Future<void> restoreRestaurantDataForTesting(
+          Map<String, dynamic> data) =>
+      _restoreRestaurantData(data);
+
+  @visibleForTesting
+  static Future<void> restoreRetailDataForTesting(Map<String, dynamic> data) =>
+      _restoreRetailData(data);
+
   /// ---------------------------
   /// 🔧 COLLECT ALL DATA (MODE-AWARE)
   /// ---------------------------
-  static Future<Map<String, dynamic>> _collectAllData() async {
+  ///
+  /// [mode] exports that business type's sections instead of the device's.
+  /// The pre-restore snapshot passes the restore's mode, so on an install
+  /// whose setup is unfinished (no mode yet) it still covers the staff,
+  /// categories, products… the restore is about to replace.
+  static Future<Map<String, dynamic>> _collectAllData({String? mode}) async {
     final exportMap = <String, List<Map<String, dynamic>>>{};
+    _exportFailures = <String>{};
+    final exportMode = mode ?? AppConfig.businessMode.name;
+    final isRestaurant = exportMode == BusinessMode.restaurant.name;
+    final isRetail = exportMode == BusinessMode.retail.name;
 
-    if (AppConfig.isRestaurant) {
+    if (isRestaurant) {
       debugPrint("📦 Collecting RESTAURANT data...");
 
       // Categories — shared box (restaurant + retail)
@@ -742,24 +1242,27 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Tax box not found: $e");
         exportMap["taxes"] = [];
+        _exportFailures.add("taxes");
       }
 
       // Expense Categories (using helper - mode aware)
       try {
-        final expenseCatBox = HiveExpenseCat.getECategory();
+        final expenseCatBox = Hive.box<ExpenseCategory>(HiveBoxNames.getExpenseCategoryBox(isRetail));
         exportMap["expenseCategories"] = expenseCatBox.values.map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>).toList();
       } catch (e) {
         debugPrint("⚠️ Expense category box error: $e");
         exportMap["expenseCategories"] = [];
+        _exportFailures.add("expenseCategories");
       }
 
       // Expenses (using helper - mode aware)
       try {
-        final expenseBox = HiveExpenceL.getexpenseBox();
+        final expenseBox = Hive.box<Expense>(HiveBoxNames.getExpenseBox(isRetail));
         exportMap["expenses"] = expenseBox.values.map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>).toList();
       } catch (e) {
         debugPrint("⚠️ Expense box error: $e");
         exportMap["expenses"] = [];
+        _exportFailures.add("expenses");
       }
 
       // Tables
@@ -768,16 +1271,18 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Tables box not found: $e");
         exportMap["tables"] = [];
+        _exportFailures.add("tables");
       }
 
       // EOD Reports (using mode-aware box name)
       try {
-        final eodBoxName = AppConfig.isRetail ? 'eodBox' : 'restaurant_eodBox';
+        final eodBoxName = isRetail ? 'eodBox' : 'restaurant_eodBox';
         final eodBox = Hive.box<EndOfDayReport>(eodBoxName);
         exportMap["eodReports"] = eodBox.values.map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>).toList();
       } catch (e) {
         debugPrint("⚠️ EOD box error: $e");
         exportMap["eodReports"] = [];
+        _exportFailures.add("eodReports");
       }
 
       // Current Orders
@@ -786,6 +1291,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Orders box not found: $e");
         exportMap["orders"] = [];
+        _exportFailures.add("orders");
       }
 
       // ✅ Restaurant Cart
@@ -795,6 +1301,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Restaurant Cart box not found: $e");
         exportMap["restaurantCart"] = [];
+        _exportFailures.add("restaurantCart");
       }
 
       // ✅ App Counters
@@ -809,6 +1316,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ App Counters box error: $e");
         exportMap["appCounters"] = [];
+        _exportFailures.add("appCounters");
       }
 
       // ✅ Test Bill Box
@@ -819,6 +1327,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Test Bill Box error: $e");
         exportMap["testBillBox"] = [];
+        _exportFailures.add("testBillBox");
       }
 
       // ✅ Shifts
@@ -831,6 +1340,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Shifts box error: $e");
         exportMap["shifts"] = [];
+        _exportFailures.add("shifts");
       }
 
       // ✅ Cash Movements
@@ -843,6 +1353,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Cash Movements box error: $e");
         exportMap["cashMovements"] = [];
+        _exportFailures.add("cashMovements");
       }
 
       // ✅ Cash Handovers
@@ -855,6 +1366,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Cash Handovers box error: $e");
         exportMap["cashHandovers"] = [];
+        _exportFailures.add("cashHandovers");
       }
 
       // Customers — shared box (restaurant + retail). Retail's export of this
@@ -870,6 +1382,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Customers box error: $e");
         exportMap["customers"] = [];
+        _exportFailures.add("customers");
       }
 
       // Past Orders — regular Box, all values in memory, no async reads needed
@@ -888,6 +1401,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("❌ Error exporting past orders: $e");
         exportMap["pastOrders"] = [];
+        _exportFailures.add("pastOrders");
       }
 
       // Saved Printers (thermal printer configs — WiFi/BT)
@@ -900,6 +1414,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Printers box error: $e");
         exportMap["printers"] = [];
+        _exportFailures.add("printers");
       }
 
       // Restaurant Sessions
@@ -912,6 +1427,37 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Sessions box error: $e");
         exportMap["restaurantSessions"] = [];
+        _exportFailures.add("restaurantSessions");
+      }
+
+      // Day Management (current session id, opening balance, day-started flag).
+      // Same key as the retail branch; without it a restored restaurant kept
+      // this device's day state pointing at sessions the backup replaced.
+      try {
+        final dayMgmtBox = Hive.box(HiveBoxNames.dayManagementBox);
+        final Map<String, dynamic> dayMgmtMap = {};
+        for (var key in dayMgmtBox.keys) {
+          dayMgmtMap[key.toString()] = dayMgmtBox.get(key);
+        }
+        exportMap["dayManagement"] = [dayMgmtMap];
+        debugPrint("📦 Day Management exported: ${dayMgmtMap.keys.length} entries");
+      } catch (e) {
+        debugPrint("⚠️ Day Management box error: $e");
+        exportMap["dayManagement"] = [];
+        _exportFailures.add("dayManagement");
+      }
+
+      // Item cancellations — the audit trail behind the Item Cancellation Report.
+      try {
+        exportMap["itemCancellations"] = Hive.box<ItemCancellationModel>(HiveBoxNames.restaurantItemCancellations)
+            .values
+            .map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>)
+            .toList();
+        debugPrint("📦 Item cancellations exported: ${exportMap["itemCancellations"]!.length}");
+      } catch (e) {
+        debugPrint("⚠️ Item cancellations box error: $e");
+        exportMap["itemCancellations"] = [];
+        _exportFailures.add("itemCancellations");
       }
 
       // Restaurant Attendance
@@ -924,6 +1470,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Attendance box error: $e");
         exportMap["restaurantAttendance"] = [];
+        _exportFailures.add("restaurantAttendance");
       }
 
       // Recipes (BOM) & Recipe Productions — inventory/recipe management
@@ -933,6 +1480,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Recipes box error: $e");
         exportMap["recipes"] = [];
+        _exportFailures.add("recipes");
       }
 
       try {
@@ -941,6 +1489,21 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Recipe Productions box error: $e");
         exportMap["recipeProductions"] = [];
+        _exportFailures.add("recipeProductions");
+      }
+
+      // Stock movement audit trail (sales, production, voids, GRN, adjustments).
+      // Shared box with retail. On a read error the key is left out rather
+      // than exported empty, so restoring that backup keeps the device's rows.
+      try {
+        exportMap["stockMovements"] =
+            Hive.box<StockMovementModel>(HiveBoxNames.restaurantStockMovements)
+                .values
+                .map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>)
+                .toList();
+        debugPrint("📦 Stock movements exported: ${exportMap["stockMovements"]!.length}");
+      } catch (e) {
+        debugPrint("⚠️ Stock movements box error: $e");
       }
 
       // Restaurant Suppliers, Purchase Orders & GRNs
@@ -950,6 +1513,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Restaurant Suppliers box error: $e");
         exportMap["restaurantSuppliers"] = [];
+        _exportFailures.add("restaurantSuppliers");
       }
 
       try {
@@ -958,6 +1522,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Restaurant Purchase Orders box error: $e");
         exportMap["restaurantPurchaseOrders"] = [];
+        _exportFailures.add("restaurantPurchaseOrders");
       }
 
       try {
@@ -966,6 +1531,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Restaurant Purchase Order Items box error: $e");
         exportMap["restaurantPurchaseOrderItems"] = [];
+        _exportFailures.add("restaurantPurchaseOrderItems");
       }
 
       try {
@@ -974,6 +1540,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Restaurant GRNs box error: $e");
         exportMap["restaurantGrns"] = [];
+        _exportFailures.add("restaurantGrns");
       }
 
       try {
@@ -982,6 +1549,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Restaurant GRN Items box error: $e");
         exportMap["restaurantGrnItems"] = [];
+        _exportFailures.add("restaurantGrnItems");
       }
 
       // Supplier balance journal — must travel with the suppliers themselves,
@@ -992,6 +1560,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Restaurant Supplier Ledger box error: $e");
         exportMap["restaurantSupplierLedger"] = [];
+        _exportFailures.add("restaurantSupplierLedger");
       }
 
       // Damaged-goods / loss / stock-take chain (typeIds 143-149). These were
@@ -1004,6 +1573,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Restaurant Purchase Returns box error: $e");
         exportMap["restaurantPurchaseReturns"] = [];
+        _exportFailures.add("restaurantPurchaseReturns");
       }
 
       try {
@@ -1012,6 +1582,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Restaurant Purchase Return Items box error: $e");
         exportMap["restaurantPurchaseReturnItems"] = [];
+        _exportFailures.add("restaurantPurchaseReturnItems");
       }
 
       try {
@@ -1020,6 +1591,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Restaurant Supplier Claims box error: $e");
         exportMap["restaurantSupplierClaims"] = [];
+        _exportFailures.add("restaurantSupplierClaims");
       }
 
       try {
@@ -1028,6 +1600,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Restaurant Supplier Claim Items box error: $e");
         exportMap["restaurantSupplierClaimItems"] = [];
+        _exportFailures.add("restaurantSupplierClaimItems");
       }
 
       try {
@@ -1036,6 +1609,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Restaurant Inventory Losses box error: $e");
         exportMap["restaurantInventoryLosses"] = [];
+        _exportFailures.add("restaurantInventoryLosses");
       }
 
       try {
@@ -1044,6 +1618,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Restaurant Stock Takes box error: $e");
         exportMap["restaurantStockTakes"] = [];
+        _exportFailures.add("restaurantStockTakes");
       }
 
       try {
@@ -1052,17 +1627,25 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Restaurant Stock Take Items box error: $e");
         exportMap["restaurantStockTakeItems"] = [];
+        _exportFailures.add("restaurantStockTakeItems");
       }
 
-    } else if (AppConfig.isRetail) {
+    } else if (isRetail) {
       debugPrint("📦 Collecting RETAIL data...");
 
       // Products
       try {
-        exportMap["products"] = Hive.box<ProductModel>(HiveBoxNames.products).values.map((e) => e.toProduct()).toList();
+        // imageBytes stripped from JSON, as for restaurant items: each image
+        // is a retail_img_{productId} binary entry in the ZIP instead.
+        exportMap["products"] = Hive.box<ProductModel>(HiveBoxNames.products).values.map((e) {
+          final map = e.toProduct();
+          map.remove('imageBytes');
+          return map;
+        }).toList();
       } catch (e) {
         debugPrint("⚠️ Products box error: $e");
         exportMap["products"] = [];
+        _exportFailures.add("products");
       }
 
       // Variants
@@ -1071,6 +1654,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Variants box error: $e");
         exportMap["variants"] = [];
+        _exportFailures.add("variants");
       }
 
       // App Counters -- retail needs these as much as restaurant does.
@@ -1090,6 +1674,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("App Counters box error: $e");
         exportMap["appCounters"] = [];
+        _exportFailures.add("appCounters");
       }
 
       // Sales
@@ -1098,6 +1683,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Sales box error: $e");
         exportMap["sales"] = [];
+        _exportFailures.add("sales");
       }
 
       // Sale Items
@@ -1106,6 +1692,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Sale Items box error: $e");
         exportMap["saleItems"] = [];
+        _exportFailures.add("saleItems");
       }
 
       // Customers — shared box (restaurant + retail)
@@ -1114,6 +1701,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Customers box error: $e");
         exportMap["customers"] = [];
+        _exportFailures.add("customers");
       }
 
       // Suppliers
@@ -1122,6 +1710,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Suppliers box error: $e");
         exportMap["suppliers"] = [];
+        _exportFailures.add("suppliers");
       }
 
       // Supplier balance journal — the history behind each currentBalance.
@@ -1130,6 +1719,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Supplier ledger box error: $e");
         exportMap["supplierLedger"] = [];
+        _exportFailures.add("supplierLedger");
       }
 
       // Purchases/purchaseItems intentionally absent — the standalone Purchase
@@ -1166,10 +1756,15 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Damaged-goods boxes error: $e");
         exportMap["purchaseReturns"] = [];
+        _exportFailures.add("purchaseReturns");
         exportMap["purchaseReturnItems"] = [];
+        _exportFailures.add("purchaseReturnItems");
         exportMap["supplierClaims"] = [];
+        _exportFailures.add("supplierClaims");
         exportMap["supplierClaimItems"] = [];
+        _exportFailures.add("supplierClaimItems");
         exportMap["inventoryLosses"] = [];
+        _exportFailures.add("inventoryLosses");
       }
 
       // Manual stock adjustments. The audit trail for the one stock movement
@@ -1184,6 +1779,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Stock movements box error: $e");
         exportMap["stockMovements"] = [];
+        _exportFailures.add("stockMovements");
       }
 
       // Cash drawer movements — Cash In / Cash Out, opening float and the EOD
@@ -1198,6 +1794,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Cash movements box error: $e");
         exportMap["cashMovements"] = [];
+        _exportFailures.add("cashMovements");
       }
 
       // Physical stock counts. The completed ones justify the adjustments in
@@ -1217,7 +1814,9 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Stock take boxes error: $e");
         exportMap["stockTakes"] = [];
+        _exportFailures.add("stockTakes");
         exportMap["stockTakeItems"] = [];
+        _exportFailures.add("stockTakeItems");
       }
 
       // Categories (String list)
@@ -1227,6 +1826,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Retail Categories box error: $e");
         exportMap["categories"] = [];
+        _exportFailures.add("categories");
       }
 
       // ✅ Cart Items
@@ -1236,37 +1836,41 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Cart Items box error: $e");
         exportMap["cartItems"] = [];
+        _exportFailures.add("cartItems");
       }
 
       // ✅ NEW: Add EOD Reports for Retail
       try {
-        final eodBoxName = AppConfig.isRetail ? 'eodBox' : 'restaurant_eodBox';
+        final eodBoxName = isRetail ? 'eodBox' : 'restaurant_eodBox';
         final eodBox = Hive.box<EndOfDayReport>(eodBoxName);
         exportMap["eodReports"] = eodBox.values.map((e) => e.toMap()).toList();
         debugPrint("📦 Retail EOD Reports exported: ${exportMap["eodReports"]!.length}");
       } catch (e) {
         debugPrint("⚠️ Retail EOD box error: $e");
         exportMap["eodReports"] = [];
+        _exportFailures.add("eodReports");
       }
 
       // ✅ NEW: Add Expense Categories for Retail
       try {
-        final expenseCatBox = HiveExpenseCat.getECategory();
+        final expenseCatBox = Hive.box<ExpenseCategory>(HiveBoxNames.getExpenseCategoryBox(isRetail));
         exportMap["expenseCategories"] = expenseCatBox.values.map((e) => e.toMap()).toList();
         debugPrint("📦 Retail Expense Categories exported: ${exportMap["expenseCategories"]!.length}");
       } catch (e) {
         debugPrint("⚠️ Retail Expense category box error: $e");
         exportMap["expenseCategories"] = [];
+        _exportFailures.add("expenseCategories");
       }
 
       // ✅ NEW: Add Expenses for Retail
       try {
-        final expenseBox = HiveExpenceL.getexpenseBox();
+        final expenseBox = Hive.box<Expense>(HiveBoxNames.getExpenseBox(isRetail));
         exportMap["expenses"] = expenseBox.values.map((e) => e.toMap()).toList();
         debugPrint("📦 Retail Expenses exported: ${exportMap["expenses"]!.length}");
       } catch (e) {
         debugPrint("⚠️ Retail Expense box error: $e");
         exportMap["expenses"] = [];
+        _exportFailures.add("expenses");
       }
 
       // ✅ Hold Sales & Hold Sale Items
@@ -1276,6 +1880,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Hold Sales box error: $e");
         exportMap["holdSales"] = [];
+        _exportFailures.add("holdSales");
       }
 
       try {
@@ -1284,6 +1889,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Hold Sale Items box error: $e");
         exportMap["holdSaleItems"] = [];
+        _exportFailures.add("holdSaleItems");
       }
 
       // ✅ Purchase Orders & Purchase Order Items
@@ -1293,6 +1899,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Purchase Orders box error: $e");
         exportMap["purchaseOrders"] = [];
+        _exportFailures.add("purchaseOrders");
       }
 
       try {
@@ -1301,6 +1908,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Purchase Order Items box error: $e");
         exportMap["purchaseOrderItems"] = [];
+        _exportFailures.add("purchaseOrderItems");
       }
 
       // ✅ GRNs & GRN Items
@@ -1310,6 +1918,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ GRNs box error: $e");
         exportMap["grns"] = [];
+        _exportFailures.add("grns");
       }
 
       try {
@@ -1318,6 +1927,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ GRN Items box error: $e");
         exportMap["grnItems"] = [];
+        _exportFailures.add("grnItems");
       }
 
       // ✅ Bundles & Kit Assemblies (bundle/repack inventory)
@@ -1327,6 +1937,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Bundles box error: $e");
         exportMap["bundles"] = [];
+        _exportFailures.add("bundles");
       }
 
       try {
@@ -1335,6 +1946,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Kit Assemblies box error: $e");
         exportMap["kitAssemblies"] = [];
+        _exportFailures.add("kitAssemblies");
       }
 
       // ✅ Categories — shared box (restaurant + retail). Restaurant's export
@@ -1347,6 +1959,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Categories box error: $e");
         exportMap["categories"] = [];
+        _exportFailures.add("categories");
       }
 
       // ✅ Payment Entries
@@ -1356,6 +1969,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Payment Entries box error: $e");
         exportMap["paymentEntries"] = [];
+        _exportFailures.add("paymentEntries");
       }
 
       // ✅ Credit Payments
@@ -1365,6 +1979,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Credit Payments box error: $e");
         exportMap["creditPayments"] = [];
+        _exportFailures.add("creditPayments");
       }
 
       // ✅ Attributes, Attribute Values, Product Attributes
@@ -1374,6 +1989,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Attributes box error: $e");
         exportMap["attributes"] = [];
+        _exportFailures.add("attributes");
       }
 
       try {
@@ -1382,6 +1998,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Attribute Values box error: $e");
         exportMap["attributeValues"] = [];
+        _exportFailures.add("attributeValues");
       }
 
       try {
@@ -1390,6 +2007,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Product Attributes box error: $e");
         exportMap["productAttributes"] = [];
+        _exportFailures.add("productAttributes");
       }
 
       // Staff — shared box (restaurant + retail). Restaurant's export of this
@@ -1402,6 +2020,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Staff box error: $e");
         exportMap["staffBox"] = [];
+        _exportFailures.add("staffBox");
       }
 
       // Shifts — shared box (restaurant + retail), same reasoning as Staff
@@ -1416,6 +2035,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Shifts box error: $e");
         exportMap["shifts"] = [];
+        _exportFailures.add("shifts");
       }
 
       // Attendance — shared box, same reasoning. The key stays
@@ -1432,6 +2052,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Attendance box error: $e");
         exportMap["restaurantAttendance"] = [];
+        _exportFailures.add("restaurantAttendance");
       }
 
       // Tax — shared box (restaurant + retail), same reasoning as Staff above.
@@ -1441,6 +2062,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Tax box error: $e");
         exportMap["taxes"] = [];
+        _exportFailures.add("taxes");
       }
 
       // ✅ Billing Tabs
@@ -1450,6 +2072,7 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Billing Tabs box error: $e");
         exportMap["billingTabs"] = [];
+        _exportFailures.add("billingTabs");
       }
 
       // ✅ Day Management Box (opening balance)
@@ -1464,6 +2087,34 @@ class UnifiedBackupService {
       } catch (e) {
         debugPrint("⚠️ Day Management box error: $e");
         exportMap["dayManagement"] = [];
+        _exportFailures.add("dayManagement");
+      }
+
+      // Day sessions — retail's DayManagementService keeps its sessions in this
+      // shared box, and dayManagement above points into it by session id.
+      try {
+        exportMap["restaurantSessions"] = Hive.box<RestaurantSessionModel>(HiveBoxNames.restaurantSessions)
+            .values
+            .map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>)
+            .toList();
+        debugPrint("📦 Sessions exported: ${exportMap["restaurantSessions"]!.length}");
+      } catch (e) {
+        debugPrint("⚠️ Sessions box error: $e");
+        exportMap["restaurantSessions"] = [];
+        _exportFailures.add("restaurantSessions");
+      }
+
+      // Saved printers — shared box, also written by retail's printer setup.
+      try {
+        exportMap["printers"] = Hive.box<SavedPrinterModel>(HiveBoxNames.restaurantPrinters)
+            .values
+            .map((e) => _deepCleanMap(e.toMap()) as Map<String, dynamic>)
+            .toList();
+        debugPrint("📦 Printers exported: ${exportMap["printers"]!.length}");
+      } catch (e) {
+        debugPrint("⚠️ Printers box error: $e");
+        exportMap["printers"] = [];
+        _exportFailures.add("printers");
       }
 
       // Admin credential is a SharedPreferences value now (retail_admin_username/
@@ -1485,6 +2136,7 @@ class UnifiedBackupService {
     } catch (e) {
       debugPrint("⚠️ App config box error: $e");
       exportMap["appConfig"] = [];
+      _exportFailures.add("appConfig");
     }
 
     // App State
@@ -1499,6 +2151,7 @@ class UnifiedBackupService {
     } catch (e) {
       debugPrint("⚠️ App state box error: $e");
       exportMap["appState"] = [];
+      _exportFailures.add("appState");
     }
 
     // Store Box (legacy store info)
@@ -1513,6 +2166,7 @@ class UnifiedBackupService {
     } catch (e) {
       debugPrint("⚠️ Store box error: $e");
       exportMap["storeBox"] = [];
+      _exportFailures.add("storeBox");
     }
 
     // Business Details Box
@@ -1523,6 +2177,7 @@ class UnifiedBackupService {
     } catch (e) {
       debugPrint("⚠️ Business details box error: $e");
       exportMap["businessDetails"] = [];
+      _exportFailures.add("businessDetails");
     }
 
     // Business Type Box
@@ -1533,6 +2188,7 @@ class UnifiedBackupService {
     } catch (e) {
       debugPrint("⚠️ Business type box error: $e");
       exportMap["businessTypes"] = [];
+      _exportFailures.add("businessTypes");
     }
 
     // Tax Details Box
@@ -1543,6 +2199,7 @@ class UnifiedBackupService {
     } catch (e) {
       debugPrint("⚠️ Tax details box error: $e");
       exportMap["taxDetails"] = [];
+      _exportFailures.add("taxDetails");
     }
 
     // Payment Methods Box (shared)
@@ -1553,6 +2210,7 @@ class UnifiedBackupService {
     } catch (e) {
       debugPrint("⚠️ Payment methods box error: $e");
       exportMap["paymentMethods"] = [];
+      _exportFailures.add("paymentMethods");
     }
 
     // ✅ Non-Hive settings: SharedPreferences (admin PIN, store/UPI, currency,
@@ -1581,6 +2239,7 @@ class UnifiedBackupService {
     } catch (e) {
       debugPrint("⚠️ Local prefs export error: $e");
       exportMap["localPrefs"] = [];
+      _exportFailures.add("localPrefs");
     }
 
     // ✅ Backup password (flutter_secure_storage) so a restored device keeps it.
@@ -1591,6 +2250,7 @@ class UnifiedBackupService {
     } catch (e) {
       debugPrint("⚠️ Secure creds export error: $e");
       exportMap["secureCreds"] = [];
+      _exportFailures.add("secureCreds");
     }
 
     debugPrint("📦 Total items exported: ${exportMap.values.fold(0, (sum, list) => sum + list.length)}");
@@ -1603,15 +2263,47 @@ class UnifiedBackupService {
     };
   }
 
+  /// Backups are written one at a time: a second one waits until the first
+  /// has finished. Two at once could otherwise delete each other's
+  /// temporary `.part` file and double the memory used.
+  static Future<void> _backupQueue = Future<void>.value();
+
+  static Future<T> _oneAtATime<T>(Future<T> Function() task) {
+    final run = _backupQueue.then((_) => task());
+    _backupQueue = run.then<void>((_) {}, onError: (_) {});
+    return run;
+  }
+
   /// ---------------------------
   /// 🔧 CREATE ZIP BACKUP
   /// ---------------------------
   static Future<String?> _createZipBackup(
-      Map<String, dynamic> data, {
-        bool saveToDownloads = false,
-        String? customPath,
-        bool includeImages = true,
-      }) async {
+    Map<String, dynamic> data, {
+    bool saveToDownloads = false,
+    String? customPath,
+    bool includeImages = true,
+    // BKP-5: the restore snapshot when no device PIN is stored is locked
+    // with the PIN of the backup being restored. Same format.
+    String? passwordOverride,
+    // BKP-6: the start-of-day prompt's backups get their own name for
+    // retention.
+    bool daily = false,
+  }) =>
+      _oneAtATime(() => _createZipBackupNow(data,
+          saveToDownloads: saveToDownloads,
+          customPath: customPath,
+          includeImages: includeImages,
+          passwordOverride: passwordOverride,
+          daily: daily));
+
+  static Future<String?> _createZipBackupNow(
+    Map<String, dynamic> data, {
+    required bool saveToDownloads,
+    required String? customPath,
+    required bool includeImages,
+    required String? passwordOverride,
+    required bool daily,
+  }) async {
     try {
       final appDir = await getApplicationDocumentsDirectory();
       final backupDir = Directory('${appDir.path}/temp_backup');
@@ -1622,7 +2314,8 @@ class UnifiedBackupService {
 
       // 2️⃣ Encryption is mandatory — a backup password MUST be set.
       // We never write plaintext: no password ⇒ no backup.
-      final password = await BackupEncryptionService.getStoredPassword();
+      final password =
+          passwordOverride ?? await BackupEncryptionService.getStoredPassword();
       if (password == null || password.isEmpty) {
         throw Exception(
             'No backup password set — refusing to write an unencrypted backup');
@@ -1644,13 +2337,31 @@ class UnifiedBackupService {
           int imgCount = 0;
           for (final item in itemBox.values) {
             if (item.imageBytes != null && item.imageBytes!.isNotEmpty) {
-              entries.add({'name': 'item_img_${item.id}', 'bytes': item.imageBytes!.toList()});
+              entries.add({'name': 'item_img_${item.id}', 'bytes': item.imageBytes!});
               imgCount++;
             }
           }
           if (imgCount > 0) debugPrint("📦 Added $imgCount item images to ZIP");
         } catch (e) {
           debugPrint("⚠️ Could not add item images: $e");
+        }
+      } else if (AppConfig.isRetail) {
+        try {
+          final productBox = Hive.box<ProductModel>(HiveBoxNames.products);
+          int imgCount = 0;
+          for (final product in productBox.values) {
+            final bytes = product.imageBytes;
+            if (bytes != null && bytes.isNotEmpty) {
+              entries.add({
+                'name': '$retailImagePrefix${product.productId}',
+                'bytes': bytes,
+              });
+              imgCount++;
+            }
+          }
+          if (imgCount > 0) debugPrint("📦 Added $imgCount product images to ZIP");
+        } catch (e) {
+          debugPrint("⚠️ Could not add product images: $e");
         }
       }
 
@@ -1668,6 +2379,10 @@ class UnifiedBackupService {
           debugPrint("📦 Added ${imageFiles.length} product folder images to ZIP");
         }
       }
+
+      // What the verified file must hold, fixed before anything can change it.
+      final expectedEntries = entries.length;
+      beforeArchiveForTesting?.call(entries);
 
       // 5️⃣ Encode a password-protected (AES) ZIP in a background isolate.
       final zipData = await compute(_encodeArchiveInIsolate, (entries, password));
@@ -1690,7 +2405,7 @@ class UnifiedBackupService {
 
       // 6️⃣ Save ZIP to destination
       final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').substring(0, 19);
-      final suffix = isEncrypted ? 'encrypted' : 'backup';
+      final suffix = daily ? 'daily' : (isEncrypted ? 'encrypted' : 'backup');
       final fileName = 'BillBerryLite_${suffix}_$timestamp.zip';
 
       File outputFile;
@@ -1707,18 +2422,129 @@ class UnifiedBackupService {
       } else {
         throw Exception("No save location specified");
       }
+      // Two files in the same second never share a name: an existing backup
+      // or restore snapshot is never replaced (BKP-5 R1).
+      for (var i = 1; outputFile.existsSync(); i++) {
+        outputFile = File(p.join(outputFile.parent.path,
+            'BillBerryLite_${suffix}_$timestamp-$i.zip'));
+      }
 
-      await outputFile.writeAsBytes(protectedZipData);
+      // BKP-11: never trust the write. The file only gets its final name once
+      // it has been read back and opened exactly as a restore would.
+      await _writeVerifiedBackup(outputFile, protectedZipData, password,
+          expectedJson: jsonString, expectedEntries: expectedEntries);
 
-      debugPrint("✅ Backup saved: ${outputFile.path}");
+      debugPrint("✅ Backup saved and verified: ${outputFile.path}");
       debugPrint("✅ Encrypted: $isEncrypted");
 
       return outputFile.path;
     } catch (e, stackTrace) {
+      // BKP-6 K3: every failure carries a reason the dialogs can show.
+      lastExportError = backupFailureMessage(e);
       debugPrint("❌ ZIP backup creation failed: $e");
       debugPrint("Stack trace: $stackTrace");
       return null;
     }
+  }
+
+  /// Test hook: sees the archive entries just before they are zipped, so a
+  /// test can make the encoder's output differ from the data (null in
+  /// production).
+  @visibleForTesting
+  static void Function(List<Map<String, dynamic>> entries)?
+      beforeArchiveForTesting;
+
+  /// Test hook: runs on the temporary file right after it is written, before
+  /// it is read back (to truncate or corrupt it).
+  @visibleForTesting
+  static Future<void> Function(File written)? afterBackupWriteForTesting;
+
+  /// Suffix of the temporary file a backup is written to before verifying.
+  static const String _partSuffix = '.part';
+
+  /// BKP-11: writes [bytes] to `<target>.part`, reads the file back, checks
+  /// it byte for byte, opens it with [password] the way a restore does and
+  /// compares its data, and only then renames it to [target]. On any failure
+  /// the temporary file is deleted (no unverified backup is ever left with a
+  /// backup's name) and a [BackupVerificationException] is thrown.
+  static Future<void> _writeVerifiedBackup(
+    File target,
+    Uint8List bytes,
+    String password, {
+    required String expectedJson,
+    required int expectedEntries,
+  }) async {
+    _deleteStalePartFiles(target.parent);
+    final part = File('${target.path}$_partSuffix');
+    try {
+      await part.writeAsBytes(bytes, flush: true);
+      await afterBackupWriteForTesting?.call(part);
+
+      final readBack = await part.readAsBytes();
+      if (readBack.length != bytes.length) {
+        throw BackupVerificationException(
+            'only ${readBack.length} of ${bytes.length} bytes were saved');
+      }
+      for (var i = 0; i < bytes.length; i++) {
+        if (readBack[i] != bytes[i]) {
+          throw const BackupVerificationException(
+              'the saved file differs from what was written');
+        }
+      }
+      final zip = BackupEncryptionService.decryptBytes(readBack, password);
+      if (zip == null) {
+        throw const BackupVerificationException('it could not be decrypted');
+      }
+      final List<Map<String, dynamic>> files;
+      try {
+        files = await compute(_decodeZipInIsolate, (zip.toList(), password));
+      } catch (_) {
+        throw const BackupVerificationException('its contents could not be read');
+      }
+      if (files.length != expectedEntries) {
+        throw BackupVerificationException(
+            'it holds ${files.length} of $expectedEntries entries');
+      }
+      final decoded = await _decodeEntries(files, password);
+      if (jsonEncode(decoded.data) != expectedJson) {
+        throw const BackupVerificationException(
+            'its data does not match what was saved');
+      }
+
+      await part.rename(target.path);
+    } catch (e) {
+      try {
+        if (part.existsSync()) part.deleteSync();
+      } catch (_) {}
+      if (e is BackupVerificationException) rethrow;
+      throw BackupVerificationException('$e');
+    }
+  }
+
+  /// Removes `BillBerryLite_*.zip.part` files an interrupted earlier backup
+  /// left in [dir]. Best effort.
+  static void _deleteStalePartFiles(Directory dir) {
+    try {
+      if (!dir.existsSync()) return;
+      for (final f in dir.listSync().whereType<File>()) {
+        final name = p.basename(f.path);
+        if (name.startsWith('BillBerryLite_') &&
+            name.endsWith('.zip$_partSuffix')) {
+          f.deleteSync();
+        }
+      }
+    } catch (e) {
+      debugPrint("⚠️ Could not remove old temporary backup files: $e");
+    }
+  }
+
+  /// Test hook: writes a backup of this device's data into [dir] through the
+  /// real export path; returns its path, or null when it was not saved.
+  @visibleForTesting
+  static Future<String?> createBackupFileForTesting(Directory dir) async {
+    lastExportError = null;
+    return _createZipBackup(await _collectCompleteBackup(),
+        customPath: dir.path);
   }
 
   /// ---------------------------
@@ -1727,12 +2553,14 @@ class UnifiedBackupService {
   /// Backups are password-protected (AES) zips. We prompt for the password,
   /// then decrypt the whole archive with it. [passwordProvider] returns the
   /// entered password, or null to cancel.
-  static Future<Map<String, dynamic>> _extractZipBackup(
+  static Future<_DecodedBackup> _extractZipBackup(
     File file, {
     Future<String?> Function()? passwordProvider,
   }) async {
     final zipBytes = await file.readAsBytes();
 
+    // BKP-11: an incomplete file is refused before asking for a password.
+    _refuseTruncatedBlob(zipBytes);
     if (passwordProvider == null) {
       throw Exception("Backup is encrypted but no password provider was given");
     }
@@ -1742,14 +2570,12 @@ class UnifiedBackupService {
     List<Map<String, dynamic>> entries;
     if (BackupEncryptionService.isEncryptedBlob(zipBytes)) {
       // New protected backup: decrypt the outer layer first
-      final decryptedZip = BackupEncryptionService.decryptBytes(zipBytes, password);
-      if (decryptedZip == null) {
-        throw Exception("Wrong password — cannot open backup");
-      }
+      final decryptedZip = _openProtectedBlob(zipBytes, password);
       try {
         entries = await compute(_decodeZipInIsolate, (decryptedZip.toList(), password));
-      } catch (_) {
-        throw Exception("Wrong password or corrupted backup entries");
+      } catch (e) {
+        throw Exception(_innerDecodeMessage(
+            e, "Wrong password or corrupted backup entries"));
       }
     } else {
       // Legacy backup: check if plain
@@ -1758,12 +2584,12 @@ class UnifiedBackupService {
       }
       try {
         entries = await compute(_decodeZipInIsolate, (zipBytes.toList(), password));
-      } catch (_) {
-        throw Exception("Wrong password — cannot open backup");
+      } catch (e) {
+        throw Exception(_innerDecodeMessage(e, backupWrongPasswordMessage));
       }
     }
 
-    return _restoreEntries(entries, password);
+    return _decodeEntries(entries, password);
   }
 
   /// True if the zip's data.json can be read WITHOUT a password (i.e. it's
@@ -1783,30 +2609,23 @@ class UnifiedBackupService {
 
   /// Writes images to product_images/ (skipped on web) and returns the parsed
   /// data.json map.
-  static Future<Map<String, dynamic>> _restoreEntries(
+  /// Decodes the backup's data.json and collects its image entries WITHOUT
+  /// writing anything, so a backup can be rejected before it touches disk.
+  /// The images are written by [_writeImageEntries] once the restore is allowed.
+  static Future<_DecodedBackup> _decodeEntries(
       List<Map<String, dynamic>> entries, String password) async {
-    Directory? productDir;
-    if (!kIsWeb) {
-      final appDir = await getApplicationDocumentsDirectory();
-      productDir = Directory('${appDir.path}/product_images');
-    }
+    final images = <Map<String, dynamic>>[];
     List<int>? dataBytes;
 
     for (final f in entries) {
       final name = f['name'] as String;
-      final bytes = f['bytes'] as List<int>;
 
-      if (name.startsWith('item_img_') || name.startsWith('prod_img_')) {
-        if (productDir == null) continue; // no filesystem on web
-        if (!productDir.existsSync()) productDir.createSync(recursive: true);
-        final imgName = name.startsWith('prod_img_')
-            ? name.replaceFirst('prod_img_', '')
-            : name;
-        File('${productDir.path}/$imgName')
-          ..createSync(recursive: true)
-          ..writeAsBytesSync(bytes);
+      if (name.startsWith('item_img_') ||
+          name.startsWith('prod_img_') ||
+          name.startsWith(retailImagePrefix)) {
+        images.add(f);
       } else if (name.toLowerCase() == 'data.json') {
-        dataBytes = bytes;
+        dataBytes = f['bytes'] as List<int>;
       }
     }
 
@@ -1823,10 +2642,911 @@ class UnifiedBackupService {
       if (decrypted == null) {
         throw Exception("Wrong password or corrupted backup data inside ZIP");
       }
-      return jsonDecode(decrypted) as Map<String, dynamic>;
+      return (data: jsonDecode(decrypted) as Map<String, dynamic>, images: images);
     } else {
-      return jsonMap;
+      return (data: jsonMap, images: images);
     }
+  }
+
+  /// Writes the backup's product/item images into `product_images` through
+  /// [journal], so a failed restore can put the previous files back. Restore
+  /// never deletes an image file; it only creates or overwrites.
+  static Future<void> _writeImageEntries(
+      List<Map<String, dynamic>> images, _ImageJournal? journal) async {
+    if (kIsWeb || images.isEmpty || journal == null) return; // no filesystem on web
+    final appDir = await getApplicationDocumentsDirectory();
+    final productDir = Directory('${appDir.path}/product_images');
+
+    for (final f in images) {
+      final name = f['name'] as String;
+      final bytes = f['bytes'] as List<int>;
+      final imgName = safeImageFileName(name);
+      if (imgName == null) {
+        debugPrint('Skipped unsafe backup image entry: $name');
+        continue;
+      }
+      if (!productDir.existsSync()) productDir.createSync(recursive: true);
+      await journal.write(File('${productDir.path}/$imgName'), bytes);
+    }
+  }
+
+  /// The file name a backup image entry is written under inside
+  /// `product_images`, or null when the entry name holds a folder path
+  /// (`../`, `/`) — export only ever writes plain names, so such an entry
+  /// can only come from a crafted file and must not leave the folder.
+  @visibleForTesting
+  static String? safeImageFileName(String entryName) {
+    final name = entryName.startsWith('prod_img_')
+        ? entryName.replaceFirst('prod_img_', '')
+        : entryName;
+    final base = p.basename(name);
+    if (base != name || base.isEmpty || base == '.' || base == '..') {
+      return null;
+    }
+    return base;
+  }
+
+  /// ZIP entry name prefix of a retail product image: `retail_img_{productId}`.
+  @visibleForTesting
+  static const String retailImagePrefix = 'retail_img_';
+
+  /// Puts each `retail_img_{productId}` entry back on its product map as
+  /// `imageBytes`, so `ProductModel.fromMap` restores it like an old-format
+  /// backup whose images sat inside data.json. Done in memory: retail images
+  /// are never written to disk. Returns the entries still to write to disk.
+  static List<Map<String, dynamic>> _mergeRetailImages(
+      Map<String, dynamic> data, List<Map<String, dynamic>> images) {
+    final retail = <String, List<int>>{};
+    final rest = <Map<String, dynamic>>[];
+    for (final f in images) {
+      final name = f['name'] as String;
+      if (name.startsWith(retailImagePrefix)) {
+        retail[name.substring(retailImagePrefix.length)] =
+            f['bytes'] as List<int>;
+      } else {
+        rest.add(f);
+      }
+    }
+    if (retail.isEmpty) return rest;
+
+    final section = data['data'] is Map ? data['data'] as Map : data;
+    final products = section['products'];
+    if (products is List) {
+      for (final product in products) {
+        if (product is! Map) continue;
+        final bytes = retail[product['productId']];
+        if (bytes != null) {
+          product['imageBytes'] =
+              bytes is Uint8List ? bytes : Uint8List.fromList(bytes);
+        }
+      }
+    }
+    return rest;
+  }
+
+  /// Sections the most recent `_collectAllData` could not export: each was
+  /// written as an empty list. Reset at the start of every export.
+  static Set<String> _exportFailures = {};
+
+  /// Sections whose export is not required for a safe rollback. The backup
+  /// password: an empty `secureCreds` leaves the device's password alone.
+  /// (`localPrefs` IS required: rollback reads the store-info preferences from
+  /// it, and an empty one would remove them.)
+  static const Set<String> _optionalSnapshotSections = {'secureCreds'};
+
+  /// Sections of the last export that failed and matter for a safe rollback.
+  static Set<String> get _requiredExportFailures =>
+      _exportFailures.difference(_optionalSnapshotSections);
+
+  /// Why the last manual or automatic backup was not saved, when the reason
+  /// is an incomplete export; null otherwise. Reset by every export call.
+  static String? lastExportError;
+
+  /// The export for a backup file. A section that could not be read would be
+  /// saved as empty, and restoring that file would empty the section on the
+  /// target device, so an incomplete export is never written as a backup.
+  static Future<Map<String, dynamic>> _collectCompleteBackup() async {
+    final data = await _collectAllData();
+    final failed = _requiredExportFailures;
+    if (failed.isNotEmpty) {
+      lastExportError = 'Backup not saved: these sections could not be read: '
+          '${(failed.toList()..sort()).join(', ')}. A backup without them '
+          'could not be restored completely.';
+      throw Exception(lastExportError);
+    }
+    return data;
+  }
+
+  /// Sections the last successful restore could not read and left unchanged
+  /// (their restore step tolerates unreadable records). Shown to the user.
+  static List<String> lastRestoreSkippedSections = const [];
+
+  /// BKP-9: steps after the writes that did not finish in the last
+  /// successful restore. Any entry means the restore was not fully clean.
+  static List<String> lastRestorePostRestoreWarnings = const [];
+
+  /// BKP-9: Restaurant sections whose restore step tolerates unreadable
+  /// records but which hold money, stock, ledgers, numbering or the
+  /// definitions those depend on. One of them unreadable refuses the whole
+  /// restore before anything is written. (Steps without a try/catch were
+  /// already strict.)
+  static const Set<String> restaurantCriticalSections = {
+    'itemCancellations',
+    'cashMovements',
+    'cashHandovers',
+    'restaurantSessions',
+    'dayManagement',
+    'shifts',
+    'appCounters',
+    'customers',
+    'stockMovements',
+    'recipes',
+    'recipeProductions',
+    'restaurantSuppliers',
+    'restaurantSupplierLedger',
+    'restaurantPurchaseOrders',
+    'restaurantPurchaseOrderItems',
+    'restaurantGrns',
+    'restaurantGrnItems',
+    'restaurantPurchaseReturns',
+    'restaurantPurchaseReturnItems',
+    'restaurantSupplierClaims',
+    'restaurantSupplierClaimItems',
+    'restaurantInventoryLosses',
+    'restaurantStockTakes',
+    'restaurantStockTakeItems',
+  };
+
+  /// BKP-9: the Retail counterpart of [restaurantCriticalSections].
+  static const Set<String> retailCriticalSections = {
+    'cashMovements',
+    'paymentEntries',
+    'creditPayments',
+    'eodReports',
+    'expenses',
+    'restaurantSessions',
+    'dayManagement',
+    'shifts',
+    'appCounters',
+    'supplierLedger',
+    'stockMovements',
+    'kitAssemblies',
+    'purchaseOrders',
+    'purchaseOrderItems',
+    'grns',
+    'grnItems',
+    'holdSales',
+    'holdSaleItems',
+    'taxes',
+    'staffBox',
+    'billingTabs',
+  };
+
+  /// BKP-9: labels of the steps after the writes, as the user reads them.
+  static const String postStepItemImages = 'reloading item images';
+  static const String postStepProductList = 'refreshing the product list';
+  static const String postStepStoreDetails =
+      'copying store details for receipts';
+
+  /// Test hook: the post-restore step with this label fails.
+  @visibleForTesting
+  static String? failPostRestoreStepForTesting;
+
+  /// Runs one step after the writes. A failure does not undo the restore,
+  /// but is recorded so the result is never reported as fully successful.
+  static Future<void> _postRestoreStep(
+      _RestoreRun r, String label, Future<void> Function() step) async {
+    try {
+      if (failPostRestoreStepForTesting == label) {
+        throw StateError('injected failure: $label');
+      }
+      await step();
+    } catch (e) {
+      debugPrint("⚠️ Post-restore step '$label' did not finish: $e");
+      r.postRestoreWarnings.add(label);
+    }
+  }
+
+  /// BKP-2: per backup key, how many records of the last restore kept an
+  /// automatic key instead of their ID (a blank ID, or an earlier copy of a
+  /// repeated ID). Every record is still restored; this only says how.
+  @visibleForTesting
+  static Map<String, int> lastRestoreUnkeyedRecords = const {};
+
+  /// BKP-2: writes [models] keyed by their ID, losing none. The LAST copy of
+  /// a repeated ID takes the ID key — the one an ID lookup on the source
+  /// device returned (Hive lists integer keys before string keys, so the
+  /// `put(id)` copy comes last); earlier copies and records with a blank ID
+  /// keep automatic keys, exactly as the backup's device held them.
+  static Future<void> _putKeyedById<T>(String keyName, Box<T> box,
+      List<T> models, String Function(T) idOf) async {
+    final lastAt = <String, int>{};
+    for (var i = 0; i < models.length; i++) {
+      final id = idOf(models[i]);
+      if (id.isNotEmpty) lastAt[id] = i;
+    }
+    final keyed = <String, T>{};
+    final unkeyed = <T>[];
+    for (var i = 0; i < models.length; i++) {
+      final id = idOf(models[i]);
+      if (id.isNotEmpty && lastAt[id] == i) {
+        keyed[id] = models[i];
+      } else {
+        unkeyed.add(models[i]);
+      }
+    }
+    await box.putAll(keyed);
+    if (unkeyed.isNotEmpty) {
+      await box.addAll(unkeyed);
+      debugPrint("⚠️ $keyName: ${unkeyed.length} record(s) with a blank or "
+          "repeated ID kept under automatic keys");
+      lastRestoreUnkeyedRecords = {
+        ...lastRestoreUnkeyedRecords,
+        keyName: unkeyed.length,
+      };
+    }
+  }
+
+  /// Test hook: clearing the pending-work journal inside the restore removes
+  /// this many entries, then fails (0 = fails before removing any).
+  @visibleForTesting
+  static int? failWorkJournalClearForTesting;
+
+  /// Test hook: putting the journal back during a rollback fails.
+  @visibleForTesting
+  static bool failWorkJournalPutBackForTesting = false;
+
+  static String _workJournalBox(String mode) =>
+      mode == BusinessMode.retail.name
+          ? HiveBoxNames.retailCheckoutJournal
+          : HiveBoxNames.restaurantStockJournal;
+
+  static String _workJournalLabel(String mode) =>
+      mode == BusinessMode.retail.name
+          ? 'Retail checkout journal'
+          : 'Restaurant stock journal';
+
+  /// Every entry of the pending-work journal, copied out of Hive.
+  static Map<dynamic, dynamic> _captureWorkJournal(String mode) {
+    final box = Hive.box(_workJournalBox(mode));
+    return {for (final key in box.keys) key: _deepCopy(box.get(key))};
+  }
+
+  /// Empties the pending-work journal (inside the restore transaction).
+  static Future<void> _clearWorkJournal(String mode) async {
+    final killAfter = killDuringWorkJournalClearForTesting;
+    if (killAfter != null) {
+      final box = Hive.box(_workJournalBox(mode));
+      for (final key in box.keys.take(killAfter).toList()) {
+        await box.delete(key);
+      }
+      throw SimulatedProcessKill('clearing the work journal');
+    }
+    final failAfter = failWorkJournalClearForTesting;
+    if (failAfter != null) {
+      final box = Hive.box(_workJournalBox(mode));
+      for (final key in box.keys.take(failAfter).toList()) {
+        await box.delete(key);
+      }
+      throw StateError('injected journal clear failure after $failAfter');
+    }
+    if (mode == BusinessMode.retail.name) {
+      await RetailCheckoutCommit.clear();
+    } else {
+      await StockJournal.clear();
+    }
+  }
+
+  /// Rollback: puts back every [before] entry that is missing or changed,
+  /// then checks the whole set is there again. Never throws; false means the
+  /// journal is NOT as it was (the rollback is then not reported verified).
+  /// Entries added since are kept: they are pending work, never discarded.
+  static Future<bool> _putBackWorkJournal(
+      String mode, Map<dynamic, dynamic> before) async {
+    try {
+      if (failWorkJournalPutBackForTesting) {
+        throw StateError('injected journal put-back failure');
+      }
+      final box = Hive.box(_workJournalBox(mode));
+      final missing = {
+        for (final e in before.entries)
+          if (!box.containsKey(e.key) || !_deepEquals(box.get(e.key), e.value))
+            e.key: _deepCopy(e.value),
+      };
+      if (missing.isNotEmpty) await box.putAll(missing);
+      final ok = before.entries.every((e) =>
+          box.containsKey(e.key) && _deepEquals(box.get(e.key), e.value));
+      if (!ok) debugPrint("❌ ${_workJournalLabel(mode)} not fully put back");
+      return ok;
+    } catch (e) {
+      debugPrint("❌ ${_workJournalLabel(mode)} could not be put back "
+          "(${before.length} entries: ${before.keys.join(', ')}): $e");
+      return false;
+    }
+  }
+
+  static Object? _deepCopy(Object? v) {
+    if (v is Map) return {for (final e in v.entries) e.key: _deepCopy(e.value)};
+    if (v is List) return [for (final e in v) _deepCopy(e)];
+    return v;
+  }
+
+  static bool _deepEquals(Object? a, Object? b) {
+    if (a is Map && b is Map) {
+      if (a.length != b.length) return false;
+      for (final e in a.entries) {
+        if (!b.containsKey(e.key) || !_deepEquals(e.value, b[e.key])) {
+          return false;
+        }
+      }
+      return true;
+    }
+    if (a is List && b is List) {
+      if (a.length != b.length) return false;
+      for (var i = 0; i < a.length; i++) {
+        if (!_deepEquals(a[i], b[i])) return false;
+      }
+      return true;
+    }
+    return a == b;
+  }
+
+  /// Test hook: the write pass fails right after writing this backup key.
+  @visibleForTesting
+  static String? failWritingKeyForTesting;
+
+  /// Test hook: the rollback fails right after writing this backup key.
+  @visibleForTesting
+  static String? failRollbackWritingKeyForTesting;
+
+  /// Test hook (BKP-5): the process "dies" right after this key is written.
+  @visibleForTesting
+  static String? killAfterWritingKeyForTesting;
+
+  /// Test hook (BKP-5): the process "dies" during the rollback, right after
+  /// this key is written back.
+  @visibleForTesting
+  static String? killDuringRollbackAfterKeyForTesting;
+
+  /// Test hook (BKP-5): the process "dies" while clearing the pending-work
+  /// journal, after removing this many entries.
+  @visibleForTesting
+  static int? killDuringWorkJournalClearForTesting;
+
+  /// The single restore path both import entry points share once the file is
+  /// decoded: decide the backup's business type, refuse a cross-mode restore,
+  /// read the whole backup, snapshot this device, and only then write. A
+  /// failure while writing rolls everything back to the snapshot.
+  static Future<void> _restoreDecodedBackup(
+    Map<String, dynamic> data, {
+    List<Map<String, dynamic>> images = const [],
+    // BKP-5: the PIN that opened this backup (locks the snapshot when no
+    // device PIN is stored) and where the restore was started.
+    String? password,
+    RestoreSource source = RestoreSource.normal,
+  }) async {
+    lastRestoreSkippedSections = const [];
+    lastRestorePostRestoreWarnings = const [];
+    lastRestoreUnkeyedRecords = const {};
+    final backupMode = _resolveBackupMode(data);
+    debugPrint("📦 Detected backup mode: $backupMode");
+
+    _ensureRestoreModeAllowed(backupMode);
+
+    // Retail images go onto their product maps (validated and restored with
+    // them); only the rest are files to write.
+    final diskImages = _mergeRetailImages(data, images);
+
+    await _ensureBoxesOpened(backupMode);
+    final check = _RestoreRun(validateOnly: true);
+    try {
+      await _restoreAllData(data, backupMode, validateOnly: true, run: check);
+    } on FormatException catch (e) {
+      throw Exception(
+        'This backup file is damaged and was not restored. Nothing on this '
+        'device was changed. (${e.message})',
+      );
+    }
+
+    // BKP-9: an unreadable critical section refuses the whole restore here,
+    // before the snapshot and before any box is cleared or written.
+    final critical = backupMode == BusinessMode.retail.name
+        ? retailCriticalSections
+        : restaurantCriticalSections;
+    final unreadable = check.tolerated.values.toSet().intersection(critical);
+    if (unreadable.isNotEmpty) {
+      throw RestoreRefusedException(unreadable.toList()..sort());
+    }
+
+    // Nothing has been written yet.
+    final snapshot =
+        await _takeSnapshot(backupMode, fallbackPassword: password);
+
+    // BKP-5 (Android, Windows): no business data is written until a verified
+    // snapshot file exists, so an interrupted restore can always be undone.
+    String? docs;
+    RestoreRecord? openBefore;
+    if (!kIsWeb) {
+      if (snapshot.filePath == null || snapshot.sha256 == null) {
+        throw Exception(
+          'The restore did not start: a safety copy of this device\'s data '
+          'could not be saved and checked, so an interrupted restore could not '
+          'be undone. Nothing on this device was changed.'
+          '${lastExportError == null ? '' : ' ($lastExportError)'}',
+        );
+      }
+      docs = (await getApplicationDocumentsDirectory()).path;
+      // A record already open (Undo, or a restore after an interrupted one)
+      // still points to the TRUE original data: it is kept, not replaced.
+      openBefore = RestoreRecordStore.read(docs);
+    }
+    _ImageJournal? journal;
+    if (!kIsWeb && diskImages.isNotEmpty) {
+      journal = _ImageJournal(Directory(p.join(
+          (await getApplicationDocumentsDirectory()).path,
+          'restore_image_undo')));
+      journal.discard(); // leftovers of an interrupted earlier restore
+    }
+
+    // Pending work journal (Restaurant stock journal: Settle, void, cancel and
+    // goods-receipt entries; Retail checkout journal). Device-local and never
+    // exported: its entries describe this device's data before the restore.
+    // Copied now, before any write, so a rollback can put every entry back.
+    final pendingWork = _captureWorkJournal(backupMode);
+
+    // BKP-5: the restore-in-progress record (snapshot + hash, mode, source,
+    // PIN, the journal copy) is written and verified before the first write.
+    // While it is open, the next start is blocked: no journal replay, no POS.
+    var ownsRecord = false;
+    if (!kIsWeb && openBefore == null) {
+      try {
+        await RestoreRecordStore.write(
+          docs!,
+          RestoreRecord(
+            snapshotPath: snapshot.filePath!,
+            snapshotSha256: snapshot.sha256!,
+            mode: backupMode,
+            startedAt: DateTime.now(),
+            source: source,
+            pin: snapshot.pin!,
+            journal: [
+              for (final e in pendingWork.entries)
+                MapEntry(e.key as Object, e.value),
+            ],
+          ),
+        );
+        ownsRecord = true;
+      } catch (e) {
+        throw Exception(
+          'The restore did not start: its safety record could not be saved. '
+          'Nothing on this device was changed. ($e)',
+        );
+      }
+    }
+
+    final run = _RestoreRun(validateOnly: false, tolerated: check.tolerated);
+    try {
+      await _writeImageEntries(diskImages, journal);
+      await _restoreAllData(data, backupMode, run: run);
+      // Part of the restore itself: the restored data and the emptied journal
+      // succeed together, or both go back to how they were. A failure here
+      // rolls back like any write failure, so stale entries can never be
+      // replayed against the restored data.
+      await _clearWorkJournal(backupMode);
+    } on SimulatedProcessKill {
+      rethrow; // test only: the process died — no rollback, record stays open
+    } catch (e) {
+      debugPrint("❌ Restore failed while writing, rolling back: $e");
+      final rolledBack = await _rollback(snapshot, backupMode, journal);
+      final journalBack = await _putBackWorkJournal(backupMode, pendingWork);
+      // R4: only a rollback verified for both the data and the journal closes
+      // the record. Otherwise the next start stays blocked (Undo offered).
+      if (ownsRecord && rolledBack && journalBack) {
+        await _closeRestoreRecord(docs!, 'rolled-back');
+      }
+      throw RestoreFailedException(
+        cause: e,
+        dataRolledBack: rolledBack,
+        journalRestored: journalBack,
+        snapshotPath: snapshot.filePath,
+        unrestoredJournal: journalBack ? null : _workJournalLabel(backupMode),
+        unrestoredJournalEntries: journalBack ? const {} : pendingWork,
+      );
+    }
+
+    journal?.discard();
+    // A restore closes only the record it opened; Undo and restores started
+    // over an open record are closed by the recovery that started them.
+    if (ownsRecord) await _closeRestoreRecord(docs!, 'completed');
+
+    lastRestoreSkippedSections = {
+      ...check.tolerated.values,
+      ...run.unrestoredSettings,
+    }.toList()
+      ..sort();
+    lastRestorePostRestoreWarnings = List.unmodifiable(run.postRestoreWarnings);
+  }
+
+  /// True when setup that is not finished yet has already saved data a restore
+  /// would replace: a store name, tax settings, or records in the staff,
+  /// category, tax, product or item boxes. Payment methods are not checked on
+  /// their own: defaults are seeded on every install, and the wizard's payment
+  /// step comes after Store Details, whose store name is required.
+  static bool hasSetupDataToLose() {
+    bool has<T>(String name) =>
+        Hive.isBoxOpen(name) && Hive.box<T>(name).isNotEmpty;
+    final details = Hive.isBoxOpen(HiveBoxNames.businessDetailsBox)
+        ? Hive.box<BusinessDetails>(HiveBoxNames.businessDetailsBox).values
+        : const <BusinessDetails>[];
+    return details.any((d) => (d.storeName ?? '').trim().isNotEmpty) ||
+        has<TaxDetails>(HiveBoxNames.taxBox) ||
+        has<StaffModel>(HiveBoxNames.staff) ||
+        has<Category>(HiveBoxNames.category) ||
+        has<Tax>(HiveBoxNames.tax) ||
+        has<ProductModel>(HiveBoxNames.products) ||
+        has<Items>(HiveBoxNames.restaurantItems);
+  }
+
+  /// The restore path tests drive. A real restore always knows the PIN that
+  /// opened the backup, so tests pass one too (BKP-5 snapshot fallback).
+  @visibleForTesting
+  static Future<void> restoreDecodedBackupForTesting(
+    Map<String, dynamic> data, {
+    List<Map<String, dynamic>> images = const [],
+    String password = testBackupPin,
+    RestoreSource source = RestoreSource.normal,
+  }) =>
+      _restoreDecodedBackup(data,
+          images: images, password: password, source: source);
+
+  @visibleForTesting
+  static const String testBackupPin = '135790';
+
+  /// Closes the restore record; a failure is logged (the record then stays
+  /// open and the next start offers recovery, which is safe).
+  static Future<void> _closeRestoreRecord(String docs, String status) async {
+    try {
+      await RestoreRecordStore.close(docs, status);
+    } catch (e) {
+      debugPrint('⚠️ Could not close the restore record: $e');
+    }
+  }
+
+  /// BKP-5 Undo: after the snapshot was restored (which empties the
+  /// pending-work journal), puts the journal back exactly as the record holds
+  /// it and checks every entry. False means it is NOT as it was.
+  static Future<bool> putBackWorkJournalEntries(
+      String mode, List<MapEntry<Object, Object?>> entries) async {
+    try {
+      final box = Hive.box(_workJournalBox(mode));
+      await box.clear();
+      for (final e in entries) {
+        await box.put(e.key, e.value);
+      }
+      if (box.length != entries.length) return false;
+      return entries.every(
+          (e) => box.containsKey(e.key) && _deepEquals(box.get(e.key), e.value));
+    } catch (e) {
+      debugPrint('❌ Could not put the pending-work journal back: $e');
+      return false;
+    }
+  }
+
+  /// Takes this device's data just before a restore's first write: the
+  /// export map and restaurant item image bytes in memory, plus, on native
+  /// with a backup password set, an encrypted copy (the normal backup format)
+  /// in app-private `restore_snapshots/`. Never writes an unencrypted file:
+  /// `_createZipBackup` refuses without a password.
+  ///
+  /// BKP-5: with no device PIN stored, [fallbackPassword] (the PIN of the
+  /// backup being restored) locks the file instead. Old snapshots are removed
+  /// except the one an open restore record still points to (R1).
+  static Future<_Snapshot> _takeSnapshot(String mode,
+      {String? fallbackPassword}) async {
+    final exported = await _collectAllData(mode: mode);
+    // A section that failed to export is an empty list in the snapshot;
+    // rolling back to it would empty that box and still compare equal. Refuse
+    // to start instead (nothing has been written yet).
+    final failed = _requiredExportFailures;
+    if (failed.isNotEmpty) {
+      throw Exception(
+        'The restore did not start: a complete safety copy of this device\'s '
+        'data could not be made, so a failed restore could not be undone. '
+        'Nothing on this device was changed. (Could not copy: '
+        '${(failed.toList()..sort()).join(', ')})',
+      );
+    }
+    final data = jsonDecode(jsonEncode(exported)) as Map<String, dynamic>;
+
+    final itemImages = <String, Uint8List>{};
+    if (Hive.isBoxOpen(HiveBoxNames.restaurantItems)) {
+      for (final item in Hive.box<Items>(HiveBoxNames.restaurantItems).values) {
+        final bytes = item.imageBytes;
+        if (bytes != null && bytes.isNotEmpty) itemImages[item.id] = bytes;
+      }
+    }
+    final productImages = <String, Uint8List>{};
+    if (Hive.isBoxOpen(HiveBoxNames.products)) {
+      for (final product in Hive.box<ProductModel>(HiveBoxNames.products).values) {
+        final bytes = product.imageBytes;
+        if (bytes != null && bytes.isNotEmpty) {
+          productImages[product.productId] = bytes;
+        }
+      }
+    }
+
+    String? filePath;
+    String? fileSha;
+    SnapshotPin? pin;
+    if (!kIsWeb) {
+      try {
+        final stored = await BackupEncryptionService.getStoredPassword();
+        final useStored = stored != null && stored.isNotEmpty;
+        final password = useStored ? stored : fallbackPassword;
+        if (password != null && password.isNotEmpty) {
+          final docs = (await getApplicationDocumentsDirectory()).path;
+          final dir = Directory(p.join(docs, RestoreRecordStore.folderName));
+          if (!dir.existsSync()) dir.createSync(recursive: true);
+          // Written, read back, decrypted and compared (BKP-11).
+          filePath = await _createZipBackup(exported,
+              customPath: dir.path,
+              passwordOverride: useStored ? null : password);
+          if (filePath != null) {
+            fileSha = sha256
+                .convert(await File(filePath).readAsBytes())
+                .toString();
+            pin = useStored
+                ? SnapshotPin.deviceBackupPin
+                : SnapshotPin.restoredBackupPin;
+            // Keep only the newest snapshot, and never the one an open
+            // restore record points to. p.equals, not ==: the new path is
+            // built with '/', while listSync uses the platform separator.
+            final open = RestoreRecordStore.read(docs);
+            for (final old in dir.listSync().whereType<File>()) {
+              if (!p.basename(old.path).startsWith('BillBerryLite_') ||
+                  !old.path.endsWith('.zip')) {
+                continue;
+              }
+              if (p.equals(old.path, filePath)) continue;
+              if (open != null &&
+                  (!open.readable || p.equals(old.path, open.snapshotPath))) {
+                continue;
+              }
+              old.deleteSync();
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint("⚠️ Could not save the encrypted pre-restore snapshot: $e");
+        filePath = null;
+      }
+    }
+    debugPrint("📦 Pre-restore snapshot taken (file: ${filePath ?? 'none'})");
+    return _Snapshot(data, itemImages, filePath,
+        sha256: fileSha, pin: pin, productImages: productImages);
+  }
+
+  /// Puts the snapshot back through the same restore path, then re-exports
+  /// and compares. Returns true only when every backed-up section matches the
+  /// snapshot again.
+  static Future<bool> _rollback(
+      _Snapshot snapshot, String backupMode, _ImageJournal? journal) async {
+    try {
+      await journal?.revert();
+      final run = _RestoreRun(validateOnly: false, isRollback: true);
+      await _restoreAllData(snapshot.data, backupMode, run: run);
+      await _putBackItemImages(snapshot.itemImages);
+      await _putBackProductImages(snapshot.productImages);
+      await _putBackStoreInfoPrefs(snapshot.data);
+
+      final now =
+          jsonDecode(jsonEncode(await _collectAllData(mode: backupMode)))
+              as Map<String, dynamic>;
+      if (_requiredExportFailures.isNotEmpty) {
+        debugPrint("❌ Rollback not verified: could not re-read "
+            "${_requiredExportFailures.join(', ')}");
+        return false;
+      }
+      final same = _sameBackedUpData(now, snapshot.data);
+      debugPrint(same
+          ? "✅ Rollback verified: previous data is back"
+          : "❌ Rollback did not reproduce the previous data");
+      return same;
+    } on SimulatedProcessKill {
+      rethrow; // test only: the process died during the rollback
+    } catch (e) {
+      debugPrint("❌ Rollback failed: $e");
+      return false;
+    }
+  }
+
+  /// The store-info preferences `_syncSharedPreferencesFromBusinessDetails`
+  /// writes (retail reads them for receipts).
+  static const List<String> _storeInfoPrefKeys = [
+    'store_name',
+    'store_owner_name',
+    'store_address',
+    'store_city',
+    'store_state',
+    'store_pincode',
+    'store_phone',
+    'store_email',
+    'store_gst_number',
+  ];
+
+  /// Puts the store-info preferences back exactly as they were before the
+  /// restore: the failed restore may have synced the backup's store details
+  /// into them, including keys this device never had.
+  static Future<void> _putBackStoreInfoPrefs(
+      Map<String, dynamic> snapshot) async {
+    final before = <String, Object?>{
+      for (final entry
+          in ((snapshot['data'] as Map)['localPrefs'] as List? ?? const []))
+        if (entry is Map && entry['key'] is String)
+          entry['key'] as String: entry['value'],
+    };
+    final prefs = await SharedPreferences.getInstance();
+    for (final key in _storeInfoPrefKeys) {
+      final value = before[key];
+      if (value == null) {
+        await prefs.remove(key);
+      } else {
+        await prefs.setString(key, value.toString());
+      }
+    }
+  }
+
+  /// Restores restaurant item image bytes, which the export map strips.
+  static Future<void> _putBackItemImages(Map<String, Uint8List> images) async {
+    if (images.isEmpty || !Hive.isBoxOpen(HiveBoxNames.restaurantItems)) return;
+    final box = Hive.box<Items>(HiveBoxNames.restaurantItems);
+    final batch = <dynamic, Items>{};
+    for (final key in box.keys) {
+      final item = box.get(key);
+      final bytes = item == null ? null : images[item.id];
+      if (item != null && bytes != null) {
+        batch[key] = item.copyWith(imageBytes: bytes);
+      }
+    }
+    if (batch.isNotEmpty) await box.putAll(batch);
+  }
+
+  /// Restores retail product image bytes, which the export map strips.
+  static Future<void> _putBackProductImages(
+      Map<String, Uint8List> images) async {
+    if (images.isEmpty || !Hive.isBoxOpen(HiveBoxNames.products)) return;
+    final box = Hive.box<ProductModel>(HiveBoxNames.products);
+    final batch = <dynamic, ProductModel>{};
+    for (final key in box.keys) {
+      final product = box.get(key);
+      final bytes = product == null ? null : images[product.productId];
+      if (product != null && bytes != null) {
+        // copyWith stamps updateAt with now unless given: keep the original,
+        // so the rolled-back product matches the snapshot exactly.
+        batch[key] =
+            product.copyWith(imageBytes: bytes, updateAt: product.updateAt);
+      }
+    }
+    if (batch.isNotEmpty) await box.putAll(batch);
+  }
+
+  /// Compares two exports section by section, ignoring record order.
+  /// `localPrefs`/`secureCreds` are device settings a restore only adds to,
+  /// never removes from, so they are not part of the check.
+  static bool _sameBackedUpData(
+      Map<String, dynamic> a, Map<String, dynamic> b) {
+    const ignored = {'localPrefs', 'secureCreds'};
+    final da = (a['data'] as Map).cast<String, dynamic>();
+    final db = (b['data'] as Map).cast<String, dynamic>();
+    final keys = {...da.keys, ...db.keys}.difference(ignored);
+    for (final key in keys) {
+      List<String> canon(Object? v) =>
+          [for (final e in (v as List? ?? const [])) jsonEncode(_canonical(e))]
+            ..sort();
+      final ca = canon(da[key]);
+      final cb = canon(db[key]);
+      if (ca.length != cb.length) return false;
+      for (var i = 0; i < ca.length; i++) {
+        if (ca[i] != cb[i]) return false;
+      }
+    }
+    return true;
+  }
+
+  /// [value] with every map's keys sorted, so equal data encodes equally.
+  static Object? _canonical(Object? value) {
+    if (value is Map) {
+      final keys = value.keys.map((k) => k.toString()).toList()..sort();
+      return {for (final k in keys) k: _canonical(value[k])};
+    }
+    if (value is List) return [for (final e in value) _canonical(e)];
+    return value;
+  }
+
+  /// The rollback's own comparison, so tests can show what it can and cannot
+  /// see (BKP-4).
+  @visibleForTesting
+  static bool sameBackedUpDataForTesting(
+          Map<String, dynamic> a, Map<String, dynamic> b) =>
+      _sameBackedUpData(a, b);
+
+  @visibleForTesting
+  static Future<String?> takeSnapshotFileForTesting() async =>
+      (await _takeSnapshot(AppConfig.businessMode.name)).filePath;
+
+  /// M4 startup recovery: opens a backup file exactly as a restore would
+  /// (truncation check, password, outer and inner integrity, data.json) and
+  /// reports its business type and the BKP-9 critical sections it does not
+  /// contain. Writes nothing and needs no Hive box. Throws with the same
+  /// messages as an import (damaged, wrong password, unencrypted…).
+  static Future<({String mode, List<String> missingCriticalSections})>
+      inspectBackupFile(String path, String password) async {
+    final file = File(path);
+    if (p.extension(path).toLowerCase() == '.json') {
+      throw Exception(_unencryptedMsg);
+    }
+    final decoded =
+        await _extractZipBackup(file, passwordProvider: () async => password);
+    final mode = _resolveBackupMode(decoded.data);
+    final sections = decoded.data['data'];
+    final present = sections is Map<String, dynamic> ? sections.keys.toSet() : <String>{};
+    final critical = mode == BusinessMode.retail.name
+        ? retailCriticalSections
+        : restaurantCriticalSections;
+    return (
+      mode: mode,
+      missingCriticalSections: critical.difference(present).toList()..sort(),
+    );
+  }
+
+  @visibleForTesting
+  static Future<Map<String, dynamic>> readBackupFileForTesting(
+          String path, String password,
+          {void Function()? onPasswordAsked}) async =>
+      (await _extractZipBackup(File(path), passwordProvider: () async {
+        onPasswordAsked?.call();
+        return password;
+      }))
+          .data;
+
+  /// BLK-04: a configured install accepts only its own business type's
+  /// backup. A fresh install (mode not set yet) accepts either, which is how
+  /// a new device is restored. An undeterminable backup is left to the
+  /// existing format checks, which reject it before any write.
+  static void _ensureRestoreModeAllowed(String backupMode) {
+    if (!AppConfig.isBusinessModeSet) return;
+    if (backupMode != BusinessMode.restaurant.name &&
+        backupMode != BusinessMode.retail.name) {
+      return;
+    }
+    final deviceMode = AppConfig.businessMode.name;
+    if (backupMode == deviceMode) return;
+
+    String label(String mode) =>
+        mode == BusinessMode.retail.name ? 'Retail' : 'Restaurant';
+    throw Exception(
+      'This is a ${label(backupMode)} backup, but this device is set up for '
+      '${label(deviceMode)}. A backup can only be restored on the same '
+      'business type.',
+    );
+  }
+
+  /// The backup's business type, including legacy backups that have neither
+  /// `appMode` nor the `data` wrapper; 'unknown' when it cannot be told.
+  static String _resolveBackupMode(Map<String, dynamic> data) {
+    final mode = _detectModeFromBackup(data);
+    if (mode != 'unknown' || data.containsKey('data')) return mode;
+    return _legacyModeOf(data);
+  }
+
+  /// Mode of a legacy (unwrapped) backup from its top-level keys.
+  static String _legacyModeOf(Map<String, dynamic> data) {
+    if (data.containsKey('products') && data.containsKey('suppliers')) {
+      return 'retail';
+    } else if (data.containsKey('items') || data.containsKey('tables')) {
+      return 'restaurant';
+    }
+    return 'unknown';
   }
 
   /// ---------------------------
@@ -1867,8 +3587,13 @@ class UnifiedBackupService {
   /// ---------------------------
   /// 🔧 RESTORE ALL DATA
   /// ---------------------------
-  static Future<void> _restoreAllData(Map<String, dynamic> data, String backupMode) async {
-    debugPrint("📦 Restoring data for mode: $backupMode");
+  /// With [validateOnly], runs the same steps reading every record and the
+  /// settings blocks but writing nothing, so a damaged backup is refused
+  /// before any box is cleared.
+  static Future<void> _restoreAllData(Map<String, dynamic> data, String backupMode,
+      {bool validateOnly = false, _RestoreRun? run}) async {
+    final r = run ?? _RestoreRun(validateOnly: validateOnly);
+    debugPrint("📦 ${validateOnly ? 'Validating' : 'Restoring'} data for mode: $backupMode");
 
     // Validate backup data structure
     if (!data.containsKey('data') || data['data'] == null) {
@@ -1879,7 +3604,8 @@ class UnifiedBackupService {
       if (data.containsKey('products') || data.containsKey('items') || data.containsKey('categories')) {
         debugPrint("📦 Detected legacy backup format (unwrapped data)");
         // Treat the entire data object as the backup data
-        await _handleLegacyRestore(data, backupMode);
+        await _handleLegacyRestore(data, backupMode,
+            validateOnly: validateOnly, run: r);
         return;
       }
 
@@ -1897,147 +3623,100 @@ class UnifiedBackupService {
 
     // Restore based on detected mode
     if (backupMode == 'restaurant') {
-      await _restoreRestaurantData(backupData);
+      await _restoreRestaurantData(backupData,
+          validateOnly: validateOnly, run: r);
     } else if (backupMode == 'retail') {
-      await _restoreRetailData(backupData);
+      await _restoreRetailData(backupData, validateOnly: validateOnly, run: r);
     } else {
       throw Exception("Unsupported backup mode: $backupMode");
     }
 
+    if (validateOnly) {
+      _validateSettings(backupData);
+      return;
+    }
+
     // ==================== RESTORE COMMON BOXES (both retail and restaurant) ====================
+    // Settings were checked strictly by the validate pass, so these steps no
+    // longer swallow errors: a failure here is a write failure.
 
     // ✅ Restore app config FIRST (CRITICAL - contains business mode and setup status)
-    if (backupData["appConfig"] != null && backupData["appConfig"].isNotEmpty) {
-      try {
-        debugPrint("📦 Restoring app config...");
-        final appConfigBox = Hive.box(HiveBoxNames.appConfig);
-        await appConfigBox.clear();
-        final appConfigData = backupData["appConfig"][0] as Map<String, dynamic>;
-        for (var entry in appConfigData.entries) {
-          await appConfigBox.put(entry.key, entry.value);
+    // A backup without these settings blocks never carried them (legacy), so
+    // the device's own are kept rather than emptied.
+    await _restoreKeyValueBox(backupData, "appConfig",
+        Hive.box(HiveBoxNames.appConfig), r, clearWhenMissing: false);
+    await _restoreKeyValueBox(backupData, "appState",
+        Hive.box("app_state"), r, clearWhenMissing: false);
+    await _restoreKeyValueBox(backupData, "storeBox",
+        Hive.box(HiveBoxNames.storeBox), r, clearWhenMissing: false);
+
+    Future<void> settingsList<T>(String key, Box<T> box,
+        T Function(Map<String, dynamic>) fromMap) async {
+      final raw = backupData[key];
+      if (raw == null || raw.isEmpty) {
+        // Rollback only: the snapshot is complete (E1), so an empty section
+        // means the device had none before the restore. A normal restore
+        // keeps the device's settings when the backup has none.
+        if (r.isRollback && raw != null) {
+          await r.write(key, box, () async {
+            await box.clear();
+            return 0;
+          });
         }
-        debugPrint("📦 App config restored: ${appConfigData.keys.length} entries");
-        debugPrint("📦 Business mode: ${appConfigBox.get('businessMode')}");
-        debugPrint("📦 Setup complete: ${appConfigBox.get('isSetupComplete')}");
-      } catch (e) {
-        debugPrint("⚠️ Error restoring app config: $e");
+        return;
       }
+      debugPrint("📦 Restoring $key...");
+      await r.write(key, box, () async {
+        final models = [
+          for (var item in raw) fromMap(Map<String, dynamic>.from(item)),
+        ];
+        await box.clear();
+        for (final model in models) {
+          await box.add(model);
+        }
+        return models.length;
+      });
     }
 
-    // Restore app state
-    if (backupData["appState"] != null && backupData["appState"].isNotEmpty) {
-      try {
-        debugPrint("📦 Restoring app state...");
-        final appStateBox = Hive.box("app_state");
-        await appStateBox.clear();
-        final appStateData = backupData["appState"][0] as Map<String, dynamic>;
-        for (var entry in appStateData.entries) {
-          await appStateBox.put(entry.key, entry.value);
-        }
-        debugPrint("📦 App state restored: ${appStateData.keys.length} settings");
-      } catch (e) {
-        debugPrint("⚠️ Error restoring app state: $e");
-      }
+    await settingsList("businessDetails",
+        Hive.box<BusinessDetails>(HiveBoxNames.businessDetailsBox),
+        BusinessDetails.fromMap);
+    // ✅ CRITICAL: Sync SharedPreferences from BusinessDetails for retail
+    // Retail side uses SharedPreferences for store info, not Hive
+    // This must happen AFTER BusinessDetails is restored
+    if (backupMode == 'retail' &&
+        r.writeFailure == null &&
+        backupData["businessDetails"] != null &&
+        backupData["businessDetails"].isNotEmpty) {
+      await _postRestoreStep(r, postStepStoreDetails,
+          _syncSharedPreferencesFromBusinessDetails);
     }
-
-    // Restore store box (legacy store info)
-    if (backupData["storeBox"] != null && backupData["storeBox"].isNotEmpty) {
-      try {
-        debugPrint("📦 Restoring store box...");
-        final storeBox = Hive.box(HiveBoxNames.storeBox);
-        await storeBox.clear();
-        final storeData = backupData["storeBox"][0] as Map<String, dynamic>;
-        for (var entry in storeData.entries) {
-          await storeBox.put(entry.key, entry.value);
-        }
-        debugPrint("📦 Store box restored: ${storeData.keys.length} entries");
-      } catch (e) {
-        debugPrint("⚠️ Error restoring store box: $e");
-      }
-    }
-
-    // Restore business details
-    if (backupData["businessDetails"] != null && backupData["businessDetails"].isNotEmpty) {
-      try {
-        debugPrint("📦 Restoring business details...");
-        final businessDetailsBox = Hive.box<BusinessDetails>(HiveBoxNames.businessDetailsBox);
-        await businessDetailsBox.clear();
-        for (var item in backupData["businessDetails"]) {
-          final map = Map<String, dynamic>.from(item);
-          await businessDetailsBox.add(BusinessDetails.fromMap(map));
-        }
-        debugPrint("📦 Business details restored: ${backupData["businessDetails"].length} items");
-
-        // ✅ CRITICAL: Sync SharedPreferences from BusinessDetails for retail
-        // Retail side uses SharedPreferences for store info, not Hive
-        // This must happen AFTER BusinessDetails is restored
-        if (backupMode == 'retail') {
-          await _syncSharedPreferencesFromBusinessDetails();
-        }
-      } catch (e) {
-        debugPrint("⚠️ Error restoring business details: $e");
-      }
-    }
-
-    // Restore business types
-    if (backupData["businessTypes"] != null && backupData["businessTypes"].isNotEmpty) {
-      try {
-        debugPrint("📦 Restoring business types...");
-        final businessTypeBox = Hive.box<BusinessType>(HiveBoxNames.businessTypeBox);
-        await businessTypeBox.clear();
-        for (var item in backupData["businessTypes"]) {
-          final map = Map<String, dynamic>.from(item);
-          await businessTypeBox.add(BusinessType.fromMap(map));
-        }
-        debugPrint("📦 Business types restored: ${backupData["businessTypes"].length} items");
-      } catch (e) {
-        debugPrint("⚠️ Error restoring business types: $e");
-      }
-    }
-
-    // Restore tax details
-    if (backupData["taxDetails"] != null && backupData["taxDetails"].isNotEmpty) {
-      try {
-        debugPrint("📦 Restoring tax details...");
-        final taxBox = Hive.box<TaxDetails>(HiveBoxNames.taxBox);
-        await taxBox.clear();
-        for (var item in backupData["taxDetails"]) {
-          final map = Map<String, dynamic>.from(item);
-          await taxBox.add(TaxDetails.fromMap(map));
-        }
-        debugPrint("📦 Tax details restored: ${backupData["taxDetails"].length} items");
-      } catch (e) {
-        debugPrint("⚠️ Error restoring tax details: $e");
-      }
-    }
-
-    // Restore payment methods
-    if (backupData["paymentMethods"] != null && backupData["paymentMethods"].isNotEmpty) {
-      try {
-        debugPrint("📦 Restoring payment methods...");
-        final paymentMethodsBox = Hive.box<pm.PaymentMethod>(HiveBoxNames.paymentMethods);
-        await paymentMethodsBox.clear();
-        for (var item in backupData["paymentMethods"]) {
-          final map = Map<String, dynamic>.from(item);
-          await paymentMethodsBox.add(pm.PaymentMethod.fromMap(map));
-        }
-        debugPrint("📦 Payment methods restored: ${backupData["paymentMethods"].length} items");
-      } catch (e) {
-        debugPrint("⚠️ Error restoring payment methods: $e");
-      }
-    }
+    await settingsList("businessTypes",
+        Hive.box<BusinessType>(HiveBoxNames.businessTypeBox),
+        BusinessType.fromMap);
+    await settingsList("taxDetails",
+        Hive.box<TaxDetails>(HiveBoxNames.taxBox), TaxDetails.fromMap);
+    await settingsList("paymentMethods",
+        Hive.box<pm.PaymentMethod>(HiveBoxNames.paymentMethods),
+        pm.PaymentMethod.fromMap);
 
     // ✅ CRITICAL: Update AppConfig with the correct business mode
     // Note: Only update if appConfig wasn't in the backup (for legacy backups)
     if (backupData["appConfig"] == null || backupData["appConfig"].isEmpty) {
       debugPrint("📦 AppConfig not found in backup - updating from detected mode: $backupMode");
-      await _updateAppConfigFromBackup(backupMode);
+      await r.write("appConfig", Hive.box(HiveBoxNames.appConfig), () async {
+        await _updateAppConfigFromBackup(backupMode);
+        return null;
+      });
     } else {
       debugPrint("📦 AppConfig already restored from backup - skipping manual update");
     }
 
+    // Stop before the device-level settings if any box write failed.
+    if (r.writeFailure != null) throw r.writeFailure!;
+
     // ✅ Restore non-Hive settings (admin PIN, store/UPI, prefs, backup password)
-    await _restoreLocalSettings(backupData);
+    await _restoreLocalSettings(backupData, r);
 
     debugPrint("✅ Data restoration completed!");
   }
@@ -2045,7 +3724,9 @@ class UnifiedBackupService {
   /// Restores SharedPreferences (`localPrefs`) + the backup password
   /// (`secureCreds`) saved by `_collectAllData`. Re-applies the denylist so a
   /// tampered backup can't overwrite device id / license / printer keys.
-  static Future<void> _restoreLocalSettings(Map<String, dynamic> backupData) async {
+  /// BKP-9: a failure is recorded in [r] and reported, never silent.
+  static Future<void> _restoreLocalSettings(
+      Map<String, dynamic> backupData, _RestoreRun r) async {
     try {
       final localPrefs = backupData['localPrefs'];
       if (localPrefs is List && localPrefs.isNotEmpty) {
@@ -2082,6 +3763,7 @@ class UnifiedBackupService {
       }
     } catch (e) {
       debugPrint("⚠️ Local prefs restore error: $e");
+      r.unrestoredSettings.add('localPrefs');
     }
 
     try {
@@ -2095,6 +3777,7 @@ class UnifiedBackupService {
       }
     } catch (e) {
       debugPrint("⚠️ Secure creds restore error: $e");
+      r.unrestoredSettings.add('secureCreds');
     }
   }
 
@@ -2122,7 +3805,8 @@ class UnifiedBackupService {
     } catch (e, stackTrace) {
       debugPrint("❌ Failed to update AppConfig: $e");
       debugPrint("Stack trace: $stackTrace");
-      // Don't throw - let the restore continue even if this fails
+      // Its caller records this as a write failure, so the restore rolls back.
+      rethrow;
     }
   }
 
@@ -2130,35 +3814,35 @@ class UnifiedBackupService {
   /// 🔧 HANDLE LEGACY BACKUP RESTORE
   /// ---------------------------
   /// Handles restoration of legacy backup formats that don't have the wrapper structure
-  static Future<void> _handleLegacyRestore(Map<String, dynamic> data, String backupMode) async {
+  static Future<void> _handleLegacyRestore(Map<String, dynamic> data, String backupMode,
+      {bool validateOnly = false, _RestoreRun? run}) async {
+    final r = run ?? _RestoreRun(validateOnly: validateOnly);
     debugPrint("📦 Attempting legacy restore...");
 
     // Re-detect mode if unknown
-    String mode = backupMode;
+    final mode = backupMode == 'unknown' ? _legacyModeOf(data) : backupMode;
     if (mode == 'unknown') {
-      if (data.containsKey('products') && data.containsKey('suppliers')) {
-        mode = 'retail';
-        debugPrint("📦 Detected retail mode from legacy backup");
-      } else if (data.containsKey('items') || data.containsKey('tables')) {
-        mode = 'restaurant';
-        debugPrint("📦 Detected restaurant mode from legacy backup");
-      } else {
-        throw Exception("Cannot determine mode from legacy backup. Keys: ${data.keys.toList()}");
-      }
+      throw Exception("Cannot determine mode from legacy backup. Keys: ${data.keys.toList()}");
     }
+    debugPrint("📦 Legacy backup mode: $mode");
 
     // Ensure boxes are opened
     await _ensureBoxesOpened(mode);
 
     // Restore based on mode
     if (mode == 'restaurant') {
-      await _restoreRestaurantData(data);
+      await _restoreRestaurantData(data, validateOnly: validateOnly, run: r);
     } else if (mode == 'retail') {
-      await _restoreRetailData(data);
+      await _restoreRetailData(data, validateOnly: validateOnly, run: r);
     }
+    if (validateOnly) return;
 
     // Update AppConfig with the correct business mode
-    await _updateAppConfigFromBackup(mode);
+    await r.write("appConfig", Hive.box(HiveBoxNames.appConfig), () async {
+      await _updateAppConfigFromBackup(mode);
+      return null;
+    });
+    if (r.writeFailure != null) throw r.writeFailure!;
 
     debugPrint("✅ Legacy backup restored successfully!");
   }
@@ -2166,24 +3850,133 @@ class UnifiedBackupService {
   /// ---------------------------
   /// 🔧 RESTORE RESTAURANT DATA
   /// ---------------------------
-  static Future<void> _restoreRestaurantData(Map<String, dynamic> data) async {
-    debugPrint("📦 Restoring restaurant data...");
+  /// Parses every record of [key] exactly as the restore helpers do, writing
+  /// nothing. Throws on the first record the restore could not read.
+  static void _validateRecords<T>(
+    String key,
+    Object? raw,
+    T Function(Map<String, dynamic>) fromMap, [
+    String Function(T)? idOf,
+  ]) {
+    final items = raw as List;
+    for (var i = 0; i < items.length; i++) {
+      try {
+        final model = fromMap(Map<String, dynamic>.from(items[i]));
+        idOf?.call(model);
+      } catch (e) {
+        throw FormatException(
+            '"$key" record ${i + 1} of ${items.length} cannot be read ($e)');
+      }
+    }
+  }
+
+  /// Strict check of the settings blocks `_restoreAllData` writes. A
+  /// malformed one would be cleared and left empty, wiping the business mode
+  /// and setup flags, so these must parse even though their restore steps
+  /// swallow errors.
+  static void _validateSettings(Map<String, dynamic> backupData) {
+    for (final key in const ['appConfig', 'appState', 'storeBox']) {
+      final raw = backupData[key];
+      if (raw == null || raw.isEmpty) continue;
+      if ((raw as List).first is! Map<String, dynamic>) {
+        throw FormatException('"$key" settings cannot be read');
+      }
+    }
+
+    void records<T>(String key, T Function(Map<String, dynamic>) fromMap) {
+      final raw = backupData[key];
+      if (raw == null || raw.isEmpty) return;
+      _validateRecords(key, raw, fromMap);
+    }
+
+    records('businessDetails', BusinessDetails.fromMap);
+    records('businessTypes', BusinessType.fromMap);
+    records('taxDetails', TaxDetails.fromMap);
+    records('paymentMethods', pm.PaymentMethod.fromMap);
+  }
+
+  /// Restores a key/value box exported as `[{...}]` (counters, day state).
+  /// [clearWhenMissing]: empty the box when the backup has no such key (true
+  /// replace); otherwise keep it.
+  static Future<void> _restoreKeyValueBox(Map<String, dynamic> data,
+      String key, Box box, _RestoreRun r,
+      {required bool clearWhenMissing}) async {
+    final raw = data[key];
+    if (raw == null || raw.isEmpty) {
+      if (raw == null && clearWhenMissing && !r.validateOnly) {
+        await r.write(key, box, () async {
+          await box.clear();
+          return 0;
+        });
+      }
+      return;
+    }
+    if (r.validateOnly) {
+      r.parse(box.name, key, () => raw[0] as Map<String, dynamic>);
+      return;
+    }
+    if (r.isTolerated(box.name)) return;
+    await r.write(key, box, () async {
+      final values = raw[0] as Map<String, dynamic>;
+      await box.clear();
+      for (final entry in values.entries) {
+        await box.put(entry.key, entry.value);
+      }
+      return values.length;
+    });
+  }
+
+  static Future<void> _restoreRestaurantData(Map<String, dynamic> data,
+      {bool validateOnly = false, _RestoreRun? run}) async {
+    final r = run ?? _RestoreRun(validateOnly: validateOnly);
+    debugPrint(validateOnly
+        ? "📦 Validating restaurant data..."
+        : "📦 Restoring restaurant data...");
 
     // Helper function to restore a box
-    // ⚠️ WARNING: This uses box.add() which generates auto-increment keys
-    // Use restoreBoxWithId() for models that need their ID as the key
+    // ⚠️ WARNING: without [idOf] this uses box.add() (auto-increment keys).
+    // BKP-2: with [idOf] each record is keyed by its ID, none dropped
+    // ([_putKeyedById]). Use restoreBoxWithId() where repeats may collapse.
     Future<void> restoreBox<T>(
         String keyName,
         Box<T> box,
-        T Function(Map<String, dynamic>) fromMap,
-        ) async {
-      if (data[keyName] == null) return;
+        T Function(Map<String, dynamic>) fromMap, {
+        String Function(T)? idOf,
+        }) async {
+      if (data[keyName] == null) {
+        // True replace: a box the backup does not carry is emptied.
+        if (!validateOnly) {
+          await r.write(keyName, box, () async {
+            await box.clear();
+            return 0;
+          });
+        }
+        return;
+      }
+      if (validateOnly) {
+        r.parse(box.name, keyName,
+            () => _validateRecords(keyName, data[keyName], fromMap, idOf));
+        return;
+      }
+      if (r.isTolerated(box.name)) {
+        debugPrint("⚠️ $keyName could not be read — left unchanged");
+        return;
+      }
       debugPrint("📦 Restoring $keyName...");
-      await box.clear();
-      final items = data[keyName] as List;
-      // addAll = single batch write, far faster than N individual add() calls
-      await box.addAll(items.map((item) => fromMap(Map<String, dynamic>.from(item))).toList());
-      debugPrint("📦 $keyName: ${items.length} items restored");
+      await r.write(keyName, box, () async {
+        final items = data[keyName] as List;
+        final models = items
+            .map((item) => fromMap(Map<String, dynamic>.from(item)))
+            .toList();
+        await box.clear();
+        if (idOf != null) {
+          await _putKeyedById(keyName, box, models, idOf);
+        } else {
+          // addAll = single batch write, far faster than N individual add() calls
+          await box.addAll(models);
+        }
+        return models.length;
+      });
     }
 
     Future<void> restoreBoxWithId<T>(
@@ -2192,18 +3985,38 @@ class UnifiedBackupService {
         T Function(Map<String, dynamic>) fromMap,
         String Function(T) getIdFunc,
         ) async {
-      if (data[keyName] == null) return;
-      debugPrint("📦 Restoring $keyName (with ID keys)...");
-      await box.clear();
-      final items = data[keyName] as List;
-      // putAll = single batch write, far faster than N individual put() calls
-      final Map<String, T> batch = {};
-      for (final item in items) {
-        final model = fromMap(Map<String, dynamic>.from(item));
-        batch[getIdFunc(model)] = model;
+      if (data[keyName] == null) {
+        // True replace: a box the backup does not carry is emptied.
+        if (!validateOnly) {
+          await r.write(keyName, box, () async {
+            await box.clear();
+            return 0;
+          });
+        }
+        return;
       }
-      await box.putAll(batch);
-      debugPrint("📦 $keyName: ${items.length} items restored with ID keys");
+      if (validateOnly) {
+        r.parse(box.name, keyName,
+            () => _validateRecords(keyName, data[keyName], fromMap, getIdFunc));
+        return;
+      }
+      if (r.isTolerated(box.name)) {
+        debugPrint("⚠️ $keyName could not be read — left unchanged");
+        return;
+      }
+      debugPrint("📦 Restoring $keyName (with ID keys)...");
+      await r.write(keyName, box, () async {
+        final items = data[keyName] as List;
+        // putAll = single batch write, far faster than N individual put() calls
+        final Map<String, T> batch = {};
+        for (final item in items) {
+          final model = fromMap(Map<String, dynamic>.from(item));
+          batch[getIdFunc(model)] = model;
+        }
+        await box.clear();
+        await box.putAll(batch);
+        return batch.length;
+      });
     }
 
     await restoreBoxWithId("categories", Hive.box<Category>(HiveBoxNames.category), (m) => Category.fromMap(m), (c) => c.id);
@@ -2211,43 +4024,44 @@ class UnifiedBackupService {
 
     // Reload imageBytes for each item from its item_img_{id} file.
     // O(n) approach: build a key-by-ID lookup map first, then match files.
-    try {
-      final appDir = await getApplicationDocumentsDirectory();
-      final productDir = Directory('${appDir.path}/product_images');
-      if (productDir.existsSync()) {
-        final itemBox = Hive.box<Items>("itemBoxs");
+    if (!validateOnly) {
+      await _postRestoreStep(r, postStepItemImages, () async {
+        final appDir = await getApplicationDocumentsDirectory();
+        final productDir = Directory('${appDir.path}/product_images');
+        if (productDir.existsSync()) {
+          final itemBox = Hive.box<Items>("itemBoxs");
 
-        // Build ID → Hive key map in one pass
-        final idToKey = <String, dynamic>{};
-        for (final key in itemBox.keys) {
-          final item = itemBox.get(key);
-          if (item != null) idToKey[item.id] = key;
-        }
-
-        final imgFiles = productDir.listSync().whereType<File>()
-            .where((f) => p.basename(f.path).startsWith('item_img_'))
-            .toList();
-
-        // Build batch update map
-        final Map<dynamic, Items> imageBatch = {};
-        for (final imgFile in imgFiles) {
-          final itemId = p.basename(imgFile.path).replaceFirst('item_img_', '');
-          final key = idToKey[itemId];
-          if (key != null) {
-            final item = itemBox.get(key)!;
-            final bytes = await imgFile.readAsBytes();
-            imageBatch[key] = item.copyWith(imageBytes: bytes);
+          // Build ID → Hive key map in one pass
+          final idToKey = <String, dynamic>{};
+          for (final key in itemBox.keys) {
+            final item = itemBox.get(key);
+            if (item != null) idToKey[item.id] = key;
           }
+
+          final imgFiles = productDir.listSync().whereType<File>()
+              .where((f) => p.basename(f.path).startsWith('item_img_'))
+              .toList();
+
+          // Build batch update map
+          final Map<dynamic, Items> imageBatch = {};
+          for (final imgFile in imgFiles) {
+            final itemId = p.basename(imgFile.path).replaceFirst('item_img_', '');
+            final key = idToKey[itemId];
+            if (key != null) {
+              final item = itemBox.get(key)!;
+              final bytes = await imgFile.readAsBytes();
+              imageBatch[key] = item.copyWith(imageBytes: bytes);
+            }
+          }
+          if (imageBatch.isNotEmpty) await itemBox.putAll(imageBatch);
+          debugPrint("✅ Item images reloaded: ${imageBatch.length}");
         }
-        if (imageBatch.isNotEmpty) await itemBox.putAll(imageBatch);
-        debugPrint("✅ Item images reloaded: ${imageBatch.length}");
-      }
-    } catch (e) {
-      debugPrint("⚠️ Could not reload item images: $e");
+      });
     }
     await restoreBoxWithId("variants", Hive.box<VariantModel>("variante"), (m) => VariantModel.fromMap(m), (v) => v.id);
     await restoreBoxWithId("choices", Hive.box<ChoicesModel>("choice"), (m) => ChoicesModel.fromMap(m), (ch) => ch.id);
-    await restoreBox("extras", Hive.box<Extramodel>("extra"), (m) => Extramodel.fromMap(m));
+    await restoreBox("extras", Hive.box<Extramodel>("extra"), (m) => Extramodel.fromMap(m),
+        idOf: (e) => e.Id); // BKP-2: ExtraRepository keys by Id
     await restoreBoxWithId("staffBox", Hive.box<StaffModel>(HiveBoxNames.staff), (m) => StaffModel.fromMap(m), (s) => s.id);
     await restoreBoxWithId("taxes", Hive.box<Tax>(HiveBoxNames.tax), (m) => Tax.fromMap(m), (t) => t.id);
     await restoreBoxWithId("expenseCategories", HiveExpenseCat.getECategory(), (m) => ExpenseCategory.fromMap(m), (ec) => ec.id);
@@ -2255,7 +4069,8 @@ class UnifiedBackupService {
     await restoreBoxWithId("tables", Hive.box<TableModel>("tablesBox"), (m) => TableModel.fromMap(m), (tb) => tb.id);
 
     // ✅ EOD Reports - hardcoded for restaurant mode (AppConfig not restored yet)
-    await restoreBox("eodReports", Hive.box<EndOfDayReport>('restaurant_eodBox'), (m) => EndOfDayReport.fromMap(m));
+    await restoreBox("eodReports", Hive.box<EndOfDayReport>('restaurant_eodBox'), (m) => EndOfDayReport.fromMap(m),
+        idOf: (e) => e.reportId); // BKP-2: EodRepository keys by reportId
 
     await restoreBoxWithId("pastOrders", Hive.box<PastOrderModel>("pastorderBox"), (m) => PastOrderModel.fromMap(m), (po) => po.id);
     await restoreBoxWithId("orders", Hive.box<OrderModel>("orderBox"), (m) => OrderModel.fromMap(m), (o) => o.id);
@@ -2267,18 +4082,11 @@ class UnifiedBackupService {
       debugPrint("⚠️ Error restoring restaurant cart: $e");
     }
 
-    // ✅ Restore App Counters
+    // ✅ Restore App Counters. Kept when the backup has none: emptying them
+    // would restart bill numbers below the restored orders' numbers.
     try {
-      if (data["appCounters"] != null && data["appCounters"].isNotEmpty) {
-        debugPrint("📦 Restoring app counters...");
-        final countersBox = Hive.box(HiveBoxNames.appCounters);
-        await countersBox.clear();
-        final countersData = data["appCounters"][0] as Map<String, dynamic>;
-        for (var entry in countersData.entries) {
-          await countersBox.put(entry.key, entry.value);
-        }
-        debugPrint("📦 App counters restored: ${countersData.keys.length} entries");
-      }
+      await _restoreKeyValueBox(data, "appCounters",
+          Hive.box(HiveBoxNames.appCounters), r, clearWhenMissing: false);
     } catch (e) {
       debugPrint("⚠️ Error restoring app counters: $e");
     }
@@ -2365,6 +4173,26 @@ class UnifiedBackupService {
       debugPrint("⚠️ Error restoring restaurant sessions: $e");
     }
 
+    // ✅ Restore Day Management Box (opening balance, current session)
+    try {
+      await _restoreKeyValueBox(data, "dayManagement",
+          Hive.box(HiveBoxNames.dayManagementBox), r, clearWhenMissing: true);
+    } catch (e) {
+      debugPrint("⚠️ Error restoring day management: $e");
+    }
+
+    // ✅ Restore Item Cancellations
+    try {
+      await restoreBoxWithId(
+        "itemCancellations",
+        Hive.box<ItemCancellationModel>(HiveBoxNames.restaurantItemCancellations),
+        (m) => ItemCancellationModel.fromMap(m),
+        (c) => c.id,
+      );
+    } catch (e) {
+      debugPrint("⚠️ Error restoring item cancellations: $e");
+    }
+
     try {
       await restoreBoxWithId(
         "restaurantAttendance",
@@ -2397,6 +4225,21 @@ class UnifiedBackupService {
     } catch (e) {
       debugPrint("⚠️ Error restoring recipe productions: $e");
     }
+
+    // Absent key (older backups) → restoreBoxWithId leaves the box untouched.
+    try {
+      await restoreBoxWithId(
+        "stockMovements",
+        Hive.box<StockMovementModel>(HiveBoxNames.restaurantStockMovements),
+        (m) => StockMovementModel.fromMap(m),
+        (m) => m.id,
+      );
+    } catch (e) {
+      debugPrint("⚠️ Error restoring stock movements: $e");
+    }
+
+    // The pending stock journal is cleared by `_restoreDecodedBackup` only
+    // after the whole restore succeeded, so a failed restore keeps it.
 
     try {
       await restoreBoxWithId(
@@ -2555,29 +4398,59 @@ class UnifiedBackupService {
   /// ---------------------------
   /// 🔧 RESTORE RETAIL DATA
   /// ---------------------------
-  static Future<void> _restoreRetailData(Map<String, dynamic> data) async {
-    debugPrint("📦 Restoring retail data...");
+  static Future<void> _restoreRetailData(Map<String, dynamic> data,
+      {bool validateOnly = false, _RestoreRun? run}) async {
+    final r = run ?? _RestoreRun(validateOnly: validateOnly);
+    debugPrint(validateOnly
+        ? "📦 Validating retail data..."
+        : "📦 Restoring retail data...");
 
     // Helper function to restore typed boxes (converts Maps to model objects)
-    // ⚠️ WARNING: This uses box.add() which generates auto-increment keys
-    // Use restoreBoxTypedWithId() for models that need their ID as the key
+    // ⚠️ WARNING: without [idOf] this uses box.add() (auto-increment keys).
+    // BKP-2: with [idOf] each record is keyed by its ID, none dropped
+    // ([_putKeyedById]). Use restoreBoxTypedWithId() where repeats may collapse.
     Future<void> restoreBoxTyped<T>(
         String keyName,
         Box<T> box,
-        T Function(Map<String, dynamic>) fromMap,
-        ) async {
-      if (data[keyName] == null) return;
-
-      debugPrint("📦 Restoring $keyName...");
-      await box.clear();
-
-      final items = data[keyName] as List;
-      for (var item in items) {
-        final map = Map<String, dynamic>.from(item);
-        await box.add(fromMap(map));
+        T Function(Map<String, dynamic>) fromMap, {
+        String Function(T)? idOf,
+        }) async {
+      if (data[keyName] == null) {
+        // True replace: a box the backup does not carry is emptied.
+        if (!validateOnly) {
+          await r.write(keyName, box, () async {
+            await box.clear();
+            return 0;
+          });
+        }
+        return;
+      }
+      if (validateOnly) {
+        r.parse(box.name, keyName,
+            () => _validateRecords(keyName, data[keyName], fromMap, idOf));
+        return;
+      }
+      if (r.isTolerated(box.name)) {
+        debugPrint("⚠️ $keyName could not be read — left unchanged");
+        return;
       }
 
-      debugPrint("📦 $keyName: ${items.length} items restored");
+      debugPrint("📦 Restoring $keyName...");
+      await r.write(keyName, box, () async {
+        final items = data[keyName] as List;
+        final models = [
+          for (var item in items) fromMap(Map<String, dynamic>.from(item)),
+        ];
+        await box.clear();
+        if (idOf != null) {
+          await _putKeyedById(keyName, box, models, idOf);
+        } else {
+          for (final model in models) {
+            await box.add(model);
+          }
+        }
+        return models.length;
+      });
     }
 
     // ✅ Helper function to restore typed boxes WITH ID as key
@@ -2589,20 +4462,40 @@ class UnifiedBackupService {
         T Function(Map<String, dynamic>) fromMap,
         String Function(T) getIdFunc,
         ) async {
-      if (data[keyName] == null) return;
-
-      debugPrint("📦 Restoring $keyName (with ID keys)...");
-      await box.clear();
-
-      final items = data[keyName] as List;
-      for (var item in items) {
-        final map = Map<String, dynamic>.from(item);
-        final model = fromMap(map);
-        final id = getIdFunc(model);
-        await box.put(id, model);  // ✅ Use ID as key, not auto-increment
+      if (data[keyName] == null) {
+        // True replace: a box the backup does not carry is emptied.
+        if (!validateOnly) {
+          await r.write(keyName, box, () async {
+            await box.clear();
+            return 0;
+          });
+        }
+        return;
+      }
+      if (validateOnly) {
+        r.parse(box.name, keyName,
+            () => _validateRecords(keyName, data[keyName], fromMap, getIdFunc));
+        return;
+      }
+      if (r.isTolerated(box.name)) {
+        debugPrint("⚠️ $keyName could not be read — left unchanged");
+        return;
       }
 
-      debugPrint("📦 $keyName: ${items.length} items restored with ID keys");
+      debugPrint("📦 Restoring $keyName (with ID keys)...");
+      await r.write(keyName, box, () async {
+        final items = data[keyName] as List;
+        final byId = <String, T>{};
+        for (var item in items) {
+          final model = fromMap(Map<String, dynamic>.from(item));
+          byId[getIdFunc(model)] = model;
+        }
+        await box.clear();
+        for (final entry in byId.entries) {
+          await box.put(entry.key, entry.value);  // ✅ Use ID as key, not auto-increment
+        }
+        return byId.length;
+      });
     }
 
     // ✅ Restore Products (as ProductModel objects with ID keys)
@@ -2627,39 +4520,35 @@ class UnifiedBackupService {
     // duplicate would leave the catalogue half-populated, which is worse than
     // the duplicate. But a duplicate makes one variant permanently unscannable,
     // so it must not pass unnoticed either.
-    try {
-      final seen = <String, String>{};
-      final dupes = <String>[];
-      for (final v in Hive.box<VarianteModel>(HiveBoxNames.variants).values) {
-        final code = v.barcode?.trim() ?? '';
-        if (code.isEmpty) continue;
-        final firstOwner = seen[code];
-        if (firstOwner != null) {
-          dupes.add('$code (${v.varianteId} vs $firstOwner)');
-        } else {
-          seen[code] = v.varianteId;
+    if (!validateOnly) {
+      try {
+        final seen = <String, String>{};
+        final dupes = <String>[];
+        for (final v in Hive.box<VarianteModel>(HiveBoxNames.variants).values) {
+          final code = v.barcode?.trim() ?? '';
+          if (code.isEmpty) continue;
+          final firstOwner = seen[code];
+          if (firstOwner != null) {
+            dupes.add('$code (${v.varianteId} vs $firstOwner)');
+          } else {
+            seen[code] = v.varianteId;
+          }
         }
+        if (dupes.isNotEmpty) {
+          debugPrint("WARNING: restored catalogue has ${dupes.length} duplicate "
+              "barcode(s); the second variant of each pair will not scan: "
+              "${dupes.take(10).join(', ')}");
+        }
+      } catch (e) {
+        debugPrint("Duplicate-barcode scan skipped: $e");
       }
-      if (dupes.isNotEmpty) {
-        debugPrint("WARNING: restored catalogue has ${dupes.length} duplicate "
-            "barcode(s); the second variant of each pair will not scan: "
-            "${dupes.take(10).join(', ')}");
-      }
-    } catch (e) {
-      debugPrint("Duplicate-barcode scan skipped: $e");
     }
 
     // Restore App Counters (retail) -- see the export for why this matters.
+    // Kept when the backup has none, so invoice numbers never go backwards.
     try {
-      if (data["appCounters"] != null && data["appCounters"].isNotEmpty) {
-        final countersBox = Hive.box(HiveBoxNames.appCounters);
-        await countersBox.clear();
-        final countersData = data["appCounters"][0] as Map<String, dynamic>;
-        for (var entry in countersData.entries) {
-          await countersBox.put(entry.key, entry.value);
-        }
-        debugPrint("App counters restored: ${countersData.keys.length} entries");
-      }
+      await _restoreKeyValueBox(data, "appCounters",
+          Hive.box(HiveBoxNames.appCounters), r, clearWhenMissing: false);
     } catch (e) {
       debugPrint("Error restoring app counters: $e");
     }
@@ -2669,21 +4558,30 @@ class UnifiedBackupService {
       "cartItems",
       Hive.box<CartItemModel>(HiveBoxNames.cartItems),
           (m) => CartItemModel.fromMap(m),
+      idOf: (c) => c.cartItemId, // BKP-2: CartRepository keys by cartItemId
     );
 
     // ✅ Restore Retail Categories
     if (data["categories"] != null) {
       try {
-        debugPrint("📦 Restoring retail categories...");
         final catBox = Hive.box<String>(HiveBoxNames.retailCategories);
-        await catBox.clear();
-        final items = data["categories"] as List;
-        for (var item in items) {
-          if (item is Map && item.containsKey('name')) {
-            await catBox.add(item['name'] as String);
-          }
+        final names = r.parse(catBox.name, "categories", () {
+          final items = data["categories"] as List;
+          return [
+            for (var item in items)
+              if (item is Map && item.containsKey('name')) item['name'] as String,
+          ];
+        });
+        if (!validateOnly && !r.isTolerated(catBox.name)) {
+          debugPrint("📦 Restoring retail categories...");
+          await r.write("categories", catBox, () async {
+            await catBox.clear();
+            for (final name in names) {
+              await catBox.add(name);
+            }
+            return names.length;
+          });
         }
-        debugPrint("📦 Retail categories restored: ${items.length} items");
       } catch (e) {
         debugPrint("⚠️ Error restoring retail categories: $e");
       }
@@ -2730,7 +4628,12 @@ class UnifiedBackupService {
       final ledgerBox =
           Hive.box<SupplierLedgerEntryModel>(HiveBoxNames.supplierLedger);
       if (data["supplierLedger"] == null) {
-        await ledgerBox.clear();
+        if (!validateOnly) {
+          await r.write("supplierLedger", ledgerBox, () async {
+            await ledgerBox.clear();
+            return 0;
+          });
+        }
       } else {
         await restoreBoxTypedWithId(
           "supplierLedger",
@@ -2798,7 +4701,12 @@ class UnifiedBackupService {
       final cashBox =
           Hive.box<CashMovementModel>(HiveBoxNames.restaurantCashMovements);
       if (data["cashMovements"] == null) {
-        await cashBox.clear();
+        if (!validateOnly) {
+          await r.write("cashMovements", cashBox, () async {
+            await cashBox.clear();
+            return 0;
+          });
+        }
       } else {
         await restoreBoxTypedWithId(
           "cashMovements",
@@ -2828,7 +4736,8 @@ class UnifiedBackupService {
     // ✅ Restore EOD Reports - hardcoded for retail mode (we're inside _restoreRetailData)
     try {
       final eodBox = Hive.box<EndOfDayReport>('eodBox');
-      await restoreBoxTyped("eodReports", eodBox, (m) => EndOfDayReport.fromMap(m));
+      await restoreBoxTyped("eodReports", eodBox, (m) => EndOfDayReport.fromMap(m),
+          idOf: (e) => e.reportId); // BKP-2
     } catch (e) {
       debugPrint("⚠️ Error restoring EOD reports: $e");
     }
@@ -2836,7 +4745,8 @@ class UnifiedBackupService {
     // ✅ Restore Expense Categories (uses typed box with registered adapter)
     try {
       final expenseCatBox = Hive.box<ExpenseCategory>('expenseCategory');
-      await restoreBoxTyped("expenseCategories", expenseCatBox, (m) => ExpenseCategory.fromMap(m));
+      await restoreBoxTyped("expenseCategories", expenseCatBox, (m) => ExpenseCategory.fromMap(m),
+          idOf: (c) => c.id); // BKP-2
     } catch (e) {
       debugPrint("⚠️ Error restoring expense categories: $e");
     }
@@ -2844,20 +4754,23 @@ class UnifiedBackupService {
     // ✅ Restore Expenses (uses typed box with registered adapter)
     try {
       final expenseBox = Hive.box<Expense>('expenseBox');
-      await restoreBoxTyped("expenses", expenseBox, (m) => Expense.fromMap(m));
+      await restoreBoxTyped("expenses", expenseBox, (m) => Expense.fromMap(m),
+          idOf: (e) => e.id); // BKP-2
     } catch (e) {
       debugPrint("⚠️ Error restoring expenses: $e");
     }
 
     // ✅ Restore Hold Sales & Hold Sale Items
     try {
-      await restoreBoxTyped("holdSales", Hive.box<HoldSaleModel>(HiveBoxNames.holdSales), (m) => HoldSaleModel.fromMap(m));
+      await restoreBoxTyped("holdSales", Hive.box<HoldSaleModel>(HiveBoxNames.holdSales), (m) => HoldSaleModel.fromMap(m),
+          idOf: (h) => h.holdSaleId); // BKP-2
     } catch (e) {
       debugPrint("⚠️ Error restoring hold sales: $e");
     }
 
     try {
-      await restoreBoxTyped("holdSaleItems", Hive.box<HoldSaleItemModel>(HiveBoxNames.holdSaleItems), (m) => HoldSaleItemModel.fromMap(m));
+      await restoreBoxTyped("holdSaleItems", Hive.box<HoldSaleItemModel>(HiveBoxNames.holdSaleItems), (m) => HoldSaleItemModel.fromMap(m),
+          idOf: (i) => i.holdSaleItemId); // BKP-2
     } catch (e) {
       debugPrint("⚠️ Error restoring hold sale items: $e");
     }
@@ -2920,7 +4833,8 @@ class UnifiedBackupService {
 
     // ✅ Restore Credit Payments
     try {
-      await restoreBoxTyped("creditPayments", Hive.box<CreditPaymentModel>(HiveBoxNames.creditPayments), (m) => CreditPaymentModel.fromMap(m));
+      await restoreBoxTyped("creditPayments", Hive.box<CreditPaymentModel>(HiveBoxNames.creditPayments), (m) => CreditPaymentModel.fromMap(m),
+          idOf: (c) => c.paymentId); // BKP-2
     } catch (e) {
       debugPrint("⚠️ Error restoring credit payments: $e");
     }
@@ -2939,7 +4853,9 @@ class UnifiedBackupService {
     }
 
     try {
-      await restoreBoxTyped("productAttributes", Hive.box<ProductAttributeModel>(HiveBoxNames.productAttributes), (m) => ProductAttributeModel.fromMap(m));
+      await restoreBoxTyped("productAttributes", Hive.box<ProductAttributeModel>(HiveBoxNames.productAttributes), (m) => ProductAttributeModel.fromMap(m),
+          // BKP-2: the link's own id — attributeId points at the attribute.
+          idOf: (a) => a.id);
     } catch (e) {
       debugPrint("⚠️ Error restoring product attributes: $e");
     }
@@ -2981,25 +4897,32 @@ class UnifiedBackupService {
 
     // ✅ Restore Billing Tabs
     try {
-      await restoreBoxTyped("billingTabs", Hive.box<BillingTabModel>(HiveBoxNames.billingTabs), (m) => BillingTabModel.fromMap(m));
+      await restoreBoxTyped("billingTabs", Hive.box<BillingTabModel>(HiveBoxNames.billingTabs), (m) => BillingTabModel.fromMap(m),
+          idOf: (t) => t.id); // BKP-2
     } catch (e) {
       debugPrint("⚠️ Error restoring billing tabs: $e");
     }
 
     // ✅ Restore Day Management Box (opening balance)
     try {
-      if (data["dayManagement"] != null && data["dayManagement"].isNotEmpty) {
-        debugPrint("📦 Restoring day management...");
-        final dayMgmtBox = Hive.box(HiveBoxNames.dayManagementBox);
-        await dayMgmtBox.clear();
-        final dayMgmtData = data["dayManagement"][0] as Map<String, dynamic>;
-        for (var entry in dayMgmtData.entries) {
-          await dayMgmtBox.put(entry.key, entry.value);
-        }
-        debugPrint("📦 Day management restored: ${dayMgmtData.keys.length} entries");
-      }
+      await _restoreKeyValueBox(data, "dayManagement",
+          Hive.box(HiveBoxNames.dayManagementBox), r, clearWhenMissing: true);
     } catch (e) {
       debugPrint("⚠️ Error restoring day management: $e");
+    }
+
+    // ✅ Restore Day Sessions (shared box, referenced by dayManagement)
+    try {
+      await restoreBoxTypedWithId("restaurantSessions", Hive.box<RestaurantSessionModel>(HiveBoxNames.restaurantSessions), (m) => RestaurantSessionModel.fromMap(m), (s) => s.sessionId);
+    } catch (e) {
+      debugPrint("⚠️ Error restoring sessions: $e");
+    }
+
+    // ✅ Restore Saved Printers (shared box)
+    try {
+      await restoreBoxTypedWithId("printers", Hive.box<SavedPrinterModel>(HiveBoxNames.restaurantPrinters), (m) => SavedPrinterModel.fromMap(m), (p) => p.id);
+    } catch (e) {
+      debugPrint("⚠️ Error restoring printers: $e");
     }
 
     // Admin credential restores via the generic localPrefs restore (see
@@ -3007,12 +4930,11 @@ class UnifiedBackupService {
 
     // Boxes were written directly above, so ProductStore's in-memory lists
     // still hold the pre-restore data (and detached objects after box.clear()).
-    try {
+    if (validateOnly) return;
+    await _postRestoreStep(r, postStepProductList, () async {
       await productStore.loadProducts();
       await productStore.loadVariants();
-    } catch (e) {
-      debugPrint("⚠️ Could not refresh product store after restore: $e");
-    }
+    });
 
     debugPrint("✅ Full retail data restored successfully!");
   }
@@ -3086,7 +5008,9 @@ class UnifiedBackupService {
     } catch (e, stackTrace) {
       debugPrint("⚠️ Error syncing SharedPreferences: $e");
       debugPrint("Stack trace: $stackTrace");
-      // Don't throw - let the restore continue even if this fails
+      // BKP-9: the caller reports it as a post-restore warning; the restore
+      // itself continues.
+      rethrow;
     }
   }
 }

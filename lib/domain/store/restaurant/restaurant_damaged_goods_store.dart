@@ -104,11 +104,34 @@ abstract class _RestaurantDamagedGoodsStore with Store {
 
   // ==================== ENTRY POINT ====================
 
-  /// Called once from receiving, immediately after a GRN is confirmed.
-  /// Partitions [items] by `damagedHandling` and creates the matching record
-  /// for each group. Safe to call when nothing was damaged.
+  /// The damaged-goods documents for [grn], reporting rather than throwing a
+  /// failure. Same once-only rules as [ensureDocumentsForGRN], so calling it
+  /// for a receipt whose documents exist returns them and creates nothing.
   @action
   Future<RestaurantDamagedGoodsOutcome> recordFromGRN({
+    required RestaurantGRNModel grn,
+    required List<RestaurantGRNItemModel> items,
+  }) async {
+    try {
+      return await ensureDocumentsForGRN(grn: grn, items: items);
+    } catch (e) {
+      errorMessage = 'Damaged-goods records could not be created: $e';
+      return const RestaurantDamagedGoodsOutcome();
+    }
+  }
+
+  /// Partitions [items] by `damagedHandling` and makes sure each group has
+  /// its document — the step goods receiving runs before it confirms a GRN.
+  /// Throws on a failure, so an interrupted receipt is retried rather than
+  /// confirmed without its documents. Safe to call when nothing was damaged.
+  ///
+  /// Once only, per document type, so a resumed receipt creates nothing
+  /// twice: a return or claim already raised for this GRN is reused, and a
+  /// write-off is created only for a line that has none. A return or claim
+  /// writes its lines BEFORE its header, so an existing header means its
+  /// lines exist; lines left by an interruption before the header are never
+  /// read (lines are only ever reached through their header).
+  Future<RestaurantDamagedGoodsOutcome> ensureDocumentsForGRN({
     required RestaurantGRNModel grn,
     required List<RestaurantGRNItemModel> items,
   }) async {
@@ -118,30 +141,49 @@ abstract class _RestaurantDamagedGoodsStore with Store {
 
     if (damaged.isEmpty) return const RestaurantDamagedGoodsOutcome();
 
-    try {
-      final toReturn =
-          damaged.where((i) => i.damagedHandling == 'returnToSupplier').toList();
-      final toClaim =
-          damaged.where((i) => i.damagedHandling == 'keepForClaim').toList();
-      final toWriteOff =
-          damaged.where((i) => i.damagedHandling == 'writeOff').toList();
+    final toReturn =
+        damaged.where((i) => i.damagedHandling == 'returnToSupplier').toList();
+    final toClaim =
+        damaged.where((i) => i.damagedHandling == 'keepForClaim').toList();
+    final toWriteOff =
+        damaged.where((i) => i.damagedHandling == 'writeOff').toList();
 
-      final returnNumber =
-          toReturn.isEmpty ? null : await _createReturn(grn, toReturn);
-      final claimNumber =
-          toClaim.isEmpty ? null : await _createClaim(grn, toClaim);
-      final lossNumbers =
-          toWriteOff.isEmpty ? <String>[] : await _createLosses(grn, toWriteOff);
-
-      return RestaurantDamagedGoodsOutcome(
-        returnNumber: returnNumber,
-        claimNumber: claimNumber,
-        lossNumbers: lossNumbers,
-      );
-    } catch (e) {
-      errorMessage = 'Damaged-goods records could not be created: $e';
-      return const RestaurantDamagedGoodsOutcome();
+    String? returnNumber;
+    if (toReturn.isNotEmpty) {
+      final existing = await _returnRepository.getByGRN(grn.grnId);
+      returnNumber = existing.isNotEmpty
+          ? existing.first.returnNumber
+          : await _createReturn(grn, toReturn);
     }
+
+    String? claimNumber;
+    if (toClaim.isNotEmpty) {
+      final existing = await _claimRepository.getByGRN(grn.grnId);
+      claimNumber = existing.isNotEmpty
+          ? existing.first.claimNumber
+          : await _createClaim(grn, toClaim);
+    }
+
+    final lossNumbers = <String>[];
+    if (toWriteOff.isNotEmpty) {
+      final lineIds = {for (final i in toWriteOff) i.grnItemId};
+      final existing = (await _lossRepository.getByGRN(grn.grnId))
+          .where((l) => lineIds.contains(l.grnItemId))
+          .toList();
+      final covered = {for (final l in existing) l.grnItemId};
+      lossNumbers.addAll(existing.map((l) => l.lossNumber));
+      final missing =
+          toWriteOff.where((i) => !covered.contains(i.grnItemId)).toList();
+      if (missing.isNotEmpty) {
+        lossNumbers.addAll(await _createLosses(grn, missing));
+      }
+    }
+
+    return RestaurantDamagedGoodsOutcome(
+      returnNumber: returnNumber,
+      claimNumber: claimNumber,
+      lossNumbers: lossNumbers,
+    );
   }
 
   Future<String> _createReturn(
@@ -176,8 +218,9 @@ abstract class _RestaurantDamagedGoodsStore with Store {
             ))
         .toList();
 
-    await _returnRepository.save(header);
+    // Lines first: the header is what marks this return as raised.
     await _returnRepository.saveItems(lines);
+    await _returnRepository.save(header);
     purchaseReturns.insert(0, header);
     return number;
   }
@@ -214,8 +257,9 @@ abstract class _RestaurantDamagedGoodsStore with Store {
             ))
         .toList();
 
-    await _claimRepository.save(header);
+    // Lines first: the header is what marks this claim as raised.
     await _claimRepository.saveItems(lines);
+    await _claimRepository.save(header);
     supplierClaims.insert(0, header);
     return number;
   }

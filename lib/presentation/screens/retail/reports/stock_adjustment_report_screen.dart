@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
+import 'package:billberrylite/domain/services/common/report_export_service.dart';
 import 'package:billberrylite/domain/services/retail/report_service.dart';
 import 'package:billberrylite/presentation/widget/componets/common/report_page_scaffold.dart';
 import 'package:billberrylite/presentation/widget/componets/common/report_summary_card.dart';
@@ -21,6 +22,13 @@ class StockAdjustmentReportScreen extends StatelessWidget {
   String _dateTime(String iso) {
     final d = DateTime.tryParse(iso);
     return d == null ? iso : DateFormat('dd MMM yyyy, hh:mm a').format(d);
+  }
+
+  /// Real 12-hour date-time cell; the PDF prints the same text as [_dateTime].
+  /// Unreadable timestamps keep their stored text.
+  Object _dateTimeCell(String iso) {
+    final d = DateTime.tryParse(iso);
+    return d == null ? iso : ExportDateTime(d);
   }
 
   @override
@@ -132,6 +140,10 @@ class StockAdjustmentReportScreen extends StatelessWidget {
           ],
         );
       },
+      // All / Current page / Date range by the adjustment timestamp (the
+      // loader's filter).
+      rangedExport: true,
+      exportRowDate: (r) => DateTime.tryParse(r['timestamp'] as String? ?? ''),
       exportData: (rows) => ReportExportData(
         headers: const [
           'Date',
@@ -147,7 +159,7 @@ class StockAdjustmentReportScreen extends StatelessWidget {
         rows: rows
             .map(
               (r) => [
-                _dateTime(r['timestamp'] as String),
+                _dateTimeCell(r['timestamp'] as String),
                 r['itemName'],
                 r['reason'],
                 r['staffName'],

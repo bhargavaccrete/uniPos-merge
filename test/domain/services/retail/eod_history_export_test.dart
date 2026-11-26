@@ -12,6 +12,7 @@ import 'package:billberrylite/data/models/restaurant/db/eodmodel_317.dart';
 import 'package:billberrylite/data/models/restaurant/db/saved_printer_model.dart';
 import 'package:billberrylite/data/repositories/business_details_repository.dart';
 import 'package:billberrylite/data/repositories/restaurant/printer_repository.dart';
+import 'package:billberrylite/domain/services/common/report_export_service.dart';
 import 'package:billberrylite/domain/services/restaurant/thermal_printer_service.dart';
 import 'package:billberrylite/domain/store/restaurant/printer_store.dart';
 import 'package:billberrylite/domain/services/retail/eod_history_export.dart';
@@ -130,6 +131,10 @@ void main() {
     return null;
   }
 
+  /// An amount row's exact value — amounts are numeric ₹ cells, not text.
+  double amount(EodExport export, String section, String item) =>
+      (cell(export, section, item) as ExportMoney).value;
+
   // ── EOD-M2 — the list export ─────────────────────────────────────────────
 
   group('list export', () {
@@ -152,8 +157,26 @@ void main() {
       final row = export.rows.single;
       // Two closes on one day is the case EOD-3 exists for; a spreadsheet
       // groups them far better as two fields than as one string.
-      expect(row[0], isNot(contains(':')));
+      expect(row[0], isA<ExportDate>(), reason: 'a real date-only cell');
+      expect(ReportExportService.pdfRows([row]).single[0], '15 Apr 2026');
       expect(row[1], contains(':'));
+    });
+
+    test('PDF text is exactly what the old text cells printed', () {
+      final day = DateTime(2026, 4, 15, 21, 40);
+      final export = EodHistoryExport.list(
+        reports: [record(date: day, totalSales: 1234.5, difference: -50)],
+        period: 'All time',
+      );
+      final row = export.rows.single;
+      final pdf = ReportExportService.pdfRows([row]).single;
+
+      expect(row[4], isA<ExportMoney>());
+      expect((row[8] as ExportMoney).value, -50,
+          reason: 'a shortage stays negative');
+      expect(pdf[0], ReportExportService.formatDate(day));
+      expect(pdf[4], ReportExportService.formatCurrency(1234.5));
+      expect(pdf[8], ReportExportService.formatCurrency(-50));
     });
 
     test('a session is shortened, and blank when absent', () {
@@ -231,8 +254,8 @@ void main() {
         orderCount: 7,
       ));
 
-      expect(cell(export, 'Cash Summary', 'Opening Balance'), contains('200'));
-      expect(cell(export, 'Sales', 'Total Sales'), contains('1000'));
+      expect(amount(export, 'Cash Summary', 'Opening Balance'), 200);
+      expect(amount(export, 'Sales', 'Total Sales'), 1000);
       expect(cell(export, 'Sales', 'Transactions'), 7);
       expect(cell(export, 'Reconciliation', 'Status'), 'Balanced');
       expect(export.headers, EodHistoryExport.detailHeaders);
@@ -264,12 +287,12 @@ void main() {
         grossProfit: 600,
       ));
 
-      expect(cell(export, 'Sales', 'Total Discount'), contains('50'));
-      expect(cell(export, 'Sales', 'Refunds'), contains('30'));
-      expect(cell(export, 'Expenses', 'Non-Cash Expenses'), contains('100'));
-      expect(cell(export, 'Credit Collections', 'Total'), contains('175'));
+      expect(amount(export, 'Sales', 'Total Discount'), 50);
+      expect(amount(export, 'Sales', 'Refunds'), 30);
+      expect(amount(export, 'Expenses', 'Non-Cash Expenses'), 100);
+      expect(amount(export, 'Credit Collections', 'Total'), 175);
       expect(cell(export, 'Outstanding', 'Customers with Due'), 3);
-      expect(cell(export, 'Profit', 'Gross Profit'), contains('600'));
+      expect(amount(export, 'Profit', 'Gross Profit'), 600);
     });
 
     test('payment summaries become one row each', () {
@@ -280,8 +303,8 @@ void main() {
             paymentType: 'UPI', totalAmount: 300, transactionCount: 2, percentage: 0),
       ]));
 
-      expect(cell(export, 'Payments', 'Cash'), contains('700'));
-      expect(cell(export, 'Payments', 'UPI'), contains('300'));
+      expect(amount(export, 'Payments', 'Cash'), 700);
+      expect(amount(export, 'Payments', 'UPI'), 300);
     });
 
     test('a session appears only when the record has one', () {
@@ -316,9 +339,9 @@ void main() {
       final export = EodHistoryExport.detail(
           record(totalTax: 180, taxSummaries: legacy));
 
-      expect(cell(export, 'Tax', 'CGST'), contains('90'));
-      expect(cell(export, 'Tax', 'SGST'), contains('90'));
-      expect(cell(export, 'Tax', 'Total Tax'), contains('180'));
+      expect(amount(export, 'Tax', 'CGST'), 90);
+      expect(amount(export, 'Tax', 'SGST'), 90);
+      expect(amount(export, 'Tax', 'Total Tax'), 180);
     });
 
     test('the UK exports ONE VAT row and never the stored halves', () async {
@@ -329,7 +352,7 @@ void main() {
       expect(cell(export, 'Tax', 'CGST'), isNull);
       expect(cell(export, 'Tax', 'SGST'), isNull);
       // The AUTHORITATIVE total, not the halves added back up.
-      expect(cell(export, 'Tax', 'VAT'), contains('180'));
+      expect(amount(export, 'Tax', 'VAT'), 180);
     });
 
     test('an untaxed close exports no Tax section at all', () async {

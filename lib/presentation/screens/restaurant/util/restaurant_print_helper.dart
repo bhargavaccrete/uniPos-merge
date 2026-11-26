@@ -13,6 +13,7 @@ import 'package:billberrylite/domain/services/retail/store_settings_service.dart
 import 'package:billberrylite/core/config/tax_id_rule.dart';
 import 'package:billberrylite/domain/services/restaurant/cart_calculation_service.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
+import 'package:billberrylite/domain/services/restaurant/saved_service_charge.dart';
 import 'package:billberrylite/core/config/app_config.dart';
 import 'package:billberrylite/core/plan/entitlement_keys.dart';
 import 'package:billberrylite/core/plan/plan_enforcement.dart';
@@ -668,15 +669,8 @@ class RestaurantPrintHelper {
      final bool isDelivery = order.orderType.toLowerCase().contains('delivery');
 
      // Recalculate based on current items with saved discount and charges
-     final calculations = CartCalculationService(
-      items: currentItems,
-      discountType: DiscountType.amount,
-      discountValue: order.discount ?? 0,
-      serviceChargePercentage: isDelivery ? 0 : (order.serviceCharge ?? 0),
-      deliveryCharge: isDelivery ? (order.serviceCharge ?? 0) : 0,
-      isDeliveryOrder: isDelivery,
-      isTaxInclusive: order.isTaxInclusive, // Use stored tax mode from order
-    );
+     final calculations = SavedServiceCharge.calculate(order, currentItems,
+         isDelivery: isDelivery);
 
     // Check if new items were added (for KOT boundary tracking)
     final int previousItemCount = order.itemCountAtLastKot ?? order.items.length;
@@ -708,6 +702,9 @@ class RestaurantPrintHelper {
       order: updatedOrder, // Pass updated order with all items and KOT info
       calculations: calculations,
       billNumber: order.billNumber, // Pass stored bill number if payment was recorded
+      // Points redeemed at payment (already in the totals above), shown on
+      // the bill so it matches what was paid — as printPastOrder does.
+      loyaltyPointsDiscount: order.loyaltyPointsUsed ?? 0,
     );
   }
 

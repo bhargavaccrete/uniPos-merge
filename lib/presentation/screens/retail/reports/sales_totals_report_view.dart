@@ -494,9 +494,7 @@ class _SalesTotalsReportViewState extends State<SalesTotalsReportView> {
                     // value is whole, so the PDF prints "3" rather than "3.0"
                     // (`:464` stringifies the cell).
                     exportQty((row['totalQuantity'] as num).toDouble()),
-                    ReportExportService.formatCurrency(
-                      (row['totalRevenue'] as num).toDouble(),
-                    ),
+                    ExportMoney((row['totalRevenue'] as num).toDouble()),
                   ],
                 )
                 .toList()

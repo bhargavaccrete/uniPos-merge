@@ -739,4 +739,127 @@ void main() {
       );
     });
   });
+
+  // ==========================================================================
+  // CGST/SGST rows on restaurant bills (India). Display rule approved by the
+  // owner 2026-11-18: the first component takes the rounded half, the second
+  // the remainder, so each pair adds back to its rate's GST.
+  group('splitComponents — CGST/SGST rows', () {
+    const names = (first: 'CGST', second: 'SGST');
+    double r2(double v) => double.parse(v.toStringAsFixed(2));
+
+    test('₹517 @ 5%: 12.93 + 12.92 = 25.85 on the full taxable base', () {
+      final lines = TaxBreakdown.compute(
+        items: [item(575, 5)],
+        billDiscount: 58,
+        isTaxInclusive: false,
+        reconcileToGst: 25.85,
+      );
+      final rows = TaxBreakdown.splitComponents(lines, names: names);
+
+      expect(rows, hasLength(1));
+      final c = rows.single;
+      expect(c.firstLabel, 'CGST (2.5%)');
+      expect(c.secondLabel, 'SGST (2.5%)');
+      expect(c.taxable, closeTo(517, 0.005),
+          reason: 'each component is charged on the FULL base, not half');
+      expect(c.first, 12.93);
+      expect(c.second, 12.92);
+      expect(r2(c.gst), 25.85);
+    });
+
+    test('an even GST splits into equal halves (₹112.22 @ 18%)', () {
+      final rows = TaxBreakdown.splitComponents(
+        const [TaxRateLine(ratePercent: 18, taxable: 112.22, gst: 20.20)],
+        names: names,
+      );
+      expect(rows.single.firstLabel, 'CGST (9%)');
+      expect(rows.single.first, 10.10);
+      expect(rows.single.second, 10.10);
+    });
+
+    test('mixed rates: one pair per rate, ascending, every pair closes', () {
+      final lines = TaxBreakdown.compute(
+        items: [item(517, 5), item(112.22, 18), item(33.33, 12)],
+        billDiscount: 0,
+        isTaxInclusive: false,
+      );
+      final rows = TaxBreakdown.splitComponents(lines, names: names);
+
+      expect(rows.map((r) => r.ratePercent), [5, 12, 18]);
+      expect(rows.map((r) => r.firstLabel),
+          ['CGST (2.5%)', 'CGST (6%)', 'CGST (9%)']);
+      for (var i = 0; i < rows.length; i++) {
+        expect(r2(rows[i].first + rows[i].second), r2(lines[i].gst));
+        expect((rows[i].first - rows[i].second).abs(), lessThanOrEqualTo(0.01));
+      }
+    });
+
+    test('the pairs add up to the bill GST the order stored', () {
+      final lines = TaxBreakdown.compute(
+        items: [item(10.10, 5), item(10.10, 5), item(112.22, 18)],
+        billDiscount: 0,
+        isTaxInclusive: false,
+        reconcileToGst: 21.22,
+      );
+      final rows = TaxBreakdown.splitComponents(lines, names: names);
+      final printed =
+          rows.fold<double>(0, (s, r) => s + r.first + r.second);
+      expect(r2(printed), 21.22);
+    });
+
+    test('tax-inclusive bill: split of the extracted GST', () {
+      final lines = TaxBreakdown.compute(
+        items: [item(542.85, 5)],
+        billDiscount: 0,
+        isTaxInclusive: true,
+      );
+      final c = TaxBreakdown.splitComponents(lines, names: names).single;
+      expect(c.taxable, closeTo(517, 0.005));
+      expect(c.first, 12.93);
+      expect(c.second, 12.92);
+    });
+
+    test('the component names come from the caller', () {
+      final c = TaxBreakdown.splitComponents(
+        const [TaxRateLine(ratePercent: 5, taxable: 100, gst: 5)],
+        names: (first: 'CGST', second: 'UTGST'),
+      ).single;
+      expect(c.secondLabel, 'UTGST (2.5%)');
+    });
+
+    test('no taxed lines: no rows (0% bills print no table)', () {
+      final lines = TaxBreakdown.compute(
+        items: [item(100, 0)],
+        billDiscount: 0,
+        isTaxInclusive: false,
+      );
+      expect(TaxBreakdown.splitComponents(lines, names: names), isEmpty);
+    });
+
+    test('a sweep of GST values never leaves a pair off by a paisa', () {
+      for (var paise = 1; paise <= 100000; paise++) {
+        final gst = paise / 100;
+        final c = TaxBreakdown.splitComponents(
+          [TaxRateLine(ratePercent: 5, taxable: 0, gst: gst)],
+          names: names,
+        ).single;
+        expect(r2(c.first + c.second), gst, reason: 'gst $gst');
+        expect(r2((c.first - c.second).abs()), lessThanOrEqualTo(0.01),
+            reason: 'gst $gst');
+      }
+    });
+  });
+
+  group('formatRatePercent', () {
+    test('drops trailing zeros and keeps up to three places', () {
+      expect(TaxBreakdown.formatRatePercent(5), '5');
+      expect(TaxBreakdown.formatRatePercent(2.5), '2.5');
+      expect(TaxBreakdown.formatRatePercent(9), '9');
+      expect(TaxBreakdown.formatRatePercent(14), '14');
+      expect(TaxBreakdown.formatRatePercent(0.125), '0.125');
+      expect(TaxBreakdown.formatRatePercent(1.5), '1.5');
+      expect(TaxBreakdown.formatRatePercent(20), '20');
+    });
+  });
 }

@@ -40,7 +40,6 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
   // Pre-computed state
   List<CustomerRevenueData> _customers = [];
   double _totalRevenue = 0.0;
-  int _totalOrders = 0;
 
   // Period filter (default: all-time).
   _RevPeriod _period = _RevPeriod.all;
@@ -68,7 +67,6 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
   void _buildCustomerData() {
     final Map<String, CustomerRevenueData> customerMap = {};
     double revenueSum = 0.0;
-    int orderSum = 0;
 
     final (start, end) = _periodBounds();
 
@@ -98,7 +96,6 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
       if (netRevenue <= 0) continue;
 
       revenueSum += netRevenue;
-      orderSum++;
 
       final mapKey = customerName.toLowerCase();
       if (customerMap.containsKey(mapKey)) {
@@ -123,7 +120,6 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
     setState(() {
       _customers = customers;
       _totalRevenue = revenueSum;
-      _totalOrders = orderSum;
       _currentPage = 0;
       _isLoading = false;
     });
@@ -258,39 +254,42 @@ class _CustomerListByRevenueState extends State<CustomerListByRevenue> {
 
     final headers = ['Rank', 'Customer Name', 'Total Orders', 'Total Revenue'];
 
-    final data = _customers
-        .map(
-          (customer) => [
-            customer.srNo.toString(),
-            customer.name,
-            customer.orderCount.toString(),
-            ReportExportService.formatCurrency(customer.revenue),
-          ],
-        )
-        .toList();
+    // Every order is counted under exactly one customer, so these sums over
+    // the exported rows equal the screen's totals for All.
+    Map<String, dynamic> summaryOf(List<CustomerRevenueData> rows) {
+      final revenue = rows.fold<double>(0.0, (s, c) => s + c.revenue);
+      final orders = rows.fold<int>(0, (s, c) => s + c.orderCount);
+      return {
+        'Total Customers': rows.length.toString(),
+        'Total Orders': orders.toString(),
+        'Total Revenue': ReportExportService.formatCurrency(revenue),
+        'Average Revenue per Customer': ReportExportService.formatCurrency(
+          rows.isNotEmpty ? revenue / rows.length : 0.0,
+        ),
+        'Generated': ReportExportService.formatDateTime(DateTime.now()),
+      };
+    }
 
-    final averageRevenue = _customers.isNotEmpty
-        ? _totalRevenue / _customers.length
-        : 0.0;
-
-    final summary = {
-      'Total Customers': _customers.length.toString(),
-      'Total Orders': _totalOrders.toString(),
-      'Total Revenue': ReportExportService.formatCurrency(_totalRevenue),
-      'Average Revenue per Customer': ReportExportService.formatCurrency(
-        averageRevenue,
-      ),
-      'Generated': ReportExportService.formatDateTime(DateTime.now()),
-    };
-
-    await ReportExportService.showExportDialog(
+    // All filtered customers / Current page. Rows are per-customer totals,
+    // so no date range.
+    await ReportExportService.showRangedExportDialog<CustomerRevenueData>(
       context: context,
       fileName:
           'customer_revenue_${DateFormat('yyyyMMdd').format(DateTime.now())}',
       reportTitle: 'Customer Revenue Report',
       headers: headers,
-      data: data,
-      summary: summary,
+      items: _customers,
+      rowOf: (customer) => [
+        customer.srNo.toString(),
+        customer.name,
+        customer.orderCount.toString(),
+        ExportMoney(customer.revenue),
+      ],
+      dateOf: (_) => null,
+      summaryOf: summaryOf,
+      currentPage: _currentPage,
+      rowsPerPage: _rowsPerPage,
+      unit: 'customers',
     );
   }
 

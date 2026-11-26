@@ -229,6 +229,57 @@ abstract class _RestaurantSupplierStore with Store {
     await loadSuppliers();
   }
 
+  /// [recordBalanceMovement] at most once per ([docId], [type]) — the form a
+  /// resumable document (an interrupted goods receipt) needs.
+  ///
+  /// [recordBalanceMovement] writes the row, then the balance. When a row for
+  /// this document already exists, whether its balance write also landed is
+  /// read from the journal itself: the balance carried forward from the row —
+  /// the supplier's current balance if it is the latest row, else the next
+  /// row's opening (`balanceAfter - amount`) — equals the row's `balanceAfter`
+  /// only if it did. If it did not, the amount is applied now; the row is
+  /// never written twice.
+  Future<void> recordBalanceMovementOnce({
+    required String supplierId,
+    required double amount,
+    required RestaurantSupplierLedgerType type,
+    required String description,
+    required String docId,
+    String? docNumber,
+    String? date,
+  }) async {
+    final rows =
+        (await restaurantSupplierLedgerRepository.getBySupplier(supplierId))
+          ..sort((a, b) => a.seq.compareTo(b.seq));
+    final index =
+        rows.indexWhere((e) => e.docId == docId && e.type == type.name);
+    if (index == -1) {
+      await recordBalanceMovement(
+        supplierId: supplierId,
+        amount: amount,
+        type: type,
+        description: description,
+        docNumber: docNumber,
+        docId: docId,
+        date: date,
+      );
+      return;
+    }
+
+    final supplier = restaurantSupplierRepository.getSupplierById(supplierId);
+    if (supplier == null) return;
+    final row = rows[index];
+    final carriedForward = index == rows.length - 1
+        ? supplier.currentBalance
+        : rows[index + 1].balanceAfter - rows[index + 1].amount;
+    if ((carriedForward - row.balanceAfter).abs() < 0.005) return;
+
+    await restaurantSupplierRepository.saveSupplier(
+      supplier.copyWith(currentBalance: supplier.currentBalance + row.amount),
+    );
+    await loadSuppliers();
+  }
+
   /// One-time lazy backfill for suppliers that carried a balance before the
   /// journal existed.
   ///

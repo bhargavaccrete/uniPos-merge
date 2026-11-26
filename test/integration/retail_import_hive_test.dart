@@ -725,12 +725,15 @@ void main() {
 
   group('the product limit is not bypassed', () {
     /// Loads a manifest granting the catalog but capping products at [max].
-    void seedPlan({required int max}) {
+    /// `canAddProduct` needs the module, the products submodule and the add
+    /// action, so all three are granted.
+    void seedPlan({required int max, bool grantProducts = true}) {
       locator<LicenseStore>().licenseBypassed = false;
       Entitlements.instance.loadFromManifest(
         ManifestData(
           entitlements: {
             RetailEntKeys.catalog: true,
+            if (grantProducts) RetailEntKeys.catalogProducts: true,
             RetailEntKeys.catalogProductsAdd: true,
             RetailEntKeys.catalogProductsMax: max,
           },
@@ -782,6 +785,19 @@ void main() {
         expect(store.outcome!.productsBlockedByLimit, 1);
       },
     );
+
+    test('a plan without the products submodule creates nothing', () async {
+      seedPlan(max: 10, grantProducts: false);
+
+      final store = await importRows([
+        row(handle: 'a', name: 'A'),
+        row(handle: 'b', name: 'B'),
+      ]);
+
+      expect(productStore.products, isEmpty);
+      expect(store.outcome!.productsCreated, 0);
+      expect(store.outcome!.productsBlockedByLimit, 2);
+    });
   });
 
   // ── The template the shop actually downloads ──────────────────────────────

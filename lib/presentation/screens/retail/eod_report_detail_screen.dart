@@ -303,6 +303,16 @@ class EODReportDetailScreen extends StatelessWidget {
                         'Margin',
                         '${report.profitMargin.toStringAsFixed(1)}%',
                       ),
+                      // Their revenue is counted at 100% margin above, so the
+                      // profit is overstated by up to this much.
+                      if (report.unknownCostLines > 0)
+                        _buildRow(
+                          context,
+                          'No cost price (${report.unknownCostLines} '
+                              'line${report.unknownCostLines == 1 ? '' : 's'})',
+                          formatMoney(report.unknownCostRevenue),
+                          color: AppColors.warning,
+                        ),
                     ],
                   ),
                   SizedBox(height: AppResponsive.largeSpacing(context)),

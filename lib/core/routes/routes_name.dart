@@ -144,7 +144,6 @@ class RouteNames {
   // Restaurant - Other
   static const restaurantNeedHelp = '/restaurant-need-help';
   static const restaurantCustomizationDrawer = '/restaurant-customization';
-  static const restaurantTestData = '/restaurant-testdatascreen';
   static const restaurantAddPrinter = '/restaurant-addprinter';
   static const restaurantBulkImport = '/restaurant-bulk-import';
   static const restaurantDataGenratorScreen = '/restaurant-datageneratorscreen';

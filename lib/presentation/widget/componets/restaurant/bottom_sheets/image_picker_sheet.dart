@@ -36,9 +36,13 @@ class ImagePickerSheet extends StatelessWidget {
   Future<void> _pickImage(BuildContext context, ImageSource source) async {
     try {
       final picker = ImagePicker();
+      // Same cap as ImagePickerService.pickProductImage: a full-size phone
+      // photo was stored as-is and decoded at native size wherever shown.
       final pickedFile = await picker.pickImage(
         source: source,
         imageQuality: 85,
+        maxWidth: 1200,
+        maxHeight: 1200,
       );
 
       if (pickedFile == null) {

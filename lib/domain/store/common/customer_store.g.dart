@@ -350,6 +350,15 @@ mixin _$CustomerStore on _CustomerStore, Store {
         .run(() => super.reduceCredit(customerId, amount));
   }
 
+  late final _$addCreditAsyncAction =
+      AsyncAction('_CustomerStore.addCredit', context: context);
+
+  @override
+  Future<void> addCredit(String customerId, double amount) {
+    return _$addCreditAsyncAction
+        .run(() => super.addCredit(customerId, amount));
+  }
+
   late final _$_CustomerStoreActionController =
       ActionController(name: '_CustomerStore', context: context);
 

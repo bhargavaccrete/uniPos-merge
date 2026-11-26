@@ -27,12 +27,18 @@ class RetailStoreType {
   /// starter values; an unlisted name is still created, just empty.
   final List<String> defaultAttributeNames;
 
+  /// Whether this kind of store plausibly sells food (packaged snacks,
+  /// chocolates…), so the food-business licence field (FSSAI in India) is
+  /// offered. Read only through `FoodLicenseRule.appliesFor`.
+  final bool mayNeedFoodLicense;
+
   const RetailStoreType({
     required this.key,
     required this.name,
     required this.description,
     required this.iconName,
     this.defaultAttributeNames = const [],
+    this.mayNeedFoodLicense = false,
   });
 }
 
@@ -90,6 +96,7 @@ class RetailStoreTypes {
     description: 'Gifts, novelty and general merchandise',
     iconName: 'gift',
     defaultAttributeNames: ['Color', 'Size', 'Material', 'Pattern'],
+    mayNeedFoodLicense: true,
   );
 
   static const RetailStoreType other = RetailStoreType(
@@ -102,6 +109,8 @@ class RetailStoreTypes {
     // A shop that fits none of the six above configures its own fields in
     // Settings rather than starting with someone else's.
     defaultAttributeNames: [],
+    // Grocery/kirana shops have no type of their own yet and land here.
+    mayNeedFoodLicense: true,
   );
 
   /// Display order in the setup wizard. `other` sits last — it is the answer for

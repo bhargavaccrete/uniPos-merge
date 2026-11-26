@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
+import 'package:billberrylite/domain/services/common/report_export_service.dart';
 import 'package:billberrylite/domain/services/restaurant/restaurant_purchase_report_service.dart';
 import 'package:billberrylite/presentation/widget/componets/common/report_page_scaffold.dart';
 import 'package:billberrylite/presentation/widget/componets/common/report_summary_card.dart';
@@ -163,7 +164,9 @@ class RestaurantStockAdjustmentReportScreen extends StatelessWidget {
         rows: rows
             .map(
               (r) => [
-                _dateTime(r['timestamp'] as String),
+                // Real 24-hour date-time; the PDF prints the same text.
+                ReportExportService.isoDateCell(r['timestamp'] as String,
+                    hour24: true),
                 r['itemName'],
                 r['reason'],
                 r['staffName'],
@@ -177,6 +180,10 @@ class RestaurantStockAdjustmentReportScreen extends StatelessWidget {
             .toList(),
         summary: stockAdjustmentExportSummary(rows),
       ),
+      // Opt-in: All / Current page / Date range by timestamp — the field the
+      // loader filters on. Quantities stay quantities (no money here).
+      rangedExport: true,
+      exportRowDate: (r) => DateTime.tryParse(r['timestamp'] as String),
     );
   }
 }

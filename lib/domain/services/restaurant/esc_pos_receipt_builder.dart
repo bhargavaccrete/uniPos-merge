@@ -464,12 +464,26 @@ class EscPosReceiptBuilder {
           );
     if (receiptData.taxEnabled && PrintSettings.showTax && taxLines.isNotEmpty) {
       final totalGst = sale.totalGstAmount ?? 0; // authoritative — matches order
+      // Restaurant in India prints each rate as CGST + SGST rows.
+      final components =
+          AppConfig.isRestaurant ? TaxLabelRule.components : null;
       bytes.addAll(_divider(cols));
-      bytes.addAll(
-          _text(_formatRow4('Tax', 'Taxable', TaxLabelRule.name, 'Total', cols)));
-      for (final l in taxLines) {
-        bytes.addAll(_text(_formatRow4(_taxLabel(l.ratePercent),
-            _fmt(l.taxable), _fmt(l.gst), _fmt(l.taxable + l.gst), cols)));
+      if (components != null) {
+        bytes.addAll(_text(_formatRow3('Tax', 'Taxable', 'Amount', cols)));
+        for (final c
+            in TaxBreakdown.splitComponents(taxLines, names: components)) {
+          bytes.addAll(_text(
+              _formatRow3(c.firstLabel, _fmt(c.taxable), _fmt(c.first), cols)));
+          bytes.addAll(_text(_formatRow3(
+              c.secondLabel, _fmt(c.taxable), _fmt(c.second), cols)));
+        }
+      } else {
+        bytes.addAll(_text(
+            _formatRow4('Tax', 'Taxable', TaxLabelRule.name, 'Total', cols)));
+        for (final l in taxLines) {
+          bytes.addAll(_text(_formatRow4(_taxLabel(l.ratePercent),
+              _fmt(l.taxable), _fmt(l.gst), _fmt(l.taxable + l.gst), cols)));
+        }
       }
       bytes.addAll(_divider(cols));
       bytes.addAll(_text(_formatTotalRow(
@@ -807,6 +821,17 @@ class EscPosReceiptBuilder {
         s.length > width ? s.substring(0, width) : s.padLeft(width);
     final first = c1.length > w1 ? c1.substring(0, w1) : c1.padRight(w1);
     return first + padR(c2, wNum) + padR(c3, wNum) + padR(c4, wNum);
+  }
+
+  /// 3-column row for the CGST/SGST table (Tax | Taxable | Amount). Wider
+  /// amount columns than [_formatRow4], so "Taxable" fits on 58mm.
+  static String _formatRow3(String c1, String c2, String c3, int cols) {
+    final wNum = (cols ~/ 4).clamp(8, 12);
+    final w1 = cols - wNum * 2;
+    String padR(String s, int width) =>
+        s.length > width ? s.substring(0, width) : s.padLeft(width);
+    final first = c1.length > w1 ? c1.substring(0, w1) : c1.padRight(w1);
+    return first + padR(c2, wNum) + padR(c3, wNum);
   }
 
   /// Label for a GST rate, e.g. "GST1 (5%)". Uses the configured tax name when a

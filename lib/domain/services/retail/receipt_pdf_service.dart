@@ -767,6 +767,9 @@ class ReceiptPdfService {
               reconcileToGst: data.sale.taxAmount, // lines must sum to the order's GST
             );
             final bool hasGst = showTax && taxLines.isNotEmpty;
+            // Restaurant in India prints each rate as CGST + SGST rows.
+            final components =
+                AppConfig.isRestaurant ? TaxLabelRule.components : null;
             // Authoritative total — always matches the order's GST.
             final double totalGst = data.sale.taxAmount;
             // Tax toggle OFF → collapse the per-rate table to a single summary
@@ -805,8 +808,17 @@ class ReceiptPdfService {
                   pw.SizedBox(height: lineSpacing),
                   _buildDashedLine(isSmallMedia: isSmallMedia),
                   pw.SizedBox(height: lineSpacing),
-                  _buildTaxSummaryHeader(),
-                  ...taxLines.map(_buildTaxSummaryRow),
+                  if (components != null) ...[
+                    _buildTaxComponentHeader(),
+                    for (final c in TaxBreakdown.splitComponents(taxLines,
+                        names: components)) ...[
+                      _buildTaxComponentRow(c.firstLabel, c.taxable, c.first),
+                      _buildTaxComponentRow(c.secondLabel, c.taxable, c.second),
+                    ],
+                  ] else ...[
+                    _buildTaxSummaryHeader(),
+                    ...taxLines.map(_buildTaxSummaryRow),
+                  ],
                   pw.SizedBox(height: lineSpacing),
                   _buildDashedLine(isSmallMedia: isSmallMedia),
                   pw.SizedBox(height: lineSpacing),
@@ -1570,6 +1582,8 @@ class ReceiptPdfService {
     if (taxLines.isEmpty) return [];
 
     final totalGst = data.sale.taxAmount;
+    // Restaurant in India: one row per rate with CGST and SGST columns.
+    final components = AppConfig.isRestaurant ? TaxLabelRule.components : null;
 
     String n(double v) => v.toStringAsFixed(2);
 
@@ -1602,6 +1616,43 @@ class ReceiptPdfService {
               fontWeight: pw.FontWeight.bold,
               color: PdfColors.grey800)),
       pw.SizedBox(height: 6),
+      if (components != null)
+        pw.Container(
+          width: 400,
+          child: pw.Table(
+            border: pw.TableBorder.all(color: PdfColors.grey300, width: 0.5),
+            columnWidths: {
+              0: const pw.FlexColumnWidth(1.2),
+              1: const pw.FlexColumnWidth(1.6),
+              2: const pw.FlexColumnWidth(1.4),
+              3: const pw.FlexColumnWidth(1.4),
+              4: const pw.FlexColumnWidth(1.6),
+            },
+            children: [
+              pw.TableRow(
+                decoration: const pw.BoxDecoration(color: PdfColors.green800),
+                children: [
+                  headerCell('${TaxLabelRule.name} %', align: pw.TextAlign.left),
+                  headerCell('Taxable'),
+                  headerCell(components.first),
+                  headerCell(components.second),
+                  headerCell('Total Tax'),
+                ],
+              ),
+              for (final c
+                  in TaxBreakdown.splitComponents(taxLines, names: components))
+                pw.TableRow(children: [
+                  cell('${TaxBreakdown.formatRatePercent(c.ratePercent)}%',
+                      align: pw.TextAlign.left),
+                  cell(n(c.taxable)),
+                  cell(n(c.first)),
+                  cell(n(c.second)),
+                  cell(n(c.gst)),
+                ]),
+            ],
+          ),
+        )
+      else
       pw.Container(
         width: 340,
         child: pw.Table(
@@ -1635,7 +1686,7 @@ class ReceiptPdfService {
       ),
       pw.SizedBox(height: 6),
       pw.Container(
-        width: 340,
+        width: components != null ? 400 : 340,
         child: pw.Row(
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
           children: [
@@ -1942,6 +1993,40 @@ class ReceiptPdfService {
           cell(_formatCurrency(line.taxable), 5),
           cell(_formatCurrency(line.gst), 4),
           cell(_formatCurrency(line.taxable + line.gst), 5),
+        ],
+      ),
+    );
+  }
+
+  /// Header for the CGST/SGST layout: Tax | Taxable | Amount.
+  pw.Widget _buildTaxComponentHeader() {
+    const style = pw.TextStyle(fontSize: 8, color: PdfColors.grey700);
+    pw.Widget cell(String t, int flex, {pw.TextAlign align = pw.TextAlign.right}) =>
+        pw.Expanded(flex: flex, child: pw.Text(t, style: style, textAlign: align));
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(vertical: 0.5),
+      child: pw.Row(
+        children: [
+          cell('Tax', 6, align: pw.TextAlign.left),
+          cell('Taxable', 5),
+          cell('Amount', 9),
+        ],
+      ),
+    );
+  }
+
+  /// One component row, e.g. "CGST (2.5%) | 517.00 | 12.93".
+  pw.Widget _buildTaxComponentRow(String label, double taxable, double amount) {
+    const style = pw.TextStyle(fontSize: 8);
+    pw.Widget cell(String t, int flex, {pw.TextAlign align = pw.TextAlign.right}) =>
+        pw.Expanded(flex: flex, child: pw.Text(t, style: style, textAlign: align));
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(vertical: 0.5),
+      child: pw.Row(
+        children: [
+          cell(label, 6, align: pw.TextAlign.left),
+          cell(_formatCurrency(taxable), 5),
+          cell(_formatCurrency(amount), 9),
         ],
       ),
     );

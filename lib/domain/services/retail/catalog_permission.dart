@@ -17,4 +17,8 @@ class CatalogPermission {
   CatalogPermission._();
 
   static bool get canEdit => RestaurantSession.canAccess('catalogEdit');
+
+  /// Whether the POS price dialogs may show the cost price. A Cashier may
+  /// override and discount, but sees no cost figure.
+  static bool get canSeeCost => RestaurantSession.canAccess('viewCostPrice');
 }

@@ -114,6 +114,10 @@ class CashDrawerHistoryReportScreen extends StatelessWidget {
           ],
         );
       },
+      // All / Current page / Date range by movement time. Safe to narrow: this
+      // report has no running balance, only per-row signed amounts.
+      rangedExport: true,
+      exportRowDate: (r) => r['at'] as DateTime?,
       exportData: (rows) {
         final moneyIn = _sumOf(rows, (a) => a > 0);
         final moneyOut = _sumOf(rows, (a) => a < 0).abs();
@@ -125,13 +129,11 @@ class CashDrawerHistoryReportScreen extends StatelessWidget {
           rows: rows
               .map(
                 (r) => [
-                  ReportExportService.formatDateTime(r['at'] as DateTime),
+                  ExportDateTime(r['at'] as DateTime),
                   r['type'],
                   r['description'],
                   r['reference'],
-                  ReportExportService.formatCurrency(
-                    (r['amount'] as num).toDouble(),
-                  ),
+                  ExportMoney((r['amount'] as num).toDouble()),
                 ],
               )
               .toList(),

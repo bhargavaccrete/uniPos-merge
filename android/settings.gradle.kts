@@ -22,6 +22,8 @@ plugins {
     id("org.jetbrains.kotlin.android") version "2.1.0" apply false
     // Google services Gradle plugin (Firebase) — version declared once here, applied in app module.
     id("com.google.gms.google-services") version "4.5.0" apply false
+    // Crashlytics: uploads the R8 mapping file so release stack traces are readable.
+    id("com.google.firebase.crashlytics") version "3.0.2" apply false
 }
 
 include(":app")

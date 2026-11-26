@@ -109,6 +109,30 @@ Future<Response> getKdsOrdersHandler(Request request) async {
   }
 }
 
+/// The only statuses the KDS endpoints accept, mapped to the POS status they
+/// save (N1). The KDS app sends its enum names; the POS names are accepted as
+/// themselves. Anything else (e.g. "Completed") used to be saved as-is and
+/// dropped an unpaid order out of Active Orders.
+const Map<String, String> kdsStatusToPos = {
+  'newOrder': 'Processing',
+  'accepted': 'Cooking',
+  'preparing': 'Cooking',
+  'ready': 'Ready',
+  'served': 'Served',
+  'Processing': 'Processing',
+  'Cooking': 'Cooking',
+  'Ready': 'Ready',
+  'Served': 'Served',
+};
+
+Response _unsupportedKdsStatus(String status) => Response.badRequest(
+      body: jsonEncode({
+        'success': false,
+        'error': 'Unsupported status "$status"',
+      }),
+      headers: {'Content-Type': 'application/json'},
+    );
+
 // Legacy handler - updates whole order status (kept for backward compatibility)
 Future<Response> updateKdsStatusHandler(Request request, String id) async {
   try {
@@ -132,25 +156,8 @@ Future<Response> updateKdsStatusHandler(Request request, String id) async {
       orElse: () => throw Exception('Order not found'),
     );
 
-    // Map KDS status to order status
-    String orderStatus;
-    switch (newStatus) {
-      case 'newOrder':
-        orderStatus = 'Processing';
-        break;
-      case 'accepted':
-      case 'preparing':
-        orderStatus = 'Cooking';
-        break;
-      case 'ready':
-        orderStatus = 'Ready';
-        break;
-      case 'served':
-        orderStatus = 'Served';
-        break;
-      default:
-        orderStatus = newStatus;
-    }
+    final orderStatus = kdsStatusToPos[newStatus];
+    if (orderStatus == null) return _unsupportedKdsStatus(newStatus);
 
     // Update the order
     final updatedOrder = orderToUpdate.copyWith(status: orderStatus);
@@ -224,25 +231,8 @@ Future<Response> updateKotStatusHandler(Request request, String id, String kotNu
       );
     }
 
-    // Map KDS status to order status
-    String kotStatus;
-    switch (newStatus) {
-      case 'newOrder':
-        kotStatus = 'Processing';
-        break;
-      case 'accepted':
-      case 'preparing':
-        kotStatus = 'Cooking';
-        break;
-      case 'ready':
-        kotStatus = 'Ready';
-        break;
-      case 'served':
-        kotStatus = 'Served';
-        break;
-      default:
-        kotStatus = newStatus;
-    }
+    final kotStatus = kdsStatusToPos[newStatus];
+    if (kotStatus == null) return _unsupportedKdsStatus(newStatus);
 
     // Update KOT status
     Map<int, String> updatedKotStatuses = Map<int, String>.from(orderToUpdate.kotStatuses ?? {});

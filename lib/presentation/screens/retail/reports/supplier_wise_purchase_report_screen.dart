@@ -136,6 +136,8 @@ class SupplierWisePurchaseReportScreen extends StatelessWidget {
           DataCell(Text(formatMoney(row['totalAmount'] as double))),
         ],
       ),
+      // All / Current page only: one row per supplier, so no row date.
+      rangedExport: true,
       exportData: (rows) {
         return ReportExportData(
           headers: const [
@@ -153,18 +155,10 @@ class SupplierWisePurchaseReportScreen extends StatelessWidget {
                   r['supplierName'],
                   r['receiptCount'],
                   exportQty((r['totalItems'] as num).toDouble()),
-                  ReportExportService.formatCurrency(
-                    r['damagedExpected'] as double,
-                  ),
-                  ReportExportService.formatCurrency(
-                    r['damagedRecovered'] as double,
-                  ),
-                  ReportExportService.formatCurrency(
-                    r['damagedAbsorbed'] as double,
-                  ),
-                  ReportExportService.formatCurrency(
-                    r['totalAmount'] as double,
-                  ),
+                  ExportMoney(r['damagedExpected'] as double),
+                  ExportMoney(r['damagedRecovered'] as double),
+                  ExportMoney(r['damagedAbsorbed'] as double),
+                  ExportMoney(r['totalAmount'] as double),
                 ],
               )
               .toList(),

@@ -134,6 +134,52 @@ class RetailReturnMath {
     return out;
   }
 
+  /// Ids of the sales whose every sold unit has come back — the same rule as
+  /// `ReturnService.isFullyReturned`, for a whole list in one pass over
+  /// [lines] instead of one full scan per sale.
+  ///
+  /// A return document counts against `originalSaleId`, exactly as
+  /// `ReturnService.getReturnsForSale` matches it. A sale with no lines is
+  /// never fully returned. Return documents are never in the result.
+  static Set<String> fullyReturnedSaleIds({
+    required Iterable<SaleModel> sales,
+    required Iterable<SaleItemModel> lines,
+  }) {
+    final originalOfReturn = <String, String>{};
+    for (final sale in sales) {
+      final original = sale.originalSaleId;
+      if ((sale.isReturn ?? false) && original != null) {
+        originalOfReturn[sale.saleId] = original;
+      }
+    }
+
+    final soldBySale = <String, List<SaleItemModel>>{};
+    final returnedByOriginal = <String, List<SaleItemModel>>{};
+    for (final line in lines) {
+      final original = originalOfReturn[line.saleId];
+      if (original != null) {
+        (returnedByOriginal[original] ??= []).add(line);
+      } else {
+        (soldBySale[line.saleId] ??= []).add(line);
+      }
+    }
+
+    final out = <String>{};
+    for (final sale in sales) {
+      if (sale.isReturn ?? false) continue;
+      final sold = soldBySale[sale.saleId];
+      if (sold == null) continue;
+      final remaining = remainingByVariant(
+        soldLines: sold,
+        returnedLines: returnedByOriginal[sale.saleId] ?? const [],
+      );
+      if (remaining.isNotEmpty && remaining.values.every((q) => q <= 0)) {
+        out.add(sale.saleId);
+      }
+    }
+    return out;
+  }
+
   /// Scales the sum of line totals onto the sale's authoritative `totalAmount`.
   ///
   /// `SaleItemModel.total` excludes round-off; `SaleModel.totalAmount` includes

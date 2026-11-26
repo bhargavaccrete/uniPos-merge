@@ -1,5 +1,6 @@
 import 'package:mobx/mobx.dart';
 import 'package:billberrylite/data/models/common/categorymodel_300.dart';
+import 'package:billberrylite/data/models/common/customer_model_125.dart';
 import 'package:billberrylite/data/models/retail/hive_model/product_model_200.dart';
 import 'package:billberrylite/data/models/retail/hive_model/variante_model_201.dart';
 import 'package:uuid/uuid.dart';
@@ -190,6 +191,15 @@ abstract class _CartStore with Store {
   @action
   void setLoyaltyRedemption(double value) {
     loyaltyRedemption = value < 0 ? 0 : value;
+  }
+
+  /// Attach [customer] (null = walk-in) to the sale. Points belong to the
+  /// customer they were redeemed for, so a different customer drops the
+  /// redemption (LOY-1); picking the same customer again keeps it.
+  void selectSaleCustomer(Customer? customer) {
+    final previous = customerStore.selectedCustomer?.customerId;
+    customerStore.selectCustomer(customer);
+    if (customer?.customerId != previous) setLoyaltyRedemption(0);
   }
 
   /// Reset the bill inputs. Must run whenever we move to a different sale —
@@ -1476,6 +1486,39 @@ abstract class _CartStore with Store {
   Future<void> clearCartAndSave() async {
     await clearCart();
     await _saveCurrentTabItems();
+  }
+
+  /// Id of the billing tab being worked on, or null with no tabs.
+  String? get activeTabId =>
+      tabs.isEmpty || activeTabIndex >= tabs.length
+          ? null
+          : tabs[activeTabIndex].id;
+
+  /// Takes the lines of a sale that is already saved off the tab it was
+  /// billed from (BLK-13B recovery), so that cart can never be checked out
+  /// again. Only those lines: anything else on the tab, and every other tab,
+  /// is left alone. Running it again changes nothing.
+  Future<void> removeSoldLines(String? tabId, Set<String> cartItemIds) async {
+    for (final id in cartItemIds) {
+      await _repository.deleteCartItem(id);
+    }
+    final index = tabs.indexWhere((t) => t.id == tabId);
+    if (index < 0) return;
+    final tab = tabs[index];
+    final kept =
+        tab.items.where((i) => !cartItemIds.contains(i.cartItemId)).toList();
+    if (kept.length == tab.items.length) return;
+    final updated = tab.copyWith(items: kept, updatedAt: DateTime.now());
+    await _repository.saveTab(updated);
+    runInAction(() {
+      tabs[index] = updated;
+      if (index == activeTabIndex) {
+        items
+          ..clear()
+          ..addAll(kept);
+        resetBillingInputs();
+      }
+    });
   }
 
   /// Update tab customer info

@@ -1,3 +1,5 @@
+import '../../../util/common/tax_split.dart';
+
 /// One row of the bill's "Tax Summary" — a tax rate with its taxable base and GST.
 class TaxRateLine {
   final double ratePercent; // e.g. 5, 18
@@ -9,6 +11,32 @@ class TaxRateLine {
     required this.taxable,
     required this.gst,
   });
+}
+
+/// One [TaxRateLine] printed as its two components (CGST + SGST), each charged
+/// at half the rate on the SAME taxable base.
+///
+/// The amounts are [TaxSplit.halves] of the rate's own GST — the owner-approved
+/// display rule (2026-11-18): ₹25.85 prints as 12.93 + 12.92, so the two rows
+/// always add back to the GST charged and the Round Off line is untouched.
+class TaxComponentLine {
+  final double ratePercent; // combined, e.g. 5
+  final double taxable;
+  final String firstLabel; // "CGST (2.5%)"
+  final String secondLabel; // "SGST (2.5%)"
+  final double first;
+  final double second;
+
+  const TaxComponentLine({
+    required this.ratePercent,
+    required this.taxable,
+    required this.firstLabel,
+    required this.secondLabel,
+    required this.first,
+    required this.second,
+  });
+
+  double get gst => first + second;
 }
 
 /// Builds the per-rate tax summary for a bill.
@@ -155,6 +183,38 @@ class TaxBreakdown {
   }
 
   static double _round2(double v) => (v * 100).roundToDouble() / 100;
+
+  /// [lines] as component rows for a tax that splits in two ([names] comes from
+  /// `TaxLabelRule.components`). Presentation only: totals are not recomputed,
+  /// so each pair sums to its line's GST and all pairs sum to the bill's.
+  static List<TaxComponentLine> splitComponents(
+    List<TaxRateLine> lines, {
+    required ({String first, String second}) names,
+  }) {
+    return [
+      for (final l in lines)
+        () {
+          final halves = TaxSplit.halves(l.gst);
+          final rate = formatRatePercent(l.ratePercent / 2);
+          return TaxComponentLine(
+            ratePercent: l.ratePercent,
+            taxable: l.taxable,
+            firstLabel: '${names.first} ($rate%)',
+            secondLabel: '${names.second} ($rate%)',
+            first: halves.cgst,
+            second: halves.sgst,
+          );
+        }(),
+    ];
+  }
+
+  /// A rate for a label with no trailing zeros: 5 → "5", 2.5 → "2.5",
+  /// 0.125 → "0.125". Three places, because half of 0.25% is 0.125%.
+  static String formatRatePercent(double percent) {
+    var s = percent.toStringAsFixed(3);
+    s = s.replaceFirst(RegExp(r'0+$'), '');
+    return s.endsWith('.') ? s.substring(0, s.length - 1) : s;
+  }
 
   /// Robustly derive the tax mode from the order's own totals — the stored
   /// `isTaxInclusive` flag can be null/stale and fall back to the current global

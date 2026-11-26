@@ -171,6 +171,45 @@ class CustomerRepository {
     }
   }
 
+  /// A sale's purchase total, points earned and visit in ONE write — same
+  /// result as [updatePurchaseAmount] + [addLoyaltyPoints] +
+  /// [incrementVisitCount], but a stop can no longer leave it half applied.
+  Future<void> recordPurchase(
+      String customerId, double amount, int points) async {
+    final customer = _customerBox.get(customerId);
+    if (customer == null) return;
+    final now = DateTime.now().toIso8601String();
+    await _customerBox.put(
+      customerId,
+      customer.copyWith(
+        totalPurchaseAmount: customer.totalPurchaseAmount + amount,
+        loyaltyPoints: customer.loyaltyPoints + points,
+        totalPointEarned: customer.totalPointEarned + points,
+        totalVisites: customer.totalVisites + 1,
+        lastVisitAt: now,
+        updatedAt: now,
+      ),
+    );
+  }
+
+  /// A Pay Later sale's credit, purchase total and visit in ONE write — same
+  /// result as [updateCredit] + [updatePurchaseAmount] + [incrementVisitCount].
+  Future<void> recordCreditSale(String customerId, double amount) async {
+    final customer = _customerBox.get(customerId);
+    if (customer == null) return;
+    final now = DateTime.now().toIso8601String();
+    await _customerBox.put(
+      customerId,
+      customer.copyWith(
+        creditBalance: customer.creditBalance + amount,
+        totalPurchaseAmount: customer.totalPurchaseAmount + amount,
+        totalVisites: customer.totalVisites + 1,
+        lastVisitAt: now,
+        updatedAt: now,
+      ),
+    );
+  }
+
   // ---------------- CREDIT SYSTEM (retail only — restaurant has no credit) ----------------
 
   /// Update customer's credit balance (positive to add debt, negative to reduce)

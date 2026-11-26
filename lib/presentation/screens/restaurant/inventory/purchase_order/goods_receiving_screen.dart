@@ -420,10 +420,9 @@ class _GoodsReceivingScreenState extends State<GoodsReceivingScreen> {
         ],
       );
 
-      // Raise the purchase return / supplier claim / write-off documents for
-      // whatever was marked damaged. confirmGRN only returns the line items;
-      // the GRN header it just saved is looked up by id so recordFromGRN gets
-      // both without confirmGRN's signature having to change.
+      // confirmGRN has already raised the damaged-goods documents (S-06);
+      // recordFromGRN is once-only, so this just reads them back for the
+      // message below.
       RestaurantDamagedGoodsOutcome outcome =
           const RestaurantDamagedGoodsOutcome();
       if (grnItems.isNotEmpty) {
@@ -442,6 +441,16 @@ class _GoodsReceivingScreenState extends State<GoodsReceivingScreen> {
         outcome.isEmpty
             ? 'Goods received and stock updated'
             : 'Goods received — ${outcome.summary} raised for damaged units',
+      );
+    } on StateError catch (e) {
+      // A second confirm while the first is still saving (double tap).
+      NotificationService.instance.showError(e.message);
+    } catch (e) {
+      // The receipt is kept as a draft; it is finished automatically the
+      // next time the purchase screens open or the app starts.
+      NotificationService.instance.showError(
+        'The receipt could not be completed. It will be finished '
+        'automatically — check Goods Receipts before receiving again.',
       );
     } finally {
       if (mounted) setState(() => _saving = false);

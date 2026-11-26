@@ -6,7 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/data/models/retail/hive_model/attribute_model_219.dart';
 import 'package:billberrylite/data/models/retail/hive_model/attribute_value_model_220.dart';
 import 'package:billberrylite/domain/services/common/notification_service.dart';
-import 'package:billberrylite/domain/services/retail/store_type_attribute_defaults_service.dart';
+import 'package:billberrylite/domain/services/retail/simple_product_fields_service.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_dialog.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_empty_state.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
@@ -23,8 +23,8 @@ import '../../../domain/store/retail/attribute_store.dart';
 /// names (Color, Size, Material) and their values (Red, S/M/L, Cotton).
 ///
 /// One shared list, read by two very different consumers: **Variable** products
-/// use it to generate variants, and Settings → Simple Product Fields picks from
-/// it to decide which text boxes a **Simple** product shows.
+/// use it to generate variants, and **Simple** products show the attributes
+/// switched on here (in the order set here) as text boxes on their form.
 class AttributesScreen extends StatefulWidget {
   const AttributesScreen({super.key});
 
@@ -34,6 +34,11 @@ class AttributesScreen extends StatefulWidget {
 
 class _AttributesScreenState extends State<AttributesScreen> {
   final AttributeStore _attributeStore = attributeStore;
+  final SimpleProductFieldsService _fieldsService =
+      SimpleProductFieldsService();
+
+  /// Attribute ids shown on simple products, in display order.
+  List<String> _simpleFieldIds = [];
 
   @override
   void initState() {
@@ -41,17 +46,65 @@ class _AttributesScreenState extends State<AttributesScreen> {
     _init();
   }
 
-  /// Seed before loading, so a shop that finished the wizard and came straight
-  /// here sees its store type's default attributes instead of an empty list —
-  /// previously they only appeared once a product form had been opened.
-  ///
-  /// A no-op after the first run (a SharedPreferences read), and a no-op
-  /// entirely for `other` or a business with no store type. It never
-  /// resurrects an attribute deleted from this very screen.
+  /// resolveFields seeds the store type's default attributes and loads the
+  /// attribute cache before resolving the saved simple-product selection, so a
+  /// shop coming straight from the wizard sees its defaults here.
   Future<void> _init() async {
-    await StoreTypeAttributeDefaultsService().ensureStoreTypeDefaults();
+    final fields = await _fieldsService.resolveFields();
     if (!mounted) return;
-    await _attributeStore.loadAttributes();
+    setState(() => _simpleFieldIds = fields.map((a) => a.attributeId).toList());
+  }
+
+  /// Saved ids that still resolve — an attribute deleted since drops out.
+  List<AttributeModel> get _simpleFields =>
+      _attributeStore.attributesByIds(_simpleFieldIds);
+
+  Future<void> _saveSimpleFields(List<String> ids) async {
+    final previous = _simpleFieldIds;
+    setState(() => _simpleFieldIds = ids);
+    final ok = await _fieldsService.setFieldIds(ids);
+    if (!mounted || ok) return;
+    setState(() => _simpleFieldIds = previous);
+    NotificationService.instance.showError(
+      'Could not save simple product fields',
+    );
+  }
+
+  void _setShownOnSimple(AttributeModel attribute, bool shown) {
+    final ids = _simpleFields.map((a) => a.attributeId).toList()
+      ..remove(attribute.attributeId);
+    if (shown) ids.add(attribute.attributeId);
+    _saveSimpleFields(ids);
+  }
+
+  Future<void> _resetSimpleFields() async {
+    // Name the actual defaults for THIS store type rather than a fixed list —
+    // a cosmetics shop being offered "Size, Color and Weight" would be wrong.
+    final defaults = _fieldsService.defaultFieldNames();
+    final restoring = defaults.isEmpty
+        ? 'Clear the fields shown on simple products?'
+        : 'Restore ${_joinNames(defaults)} as the fields on simple products?';
+
+    final confirmed = await showAppConfirmDialog(
+      context: context,
+      title: 'Reset Simple Product Fields',
+      message: '$restoring Your attributes themselves are not deleted.',
+      confirmLabel: 'Reset',
+      icon: Icons.restart_alt_rounded,
+    );
+    if (!confirmed) return;
+
+    await _fieldsService.resetToDefaults();
+    final fields = await _fieldsService.resolveDefaultFields();
+    if (!mounted) return;
+    setState(() => _simpleFieldIds = fields.map((a) => a.attributeId).toList());
+    NotificationService.instance.showSuccess('Simple product fields reset');
+  }
+
+  /// 'Size, Color and Weight' — for the reset confirm message.
+  static String _joinNames(List<String> names) {
+    if (names.length == 1) return names.first;
+    return '${names.sublist(0, names.length - 1).join(', ')} and ${names.last}';
   }
 
   @override
@@ -61,6 +114,14 @@ class _AttributesScreenState extends State<AttributesScreen> {
       appBar: buildPrimaryAppBar(
         title: 'Product Attributes',
         titleFontSize: AppResponsive.subheadingFontSize(context),
+        actions: [
+          if (CatalogPermission.canEdit)
+            IconButton(
+              icon: const Icon(Icons.restart_alt_rounded),
+              tooltip: 'Reset simple product fields',
+              onPressed: _resetSimpleFields,
+            ),
+        ],
       ),
       body: SafeArea(
         child: AppResponsive.constrainedContent(
@@ -83,6 +144,9 @@ class _AttributesScreenState extends State<AttributesScreen> {
                 );
               }
 
+              final simpleIds =
+                  _simpleFields.map((a) => a.attributeId).toSet();
+
               return ListView(
                 padding: AppResponsive.screenPadding(
                   context,
@@ -94,6 +158,9 @@ class _AttributesScreenState extends State<AttributesScreen> {
                     (attribute) => _AttributeCard(
                       attribute: attribute,
                       values: _attributeStore.getValues(attribute.attributeId),
+                      shownOnSimple: simpleIds.contains(attribute.attributeId),
+                      onShownOnSimpleChanged: (shown) =>
+                          _setShownOnSimple(attribute, shown),
                       onEdit: () => _showEditAttributeDialog(attribute),
                       onDelete: () => _confirmDeleteAttribute(attribute),
                       onAddValue: () => _showAddValueDialog(attribute),
@@ -142,7 +209,7 @@ class _AttributesScreenState extends State<AttributesScreen> {
             child: Text(
               'Attributes are shared across every product. Variable products '
               'use them to generate variants; simple products show the ones '
-              'picked in Settings → Simple Product Fields.',
+              'switched on below as fields.',
               style: GoogleFonts.poppins(
                 fontSize: AppResponsive.captionFontSize(context),
                 height: 1.4,
@@ -418,6 +485,10 @@ class _AttributeCard extends StatelessWidget {
   final ValueChanged<AttributeValueModel> onEditValue;
   final ValueChanged<AttributeValueModel> onDeleteValue;
 
+  /// Whether this attribute is a field on simple products.
+  final bool shownOnSimple;
+  final ValueChanged<bool> onShownOnSimpleChanged;
+
   /// False for a cashier: every callback above mutates the catalogue, so the
   /// card renders read-only rather than offering controls that would refuse.
   final bool canEdit;
@@ -425,6 +496,8 @@ class _AttributeCard extends StatelessWidget {
   const _AttributeCard({
     required this.attribute,
     required this.values,
+    required this.shownOnSimple,
+    required this.onShownOnSimpleChanged,
     required this.onEdit,
     required this.onDelete,
     required this.onAddValue,
@@ -505,7 +578,24 @@ class _AttributeCard extends StatelessWidget {
               ],
             ],
           ),
-          SizedBox(height: 4),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Show on simple products',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.smallFontSize(context),
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+              Switch(
+                value: shownOnSimple,
+                activeThumbColor: AppColors.primary,
+                onChanged: canEdit ? onShownOnSimpleChanged : null,
+              ),
+            ],
+          ),
           const Divider(height: 1, color: AppColors.divider),
           SizedBox(height: AppResponsive.smallSpacing(context)),
 

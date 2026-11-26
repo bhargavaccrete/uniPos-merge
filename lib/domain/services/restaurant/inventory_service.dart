@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../data/models/restaurant/db/itemmodel_302.dart';
+import '../../../data/models/restaurant/db/product_type.dart';
 import '../../../data/models/restaurant/db/recipe_model.dart';
 import '../../../data/models/restaurant/db/recipe_production_model.dart';
 import '../../../util/restaurant/staticswitch.dart';
@@ -10,6 +11,7 @@ import '../../../data/models/restaurant/db/stock_movement_model.dart';
 import '../../../data/repositories/restaurant/stock_movement_repository.dart';
 import '../../../util/restaurant/restaurant_session.dart';
 import 'day_management_service.dart';
+import 'line_stock.dart';
 import '../common/notification_service.dart';
 
 /// The POS's view of an item's sellability. Mirrors the per-screen enums the
@@ -17,19 +19,342 @@ import '../common/notification_service.dart';
 /// decision itself lives in one place.
 enum PosStockStatus { inStock, orderAvailable, outOfStock, notTracked }
 
+/// One stock change a sale makes: an item, a variant, or one recipe-ingredient
+/// row. Planned up front so a journaled Settle can persist the exact work
+/// before doing it (StockJournal); a plain sale applies it straight away.
+class SaleStockUnit {
+  /// The cart line it comes from, and the recipe row for an ingredient.
+  final String lineId;
+  final int? recipeRow;
+  final Items item;
+  final String? variantId;
+
+  /// Stock units to deduct (weight already converted).
+  final double qty;
+  final String reason;
+  final String label;
+
+  const SaleStockUnit({
+    required this.lineId,
+    this.recipeRow,
+    required this.item,
+    this.variantId,
+    required this.qty,
+    required this.reason,
+    required this.label,
+  });
+
+  String get unit => item.unit ?? (item.isSoldByWeight ? 'kg' : 'pcs');
+
+  /// Stable per entry: `<key>:<lineId>` or `<key>:<lineId>:<row>`.
+  String uidFor(String key) =>
+      recipeRow == null ? '$key:$lineId' : '$key:$lineId:$recipeRow';
+}
+
+/// One item (or one variant of it) that a set of order lines asks for more of
+/// than can be sold — see [InventoryService.stockShortfalls].
+class StockShortfall {
+  final String itemId;
+  final String name;
+  final double available;
+  final double requested;
+  final String unit;
+
+  const StockShortfall({
+    required this.itemId,
+    required this.name,
+    required this.available,
+    required this.requested,
+    required this.unit,
+  });
+
+  static String _fmt(double v) =>
+      v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(2);
+
+  String get message =>
+      '$name (available ${_fmt(available < 0 ? 0 : available)} $unit, '
+      'requested ${_fmt(requested)} $unit)';
+}
+
 class InventoryService {
-  static Future<void> deductStockForOrder(List<CartItem> cartItems) async {
+  /// The lines of [cartItems] that current stock cannot cover — empty when
+  /// the order can be accepted. No writes.
+  ///
+  /// The server-side gate for orders another device sends (Captain, S-04):
+  /// it reads the POS's own item records, never stock flags or figures the
+  /// client sent. It validates exactly what [planSale] is about to deduct:
+  ///
+  /// * Lines resolve to items as [planSale] does (product id, then name); a
+  ///   line no item matches, or whose variant no longer exists, deducts
+  ///   nothing and is not limited.
+  /// * Not stock-governed ([isStockGoverned]) or "sell when out of stock"
+  ///   ([Items.allowOrderWhenOutOfStock]) → never limited.
+  /// * Made to order / make-fresh hybrid → [effectiveAvailableStock] (what
+  ///   the recipe can make, plus prepared stock for the hybrid), all lines of
+  ///   the item combined, whatever their variant — they draw on the same
+  ///   ingredients.
+  /// * A variant line → that variant's own stock, lines of the same item and
+  ///   variant combined.
+  /// * Otherwise the item's stock, lines combined; a weight line asks for
+  ///   quantity × its weight in the item's stock unit, as [planSale] deducts.
+  ///
+  /// [returning] — lines the SAME operation puts back (Place Order on an
+  /// existing order removing or reducing lines). Measured by the same rules
+  /// and credited against what [cartItems] ask of the same item / variant, so
+  /// "reduce X by 2, add X ×2" is not refused for stock it is handing back.
+  static Future<List<StockShortfall>> stockShortfalls(
+    List<CartItem> cartItems, {
+    List<CartItem> returning = const [],
+  }) async {
     await itemStore.ensureLoaded();
-    // Variant names are needed for lookup. Load only if not yet loaded: the
-    // store is lazy, and a server-side order can be its first caller.
-    if (variantStore.variants.isEmpty) await variantStore.loadVariants();
+    if ([...cartItems, ...returning].any((c) => c.variantName != null) &&
+        variantStore.variants.isEmpty) {
+      await variantStore.loadVariants();
+    }
     final items = itemStore.items;
-    final List<String> lowStockAlerts = [];
+
+    final requested = <String, double>{};
+    final available = <String, double>{};
+    final label = <String, ({String itemId, String name, String unit})>{};
+    // RECIPE: net quantity per dish made from a recipe, for the combined
+    // ingredient pass below.
+    final recipeDishes = <String, ({Items item, RecipeModel recipe})>{};
+    final recipeNet = <String, double>{};
+
+    for (final (line, sign) in [
+      for (final l in cartItems) (l, 1.0),
+      for (final l in returning) (l, -1.0),
+    ]) {
+      final item = items
+              .where((i) => line.productId.isNotEmpty && i.id == line.productId)
+              .firstOrNull ??
+          items
+              .where((i) =>
+                  i.name.toLowerCase().trim() == line.title.toLowerCase().trim())
+              .firstOrNull;
+      if (item == null) continue;
+      if (!isStockGoverned(item) || item.allowOrderWhenOutOfStock) continue;
+
+      final unit = item.unit ?? (item.isSoldByWeight ? 'kg' : 'pcs');
+      final String key;
+      final double amount;
+      final double have;
+      String name = item.name;
+
+      if (usesDerivedAvailability(item)) {
+        have = effectiveAvailableStock(item);
+        if (have.isInfinite) continue; // nothing tracked limits it
+        key = 'd:${item.id}';
+        amount = line.quantity.toDouble();
+        final recipe = _usableRecipe(item);
+        if (recipe != null) {
+          recipeDishes[item.id] = (item: item, recipe: recipe);
+          recipeNet[item.id] = (recipeNet[item.id] ?? 0) + sign * amount;
+        }
+      } else if (line.variantName != null) {
+        final variant = item.variant
+            ?.where((v) => _getVariantName(v.variantId) == line.variantName)
+            .firstOrNull;
+        if (variant == null) continue; // planSale deducts nothing for it
+        key = 'v:${item.id}:${variant.variantId}';
+        amount = line.quantity.toDouble();
+        have = variant.stockQuantity ?? 0;
+        name = '${item.name} (${line.variantName})';
+      } else {
+        key = 'i:${item.id}';
+        amount = item.isSoldByWeight && line.weightDisplay != null
+            ? line.quantity *
+                _parseWeightToStockUnit(line.weightDisplay!, item.unit ?? 'kg')
+            : line.quantity.toDouble();
+        have = item.stockQuantity;
+      }
+
+      requested[key] = (requested[key] ?? 0) + sign * amount;
+      available[key] = have;
+      label[key] = (itemId: item.id, name: name, unit: unit);
+    }
+
+    List<StockShortfall> shortOf(Map<String, double> asked,
+            Map<String, double> have) =>
+        [
+          for (final key in asked.keys)
+            if (asked[key]! > have[key]! + 1e-9)
+              StockShortfall(
+                itemId: label[key]!.itemId,
+                name: label[key]!.name,
+                available: have[key]!,
+                requested: asked[key]!,
+                unit: label[key]!.unit,
+              ),
+        ];
+
+    // Each item / variant / dish on its own — unchanged.
+    final perItem = shortOf(requested, available);
+    if (perItem.isNotEmpty) return perItem;
+
+    // RECIPE: dishes judged one at a time each see the WHOLE ingredient
+    // stock, so two dishes sharing an ingredient, or a dish plus a direct
+    // sale of that ingredient, passed together for more than is on hand.
+    // Combine every line's demand on each tracked ingredient, as Retail
+    // does: direct sales (those limited above), plus what each dish makes
+    // fresh — made to order
+    // all of it; the hybrid only what its prepared stock does not cover.
+    // A hybrid handing units back earns no ingredient credit (its restore
+    // may go to prepared stock), so the pass can only refuse more.
+    final combined = <String, double>{
+      for (final key in requested.keys)
+        if (key.startsWith('i:')) key: requested[key]!,
+    };
+    final combinedHave = <String, double>{
+      for (final key in combined.keys) key: available[key]!,
+    };
+    for (final dishId in recipeNet.keys) {
+      final net = recipeNet[dishId]!;
+      final dish = recipeDishes[dishId]!;
+      double fresh;
+      if (dish.item.isMadeToOrder) {
+        fresh = net;
+      } else {
+        if (net <= 0) continue;
+        final prepared = dish.item.trackInventory && dish.item.stockQuantity > 0
+            ? dish.item.stockQuantity
+            : 0.0;
+        fresh = net > prepared ? net - prepared : 0;
+      }
+      if (fresh.abs() < 1e-9) continue;
+      for (final row in ingredientQuantitiesFor(dish.recipe, fresh.abs())) {
+        final ingredient =
+            items.where((i) => i.id == row.ingredientItemId).firstOrNull;
+        // Same rule as the per-dish figure (availableToMakeFrom): every
+        // tracked ingredient limits what can be made, whatever its own "sell
+        // when out of stock" flag — that flag governs selling the ingredient
+        // itself, and such direct sales were never limited above.
+        if (ingredient == null || !ingredient.trackInventory) continue;
+        final key = 'i:${ingredient.id}';
+        combined[key] =
+            (combined[key] ?? 0) + (fresh < 0 ? -row.quantity : row.quantity);
+        combinedHave[key] = ingredient.stockQuantity;
+        label[key] ??= (
+          itemId: ingredient.id,
+          name: ingredient.name,
+          unit: ingredient.unit ??
+              (ingredient.isSoldByWeight ? 'kg' : 'pcs'),
+        );
+      }
+    }
+    return shortOf(combined, combinedHave);
+  }
+
+  /// Deducts [cartItems] straight away. Callers that save the order lines
+  /// should use [planSale] instead, so the lines carry the stock stamp
+  /// every restore relies on.
+  static Future<void> deductStockForOrder(List<CartItem> cartItems) async {
+    await applyPlannedUnits(await planSaleDeductions(cartItems));
+  }
+
+  /// Writes [units] (from [planSale] / [planSaleDeductions]): stock through
+  /// the per-item queue, one movement row each, then the low-stock toast.
+  static Future<void> applyPlannedUnits(List<SaleStockUnit> units) async {
+    if (units.isEmpty) return;
 
     // For logging each deduction to the stock movement history (reason = "Sale").
     final stockRepo = StockMovementRepository();
     final staffName = RestaurantSession.staffName ?? RestaurantSession.effectiveRole;
     final sessionId = await DayManagementService.getCurrentSessionId();
+    final List<String> lowStockAlerts = [];
+
+    for (final u in units) {
+      final stockAfter = await itemStore.applyStockDelta(
+        itemId: u.item.id,
+        variantId: u.variantId,
+        delta: -u.qty,
+      );
+      await _logMovementAndAlert(
+        stockRepo: stockRepo,
+        item: u.item,
+        label: u.label,
+        type: 'out',
+        quantity: u.qty,
+        balanceAfter: stockAfter,
+        reason: u.reason,
+        variantId: u.variantId,
+        staffName: staffName,
+        sessionId: sessionId,
+        lowStockAlerts: lowStockAlerts,
+      );
+    }
+
+    if (lowStockAlerts.isNotEmpty) {
+      NotificationService.instance.showWarning(
+        "Low Stock - ${lowStockAlerts.join(" | ")}",
+      );
+    }
+  }
+
+  /// The stock changes selling [cartItems] makes — no writes.
+  static Future<List<SaleStockUnit>> planSaleDeductions(
+          List<CartItem> cartItems) async =>
+      (await planSale(cartItems)).units;
+
+  /// The single resolution path for every sale, with no writes: the stock
+  /// units to apply, and [cartItems] stamped with what each line takes
+  /// (`ownStockQty` from prepared stock, `freshQty` made from the recipe) —
+  /// the record every restore reads ([LineStock]).
+  ///
+  /// Product id first, then a lowercase name match. Finished made to order
+  /// cascades into its tracked ingredients (one level deep — an ingredient
+  /// must be Raw Material or Semi-Finished, see
+  /// docs/inventory_recipe_system_plan.md §5); the hybrid takes prepared
+  /// stock first and makes the rest fresh; everything else sells its own
+  /// stock. Untracked items and deleted ingredients are skipped; a variant
+  /// line whose variant no longer exists is skipped (nothing to deduct,
+  /// nothing to log); weight lines deduct quantity × single weight.
+  static Future<({List<CartItem> lines, List<SaleStockUnit> units})> planSale(
+      List<CartItem> cartItems) async {
+    await itemStore.ensureLoaded();
+    // Variant names are needed for lookup. Load only if not yet loaded: the
+    // store is lazy, and a server-side order can be its first caller.
+    if (variantStore.variants.isEmpty) await variantStore.loadVariants();
+    final items = itemStore.items;
+    final units = <SaleStockUnit>[];
+    final stampedLines = <CartItem>[];
+    // Prepared stock still unclaimed in THIS plan, per hybrid item, so two
+    // lines of one dish cannot both take the same prepared units.
+    final preparedLeft = <String, int>{};
+
+    // Recipe cascade for [qty] of [dish]: one unit per tracked ingredient
+    // row, so the per-item history explains "why did bun stock drop" as
+    // "linked to Burger sales". Returns whether a recipe was applied.
+    bool addFresh(CartItem cartItem, Items dish, int qty) {
+      final RecipeModel? recipe = recipeRepository.getRecipeForItem(dish.id);
+      if (recipe == null || !recipe.hasIngredients) return false; // unconfigured recipe
+      final lines = ingredientQuantitiesFor(recipe, qty.toDouble());
+      for (var row = 0; row < lines.length; row++) {
+        final line = lines[row];
+        Items? ingredient;
+        try {
+          ingredient = items.firstWhere((i) => i.id == line.ingredientItemId);
+        } catch (_) {
+          continue; // ingredient item was deleted — skip rather than crash the sale
+        }
+        if (!ingredient.trackInventory) continue;
+        units.add(SaleStockUnit(
+          lineId: cartItem.id,
+          recipeRow: row,
+          item: ingredient,
+          qty: line.quantity,
+          reason: 'Sale (recipe: ${dish.name})',
+          label: ingredient.name,
+        ));
+      }
+      return true;
+    }
+
+    // A new sale has returned nothing yet — also overrides any value a
+    // network client (server / Captain order) may have sent.
+    void stamp(CartItem cartItem, {int own = 0, int fresh = 0}) =>
+        stampedLines.add(cartItem.copyWith(
+            ownStockQty: own, freshQty: fresh, restockedQuantity: 0));
 
     for (final cartItem in cartItems) {
       // Try to find by productId first (matches inventory item key)
@@ -44,121 +369,96 @@ class InventoryService {
             (i) => i.name.toLowerCase().trim() == cartItem.title.toLowerCase().trim(),
           );
         } catch (_) {
+          stamp(cartItem); // not in inventory: nothing moved
           continue;
         }
       }
 
-      // Recipe-Based items aren't stocked themselves — cascade the deduction
-      // into their recipe's ingredients instead. See
-      // docs/inventory_recipe_system_plan.md §5.
-      if (item.isRecipeBased) {
-        await _deductRecipeIngredients(
-          recipeItem: item,
-          saleQty: cartItem.quantity.toDouble(),
-          items: items,
-          stockRepo: stockRepo,
-          staffName: staffName,
-          sessionId: sessionId,
-          lowStockAlerts: lowStockAlerts,
-        );
+      // Finished, made to order: no stock of its own — cascade into the
+      // recipe (none configured → nothing to deduct).
+      if (item.isMadeToOrder) {
+        final made = addFresh(cartItem, item, cartItem.quantity);
+        stamp(cartItem, fresh: made ? cartItem.quantity : 0);
         continue;
       }
 
-      if (!item.trackInventory) continue;
-
-      final double stockAfter;
-      final double deductedQty;
-      String? variantId;
-      if (cartItem.variantName != null) {
-        deductedQty = cartItem.quantity.toDouble();
-        stockAfter = await _deductVariantStock(item, cartItem);
-        try {
-          variantId = item.variant
-              ?.firstWhere((v) => _getVariantName(v.variantId) == cartItem.variantName)
-              .variantId;
-        } catch (_) {}
-      } else {
-        double quantityToDeduct = cartItem.quantity.toDouble();
-        if (item.isSoldByWeight && cartItem.weightDisplay != null) {
-          final stockUnit = item.unit ?? "kg";
-          final singleWeight = _parseWeightToStockUnit(cartItem.weightDisplay!, stockUnit);
-          quantityToDeduct = cartItem.quantity * singleWeight;
+      // Finished, made in advance + make fresh when out: prepared stock
+      // first, the shortfall from the recipe. Whole-unit, non-variant,
+      // non-weight lines only; anything else sells from prepared stock.
+      if (makesFreshWhenOut(item) && usesDerivedAvailability(item)) {
+        final left = preparedLeft[item.id] ??=
+            item.trackInventory ? item.stockQuantity.floor().clamp(0, 1 << 30) : 0;
+        final fromPrepared = cartItem.quantity < left ? cartItem.quantity : left;
+        preparedLeft[item.id] = left - fromPrepared;
+        if (fromPrepared > 0) {
+          units.add(SaleStockUnit(
+            lineId: cartItem.id,
+            item: item,
+            qty: fromPrepared.toDouble(),
+            reason: 'Sale',
+            label: item.name,
+          ));
         }
-        deductedQty = quantityToDeduct;
-        stockAfter = await _deductItemStock(item, quantityToDeduct);
+        final fresh = cartItem.quantity - fromPrepared;
+        final made = fresh > 0 && addFresh(cartItem, item, fresh);
+        stamp(cartItem, own: fromPrepared, fresh: made ? fresh : 0);
+        continue;
       }
 
-      final label = cartItem.variantName != null
-          ? "${item.name} (${cartItem.variantName})"
-          : item.name;
+      if (!item.trackInventory) {
+        stamp(cartItem);
+        continue;
+      }
 
-      await _logMovementAndAlert(
-        stockRepo: stockRepo,
+      if (cartItem.variantName != null) {
+        // Matched by NAME, exactly as before; only the id is handed on.
+        final variant = item.variant
+            ?.where((v) => _getVariantName(v.variantId) == cartItem.variantName)
+            .firstOrNull;
+        if (variant == null) {
+          stamp(cartItem); // variant gone: nothing to deduct
+          continue;
+        }
+        units.add(SaleStockUnit(
+          lineId: cartItem.id,
+          item: item,
+          variantId: variant.variantId,
+          qty: cartItem.quantity.toDouble(),
+          reason: 'Sale',
+          label: "${item.name} (${cartItem.variantName})",
+        ));
+        stamp(cartItem, own: cartItem.quantity);
+        continue;
+      }
+
+      double quantityToDeduct = cartItem.quantity.toDouble();
+      if (item.isSoldByWeight && cartItem.weightDisplay != null) {
+        final stockUnit = item.unit ?? "kg";
+        final singleWeight = _parseWeightToStockUnit(cartItem.weightDisplay!, stockUnit);
+        quantityToDeduct = cartItem.quantity * singleWeight;
+      }
+      units.add(SaleStockUnit(
+        lineId: cartItem.id,
         item: item,
-        label: label,
-        type: 'out',
-        quantity: deductedQty,
-        balanceAfter: stockAfter,
+        qty: quantityToDeduct,
         reason: 'Sale',
-        variantId: variantId,
-        staffName: staffName,
-        sessionId: sessionId,
-        lowStockAlerts: lowStockAlerts,
-      );
+        label: item.name,
+      ));
+      stamp(cartItem, own: cartItem.quantity);
     }
-
-    if (lowStockAlerts.isNotEmpty) {
-      NotificationService.instance.showWarning(
-        "Low Stock - ${lowStockAlerts.join(" | ")}",
-      );
-    }
+    return (lines: stampedLines, units: units);
   }
 
-  /// Expands a Recipe-Based item's sale into deductions against its recipe's
-  /// ingredients (one level deep — an ingredient must be Raw Material or
-  /// Semi-Finished, never itself Recipe-Based). Logs one StockMovementModel
-  /// per ingredient with a reason that traces back to the finished item, so
-  /// the existing per-item stock history explains "why did bun stock drop" as
-  /// "linked to Burger sales" with zero new audit UI. See
-  /// docs/inventory_recipe_system_plan.md §5.
-  static Future<void> _deductRecipeIngredients({
-    required Items recipeItem,
-    required double saleQty,
-    required List<Items> items,
-    required StockMovementRepository stockRepo,
-    required String staffName,
-    required String? sessionId,
-    required List<String> lowStockAlerts,
-  }) async {
-    final RecipeModel? recipe = recipeRepository.getRecipeForItem(recipeItem.id);
-    if (recipe == null || !recipe.hasIngredients) return; // unconfigured recipe — nothing to deduct
-
-    for (final line in ingredientQuantitiesFor(recipe, saleQty)) {
-      Items? ingredient;
-      try {
-        ingredient = items.firstWhere((i) => i.id == line.ingredientItemId);
-      } catch (_) {
-        continue; // ingredient item was deleted — skip rather than crash the sale
-      }
-      if (!ingredient.trackInventory) continue;
-
-      final deductQty = line.quantity;
-      final stockAfter = await _deductItemStock(ingredient, deductQty);
-
-      await _logMovementAndAlert(
-        stockRepo: stockRepo,
-        item: ingredient,
-        label: ingredient.name,
-        type: 'out',
-        quantity: deductQty,
-        balanceAfter: stockAfter,
-        reason: 'Sale (recipe: ${recipeItem.name})',
-        variantId: null,
-        staffName: staffName,
-        sessionId: sessionId,
-        lowStockAlerts: lowStockAlerts,
-      );
+  /// The in-app low-stock toast line for a deduction that left [item] at
+  /// [balanceAfter], or null. "Out of stock" is a hard fact and shows even
+  /// with alerts switched off; only the "N left" warning respects the flag.
+  static String? lowStockToastFor(Items item, String label, double balanceAfter) {
+    final lowAlertsOn = item.lowStockAlertEnabled && AppSettings.lowStockAlertsEnabled;
+    if (balanceAfter <= 0) return "$label is out of stock";
+    if (lowAlertsOn && balanceAfter <= item.effectiveLowStockThreshold) {
+      return "$label: ${balanceAfter.toStringAsFixed(0)} ${item.unit ?? "units"} left";
     }
+    return null;
   }
 
   /// Shared by every stock deduction path (direct item, variant, and
@@ -200,14 +500,8 @@ class InventoryService {
     // Stock - Paneer: 2 left"). The PERSISTED notification is no longer raised
     // here — LowStockSyncService reconciles the whole set off ItemStore, which
     // also covers the seven other paths that move stock and never had a hook.
-    // "Out of stock" is a hard fact and shows even with alerts switched off;
-    // only the "N left" warning respects the flag. Unchanged from before.
-    final lowAlertsOn = item.lowStockAlertEnabled && AppSettings.lowStockAlertsEnabled;
-    if (balanceAfter <= 0) {
-      lowStockAlerts.add("$label is out of stock");
-    } else if (lowAlertsOn && balanceAfter <= item.effectiveLowStockThreshold) {
-      lowStockAlerts.add("$label: ${balanceAfter.toStringAsFixed(0)} ${item.unit ?? "units"} left");
-    }
+    final toast = lowStockToastFor(item, label, balanceAfter);
+    if (toast != null) lowStockAlerts.add(toast);
   }
 
   /// How much of each ingredient [recipe] consumes to make [outputQty] units
@@ -297,8 +591,71 @@ class InventoryService {
   /// [Items.stockQuantity] exactly as before. **This is the only figure the POS
   /// and the cart guards should compare quantities against** — it keeps the
   /// recipe calculation in one place instead of scattered through the UI.
-  static double effectiveAvailableStock(Items item) =>
-      item.isRecipeBased ? calculateAvailableToMake(item) : item.stockQuantity;
+  ///
+  /// By Finished preparation mode: made to order → what its recipe can make
+  /// (no recipe → not limited); made in advance with "make fresh when out" →
+  /// prepared stock plus what the recipe can make; anything else → its own
+  /// stored stock.
+  static double effectiveAvailableStock(Items item) {
+    if (item.isMadeToOrder) {
+      final recipe = _usableRecipe(item);
+      if (recipe == null) {
+        // A legacy Recipe-Based item was meant to have one: nothing can be
+        // made (as before). A new made-to-order dish may have none.
+        return isRecipeMissing(item) ? 0 : double.infinity;
+      }
+      return availableToMakeFrom(recipe, _lookupItem);
+    }
+    if (usesDerivedAvailability(item)) {
+      // Hybrid. No usable recipe → prepared stock only.
+      final recipe = _usableRecipe(item);
+      if (recipe == null) return item.stockQuantity;
+      final canMake = availableToMakeFrom(recipe, _lookupItem);
+      if (canMake.isInfinite) return double.infinity;
+      final prepared = item.trackInventory && item.stockQuantity > 0
+          ? item.stockQuantity
+          : 0.0;
+      return prepared + canMake;
+    }
+    return item.stockQuantity;
+  }
+
+  /// A legacy item still stored as Recipe-Based whose recipe was never set
+  /// up. Blocked at the POS exactly as before Phase 1, so a forgotten recipe
+  /// never becomes a silent sale with no deduction. New made-to-order
+  /// Finished items (recipe optional) are never "missing" one.
+  static bool isRecipeMissing(Items item) =>
+      item.productType == ProductType.recipeBased && _usableRecipe(item) == null;
+
+  /// The item's recipe when it has ingredients, else null.
+  static RecipeModel? _usableRecipe(Items item) {
+    final recipe = recipeRepository.getRecipeForItem(item.id);
+    return (recipe != null && recipe.hasIngredients) ? recipe : null;
+  }
+
+  /// Finished, made in advance, "make fresh when out" on, with a usable
+  /// recipe — the hybrid: prepared stock first, the shortfall made fresh.
+  static bool makesFreshWhenOut(Items item) =>
+      item.isMadeInAdvance &&
+      item.makeFreshWhenOut &&
+      _usableRecipe(item) != null;
+
+  /// Whether [item]'s availability is derived (made to order, or made in
+  /// advance with "make fresh when out") rather than its stored stock alone.
+  /// Decided from the item alone — no recipe lookup — so the stock decisions
+  /// stay testable without storage; [effectiveAvailableStock] supplies the
+  /// number (no recipe → not limited / prepared stock only). Cart, menu and
+  /// stock-check code branch on this, never on the product type.
+  ///
+  /// The hybrid applies to whole-unit, non-variant items only — the same
+  /// condition [planSaleDeductions] uses; a variant or weight item sells from
+  /// its prepared stock.
+  static bool usesDerivedAvailability(Items item) =>
+      item.isMadeToOrder ||
+      (item.isMadeInAdvance &&
+          item.makeFreshWhenOut &&
+          !item.hasVariants &&
+          !item.isSoldByWeight);
 
   /// The POS status implied by an availability figure.
   ///
@@ -333,7 +690,7 @@ class InventoryService {
   /// the figure is looked up; tests supply it so the decision can be exercised
   /// without Hive or the service locator. One implementation either way.
   static bool isInStock(Items item, {double? available}) {
-    if (!item.isRecipeBased) return item.isInStock;
+    if (!usesDerivedAvailability(item)) return item.isInStock;
     final a = available ?? effectiveAvailableStock(item);
     // Infinite = nothing constrains it (no tracked ingredients).
     return a.isInfinite || a > 0;
@@ -349,7 +706,7 @@ class InventoryService {
   /// [available] behaves as it does on [isInStock] — an optional override so
   /// the decision is testable without the locator.
   static bool isLowStock(Items item, {double? available}) {
-    if (!item.isRecipeBased) return item.isLowStock;
+    if (!usesDerivedAvailability(item)) return item.isLowStock;
     if (!item.lowStockAlertEnabled || !AppSettings.lowStockAlertsEnabled) {
       return false;
     }
@@ -367,22 +724,38 @@ class InventoryService {
   /// ingredients, which have their own tracking flags. Mirrors the branch
   /// [checkStockAvailability] already applies.
   static bool isStockGoverned(Items item) =>
-      item.trackInventory || item.isRecipeBased;
+      item.trackInventory || usesDerivedAvailability(item);
 
-  /// Produces one batch of a Semi-Finished item from its recipe: validates
-  /// every ingredient has enough stock (all-or-nothing — no partial
-  /// deduction on shortage), deducts each ingredient, credits the
-  /// Semi-Finished item's own stock by [batchQty], logs a StockMovementModel
-  /// per ingredient plus one for the produced item, and writes an append-only
-  /// [RecipeProductionModel] row linking all of them. Throws [Exception] with
-  /// a user-facing message on validation failure. See
-  /// docs/inventory_recipe_system_plan.md §6.3.
+  /// Items that own stock made from a recipe ahead of sale: Semi-Finished
+  /// and made-in-advance Finished. Raw, Trade and made-to-order never are.
+  static bool canProduce(Items item) =>
+      item.isSemiFinished || item.isMadeInAdvance;
+
+  /// Produces one batch of [item] from its recipe: validates every
+  /// ingredient has enough stock (all-or-nothing — no partial deduction on
+  /// shortage), deducts the ingredients for the planned [batchQty], credits
+  /// the item with [actualQty] (what was really made; defaults to the
+  /// planned batch), logs a StockMovementModel per ingredient plus one for
+  /// the produced item, and writes an append-only [RecipeProductionModel]
+  /// row linking all of them. Unit cost = consumed cost ÷ actual output.
+  /// Throws [Exception] with a user-facing message on validation failure.
+  /// See docs/inventory_recipe_system_plan.md §6.3.
   static Future<RecipeProductionModel> produceBatch({
-    required Items semiFinishedItem,
+    required Items item,
     required double batchQty,
+    double? actualQty,
   }) async {
+    final semiFinishedItem = item;
+    if (!canProduce(item)) {
+      throw Exception('${item.name} is not produced in batches — only '
+          'Semi-Finished and made-in-advance Finished items are.');
+    }
     if (batchQty <= 0) {
       throw Exception('Batch quantity must be greater than zero.');
+    }
+    final outputQty = actualQty ?? batchQty;
+    if (outputQty <= 0) {
+      throw Exception('Actual output must be greater than zero.');
     }
     final RecipeModel? recipe = recipeRepository.getRecipeForItem(semiFinishedItem.id);
     if (recipe == null || !recipe.hasIngredients) {
@@ -471,7 +844,8 @@ class InventoryService {
     // it must be written back here or the item's cost stays invisible (₹0)
     // to all of them. The next production run overwrites it, the same way a
     // Raw Material's lastPurchaseCost is overwritten by its next GRN.
-    final producedUnitCost = recipe.estimatedCostPerUnit((id) {
+    // Consumed cost (the planned batch) spread over what was actually made.
+    final plannedUnitCost = recipe.estimatedCostPerUnit((id) {
       Items? ing;
       try {
         ing = items.firstWhere((i) => i.id == id);
@@ -480,12 +854,13 @@ class InventoryService {
       }
       return ing.lastPurchaseCost ?? 0.0;
     });
+    final producedUnitCost = plannedUnitCost * batchQty / outputQty;
     // Stock increase and the new unit cost are applied in ONE write. Done
     // separately, `semiFinishedItem.save()` would write the pre-production
     // stock back over the increase and silently lose the batch.
     final producedBalance = await itemStore.applyStockDelta(
       itemId: semiFinishedItem.id,
-      delta: batchQty,
+      delta: outputQty,
       lastPurchaseCost: producedUnitCost,
     );
     await stockRepo.saveMovement(StockMovementModel(
@@ -495,7 +870,7 @@ class InventoryService {
       variantId: null,
       itemName: semiFinishedItem.name,
       type: 'in',
-      quantity: batchQty,
+      quantity: outputQty,
       balanceAfter: producedBalance,
       reason: 'Production batch',
       unit: semiFinishedItem.unit ?? (semiFinishedItem.isSoldByWeight ? 'kg' : 'pcs'),
@@ -514,6 +889,7 @@ class InventoryService {
       producedTime: DateTime.now(),
       producedBy: staffName,
       movementIds: movementIds,
+      actualQty: outputQty == batchQty ? null : outputQty,
     );
     await recipeProductionRepository.saveProduction(production);
 
@@ -537,23 +913,6 @@ class InventoryService {
 
 
 
-  static Future<double> _deductVariantStock(Items item, CartItem cartItem) async {
-    if (item.variant == null) return 0;
-    try {
-      // Matched by NAME, exactly as before; only the id is handed on, so a
-      // stale captured list is harmless here (ids and prices don't move).
-      final variant = item.variant!.firstWhere(
-            (v) => _getVariantName(v.variantId) == cartItem.variantName,
-      );
-      return await itemStore.applyStockDelta(
-        itemId: item.id,
-        variantId: variant.variantId,
-        delta: -cartItem.quantity.toDouble(),
-      );
-    } catch (e) {
-      return 0;
-    }
-  }
 
   static String _getVariantName(String variantId) {
     try {
@@ -600,9 +959,9 @@ class InventoryService {
       }
 
 
-      // Recipe-Based items derive availability from their ingredients, not
-      // their own (unused) stockQuantity — see §5/§7 of the design doc.
-      if (item.isRecipeBased) {
+      // Made to order / hybrid: availability is derived (ingredients, plus
+      // prepared stock for the hybrid), not the stored stockQuantity alone.
+      if (usesDerivedAvailability(item)) {
         if (!item.allowOrderWhenOutOfStock) {
           final available = effectiveAvailableStock(item);
           for (final totalQuantity in itemVariantTotals[itemKey]!.values) {
@@ -679,6 +1038,12 @@ class InventoryService {
   /// e.g., weightDisplay="10KG", stockUnit="kg" → returns 10
   ///        weightDisplay="500GM", stockUnit="kg" → returns 0.5
   ///        weightDisplay="2KG", stockUnit="gm" → returns 2000
+  /// [weightDisplay] ("750GM", "1.5KG") in [stockUnit] — the same reading a
+  /// sale's stock deduction uses, so a weighed line's price and its stock
+  /// deduction come from one weight.
+  static double weightInStockUnit(String weightDisplay, String stockUnit) =>
+      _parseWeightToStockUnit(weightDisplay, stockUnit);
+
   static double _parseWeightToStockUnit(String weightDisplay, String stockUnit) {
     final grams = _parseWeightFromDisplay(weightDisplay);
     final normalizedStockUnit = stockUnit.toUpperCase().replaceAll(' ', '');
@@ -722,141 +1087,282 @@ class InventoryService {
     }
   }
 
-  /// Restore stock for a voided/cancelled active order.
-  /// Convenience wrapper — builds the quantity map and delegates to restoreStockForRefund.
-  static Future<void> restoreStockForOrder(List<CartItem> items) async {
-    if (items.isEmpty) return;
-    final itemsToRestock = <CartItem, int>{};
+  /// Restore stock for a voided/cancelled active order: every line in full.
+  /// Unstamped (pre-Phase-1) lines that are identical merge into one restore,
+  /// as they always did; stamped lines stay separate — each carries its own
+  /// record of what its sale took.
+  static Future<void> restoreStockForOrder(List<CartItem> items) {
+    final legacy = <CartItem, int>{};
+    final requests = <({CartItem line, int qty})>[];
     for (final item in items) {
-      if (item.quantity > 0) {
-        itemsToRestock[item] = (itemsToRestock[item] ?? 0) + item.quantity;
+      if (item.quantity <= 0) continue;
+      if (item.hasStockStamp) {
+        requests.add((line: item, qty: item.quantity));
+      } else {
+        legacy[item] = (legacy[item] ?? 0) + item.quantity;
       }
     }
-    await restoreStockForRefund(itemsToRestock);
+    return restoreLines([
+      for (final e in legacy.entries)
+        (line: e.key.copyWith(quantity: e.value), qty: e.value),
+      ...requests,
+    ]);
   }
 
-  /// Restore stock for refunded items
-  /// Used when processing refunds and items need to be added back to inventory
-  static Future<void> restoreStockForRefund(Map<CartItem, int> itemsToRestock) async {
-    try {
-      await itemStore.ensureLoaded();
-      if (variantStore.variants.isEmpty) await variantStore.loadVariants();
+  /// Restore the given quantity per key. A key may be a merge of several
+  /// identical lines (so its own quantity can be smaller than the amount):
+  /// the amount is honoured exactly, as before — the restockedQuantity cap
+  /// applies only on the per-line path ([restoreLines]).
+  static Future<void> restoreStockForRefund(Map<CartItem, int> itemsToRestock) =>
+      restoreLines([
+        for (final e in itemsToRestock.entries)
+          (
+            line: e.key.copyWith(
+              quantity: e.key.quantity > e.value ? e.key.quantity : e.value,
+              restockedQuantity: 0,
+            ),
+            qty: e.value,
+          ),
+      ]);
 
-      // For logging each restock to the stock movement history.
-      final stockRepo = StockMovementRepository();
-      final staffName = RestaurantSession.staffName ?? RestaurantSession.effectiveRole;
-      final sessionId = await DayManagementService.getCurrentSessionId();
+  /// Returns [qty] units of each order line to stock — the single restore
+  /// path (void, cancel, edit-reduce, refund, EOD).
+  ///
+  /// A stamped line (sold since Phase 1) restores what its sale actually
+  /// did, per [LineStock.take]: the fresh part back into the recipe's
+  /// ingredients first, the rest to prepared stock — never by the item's
+  /// current type, and never more than `quantity − restockedQuantity`. An
+  /// unstamped line restores by the current type, exactly as before.
+  ///
+  /// Callers that keep the line (closed orders) record the return with
+  /// [LineStock.restocked]; callers that shrink it use [LineStock.reduced].
+  static Future<void> restoreLines(
+      List<({CartItem line, int qty})> requests) async {
+    if (requests.isEmpty) return;
+    await itemStore.ensureLoaded();
+    if (variantStore.variants.isEmpty) await variantStore.loadVariants();
 
-      for (final entry in itemsToRestock.entries) {
-        final cartItem = entry.key;
-        final restockQuantity = entry.value;
+    // For logging each restock to the stock movement history.
+    final stockRepo = StockMovementRepository();
+    final staffName = RestaurantSession.staffName ?? RestaurantSession.effectiveRole;
+    final sessionId = await DayManagementService.getCurrentSessionId();
 
-        if (restockQuantity <= 0) {
-          continue;
-        }
+    for (final req in requests) {
+      final cartItem = req.line;
+      final r = LineStock.take(cartItem, req.qty);
+      if (r.counted <= 0) continue;
 
-
-        // Find the item - try by productId first, then by name
-        Items? existingItem;
-
-        // Try to find by productId if it exists and is not empty
-        if (cartItem.productId.isNotEmpty) {
-          try {
-            existingItem = itemStore.items.firstWhere(
-              (item) => item.id == cartItem.productId,
-            );
-          } catch (_) {
-          }
-        }
-
-        // If not found by productId, try by name
-        if (existingItem == null) {
-          try {
-            existingItem = itemStore.items.firstWhere(
-              (item) => item.name.toLowerCase().trim() == cartItem.title.toLowerCase().trim(),
-            );
-          } catch (e2) {
-            continue;
-          }
-        }
-
-        // Recipe-Based items have no stock of their own to restore — reverse
-        // the sale-time cascade back into their ingredients instead.
-        if (existingItem.isRecipeBased) {
-          await _restoreRecipeIngredients(
-            recipeItem: existingItem,
-            restoreQty: restockQuantity.toDouble(),
-            items: itemStore.items,
-            stockRepo: stockRepo,
-            staffName: staffName,
-            sessionId: sessionId,
+      // Find the item - try by productId first, then by name
+      Items? existingItem;
+      if (cartItem.productId.isNotEmpty) {
+        try {
+          existingItem = itemStore.items.firstWhere(
+            (item) => item.id == cartItem.productId,
           );
+        } catch (_) {}
+      }
+      if (existingItem == null) {
+        try {
+          existingItem = itemStore.items.firstWhere(
+            (item) => item.name.toLowerCase().trim() == cartItem.title.toLowerCase().trim(),
+          );
+        } catch (_) {
           continue;
         }
+      }
 
-        if (!existingItem.trackInventory) {
-          continue;
-        }
+      final int freshUnits;
+      final int ownUnits;
+      if (r.isLegacy) {
+        // Pre-Phase-1 line: decide by the item's current type, as before.
+        freshUnits = existingItem.isRecipeBased ? r.counted : 0;
+        ownUnits = existingItem.isRecipeBased ? 0 : r.counted;
+      } else {
+        freshUnits = r.fromFresh;
+        ownUnits = r.fromOwn;
+      }
 
-        // Handle variant items
-        double restoredQty;
-        double balanceAfter = 0;
-        String? variantId;
-        if (cartItem.variantName != null && existingItem.variant != null) {
-          restoredQty = restockQuantity.toDouble();
-          // Balance comes from the helper — re-reading `existingItem` would
-          // report the pre-restore figure into the movement row.
-          balanceAfter =
-              await _restoreVariantStock(existingItem, cartItem, restockQuantity);
-          try {
-            variantId = existingItem.variant!
-                .firstWhere((vv) => _getVariantName(vv.variantId) == cartItem.variantName)
-                .variantId;
-          } catch (_) {}
-        } else {
-          // Handle regular items (non-variant)
-          double quantityToRestore = restockQuantity.toDouble();
-
-          // For weight-based items, parse the weight and convert to stock unit
-          if (existingItem.isSoldByWeight && cartItem.weightDisplay != null) {
-            final stockUnit = existingItem.unit ?? 'kg';
-            quantityToRestore = _parseWeightToStockUnit(cartItem.weightDisplay!, stockUnit);
-          }
-
-          restoredQty = quantityToRestore;
-          balanceAfter =
-              await _restoreItemStock(existingItem, quantityToRestore);
-        }
-
-        // Log the restock (void/refund) to the per-item stock history.
-        await stockRepo.saveMovement(StockMovementModel(
-          id: const Uuid().v4(),
-          timestamp: DateTime.now(),
-          itemId: existingItem.id,
-          variantId: variantId,
-          itemName: cartItem.variantName != null
-              ? "${existingItem.name} (${cartItem.variantName})"
-              : existingItem.name,
-          type: 'in',
-          quantity: restoredQty,
-          balanceAfter: balanceAfter,
-          reason: 'Void / Refund return',
-          unit: existingItem.unit ?? (existingItem.isSoldByWeight ? 'kg' : 'pcs'),
+      if (freshUnits > 0) {
+        await _restoreRecipeIngredients(
+          recipeItem: existingItem,
+          restoreQty: freshUnits.toDouble(),
+          items: itemStore.items,
+          stockRepo: stockRepo,
           staffName: staffName,
           sessionId: sessionId,
-          unitCost: existingItem.lastPurchaseCost,
-        ));
-
-        // Restock raises stock back up; LowStockSyncService retires the
-        // notification off the ItemStore write above.
+        );
       }
-
-    } catch (e) {
-      rethrow;
+      if (ownUnits > 0 && existingItem.trackInventory) {
+        await _restoreOwnStock(
+          existingItem: existingItem,
+          cartItem: cartItem,
+          restockQuantity: ownUnits,
+          stockRepo: stockRepo,
+          staffName: staffName,
+          sessionId: sessionId,
+        );
+      }
     }
   }
 
-  /// Reverses [_deductRecipeIngredients] for a voided/refunded Recipe-Based
+  /// The stock changes [restoreLines] makes for [requests], planned without
+  /// writing anything — so a void can persist them BEFORE its record is
+  /// saved and finish them exactly once after a stop (VoidOrderCommit).
+  /// Same item resolution, stamp split, recipe expansion, variant match and
+  /// weight conversion as [restoreLines]; each unit's qty is positive stock
+  /// to add back. A variant line no variant matches plans nothing (where
+  /// [restoreLines] logs an empty row).
+  static Future<List<SaleStockUnit>> planRestoreUnits(
+      List<({CartItem line, int qty})> requests) async {
+    if (requests.isEmpty) return const [];
+    await itemStore.ensureLoaded();
+    if (variantStore.variants.isEmpty) await variantStore.loadVariants();
+    final items = itemStore.items;
+    final units = <SaleStockUnit>[];
+
+    for (final req in requests) {
+      final cartItem = req.line;
+      final r = LineStock.take(cartItem, req.qty);
+      if (r.counted <= 0) continue;
+
+      final existingItem = (cartItem.productId.isNotEmpty
+              ? items.where((i) => i.id == cartItem.productId).firstOrNull
+              : null) ??
+          items
+              .where((i) =>
+                  i.name.toLowerCase().trim() ==
+                  cartItem.title.toLowerCase().trim())
+              .firstOrNull;
+      if (existingItem == null) continue;
+
+      final int freshUnits;
+      final int ownUnits;
+      if (r.isLegacy) {
+        freshUnits = existingItem.isRecipeBased ? r.counted : 0;
+        ownUnits = existingItem.isRecipeBased ? 0 : r.counted;
+      } else {
+        freshUnits = r.fromFresh;
+        ownUnits = r.fromOwn;
+      }
+
+      if (freshUnits > 0) {
+        final recipe = recipeRepository.getRecipeForItem(existingItem.id);
+        if (recipe != null && recipe.hasIngredients) {
+          final lines = ingredientQuantitiesFor(recipe, freshUnits.toDouble());
+          for (var row = 0; row < lines.length; row++) {
+            final ingredient = items
+                .where((i) => i.id == lines[row].ingredientItemId)
+                .firstOrNull;
+            if (ingredient == null || !ingredient.trackInventory) continue;
+            units.add(SaleStockUnit(
+              lineId: cartItem.id,
+              recipeRow: row,
+              item: ingredient,
+              qty: lines[row].quantity,
+              reason: 'Void / Refund return (recipe: ${existingItem.name})',
+              label: ingredient.name,
+            ));
+          }
+        }
+      }
+
+      if (ownUnits > 0 && existingItem.trackInventory) {
+        if (cartItem.variantName != null && existingItem.variant != null) {
+          final variant = existingItem.variant!
+              .where((v) => _getVariantName(v.variantId) == cartItem.variantName)
+              .firstOrNull;
+          if (variant == null) continue;
+          units.add(SaleStockUnit(
+            lineId: cartItem.id,
+            item: existingItem,
+            variantId: variant.variantId,
+            qty: ownUnits.toDouble(),
+            reason: 'Void / Refund return',
+            label: '${existingItem.name} (${cartItem.variantName})',
+          ));
+        } else {
+          final qty = existingItem.isSoldByWeight && cartItem.weightDisplay != null
+              ? ownUnits *
+                  _parseWeightToStockUnit(
+                      cartItem.weightDisplay!, existingItem.unit ?? 'kg')
+              : ownUnits.toDouble();
+          units.add(SaleStockUnit(
+            lineId: cartItem.id,
+            item: existingItem,
+            qty: qty,
+            reason: 'Void / Refund return',
+            label: existingItem.name,
+          ));
+        }
+      }
+    }
+    return units;
+  }
+
+  /// Puts [restockQuantity] units of [cartItem] back into [existingItem]'s
+  /// own stock (variant, weight or plain) and logs the movement.
+  static Future<void> _restoreOwnStock({
+    required Items existingItem,
+    required CartItem cartItem,
+    required int restockQuantity,
+    required StockMovementRepository stockRepo,
+    required String staffName,
+    required String? sessionId,
+  }) async {
+    double restoredQty;
+    double balanceAfter = 0;
+    String? variantId;
+    if (cartItem.variantName != null && existingItem.variant != null) {
+      restoredQty = restockQuantity.toDouble();
+      // Balance comes from the helper — re-reading `existingItem` would
+      // report the pre-restore figure into the movement row.
+      balanceAfter =
+          await _restoreVariantStock(existingItem, cartItem, restockQuantity);
+      try {
+        variantId = existingItem.variant!
+            .firstWhere((vv) => _getVariantName(vv.variantId) == cartItem.variantName)
+            .variantId;
+      } catch (_) {}
+    } else {
+      // Handle regular items (non-variant)
+      double quantityToRestore = restockQuantity.toDouble();
+
+      // For weight-based items, parse the weight and convert to stock unit.
+      // Mirrors the deduction: quantity × single weight.
+      if (existingItem.isSoldByWeight && cartItem.weightDisplay != null) {
+        final stockUnit = existingItem.unit ?? 'kg';
+        quantityToRestore = restockQuantity *
+            _parseWeightToStockUnit(cartItem.weightDisplay!, stockUnit);
+      }
+
+      restoredQty = quantityToRestore;
+      balanceAfter =
+          await _restoreItemStock(existingItem, quantityToRestore);
+    }
+
+    // Log the restock (void/refund) to the per-item stock history.
+    await stockRepo.saveMovement(StockMovementModel(
+      id: const Uuid().v4(),
+      timestamp: DateTime.now(),
+      itemId: existingItem.id,
+      variantId: variantId,
+      itemName: cartItem.variantName != null
+          ? "${existingItem.name} (${cartItem.variantName})"
+          : existingItem.name,
+      type: 'in',
+      quantity: restoredQty,
+      balanceAfter: balanceAfter,
+      reason: 'Void / Refund return',
+      unit: existingItem.unit ?? (existingItem.isSoldByWeight ? 'kg' : 'pcs'),
+      staffName: staffName,
+      sessionId: sessionId,
+      unitCost: existingItem.lastPurchaseCost,
+    ));
+    // Restock raises stock back up; LowStockSyncService retires the
+    // notification off the ItemStore write above.
+  }
+
+  /// Reverses the recipe cascade of [planSaleDeductions] for a voided/refunded Recipe-Based
   /// sale — adds each ingredient's consumed quantity back and logs an 'in'
   /// movement per ingredient, same tracing convention as the deduction path.
   static Future<void> _restoreRecipeIngredients({

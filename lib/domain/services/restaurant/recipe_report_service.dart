@@ -4,12 +4,40 @@ import '../../../data/models/restaurant/db/recipe_model.dart';
 import '../../../data/models/restaurant/db/stock_movement_model.dart';
 import '../../../data/repositories/restaurant/stock_movement_repository.dart';
 
+/// Where a food-cost row's cost came from.
+enum FoodCostSource {
+  /// The item's recipe, priced from each ingredient's cost.
+  recipe,
+
+  /// `lastPurchaseCost` — written by the latest production run or GRN.
+  lastCost,
+
+  /// `lastPurchaseCost` of a Trade Item — written by the latest GRN.
+  purchase,
+
+  /// No cost is known.
+  none;
+
+  String get label => switch (this) {
+        recipe => 'Recipe cost',
+        lastCost => 'Last production/purchase cost',
+        purchase => 'Last purchase cost',
+        none => 'No cost yet',
+      };
+}
+
 /// One row of [RecipeReportService.foodCostReport] — cost/margin snapshot for
-/// a single Semi-Finished or Recipe-Based item.
+/// a single Finished, Semi-Finished or Trade item.
 class RecipeCostReportRow {
   final Items item;
   final RecipeModel? recipe;
-  final double costPerUnit;
+
+  /// Null when the cost is unknown — never reported as ₹0.
+  final double? costPerUnit;
+  final FoodCostSource costSource;
+
+  /// Recipe lines whose ingredient has no cost (or no longer exists).
+  final int missingCostIngredients;
   final double? sellingPrice;
   final double? foodCostPercent; // costPerUnit / sellingPrice * 100
   final double? marginPercent; // 100 - foodCostPercent
@@ -19,6 +47,8 @@ class RecipeCostReportRow {
     required this.item,
     this.recipe,
     required this.costPerUnit,
+    required this.costSource,
+    this.missingCostIngredients = 0,
     required this.sellingPrice,
     required this.foodCostPercent,
     required this.marginPercent,
@@ -103,9 +133,16 @@ class RecipeReportService {
     };
   }
 
-  /// Cost/margin snapshot for every Semi-Finished and Recipe-Based item that
-  /// has a configured recipe. Items without one (or without ingredients) are
-  /// skipped — nothing meaningful to report yet.
+  /// Cost/margin snapshot for every Finished, Semi-Finished and Trade item
+  /// (Raw Materials are ingredients, not costed products). Cost by type:
+  /// - Finished with a recipe → the recipe's ingredient cost.
+  /// - Finished made in advance, no recipe → `lastPurchaseCost` (latest
+  ///   production run or GRN).
+  /// - Finished made to order, no recipe → unknown.
+  /// - Trade → `lastPurchaseCost` (latest GRN).
+  /// - Semi-Finished → `lastPurchaseCost`, else its recipe estimate.
+  /// A missing cost is unknown (null), never ₹0: a recipe is unknown when any
+  /// ingredient has no cost or its yield is not positive.
   static List<RecipeCostReportRow> foodCostReport() => foodCostReportFrom(
         items: itemStore.items,
         recipeForItem: recipeRepository.getRecipeForItem,
@@ -116,35 +153,38 @@ class RecipeReportService {
     required RecipeModel? Function(String itemId) recipeForItem,
   }) {
     final itemById = _firstItemById(items);
-    double costOf(String ingredientItemId) =>
-        itemById[ingredientItemId]?.lastPurchaseCost ?? 0.0;
 
     final rows = <RecipeCostReportRow>[];
     for (final item in items) {
-      final isRecipe = item.isSemiFinished || item.isRecipeBased;
-      if (!isRecipe && !item.isFinishedGood) continue;
+      if (!item.isFinished && !item.isSemiFinished && !item.isTradeItem) {
+        continue;
+      }
 
-      // Finished Goods must have a cost configured to show up in the report
-      if (item.isFinishedGood && item.lastPurchaseCost == null) continue;
+      final stored = recipeForItem(item.id);
+      final recipe = (stored != null && stored.hasIngredients) ? stored : null;
+      final recipeCost =
+          recipe == null ? null : _recipeCostPerUnit(recipe, itemById);
 
-      RecipeModel? recipe;
-      int ingredientCount = 0;
-      double costPerUnit = 0.0;
-
-      if (isRecipe) {
-        recipe = recipeForItem(item.id);
-        if (recipe == null || !recipe.hasIngredients) continue;
-        costPerUnit = recipe.estimatedCostPerUnit(costOf);
-        ingredientCount = recipe.ingredients.length;
-      } else {
-        // Finished Good
-        costPerUnit = item.lastPurchaseCost ?? 0.0;
+      double? costPerUnit;
+      var source = FoodCostSource.none;
+      if (item.isTradeItem) {
+        costPerUnit = item.lastPurchaseCost;
+        if (costPerUnit != null) source = FoodCostSource.purchase;
+      } else if (item.isSemiFinished && item.lastPurchaseCost != null) {
+        costPerUnit = item.lastPurchaseCost;
+        source = FoodCostSource.lastCost;
+      } else if (recipeCost != null) {
+        costPerUnit = recipeCost.cost;
+        source = FoodCostSource.recipe;
+      } else if (item.isMadeInAdvance && item.lastPurchaseCost != null) {
+        costPerUnit = item.lastPurchaseCost;
+        source = FoodCostSource.lastCost;
       }
 
       final sellingPrice = item.price;
       double? foodCostPercent;
       double? marginPercent;
-      if (sellingPrice != null && sellingPrice > 0) {
+      if (costPerUnit != null && sellingPrice != null && sellingPrice > 0) {
         foodCostPercent = (costPerUnit / sellingPrice) * 100;
         marginPercent = 100 - foodCostPercent;
       }
@@ -153,14 +193,43 @@ class RecipeReportService {
         item: item,
         recipe: recipe,
         costPerUnit: costPerUnit,
+        costSource: source,
+        missingCostIngredients:
+            source == FoodCostSource.recipe ? recipeCost!.missing : 0,
         sellingPrice: sellingPrice,
         foodCostPercent: foodCostPercent,
         marginPercent: marginPercent,
-        ingredientCount: ingredientCount,
+        ingredientCount: recipe?.ingredients.length ?? 0,
       ));
     }
-    rows.sort((a, b) => a.item.name.compareTo(b.item.name));
+    // Costed rows first so unknown ones (work still to do) don't bury them.
+    rows.sort((a, b) {
+      final known = (a.costPerUnit == null ? 1 : 0)
+          .compareTo(b.costPerUnit == null ? 1 : 0);
+      return known != 0 ? known : a.item.name.compareTo(b.item.name);
+    });
     return rows;
+  }
+
+  /// [recipe]'s cost per unit, null when it can't be known: any ingredient
+  /// without a cost (or deleted), or a yield that isn't positive. [missing]
+  /// counts the uncosted ingredient lines.
+  static ({double? cost, int missing}) _recipeCostPerUnit(
+    RecipeModel recipe,
+    Map<String, Items> itemById,
+  ) {
+    var missing = 0;
+    for (final line in recipe.ingredients) {
+      if (itemById[line.ingredientItemId]?.lastPurchaseCost == null) missing++;
+    }
+    if (missing > 0 || recipe.yieldQty <= 0) {
+      return (cost: null, missing: missing);
+    }
+    return (
+      cost: recipe.estimatedCostPerUnit(
+          (id) => itemById[id]!.lastPurchaseCost!),
+      missing: 0,
+    );
   }
 
   /// Total quantity of each raw material/semi-finished item consumed via

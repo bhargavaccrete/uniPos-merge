@@ -86,8 +86,11 @@ abstract class _SaleStore with Store {
   /// `SaleItemRepository` out of the presentation layer.
   @action
   Future<void> addSaleWithItems(SaleModel sale, List<SaleItemModel> items) async {
-    await _saleRepository.addSale(sale);
+    // Lines first, header last: the header is the one write that makes the
+    // sale exist (BLK-13B). A stop before it leaves only orphan lines, which
+    // checkout recovery removes by sale id.
     await _saleItemRepository.addSaleItems(items);
+    await _saleRepository.addSale(sale);
 
     sales.insert(0, sale);
     await loadSalesStats();

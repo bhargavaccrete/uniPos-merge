@@ -6,11 +6,15 @@ import '../../../core/di/service_locator.dart';
 import '../../../data/models/restaurant/db/eodmodel_317.dart';
 import '../../../data/models/restaurant/db/pastordermodel_313.dart';
 import 'package:billberrylite/domain/services/restaurant/day_management_service.dart';
+import 'package:billberrylite/domain/services/restaurant/refund_service.dart';
 import '../../../core/constants/hive_box_names.dart';
 import '../../../data/models/restaurant/db/cash_movement_model.dart';
 import 'package:hive/hive.dart';
 import 'package:billberrylite/util/restaurant/order_status_filter.dart';
 import 'package:billberrylite/util/restaurant/payment_mode_summary.dart';
+import 'package:billberrylite/util/restaurant/refund_allocation.dart';
+import 'package:billberrylite/util/restaurant/staticswitch.dart';
+import 'package:billberrylite/domain/services/restaurant/cart_calculation_service.dart';
 import 'package:billberrylite/util/retail/payment_mode_summary.dart';
 import 'package:billberrylite/util/retail/retail_cash_expectation.dart';
 import 'package:billberrylite/domain/services/retail/eod_report_service.dart';
@@ -83,14 +87,35 @@ class EODService {
     final paymentSummaries = PaymentModeSummary.summarize(activeDayOrders);
     final taxSummaries = _calculateTaxSummaries(activeDayOrders);
 
-    // 1. Identify all orders refunded within this session's time range [startTime, endTime]
-    final sessionRefundedOrders = pastOrders.where((order) {
-      if (order.refundedAt == null) return false;
+    // SB-2b: refunds are attributed per refund, not per order. An order's
+    // `refundAmount` is a running total and `refundedAt` only the LAST refund,
+    // so an order refunded in session A and again in B used to have BOTH
+    // refunds subtracted again in B. Each refund now counts in the session it
+    // happened in: by session id when both sides have one, otherwise (orders
+    // refunded before history was recorded, or no session) by this session's
+    // time window — which reproduces the old result for old data exactly.
+    bool inThisSession(RefundEvent e) {
+      if (targetSessionId != null && e.sessionId != null) {
+        return e.sessionId == targetSessionId;
+      }
+      return (e.at.isAfter(startTime) || e.at.isAtSameMomentAs(startTime)) &&
+          (e.at.isBefore(endTime) || e.at.isAtSameMomentAs(endTime));
+    }
+
+    final refundedThisSession = <PastOrderModel, double>{};
+    for (final order in pastOrders) {
       final status = order.orderStatus?.toUpperCase() ?? '';
-      if (status == 'CANCELLED') return false;
-      return (order.refundedAt!.isAfter(startTime) || order.refundedAt!.isAtSameMomentAs(startTime)) &&
-             (order.refundedAt!.isBefore(endTime) || order.refundedAt!.isAtSameMomentAs(endTime));
-    }).toList();
+      if (status == 'CANCELLED') continue;
+      final amount = RefundService.refundEventsOf(order)
+          .where(inThisSession)
+          .fold<double>(0.0, (sum, e) => sum + e.amount);
+      if (amount > 0) refundedThisSession[order] = amount;
+    }
+    double sessionRefund(PastOrderModel order) =>
+        refundedThisSession[order] ?? 0.0;
+
+    // 1. Orders with at least one refund in this session
+    final sessionRefundedOrders = refundedThisSession.keys.toList();
 
     // 2. Identify external refunded orders (refunded in this session but created before this session)
     final externalRefundedOrders = sessionRefundedOrders.where((order) {
@@ -100,16 +125,16 @@ class EODService {
       return order.orderAt == null || (order.orderAt!.isBefore(startTime));
     }).toList();
 
-    // 3. Compute EOD totalRefunds as sum of refundAmount for all orders refunded in this session's period
-    final totalRefunds = sessionRefundedOrders.fold<double>(0.0, (sum, order) => sum + (order.refundAmount ?? 0.0));
+    // 3. EOD totalRefunds: only the refunds made in this session
+    final totalRefunds = sessionRefundedOrders.fold<double>(0.0, (sum, order) => sum + sessionRefund(order));
 
     final totalSalesBase = allDayOrders.fold<double>(0.0, (sum, order) {
       final status = order.orderStatus?.toUpperCase() ?? '';
       if (_isExcluded(status)) return sum;
       return sum + (order.totalPrice - (order.refundAmount ?? 0.0));
     });
-    // Deduct external refunds from today's net sales
-    final totalSales = totalSalesBase - externalRefundedOrders.fold<double>(0.0, (sum, order) => sum + (order.refundAmount ?? 0.0));
+    // Deduct this session's refunds of earlier sessions' orders from net sales
+    final totalSales = totalSalesBase - externalRefundedOrders.fold<double>(0.0, (sum, order) => sum + sessionRefund(order));
 
     final totalDiscount = allDayOrders.fold<double>(0.0, (sum, order) {
       final status = order.orderStatus?.toUpperCase() ?? '';
@@ -127,7 +152,7 @@ class EODService {
     });
     // Deduct external refund tax portions from today's net tax liability
     final double externalRefundedTax = externalRefundedOrders.fold<double>(0.0, (sum, order) {
-      final refund = order.refundAmount ?? 0.0;
+      final refund = sessionRefund(order);
       if (refund > 0 && order.totalPrice > 0) {
         return sum + (refund * ((order.gstAmount ?? 0.0) / order.totalPrice));
       }
@@ -135,22 +160,29 @@ class EODService {
     });
     final totalTax = totalTaxBase - externalRefundedTax;
 
-    // Subtract external refunds from paymentSummaries
+    // Subtract external refunds from paymentSummaries — each off the method
+    // it was paid out by (refunds recorded before the method was asked for
+    // spread in proportion). Same rule as the cash drawer (RefundAllocation).
     for (final order in externalRefundedOrders) {
-      final refund = order.refundAmount ?? 0.0;
-      if (refund <= 0) continue;
+      if (sessionRefund(order) <= 0) continue;
+      RefundAllocation.refundedByMethod(order, where: inThisSession)
+          .forEach((method, amount) {
+        _subtractFromSummary(paymentSummaries, method, amount);
+      });
+    }
 
-      if (order.isSplitPayment == true && order.paymentListJson != null && order.paymentListJson!.isNotEmpty) {
-        final ratio = order.totalPrice > 0 ? refund / order.totalPrice : 0.0;
-        for (final p in order.paymentList) {
-          final method = (p['method'] as String? ?? '').toLowerCase().trim();
-          final amt = ((p['amount'] as num?)?.toDouble() ?? 0.0) * ratio;
-          _subtractFromSummary(paymentSummaries, method, amt);
-        }
-      } else {
-        final method = (order.paymentmode ?? '').toLowerCase().trim();
-        _subtractFromSummary(paymentSummaries, method, refund);
-      }
+    // M7: a PAID order voided in this session is "refund pending" — its money
+    // stays in the business until the refund is issued (owner's decision), so
+    // it still counts on the collection side and in expected cash, net of the
+    // refunds already issued on it by method. A refund made in a later
+    // session comes off there through the adjustment above. Sales totals keep
+    // excluding the order.
+    for (final order in allDayOrders) {
+      if ((order.orderStatus ?? '').toUpperCase().trim() != 'VOIDED') continue;
+      RefundAllocation.netLegsOf(order).forEach((method, amount) {
+        // Subtracting a negative ADDS it to that method's row.
+        if (amount != 0) _subtractFromSummary(paymentSummaries, method, -amount);
+      });
     }
 
     // Recompute percentages for paymentSummaries
@@ -226,8 +258,10 @@ class EODService {
     final closingBalance = openingBalance + expectedCash + totalCashIn - totalCashOut - cashExpenses;
     final cashDifference = actualCash - closingBalance;
 
+    // Tolerance, not `== 0` (M3): the closing balance sums floats, so a drawer
+    // that matches can differ by 0.0000001 — same rule as retail.
     String reconciliationStatus;
-    if (cashDifference == 0) {
+    if (cashDifference.abs() < kCashReconciliationTolerance) {
       reconciliationStatus = 'Balanced';
     } else if (cashDifference > 0) {
       reconciliationStatus = 'Overage';
@@ -251,14 +285,15 @@ class EODService {
     final cancelledOrderAmount =
         cancelledOrders.fold<double>(0.0, (s, o) => s + o.totalPrice);
 
-    // Round-off: per-order rounding delta = final total − (taxable + tax − discount + service).
-    // subTotal is stored as the pre-tax taxable base in both tax modes, so this is mode-independent.
+    // Round-off: per-order rounding delta = final total − (taxable + tax + service).
+    // subTotal is stored as the pre-tax taxable base AFTER the discount (and
+    // any points) in both tax modes, so the discount must not come off again —
+    // that reported every discount as round-off (M1).
     double roundOffSum = 0.0;
     for (final o in activeDayOrders) {
       if (o.subTotal == null) continue;
       final raw = o.subTotal! +
-          (o.gstAmount ?? 0) -
-          (o.Discount ?? 0) +
+          (o.gstAmount ?? 0) +
           (o.serviceCharge ?? 0);
       final delta = o.totalPrice - raw;
       if (delta.abs() >= 0.005) roundOffSum += double.parse(delta.toStringAsFixed(2));
@@ -359,13 +394,77 @@ class EODService {
 
   static List<TaxSummary> _calculateTaxSummaries(List<PastOrderModel> orders) {
     final Map<String, TaxInfo> taxData = {};
+    // What this country calls the tax ("GST", "VAT", "Sales Tax", "Tax") —
+    // the row name is stored in the close record and cannot be re-rendered.
+    final taxLabel = TaxLabelRule.name;
+
+    void add(double rate, double tax, double taxable) {
+      final taxKey = '$taxLabel ${(rate * 100).toStringAsFixed(1)}%';
+      final existing = taxData[taxKey];
+      if (existing != null) {
+        existing.taxAmount += tax;
+        existing.taxableAmount += taxable;
+      } else {
+        taxData[taxKey] = TaxInfo(
+          taxName: taxKey,
+          taxRate: rate,
+          taxAmount: tax,
+          taxableAmount: taxable,
+        );
+      }
+    }
 
     for (final order in orders) {
       final status = order.orderStatus?.toUpperCase() ?? '';
       if (_isExcluded(status)) continue;
 
+      // Every writer stores `gstRate: 0` (an order mixes rates), so the
+      // order-level rate below never applied and the table was always empty
+      // (M2). Rows now come from the order's own lines, priced the way the
+      // order was settled — its discount, tax mode, points, discount-on-items
+      // and tax flag — with GST scaled to the order's stored total so the
+      // table always adds up to what was billed. Older rows that did carry a
+      // rate keep the path below.
+      final storedGst = order.gstAmount ?? 0.0;
+      if ((order.gstRate ?? 0) <= 0 && storedGst > 0 && order.items.isNotEmpty) {
+        final calc = CartCalculationService(
+          items: order.items,
+          discountType: DiscountType.amount,
+          discountValue: order.Discount ?? 0.0,
+          isTaxInclusive: order.isTaxInclusive ?? AppSettings.isTaxInclusive,
+          discountOnItems: order.discountOnItems,
+          loyaltyRedemption: (order.loyaltyPointsUsed ?? 0).toDouble(),
+          // Stored GST > 0 proves tax was on when it was billed; an older row
+          // without the flag must not follow today's setting.
+          taxEnabled: order.taxEnabled ?? true,
+          roundOffStep: 0,
+        );
+        final byRate = <double, ({double tax, double taxable})>{};
+        for (final r in calc.lineResults) {
+          if (r.taxRate <= 0) continue;
+          final prev = byRate[r.taxRate];
+          byRate[r.taxRate] = (
+            tax: (prev?.tax ?? 0) + r.gstAmount,
+            taxable: (prev?.taxable ?? 0) + r.taxableAmount,
+          );
+        }
+        final computedGst = byRate.values.fold(0.0, (s, v) => s + v.tax);
+        if (computedGst > 0.009) {
+          final scale = storedGst / computedGst;
+          final refundRatio = order.totalPrice > 0
+              ? ((order.totalPrice - (order.refundAmount ?? 0.0)) / order.totalPrice)
+              : 1.0;
+          byRate.forEach((rate, v) => add(
+                rate,
+                v.tax * scale * refundRatio,
+                v.taxable * refundRatio,
+              ));
+        }
+        continue;
+      }
+
       if (order.gstRate != null && order.gstAmount != null && order.gstRate! > 0) {
-        final taxKey = 'GST ${(order.gstRate! * 100).toStringAsFixed(1)}%';
+        final taxKey = '$taxLabel ${(order.gstRate! * 100).toStringAsFixed(1)}%';
 
         // Calculate proportional tax amount for partially refunded orders
         final orderRefundRatio = order.totalPrice > 0
@@ -627,6 +726,9 @@ class EODService {
         .getProfitReport(startDate: startTime, endDate: endTime);
     final totalCost = (profit['totalCost'] as num).toDouble();
     final grossProfit = (profit['grossProfit'] as num).toDouble();
+    final unknownCostLines = (profit['unknownCostLines'] as num).toInt();
+    final unknownCostRevenue =
+        (profit['unknownCostRevenue'] as num).toDouble();
 
     // ==================== CUSTOMER OUTSTANDING ====================
     // A position at close, not a movement during the day.
@@ -658,6 +760,8 @@ class EODService {
       upiCollections: collections['upi'] ?? 0.0,
       totalCost: totalCost,
       grossProfit: grossProfit,
+      unknownCostLines: unknownCostLines,
+      unknownCostRevenue: unknownCostRevenue,
       customersWithDue: customersWithCredit.length,
       totalOutstanding: totalOutstanding,
       cashWithdrawn: cashWithdrawn,
@@ -721,7 +825,8 @@ class EODService {
         taxName: 'CGST',
         taxRate: 0.0, // Rate varies by product, so we'll show 0 for overall
         taxAmount: totalCgst,
-        taxableAmount: totalTaxableAmount / 2, // Half for CGST
+        // CGST and SGST are each levied on the WHOLE taxable value.
+        taxableAmount: totalTaxableAmount,
       ));
     }
 
@@ -731,7 +836,7 @@ class EODService {
         taxName: 'SGST',
         taxRate: 0.0,
         taxAmount: totalSgst,
-        taxableAmount: totalTaxableAmount / 2, // Half for SGST
+        taxableAmount: totalTaxableAmount,
       ));
     }
 

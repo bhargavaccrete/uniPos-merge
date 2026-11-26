@@ -1,6 +1,11 @@
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
+import 'package:billberrylite/core/init/app_instance_lock.dart';
+import 'package:billberrylite/core/init/hive_safe_open.dart';
+import 'package:billberrylite/core/init/recovery_journal.dart';
 import 'package:billberrylite/core/config/app_config.dart';
 import 'package:billberrylite/core/constants/hive_type_ids.dart';
 import 'package:billberrylite/core/constants/hive_box_names.dart';
@@ -105,9 +110,53 @@ class HiveInit {
     if (_isHiveInitialized) {
       return;
     }
+    if (!kIsWeb) {
+      // The folder `Hive.initFlutter()` uses (no sub-directory).
+      final dir = (await getApplicationDocumentsDirectory()).path;
+      // Before any box is touched: only one app copy may use the data.
+      if (AppInstanceLock.appliesToThisPlatform) {
+        await AppInstanceLock.acquire(dir);
+      }
+      HiveSafeOpen.hiveDirectory = dir;
+      // A recovery restore that did not finish (failed, crashed or force-
+      // closed): put the damaged originals back before any box opens, so the
+      // app blocks again instead of running on the empty stand-in boxes.
+      await RecoveryJournal.resolvePendingAtStartup(dir);
+    }
     await Hive.initFlutter();
     await _registerCommonAdapters();
     _isHiveInitialized = true;
+  }
+
+  /// Everything startup needs from storage, in order: Hive, AppConfig (the
+  /// business mode), the common boxes, then the mode's boxes. Throws
+  /// [HiveStartupBlocked] when any box could not be opened safely, before
+  /// any repository, service or server can start.
+  ///
+  /// BKP-5: an unfinished restore (its record still open) also blocks, even
+  /// when every box opens: the data may be partly restored. [forRestore] is
+  /// only for the recovery step that opens the boxes so a restore can
+  /// replace them (C1) — never for continuing normal startup.
+  static Future<void> openStartupBoxes({bool forRestore = false}) async {
+    await init();
+    await AppConfig.init();
+    await openCommonBoxes();
+    await initializeBusinessBoxes();
+    if (!forRestore) {
+      final interrupted = HiveSafeOpen.pendingRestore();
+      if (interrupted != null) {
+        throw HiveStartupBlocked(const [], interruptedRestore: interrupted);
+      }
+    }
+  }
+
+  /// Startup recovery: after boxes were closed or their files replaced, the
+  /// next [openStartupBoxes] must re-open every group instead of trusting the
+  /// once-only flags. Re-opening an open box is a no-op.
+  static void forgetOpenedGroups() {
+    _areCommonBoxesOpen = false;
+    _areRetailBoxesOpen = false;
+    _areRestaurantBoxesOpen = false;
   }
 
   /// Register common adapters (needed regardless of business mode)
@@ -165,40 +214,40 @@ class HiveInit {
     if (_areCommonBoxesOpen) {
       return;
     }
-    await Hive.openBox(HiveBoxNames.storeBox);
-    await Hive.openBox(HiveBoxNames.appState);
-    await Hive.openBox<TaxDetails>(HiveBoxNames.taxBox);
-    await Hive.openBox<BusinessType>(HiveBoxNames.businessTypeBox);
-    await Hive.openBox<BusinessDetails>(HiveBoxNames.businessDetailsBox);
+    await HiveSafeOpen.openBox(HiveBoxNames.storeBox);
+    await HiveSafeOpen.openBox(HiveBoxNames.appState);
+    await HiveSafeOpen.openBox<TaxDetails>(HiveBoxNames.taxBox);
+    await HiveSafeOpen.openBox<BusinessType>(HiveBoxNames.businessTypeBox);
+    await HiveSafeOpen.openBox<BusinessDetails>(HiveBoxNames.businessDetailsBox);
     // Generic named-sequence counters (bill/order/KOT numbers, SKU sequence,
     // etc.) — shared across both business modes.
-    await Hive.openBox(HiveBoxNames.appCounters);
+    await HiveSafeOpen.openBox(HiveBoxNames.appCounters);
     // Saved thermal printers (Bluetooth/WiFi/USB) — one physical box for both
     // modes. PrinterRepository's constructor does a synchronous Hive.box()
     // lookup, so this must be open before the service locator builds it.
-    await Hive.openBox<SavedPrinterModel>(HiveBoxNames.restaurantPrinters);
+    await HiveSafeOpen.openBox<SavedPrinterModel>(HiveBoxNames.restaurantPrinters);
 
     // Persisted app notifications — one physical box for both modes.
     // NotificationRepository does a synchronous Hive.box() lookup, so this
     // must be open before the service locator builds the store.
-    await Hive.openBox<AppNotificationModel>(HiveBoxNames.appNotifications);
+    await HiveSafeOpen.openBox<AppNotificationModel>(HiveBoxNames.appNotifications);
 
     // Staff shifts + attendance — one physical box each for both modes.
     // ShiftRepository / AttendanceRepository do synchronous Hive.box() lookups
     // in their constructors, so these must be open before the service locator
     // builds them.
-    await Hive.openBox<ShiftModel>(HiveBoxNames.shift);
-    await Hive.openBox<AttendanceModel>(HiveBoxNames.attendance);
+    await HiveSafeOpen.openBox<ShiftModel>(HiveBoxNames.shift);
+    await HiveSafeOpen.openBox<AttendanceModel>(HiveBoxNames.attendance);
 
     // Open and initialize payment methods box with defaults
-    final paymentBox = await Hive.openBox<pm.PaymentMethod>(HiveBoxNames.paymentMethods);
+    final paymentBox = await HiveSafeOpen.openBox<pm.PaymentMethod>(HiveBoxNames.paymentMethods);
 
     // Initialize with defaults if empty
-    if (paymentBox.isEmpty) {
+    if (paymentBox != null && paymentBox.isEmpty) {
       await _initializeDefaultPaymentMethods(paymentBox);
-    } else {
     }
 
+    HiveSafeOpen.throwIfBlocked();
     _areCommonBoxesOpen = true;
   }
 
@@ -484,84 +533,71 @@ class HiveInit {
     // Clean up old incorrectly-named boxes first (one-time migration)
     await _cleanupOldAttributeBoxes();
 
-    await Hive.openBox<ProductModel>(HiveBoxNames.products);
-    await Hive.openBox<VarianteModel>(HiveBoxNames.variants);
-    await Hive.openBox<CartItemModel>(HiveBoxNames.cartItems);
-    await Hive.openBox<SaleModel>(HiveBoxNames.sales);
-    await Hive.openBox<SaleItemModel>(HiveBoxNames.saleItems);
-    await Hive.openBox<SupplierModel>(HiveBoxNames.suppliers);
-    await Hive.openBox<SupplierLedgerEntryModel>(HiveBoxNames.supplierLedger);
-    await Hive.openBox<PurchaseReturnModel>(HiveBoxNames.purchaseReturns);
-    await Hive.openBox<PurchaseReturnItemModel>(HiveBoxNames.purchaseReturnItems);
-    await Hive.openBox<SupplierClaimModel>(HiveBoxNames.supplierClaims);
-    await Hive.openBox<SupplierClaimItemModel>(HiveBoxNames.supplierClaimItems);
-    await Hive.openBox<InventoryLossModel>(HiveBoxNames.inventoryLosses);
-    await Hive.openBox<StockTakeModel>(HiveBoxNames.stockTakes);
-    await Hive.openBox<StockTakeItemModel>(HiveBoxNames.stockTakeItems);
-    await Hive.openBox<RetailBundleModel>(HiveBoxNames.bundles);
-    await Hive.openBox<RetailKitAssemblyModel>(HiveBoxNames.kitAssemblies);
-    await Hive.openBox<Customer>(HiveBoxNames.customer);
-    await Hive.openBox<HoldSaleModel>(HiveBoxNames.holdSales);
-    await Hive.openBox<HoldSaleItemModel>(HiveBoxNames.holdSaleItems);
-    await Hive.openBox<PurchaseOrderModel>(HiveBoxNames.purchaseOrders);
-    await Hive.openBox<PurchaseOrderItemModel>(HiveBoxNames.purchaseOrderItems);
-    await Hive.openBox<GRNModel>(HiveBoxNames.grns);
-    await Hive.openBox<GRNItemModel>(HiveBoxNames.grnItems);
+    await HiveSafeOpen.openBox<ProductModel>(HiveBoxNames.products);
+    await HiveSafeOpen.openBox<VarianteModel>(HiveBoxNames.variants);
+    await HiveSafeOpen.openBox<CartItemModel>(HiveBoxNames.cartItems);
+    await HiveSafeOpen.openBox<SaleModel>(HiveBoxNames.sales);
+    await HiveSafeOpen.openBox<SaleItemModel>(HiveBoxNames.saleItems);
+    await HiveSafeOpen.openBox<SupplierModel>(HiveBoxNames.suppliers);
+    await HiveSafeOpen.openBox<SupplierLedgerEntryModel>(HiveBoxNames.supplierLedger);
+    await HiveSafeOpen.openBox<PurchaseReturnModel>(HiveBoxNames.purchaseReturns);
+    await HiveSafeOpen.openBox<PurchaseReturnItemModel>(HiveBoxNames.purchaseReturnItems);
+    await HiveSafeOpen.openBox<SupplierClaimModel>(HiveBoxNames.supplierClaims);
+    await HiveSafeOpen.openBox<SupplierClaimItemModel>(HiveBoxNames.supplierClaimItems);
+    await HiveSafeOpen.openBox<InventoryLossModel>(HiveBoxNames.inventoryLosses);
+    await HiveSafeOpen.openBox<StockTakeModel>(HiveBoxNames.stockTakes);
+    await HiveSafeOpen.openBox<StockTakeItemModel>(HiveBoxNames.stockTakeItems);
+    await HiveSafeOpen.openBox<RetailBundleModel>(HiveBoxNames.bundles);
+    await HiveSafeOpen.openBox<RetailKitAssemblyModel>(HiveBoxNames.kitAssemblies);
+    await HiveSafeOpen.openBox<Customer>(HiveBoxNames.customer);
+    await HiveSafeOpen.openBox<HoldSaleModel>(HiveBoxNames.holdSales);
+    await HiveSafeOpen.openBox<HoldSaleItemModel>(HiveBoxNames.holdSaleItems);
+    await HiveSafeOpen.openBox<PurchaseOrderModel>(HiveBoxNames.purchaseOrders);
+    await HiveSafeOpen.openBox<PurchaseOrderItemModel>(HiveBoxNames.purchaseOrderItems);
+    await HiveSafeOpen.openBox<GRNModel>(HiveBoxNames.grns);
+    await HiveSafeOpen.openBox<GRNItemModel>(HiveBoxNames.grnItems);
     // Legacy string-keyed category box — kept open only for not-yet-migrated
     // callers (bulk import, sample data, backup's legacy path). Not used by
     // the main Add Product / Category Management / Cart flows anymore.
-    await Hive.openBox<String>(HiveBoxNames.retailCategories);
+    await HiveSafeOpen.openBox<String>(HiveBoxNames.retailCategories);
     // Retail categories — shared `Category` model (same as restaurant), own box.
-    await Hive.openBox<Category>(HiveBoxNames.category);
-    await Hive.openBox<PaymentEntryModel>(HiveBoxNames.paymentEntries);
-    await Hive.openBox<CreditPaymentModel>(HiveBoxNames.creditPayments);
-    await Hive.openBox<AttributeModel>(HiveBoxNames.attributes);
-    await Hive.openBox<AttributeValueModel>(HiveBoxNames.attributeValues);
-    await Hive.openBox<ProductAttributeModel>(HiveBoxNames.productAttributes);
-    await Hive.openBox<StaffModel>(HiveBoxNames.staff);
+    await HiveSafeOpen.openBox<Category>(HiveBoxNames.category);
+    await HiveSafeOpen.openBox<PaymentEntryModel>(HiveBoxNames.paymentEntries);
+    await HiveSafeOpen.openBox<CreditPaymentModel>(HiveBoxNames.creditPayments);
+    await HiveSafeOpen.openBox<AttributeModel>(HiveBoxNames.attributes);
+    await HiveSafeOpen.openBox<AttributeValueModel>(HiveBoxNames.attributeValues);
+    await HiveSafeOpen.openBox<ProductAttributeModel>(HiveBoxNames.productAttributes);
+    await HiveSafeOpen.openBox<StaffModel>(HiveBoxNames.staff);
     // Tax - shared with restaurant, same box.
-    await Hive.openBox<Tax>(HiveBoxNames.tax);
+    await HiveSafeOpen.openBox<Tax>(HiveBoxNames.tax);
 
-    // Fix for typeId 252 corruption - delete and recreate billingTabs box
-    try {
-      await Hive.openBox<BillingTabModel>(HiveBoxNames.billingTabs);
-    } catch (e) {
-      try {
-        // Close the box if it's somehow open
-        if (Hive.isBoxOpen(HiveBoxNames.billingTabs)) {
-          await Hive.box(HiveBoxNames.billingTabs).close();
-        }
-
-        // Delete the corrupted box from disk
-        await Hive.deleteBoxFromDisk(HiveBoxNames.billingTabs);
-
-        // Create a fresh box
-        await Hive.openBox<BillingTabModel>(HiveBoxNames.billingTabs);
-      } catch (deleteError) {
-        rethrow;
-      }
-    }
+    // Open Retail bills. A box that fails to open is preserved and left
+    // closed like every other box — never deleted and recreated empty.
+    await HiveSafeOpen.openBox<BillingTabModel>(HiveBoxNames.billingTabs);
 
     // EOD box (shared with restaurant mode)
-    await Hive.openBox<EndOfDayReport>(HiveBoxNames.retailEOD);
+    await HiveSafeOpen.openBox<EndOfDayReport>(HiveBoxNames.retailEOD);
 
     // Day Management box (for opening balance tracking)
-    await Hive.openBox(HiveBoxNames.dayManagementBox);
+    await HiveSafeOpen.openBox(HiveBoxNames.dayManagementBox);
 
     // Session box (shared with restaurant mode). DayManagementService stores the
     // open day as a session record, so Start Day / EOD need this box in retail
     // too — without it both throw "Box not found".
-    await Hive.openBox<RestaurantSessionModel>(HiveBoxNames.restaurantSessions);
+    await HiveSafeOpen.openBox<RestaurantSessionModel>(HiveBoxNames.restaurantSessions);
 
     // Expense boxes (shared with restaurant mode - needed for EOD)
-    await Hive.openBox<ExpenseCategory>(HiveBoxNames.retailExpenseCategory);
-    await Hive.openBox<Expense>(HiveBoxNames.retailExpense);
+    await HiveSafeOpen.openBox<ExpenseCategory>(HiveBoxNames.retailExpenseCategory);
+    await HiveSafeOpen.openBox<Expense>(HiveBoxNames.retailExpense);
 
     // Cash movements box (shared with restaurant mode - Cash In/Out powers the
     // Cash Drawer screen and makes EOD cash reconciliation accurate).
-    await Hive.openBox<CashMovementModel>(HiveBoxNames.restaurantCashMovements);
-    await Hive.openBox<StockMovementModel>(HiveBoxNames.restaurantStockMovements);
+    await HiveSafeOpen.openBox<CashMovementModel>(HiveBoxNames.restaurantCashMovements);
+    await HiveSafeOpen.openBox<StockMovementModel>(HiveBoxNames.restaurantStockMovements);
+    // Sales saved but not yet finished (BLK-13B) — plain maps, never backed up.
+    await HiveSafeOpen.openBox(HiveBoxNames.retailCheckoutJournal);
 
+    HiveSafeOpen.throwIfBlocked();
     _areRetailBoxesOpen = true;
   }
 
@@ -767,83 +803,86 @@ class HiveInit {
     }
 
     // Core restaurant boxes - use actual box names from database files
-    await Hive.openBox<Category>(HiveBoxNames.category);
-    await Hive.openBox<Items>(HiveBoxNames.restaurantItems);
-    await Hive.openBox<Extramodel>(HiveBoxNames.restaurantExtras);
-    await Hive.openBox<VariantModel>(HiveBoxNames.restaurantVariants);
-    await Hive.openBox<ChoicesModel>(HiveBoxNames.restaurantChoices);
+    await HiveSafeOpen.openBox<Category>(HiveBoxNames.category);
+    await HiveSafeOpen.openBox<Items>(HiveBoxNames.restaurantItems);
+    await HiveSafeOpen.openBox<Extramodel>(HiveBoxNames.restaurantExtras);
+    await HiveSafeOpen.openBox<VariantModel>(HiveBoxNames.restaurantVariants);
+    await HiveSafeOpen.openBox<ChoicesModel>(HiveBoxNames.restaurantChoices);
 
     // Restaurant cart
-    await Hive.openBox<CartItem>(HiveBoxNames.restaurantCart);
+    await HiveSafeOpen.openBox<CartItem>(HiveBoxNames.restaurantCart);
 
     // Orders
-    await Hive.openBox<OrderModel>(HiveBoxNames.restaurantOrders);
+    await HiveSafeOpen.openBox<OrderModel>(HiveBoxNames.restaurantOrders);
     // appCounters is opened in openCommonBoxes() now (shared with retail).
 
-    await Hive.openBox<StaffModel>(HiveBoxNames.staff);
-    await Hive.openBox<TableModel>(HiveBoxNames.restaurantTables);
+    await HiveSafeOpen.openBox<StaffModel>(HiveBoxNames.staff);
+    await HiveSafeOpen.openBox<TableModel>(HiveBoxNames.restaurantTables);
 
     // Past Orders
-    await Hive.openBox<PastOrderModel>(HiveBoxNames.restaurantPastOrders);
+    await HiveSafeOpen.openBox<PastOrderModel>(HiveBoxNames.restaurantPastOrders);
 
     // Tax - shared with retail, same box.
-    await Hive.openBox<Tax>(HiveBoxNames.tax);
+    await HiveSafeOpen.openBox<Tax>(HiveBoxNames.tax);
 
     // Expenses (restaurant-specific)
-    await Hive.openBox<ExpenseCategory>(HiveBoxNames.restaurantExpenseCategory);
-    await Hive.openBox<Expense>(HiveBoxNames.restaurantExpense);
+    await HiveSafeOpen.openBox<ExpenseCategory>(HiveBoxNames.restaurantExpenseCategory);
+    await HiveSafeOpen.openBox<Expense>(HiveBoxNames.restaurantExpense);
 
     // EOD (restaurant-specific)
-    await Hive.openBox<EndOfDayReport>(HiveBoxNames.restaurantEOD);
+    await HiveSafeOpen.openBox<EndOfDayReport>(HiveBoxNames.restaurantEOD);
 
     // Day Management (for opening balance tracking)
-    await Hive.openBox(HiveBoxNames.dayManagementBox);
+    await HiveSafeOpen.openBox(HiveBoxNames.dayManagementBox);
 
-    await Hive.openBox<TestBillModel>(HiveBoxNames.testBillBox);
+    await HiveSafeOpen.openBox<TestBillModel>(HiveBoxNames.testBillBox);
 
     // Restaurant Customer (shared Customer model, own box)
-    await Hive.openBox<Customer>(HiveBoxNames.customer);
+    await HiveSafeOpen.openBox<Customer>(HiveBoxNames.customer);
 
     // Shifts box moved to openCommonBoxes — shared with retail.
 
     // Cash Management — movements (Cash In/Out) and handovers (shift transfers)
-    await Hive.openBox<CashMovementModel>(HiveBoxNames.restaurantCashMovements);
-    await Hive.openBox<StockMovementModel>(HiveBoxNames.restaurantStockMovements);
-    await Hive.openBox<CashHandoverModel>(HiveBoxNames.restaurantCashHandovers);
+    await HiveSafeOpen.openBox<CashMovementModel>(HiveBoxNames.restaurantCashMovements);
+    await HiveSafeOpen.openBox<StockMovementModel>(HiveBoxNames.restaurantStockMovements);
+    // Pending Settle stock work — see StockJournal. Restaurant only.
+    await HiveSafeOpen.openBox(HiveBoxNames.restaurantStockJournal);
+    await HiveSafeOpen.openBox<CashHandoverModel>(HiveBoxNames.restaurantCashHandovers);
 
     // Saved thermal printers box moved to openCommonBoxes — shared with retail.
 
     // Restaurant POS Sessions
-    await Hive.openBox<RestaurantSessionModel>(HiveBoxNames.restaurantSessions);
+    await HiveSafeOpen.openBox<RestaurantSessionModel>(HiveBoxNames.restaurantSessions);
 
     // Staff attendance box moved to openCommonBoxes — shared with retail.
     // Item-level cancellation audit
-    await Hive.openBox<ItemCancellationModel>(HiveBoxNames.restaurantItemCancellations);
+    await HiveSafeOpen.openBox<ItemCancellationModel>(HiveBoxNames.restaurantItemCancellations);
 
     // Recipes (BOM) and batch-production log — see docs/inventory_recipe_system_plan.md
-    await Hive.openBox<RecipeModel>(HiveBoxNames.restaurantRecipes);
-    await Hive.openBox<RecipeProductionModel>(HiveBoxNames.restaurantRecipeProductions);
+    await HiveSafeOpen.openBox<RecipeModel>(HiveBoxNames.restaurantRecipes);
+    await HiveSafeOpen.openBox<RecipeProductionModel>(HiveBoxNames.restaurantRecipeProductions);
 
     // Restaurant Purchase Order / GRN pipeline (raw-material procurement)
-    await Hive.openBox<RestaurantSupplierModel>(HiveBoxNames.restaurantSuppliers);
-    await Hive.openBox<RestaurantPurchaseOrderModel>(HiveBoxNames.restaurantPurchaseOrders);
-    await Hive.openBox<RestaurantPurchaseOrderItemModel>(HiveBoxNames.restaurantPurchaseOrderItems);
-    await Hive.openBox<RestaurantGRNModel>(HiveBoxNames.restaurantGrns);
-    await Hive.openBox<RestaurantGRNItemModel>(HiveBoxNames.restaurantGrnItems);
+    await HiveSafeOpen.openBox<RestaurantSupplierModel>(HiveBoxNames.restaurantSuppliers);
+    await HiveSafeOpen.openBox<RestaurantPurchaseOrderModel>(HiveBoxNames.restaurantPurchaseOrders);
+    await HiveSafeOpen.openBox<RestaurantPurchaseOrderItemModel>(HiveBoxNames.restaurantPurchaseOrderItems);
+    await HiveSafeOpen.openBox<RestaurantGRNModel>(HiveBoxNames.restaurantGrns);
+    await HiveSafeOpen.openBox<RestaurantGRNItemModel>(HiveBoxNames.restaurantGrnItems);
 
     // Damaged-goods/loss/stock-take chain (returns, claims, write-offs, counts)
-    await Hive.openBox<RestaurantPurchaseReturnModel>(HiveBoxNames.restaurantPurchaseReturns);
-    await Hive.openBox<RestaurantPurchaseReturnItemModel>(HiveBoxNames.restaurantPurchaseReturnItems);
-    await Hive.openBox<RestaurantSupplierClaimModel>(HiveBoxNames.restaurantSupplierClaims);
-    await Hive.openBox<RestaurantSupplierClaimItemModel>(HiveBoxNames.restaurantSupplierClaimItems);
-    await Hive.openBox<RestaurantInventoryLossModel>(HiveBoxNames.restaurantInventoryLosses);
-    await Hive.openBox<RestaurantStockTakeModel>(HiveBoxNames.restaurantStockTakes);
-    await Hive.openBox<RestaurantStockTakeItemModel>(HiveBoxNames.restaurantStockTakeItems);
+    await HiveSafeOpen.openBox<RestaurantPurchaseReturnModel>(HiveBoxNames.restaurantPurchaseReturns);
+    await HiveSafeOpen.openBox<RestaurantPurchaseReturnItemModel>(HiveBoxNames.restaurantPurchaseReturnItems);
+    await HiveSafeOpen.openBox<RestaurantSupplierClaimModel>(HiveBoxNames.restaurantSupplierClaims);
+    await HiveSafeOpen.openBox<RestaurantSupplierClaimItemModel>(HiveBoxNames.restaurantSupplierClaimItems);
+    await HiveSafeOpen.openBox<RestaurantInventoryLossModel>(HiveBoxNames.restaurantInventoryLosses);
+    await HiveSafeOpen.openBox<RestaurantStockTakeModel>(HiveBoxNames.restaurantStockTakes);
+    await HiveSafeOpen.openBox<RestaurantStockTakeItemModel>(HiveBoxNames.restaurantStockTakeItems);
 
     // Supplier balance journal — one row per balance movement.
-    await Hive.openBox<RestaurantSupplierLedgerEntryModel>(
+    await HiveSafeOpen.openBox<RestaurantSupplierLedgerEntryModel>(
         HiveBoxNames.restaurantSupplierLedger);
 
+    HiveSafeOpen.throwIfBlocked();
     _areRestaurantBoxesOpen = true;
   }
 

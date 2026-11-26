@@ -203,6 +203,13 @@ abstract class _RestaurantStockTakeStore with Store {
       errorMessage = 'Counted quantity cannot be negative.';
       return false;
     }
+    // BLK-18: a stock-take line has no variant, and an item with variants is
+    // stocked per variant — its count would land on stock nothing sells from.
+    if (item.hasVariants) {
+      errorMessage = '${item.name} has variants. Count it per variant in '
+          'Manage Inventory, not in a stock take.';
+      return false;
+    }
 
     try {
       final systemQty =
@@ -363,15 +370,22 @@ abstract class _RestaurantStockTakeStore with Store {
           continue;
         }
 
-        final success = await StockAdjustService.adjustTo(
-          item: item,
-          newStock: target,
-          reason: line.isShortage ? shortageReason : 'Stock correction',
-          note: _lineNote(take, note),
-          // A crash between the adjustment and the appliedQty save below
-          // would otherwise re-apply this line on the next commit.
-          movementId: 'st_${line.takeItemId}',
-        );
+        bool success;
+        try {
+          success = await StockAdjustService.adjustTo(
+            item: item,
+            newStock: target,
+            reason: line.isShortage ? shortageReason : 'Stock correction',
+            note: _lineNote(take, note),
+            // A crash between the adjustment and the appliedQty save below
+            // would otherwise re-apply this line on the next commit.
+            movementId: 'st_${line.takeItemId}',
+          );
+        } on StateError {
+          // Refused before any write (e.g. stock went below zero since the
+          // count) — this line fails, the rest still apply.
+          success = false;
+        }
 
         if (!success) {
           failed.add(line.itemName ?? line.itemId);

@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/restaurant/refund_allocation.dart';
 import '../../../../data/models/restaurant/db/cartmodel_308.dart';
 import '../../../../data/models/restaurant/db/pastordermodel_313.dart';
 import '../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
+import '../../../../domain/services/restaurant/day_management_service.dart';
+import '../../../../domain/services/restaurant/refund_service.dart';
+import '../../../../util/restaurant/restaurant_session.dart';
 import '../../../../domain/services/restaurant/cart_calculation_service.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/plan/entitlement_keys.dart';
@@ -31,6 +35,7 @@ class Orderdetails extends StatefulWidget {
 
 class _OrderdetailsState extends State<Orderdetails> {
   late PastOrderModel currentOrder;
+  bool _refunding = false; // a refund is open or being saved
 
   @override
   void initState() {
@@ -103,14 +108,18 @@ class _OrderdetailsState extends State<Orderdetails> {
             if (!isFullyRefunded &&
                 (!isVoid || isPaidVoid) &&
                 AppSettings.refundsEnabled &&
-                PlanEnforce.allows(EntKeys.billingReturns))
+                PlanEnforce.allows(EntKeys.billingReturns) &&
+                // BLK-14: hidden from a Waiter; RefundService refuses too.
+                RestaurantSession.canAccess(RefundService.refundPermission))
               SizedBox(width: AppResponsive.mediumSpacing(context)),
             // Refund option is hidden entirely when refunds are turned off in
             // settings. When on, it stays subject to the refund-window check.
             if (!isFullyRefunded &&
                 (!isVoid || isPaidVoid) &&
                 AppSettings.refundsEnabled &&
-                PlanEnforce.allows(EntKeys.billingReturns))
+                PlanEnforce.allows(EntKeys.billingReturns) &&
+                // BLK-14: hidden from a Waiter; RefundService refuses too.
+                RestaurantSession.canAccess(RefundService.refundPermission))
               Expanded(
                 child: Tooltip(
                   message: isRefundEligible
@@ -1228,7 +1237,38 @@ class _OrderdetailsState extends State<Orderdetails> {
     );
   }
 
+  /// Reloads [currentOrder] from the saved order, so the screen never refunds
+  /// from (or shows) an out-of-date copy.
+  Future<void> _reloadCurrentOrder() async {
+    final latest = await pastOrderStore.getOrderById(currentOrder.id);
+    if (latest != null && mounted) setState(() => currentOrder = latest);
+  }
+
   Future<void> _showRefundDialog(BuildContext context) async {
+    // One refund at a time from this screen: further taps are ignored until
+    // the current one has been saved (or refused) and the order reloaded.
+    if (_refunding) return;
+    _refunding = true;
+    try {
+      await _openRefundDialog(context);
+    } finally {
+      _refunding = false;
+    }
+  }
+
+  Future<void> _openRefundDialog(BuildContext context) async {
+    // A refund needs an open session; tell the user before the dialog opens.
+    // RefundService.processRefund enforces the same rule.
+    if (!await DayManagementService.isSessionOpen()) {
+      NotificationService.instance
+          .showInfo(RefundService.refundNeedsOpenSessionMessage);
+      return;
+    }
+
+    // Work from the order as saved, not the copy this screen was opened with.
+    await _reloadCurrentOrder();
+    if (!context.mounted) return;
+
     // Validate refund eligibility using store
     final eligibilityError = pastOrderStore.validateRefundEligibility(
       currentOrder,
@@ -1256,6 +1296,15 @@ class _OrderdetailsState extends State<Orderdetails> {
         allOrderItems: currentOrder.items ?? [],
         orderGstRate: gstRate,
         orderTotalPrice: remainingTotal,
+        // A part-paid voided order refunds what was collected, not the bill.
+        orderPaidTotal: (currentOrder.orderStatus ?? '').toUpperCase() == 'VOIDED'
+            ? RefundAllocation.collectedOf(currentOrder)
+            : currentOrder.totalPrice,
+        // Largest first: the default way the refund goes back.
+        paidMethods: (RefundAllocation.paidLegsOf(currentOrder).entries.toList()
+              ..sort((a, b) => b.value.compareTo(a.value)))
+            .map((e) => e.key)
+            .toList(),
         orderDiscount: currentOrder.Discount ?? 0.0,
         orderSubTotal: currentOrder.subTotal ?? 0.0,
         isTaxInclusive: currentOrder.isTaxInclusive ?? false,
@@ -1275,9 +1324,6 @@ class _OrderdetailsState extends State<Orderdetails> {
     );
 
     if (updatedOrder != null) {
-      // Update UI state
-      setState(() => currentOrder = updatedOrder);
-
       // Show success message
       NotificationService.instance.showSuccess(
         'Refund processed: ${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(result.totalRefundAmount)}',
@@ -1288,6 +1334,9 @@ class _OrderdetailsState extends State<Orderdetails> {
         pastOrderStore.errorMessage ?? 'Failed to process refund',
       );
     }
+
+    // Either way, show the order as it is now saved.
+    await _reloadCurrentOrder();
   }
 
   // Business logic has been moved to RefundService and InventoryService

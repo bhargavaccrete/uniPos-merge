@@ -245,27 +245,33 @@ class _ItemsDataViewState extends State<ItemsDataView> {
       return;
     }
 
-    final headers = ['Item Name', 'Quantity Sold', 'Total Revenue'];
-    final data = _filteredData.map((item) => [
-      item.itemName,
-      item.totalQuantity.toString(),
-      ReportExportService.formatCurrency(item.totalRevenue),
-    ]).toList();
-
-    final summary = {
-      'Report Period': _getPeriodDisplayName(),
-      'Total Items': _totalItems.toString(),
-      'Total Quantity Sold': _totalQuantity.toString(),
-      'Total Revenue': ReportExportService.formatCurrency(_totalRevenue),
-    };
-
-    await ReportExportService.showExportDialog(
+    final periodName = _getPeriodDisplayName();
+    // All filtered items / Current page. Rows are per-item totals, so no
+    // date range (change the screen's period instead). The summary is built
+    // from exactly the exported rows, so it follows the search box too.
+    await ReportExportService.showRangedExportDialog<ItemReportData>(
       context: context,
       fileName: 'sales_by_items_${widget.period.name.toLowerCase()}_${DateFormat('yyyyMMdd').format(DateTime.now())}',
       reportTitle: 'Sales by Items Report',
-      headers: headers,
-      data: data,
-      summary: summary,
+      headers: const ['Item Name', 'Quantity Sold', 'Total Revenue'],
+      items: _filteredData,
+      rowOf: (item) => [
+        item.itemName,
+        item.totalQuantity.toString(),
+        ExportMoney(item.totalRevenue),
+      ],
+      dateOf: (_) => null,
+      summaryOf: (rows) => {
+        'Report Period': periodName,
+        'Total Items': rows.length.toString(),
+        'Total Quantity Sold':
+            rows.fold<int>(0, (s, i) => s + i.totalQuantity).toString(),
+        'Total Revenue': ReportExportService.formatCurrency(
+            rows.fold<double>(0.0, (s, i) => s + i.totalRevenue)),
+      },
+      currentPage: _currentPage,
+      rowsPerPage: _rowsPerPage,
+      unit: 'items',
     );
   }
 

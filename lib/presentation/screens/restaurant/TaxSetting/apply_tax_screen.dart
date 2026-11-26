@@ -8,6 +8,7 @@ import '../../../../core/di/service_locator.dart';
 import '../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../data/models/common/taxmodel_314.dart';
 import '../../../../domain/services/restaurant/notification_service.dart';
+import '../../../../domain/services/restaurant/restaurant_tax_assignment.dart';
 import '../../../../util/common/currency_helper.dart';
 import '../../../../util/restaurant/staticswitch.dart';
 import '../../../widget/componets/common/primary_app_bar.dart';
@@ -135,35 +136,64 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
     try {
       final tax = widget.taxToApply;
       final double rate = tax.taxperecentage! / 100.0;
+      final rates = RestaurantTaxAssignment.ratesById(taxStore.taxes);
       int applied = 0;
       int skipped = 0;
+      int unlinked = 0;
 
       for (String id in _selectedItemIds) {
-        try {
-          final item = itemStore.items.firstWhere((item) => item.id == id);
-          // Adds the tax (max 2 per item); skips if already applied or at cap.
-          if (item.applyTax(tax.id, rate)) {
-            applied++;
-            await itemStore.updateItem(item);
-          } else {
+        final match = itemStore.items.where((item) => item.id == id);
+        if (match.isEmpty) continue;
+        final item = match.first;
+        final plan = RestaurantTaxAssignment.planApply(
+          currentIds: item.taxIds,
+          currentRate: item.taxRate,
+          taxId: tax.id,
+          taxRate: rate,
+          rates: rates,
+        );
+        switch (plan.outcome) {
+          case TaxApplyOutcome.applied:
+          case TaxApplyOutcome.linked:
+            if (await _saveTaxes(item, plan.ids, plan.rate)) {
+              applied++;
+            } else {
+              skipped++;
+            }
+          case TaxApplyOutcome.unlinkedRate:
+            unlinked++;
+          case TaxApplyOutcome.alreadyApplied:
+          case TaxApplyOutcome.atLimit:
             skipped++;
-          }
-        } catch (e) {
-          // item not found, skip
         }
       }
 
       setState(() => _selectedItemIds.clear());
 
-      NotificationService.instance.showSuccess(
-        skipped > 0
-            ? '${tax.taxname} (${tax.taxperecentage}%) applied to $applied item(s). '
-                  '$skipped skipped (already taxed or at the 2-tax limit).'
-            : '${tax.taxname} (${tax.taxperecentage}%) applied to $applied item(s).',
-      );
+      final parts = [
+        '${tax.taxname} (${tax.taxperecentage}%) applied to $applied item(s).',
+        if (skipped > 0)
+          '$skipped skipped (already taxed or at the 2-tax limit).',
+        if (unlinked > 0)
+          '$unlinked skipped: their tax rate is not linked to a tax. '
+              'Fix it in Edit Item.',
+      ];
+      NotificationService.instance.showSuccess(parts.join(' '));
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  /// Writes [ids]/[rate] to [item]; on a refused save the item keeps what it
+  /// had, in memory as on disk.
+  Future<bool> _saveTaxes(Items item, List<String>? ids, double? rate) async {
+    final oldIds = item.taxIds, oldRate = item.taxRate;
+    item.taxIds = ids;
+    item.taxRate = rate;
+    if (await itemStore.updateItem(item)) return true;
+    item.taxIds = oldIds;
+    item.taxRate = oldRate;
+    return false;
   }
 
   Future<void> _removeTaxFromSelected() async {
@@ -173,14 +203,19 @@ class _ApplyTaxScreenState extends State<ApplyTaxScreen> {
     try {
       final tax = widget.taxToApply;
       final double rate = tax.taxperecentage! / 100.0;
+      final rates = RestaurantTaxAssignment.ratesById(taxStore.taxes);
       for (String id in _selectedItemIds) {
-        try {
-          final item = itemStore.items.firstWhere((item) => item.id == id);
-          item.removeTax(tax.id, rate);
-          await itemStore.updateItem(item);
-        } catch (e) {
-          // item not found, skip
-        }
+        final match = itemStore.items.where((item) => item.id == id);
+        if (match.isEmpty) continue;
+        final item = match.first;
+        final plan = RestaurantTaxAssignment.planRemove(
+          currentIds: item.taxIds,
+          currentRate: item.taxRate,
+          taxId: tax.id,
+          taxRate: rate,
+          rates: rates,
+        );
+        if (plan != null) await _saveTaxes(item, plan.ids, plan.rate);
       }
 
       setState(() => _selectedItemIds.clear());

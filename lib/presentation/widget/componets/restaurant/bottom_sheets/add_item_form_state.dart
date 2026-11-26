@@ -41,11 +41,18 @@ class AddItemFormState extends ChangeNotifier {
   // See docs/inventory_recipe_system_plan.md §3/§8.1.
   String productType = ProductType.finishedGood;
 
+  /// Finished only: made to order (default — a dish cooked when sold) or
+  /// made in advance (prepared stock), optionally making fresh when out.
+  String prepMode = ProductType.madeToOrder;
+  bool makeFreshWhenOut = false;
+
+  bool get isMadeToOrder =>
+      productType == ProductType.finishedGood &&
+      prepMode == ProductType.madeToOrder;
+
   /// Menu items appear on the POS grid and therefore need a category + a
   /// selling price. Back-of-house types (raw materials, prep) do not.
-  bool get isMenuType =>
-      productType == ProductType.finishedGood ||
-      productType == ProductType.recipeBased;
+  bool get isMenuType => ProductType.isMenuType(productType);
 
   // Selling method
   SellingMethod sellingMethod = SellingMethod.byUnit;
@@ -88,6 +95,8 @@ class AddItemFormState extends ChangeNotifier {
     lowStockAlertEnabled = false;
     selectedImage = null;
     productType = ProductType.finishedGood;
+    prepMode = ProductType.madeToOrder;
+    makeFreshWhenOut = false;
     sellingMethod = SellingMethod.byUnit;
     selectedUnit = 'kg';
     selectedCategoryId = null;
@@ -121,7 +130,7 @@ class AddItemFormState extends ChangeNotifier {
     if (isMenuType) {
       if (priceText.isEmpty) {
         errors.add(
-          productType == ProductType.recipeBased ? 'Selling Price' : 'Price',
+          productType == ProductType.finishedGood ? 'Selling Price' : 'Price',
         );
       } else {
         final price = double.tryParse(priceText);
@@ -177,6 +186,18 @@ class AddItemFormState extends ChangeNotifier {
               )
               .toList();
 
+    // Made to order owns no stock; only Finished carries a prep mode.
+    final stored = ProductType.storedFields(
+        type: productType, prepMode: prepMode, makeFresh: makeFreshWhenOut);
+    final stock = ProductType.resolvePhysicalStock(
+      productType,
+      prepMode: prepMode,
+      requestedTrackInventory: trackInventory,
+      requestedStockQuantity: (trackInventory && selectedVariants.isEmpty)
+          ? (double.tryParse(stockController.text.trim()) ?? 0.0)
+          : 0.0,
+    );
+
     return Items(
       id: const Uuid().v4(),
       name: itemNameController.text.trim(),
@@ -187,7 +208,9 @@ class AddItemFormState extends ChangeNotifier {
         productType,
         double.tryParse(priceController.text.trim()),
       ),
-      productType: productType,
+      productType: stored.productType,
+      prepMode: stored.prepMode,
+      makeFreshWhenOut: stored.makeFreshWhenOut,
       description: descriptionController.text.trim(),
       categoryOfItem: selectedCategoryId ?? "",
       imageBytes: selectedImage,
@@ -204,16 +227,14 @@ class AddItemFormState extends ChangeNotifier {
                 ? 'piece'
                 : null),
       // Item-level stock only for simple items; variant items track per variant.
-      stockQuantity: (trackInventory && selectedVariants.isEmpty)
-          ? (double.tryParse(stockController.text.trim()) ?? 0.0)
-          : 0.0,
+      stockQuantity: stock.stockQuantity,
       taxRate: selectedTaxRate,
       taxIds: selectedTaxIds,
-      lowStockAlertEnabled: trackInventory && lowStockAlertEnabled,
-      lowStockThreshold: (trackInventory && lowStockAlertEnabled)
+      lowStockAlertEnabled: stock.trackInventory && lowStockAlertEnabled,
+      lowStockThreshold: (stock.trackInventory && lowStockAlertEnabled)
           ? double.tryParse(lowStockThresholdController.text.trim())
           : null,
-      trackInventory: trackInventory,
+      trackInventory: stock.trackInventory,
       allowOrderWhenOutOfStock: allowOrderWhenOutOfStock,
       sellDirectlyAtPos:
           (productType == ProductType.rawMaterial ||
@@ -302,28 +323,50 @@ class AddItemFormState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Set the product type. Back-of-house types are stocked directly, so
-  /// inventory tracking is turned on for them by default; a Recipe-Based item
-  /// has no stock of its own (it's derived from ingredients), so tracking is
-  /// turned off. Either way, becoming stock-governed defaults Allow-OOS to
-  /// "block" (matches Edit's existing "enforce limits by default" policy —
-  /// see [setTrackInventory]); Recipe-Based is always stock-governed via its
-  /// ingredients, so it gets the same default. All of this stays
-  /// user-overridable via the toggle/switch.
+  /// Set the product type. Raw Material, Semi-Finished and Trade Items are
+  /// stocked directly, so inventory tracking is turned on for them by
+  /// default; a Finished item follows its preparation mode ([setPrepMode]).
+  /// Becoming stock-governed defaults Allow-OOS to "block" (matches Edit's
+  /// existing "enforce limits by default" policy — see [setTrackInventory]).
+  /// All of this stays user-overridable via the toggle/switch.
   void setProductType(String type) {
     productType = type;
     if (type == ProductType.rawMaterial || type == ProductType.semiFinished) {
       trackInventory = true;
       allowOrderWhenOutOfStock = false;
       sellDirectlyAtPos = false;
-    } else if (type == ProductType.recipeBased) {
-      trackInventory = false;
+    } else if (type == ProductType.tradeItem) {
+      trackInventory = true;
       allowOrderWhenOutOfStock = false;
       sellDirectlyAtPos = null;
     } else {
       sellDirectlyAtPos = null;
+      _applyPrepModeDefaults();
     }
     notifyListeners();
+  }
+
+  /// Finished preparation: made to order owns no stock (its recipe, if any,
+  /// governs availability); made in advance tracks prepared stock.
+  void setPrepMode(String mode) {
+    prepMode = mode;
+    if (mode == ProductType.madeToOrder) makeFreshWhenOut = false;
+    _applyPrepModeDefaults();
+    notifyListeners();
+  }
+
+  void setMakeFreshWhenOut(bool value) {
+    makeFreshWhenOut = value;
+    notifyListeners();
+  }
+
+  void _applyPrepModeDefaults() {
+    if (prepMode == ProductType.madeToOrder) {
+      trackInventory = false;
+    } else {
+      trackInventory = true;
+      allowOrderWhenOutOfStock = false;
+    }
   }
 
   /// Set track inventory. Enabling it defaults Allow-OOS to "block" (NO) —

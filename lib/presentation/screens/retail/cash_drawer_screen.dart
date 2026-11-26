@@ -15,6 +15,7 @@ import 'package:billberrylite/presentation/widget/componets/common/money_scope.d
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/common/dialog_dispose_scope.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/presentation/screens/retail/retail_day_guard.dart';
 
 /// Retail Cash Drawer.
 ///
@@ -117,7 +118,10 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
           // Returns carry a negative totalAmount, so adding them nets the
           // method down automatically — including card/UPI refunds, which
           // belong in the summary even though they never touch the drawer.
-          _addToMethod(s.paymentType, s.totalAmount);
+          // Through the stored legs (BLK-11): a return against an unpaid
+          // balance nets credit by what it cancelled and cash only by what
+          // was handed back. Without legs it is method + total, as before.
+          CashDrawerLedger.settledLegsOf(s).forEach(_addToMethod);
           // The SHARED rule, not a local one. This used to read
           // `s.paymentType == 'cash' ? s.totalAmount.abs() : 0`, which ignored
           // the stored payment legs: an exchange return booked the whole value
@@ -287,6 +291,9 @@ class _CashDrawerScreenState extends State<CashDrawerScreen>
   // ── Cash In / Cash Out dialog ────────────────────────────────────────────
 
   Future<void> _showMovementDialog(String type) async {
+    // WF-4: Cash In/Out needs an open day (offers Start Day when none is),
+    // or the money falls outside every End of Day.
+    if (!await ensureRetailDayOpen(context) || !mounted) return;
     final amountCtrl = TextEditingController();
     final noteCtrl = TextEditingController();
     final isCashIn = type == 'in';

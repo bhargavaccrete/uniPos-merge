@@ -12,6 +12,7 @@ class RestaurantSession {
   static const _loginTypeKey      = 'restaurant_login_type'; // 'admin' | 'staff'
   static const _staffRoleKey      = 'restaurant_staff_role';
   static const _staffNameKey      = 'restaurant_staff_name';
+  static const staffIdKey         = 'restaurant_staff_id';
   static const _isLoggedInKey     = 'restaurant_is_logged_in';
   static const _currentShiftIdKey = 'restaurant_current_shift_id';
 
@@ -112,6 +113,11 @@ class RestaurantSession {
   static String? get staffName => staffNameNotifier.value;
   static bool    get isAdmin   => loginType == 'admin';
 
+  /// `StaffModel.id` of the logged-in staff member; null for admin or when
+  /// nobody is logged in. Names can repeat — this identifies the record.
+  static String? _staffId;
+  static String? get staffId => _staffId;
+
   /// Effective role string for display / permission checks.
   /// Admin and Manager both get full access.
   static String get effectiveRole => isAdmin ? 'Admin' : (staffRole ?? 'Staff');
@@ -123,7 +129,9 @@ class RestaurantSession {
     await prefs.setBool(_isLoggedInKey, true);
     await prefs.remove(_staffRoleKey);
     await prefs.remove(_staffNameKey);
+    await prefs.remove(staffIdKey);
     _isLoggedIn = true;
+    _staffId = null;
     loginTypeNotifier.value = 'admin';
     staffRoleNotifier.value = null;
     staffNameNotifier.value = null;
@@ -138,7 +146,9 @@ class RestaurantSession {
     await prefs.setBool(_isLoggedInKey, true);
     await prefs.setString(_staffRoleKey, staff.isCashier);
     await prefs.setString(_staffNameKey, name);
+    await prefs.setString(staffIdKey, staff.id);
     _isLoggedIn = true;
+    _staffId = staff.id;
     loginTypeNotifier.value = 'staff';
     staffRoleNotifier.value = staff.isCashier;
     staffNameNotifier.value = name;
@@ -175,9 +185,11 @@ class RestaurantSession {
     await prefs.remove(_loginTypeKey);
     await prefs.remove(_staffRoleKey);
     await prefs.remove(_staffNameKey);
+    await prefs.remove(staffIdKey);
     await prefs.setBool(_isLoggedInKey, false);
     await prefs.remove(_currentShiftIdKey);
     _currentShiftId = null;
+    _staffId = null;
     loginTypeNotifier.value = 'admin';
     staffRoleNotifier.value = null;
     staffNameNotifier.value = null;
@@ -196,6 +208,7 @@ class RestaurantSession {
     loginTypeNotifier.value = prefs.getString(_loginTypeKey) ?? 'admin';
     staffRoleNotifier.value = prefs.getString(_staffRoleKey);
     staffNameNotifier.value = prefs.getString(_staffNameKey);
+    _staffId = prefs.getString(staffIdKey);
     _currentShiftId = prefs.getString(_currentShiftIdKey);
     timeoutMinutesNotifier.value =
         prefs.getInt(_timeoutMinutesKey) ?? _defaultTimeoutMinutes;
@@ -242,12 +255,10 @@ class RestaurantSession {
     'suppliers',
     'purchase',
     'dataBackup',
-    // Money-sensitive POS actions. Each is read through a named service getter
-    // (PriceOverrideService.canOverride and friends) whose callers HIDE the
-    // control rather than showing it and refusing.
-    'billingOverride',
-    'billingDiscount',
-    'billingExchange',
+    // Cost price in the price-override and line-discount dialogs. A Cashier
+    // may override, discount and exchange (billingOverride / billingDiscount /
+    // billingExchange are deliberately NOT listed), but not see cost.
+    'viewCostPrice',
   };
 
   /// Returns true if the current session can access the given feature key.
@@ -259,12 +270,13 @@ class RestaurantSession {
   ///
   /// Restaurant keys: 'startOrder', 'manageMenu', 'manageStaff', 'customers',
   ///   'reports', 'taxSettings', 'expenses', 'inventory', 'settings',
-  ///   'cashDrawer', 'endDay'.
+  ///   'cashDrawer', 'endDay', 'refund', 'void'. (`refund`/`void`: open to
+  ///   Cashier, denied to Waiter — who is allowed 'startOrder' only.)
   /// Retail keys: 'billing', 'customers', 'catalog', 'catalogEdit',
   ///   'inventory', 'inventoryAdjust', 'suppliers', 'purchase', 'reports',
   ///   'manageStaff', 'settings', 'taxSettings', 'dataBackup', 'cashDrawer',
   ///   'endDay', 'attendance', 'billingOverride', 'billingDiscount',
-  ///   'billingExchange'.
+  ///   'billingExchange', 'viewCostPrice'.
   static bool canAccess(String feature) {
     // Fail CLOSED when nobody is signed in. `clearSession` resets loginType to
     // 'admin' (its default), so `isAdmin` reads TRUE after a logout — without

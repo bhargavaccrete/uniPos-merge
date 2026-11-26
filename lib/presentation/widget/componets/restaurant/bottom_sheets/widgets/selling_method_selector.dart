@@ -61,14 +61,15 @@ class _SellingMethodSheetState extends State<SellingMethodSheet> {
   late SellingMethod _method;
   late String _unit;
 
-  static const _units = kItemUnits;
+  static const _units = kWeightUnits;
 
   @override
   void initState() {
     super.initState();
-    _method = widget.currentMethod;
-    // Clamp to a supported value so legacy units don't crash the dropdown.
-    _unit = normalizeItemUnit(widget.currentUnit) ?? _units.first;
+    final unit = normalizeItemUnit(widget.currentUnit);
+    // 'piece' is counting, i.e. By Unit — never a By Weight unit.
+    _method = unit == 'piece' ? SellingMethod.byUnit : widget.currentMethod;
+    _unit = _units.contains(unit) ? unit! : _units.first;
   }
 
   @override

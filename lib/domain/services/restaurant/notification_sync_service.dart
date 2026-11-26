@@ -1,7 +1,7 @@
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/core/routes/routes_name.dart';
 import 'package:billberrylite/data/models/common/notification_presenter.dart';
-import 'package:billberrylite/domain/services/common/auto_backup_service.dart';
+import 'package:billberrylite/domain/services/common/backup_due_sync.dart';
 import 'package:billberrylite/domain/services/common/local_notification_service.dart';
 import 'package:billberrylite/domain/services/restaurant/day_management_service.dart';
 import 'package:billberrylite/domain/services/restaurant/low_stock_sync_service.dart';
@@ -49,28 +49,9 @@ class NotificationSyncService {
     }
   }
 
-  static Future<void> _syncBackupDue() async {
-    const seed = 'backup_due:system';
-    final enabled = await AutoBackupService.isAutoBackupEnabled();
-    final overdue = enabled && await _backupOverdue();
-    if (overdue) {
-      await notificationStore.raiseEvent(
-        eventCode: 'backup_due',
-        subjectType: 'system',
-        fireOs: false,
-      );
-      await LocalNotificationService.instance.schedule(
-        idSeed: seed,
-        when: _nextMorning(),
-        title: 'Database Backup Needed',
-        body: 'No backup in the last 7 days. Back up to secure your data.',
-        channelId: NotificationChannels.appAlerts,
-      );
-    } else {
-      await notificationStore.resolve('backup_due', 'system', null);
-      await LocalNotificationService.instance.cancelBySeed(seed);
-    }
-  }
+  // Shared with Retail (BKP-6 K2): same check, same reminder.
+  static Future<void> _syncBackupDue() =>
+      BackupDueSync.sync(remindAt: _nextMorning());
 
   static Future<void> _syncLicense() async {
     final lic = locator<LicenseStore>();
@@ -121,14 +102,6 @@ class NotificationSyncService {
       await LocalNotificationService.instance.cancelBySeed(expiringSeed);
       await LocalNotificationService.instance.cancelBySeed(expiredSeed);
     }
-  }
-
-  static Future<bool> _backupOverdue() async {
-    final last = await AutoBackupService.getLastBackupDate();
-    if (last == null || last.isEmpty) return true;
-    final parsed = DateTime.tryParse(last);
-    if (parsed == null) return true;
-    return DateTime.now().difference(parsed).inDays >= 7;
   }
 
   static DateTime _nextMorning() {

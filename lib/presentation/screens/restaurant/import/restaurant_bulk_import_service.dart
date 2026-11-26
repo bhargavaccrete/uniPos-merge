@@ -356,6 +356,8 @@ class RestaurantBulkImportService {
       errors.add('Row $rowNumber: Pounds aren\'t supported — convert to kg first (1 lb = 0.4536 kg)');
     } else if (unit.isNotEmpty && normalizeItemUnit(unit) == null) {
       errors.add('Row $rowNumber: Unrecognized Unit "$unit" (use kg, gm, liter, ml or piece)');
+    } else if (isSoldByWeight && normalizeItemUnit(unit) == 'piece') {
+      errors.add('Row $rowNumber: Unit "piece" can\'t be sold by weight — set IsSoldByWeight to No, or use kg, gm, liter or ml');
     }
 
     // 6. Inventory validation
@@ -1041,8 +1043,12 @@ class RestaurantBulkImportService {
         final taxRateValue = TaxFeature.enabled ? _normalizeTaxRate(rawTaxRate) : 0.0;
         String? taxId;
         if (TaxFeature.enabled && rawTaxRate != null && rawTaxRate > 0) {
-          // Use raw value (5) for Tax creation, normalized value (0.05) for Item
-          taxId = await _getOrCreateTax(rawTaxRate, result);
+          // The Tax holds a percentage (5), the Item a decimal (0.05). Both come
+          // from the normalized rate, so a file written as 0.05 links to a 5%
+          // tax rather than creating a 0.05% one.
+          final percent =
+              double.parse((taxRateValue * 100).toStringAsFixed(4));
+          taxId = await _getOrCreateTax(percent, result);
         }
 
         // Step 7: Create item
@@ -1072,6 +1078,8 @@ class RestaurantBulkImportService {
           stockQuantity: _getDoubleFromValue(rowData['StockQuantity']),
           allowOrderWhenOutOfStock: _parseBool(rowData['AllowOutOfStock']?.toString() ?? '', true),
           taxRate: taxRateValue,
+          // The tax the rate came from, so taxIds and taxRate agree.
+          taxIds: taxId != null ? [taxId] : null,
           isEnabled: _parseBool(rowData['IsEnabled']?.toString() ?? '', true),
           isFavorite: _parseBool(
               rowData['IsFavorite']?.toString() ?? '', existingItem?.isFavorite ?? false),

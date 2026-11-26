@@ -21,7 +21,11 @@ import 'package:billberrylite/core/constants/hive_box_names.dart';
 import 'package:billberrylite/data/models/common/attendance_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/eodmodel_317.dart';
 import 'package:billberrylite/data/models/restaurant/db/pastordermodel_313.dart';
-import 'package:billberrylite/data/models/restaurant/db/cartmodel_308.dart';
+import 'package:billberrylite/domain/services/restaurant/kot_layout.dart';
+import 'package:billberrylite/domain/services/restaurant/paid_order_record.dart';
+import 'package:billberrylite/domain/services/restaurant/order_close.dart';
+import 'package:billberrylite/domain/services/restaurant/settle_new_order.dart';
+import 'package:billberrylite/domain/services/restaurant/void_order_commit.dart';
 import '../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../start order/startorder.dart';
 import '../start order/cart/cart.dart';
@@ -34,7 +38,6 @@ import 'package:billberrylite/domain/services/restaurant/day_management_service.
 import 'package:billberrylite/domain/services/restaurant/eod_service.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/domain/services/restaurant/esc_pos_receipt_builder.dart';
-import 'package:billberrylite/domain/services/restaurant/inventory_service.dart';
 import 'package:billberrylite/presentation/screens/restaurant/welcome_Admin.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
@@ -599,43 +602,22 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
 
   /// Mark the order served + move it to past as COMPLETED (payment preserved).
   /// No inventory change (stock already deducted). Returns the past record.
-  Future<PastOrderModel> _completeServiceForOrder(OrderModel o) async {
+  /// Null when it could not be saved — the order then stays active (SALE-4).
+  Future<PastOrderModel?> _completeServiceForOrder(OrderModel o) async {
     final int billNumber = o.billNumber ?? await orderStore.getNextBillNumber();
-    final pastOrder = PastOrderModel(
-      id: o.id,
-      customerName: o.customerName,
-      totalPrice: o.totalPrice,
-      items: o.items,
-      orderAt: o.timeStamp,
-      orderType: o.orderType,
-      paymentmode: o.paymentMethod ?? 'Cash',
-      subTotal: o.subTotal,
-      Discount: o.discount,
-      gstRate: o.gstRate,
-      gstAmount: o.gstAmount,
-      kotNumbers: o.kotNumbers,
-      kotBoundaries: o.kotBoundaries,
+    // Same record as Active Orders builds; the shift is the one that took
+    // the payment, not the one open at End of Day.
+    final pastOrder = PaidOrderRecord.toPastOrder(
+      o,
       billNumber: billNumber,
-      isTaxInclusive: o.isTaxInclusive,
-      taxEnabled: TaxFeature.enabled,
       storeGstNumber: await StoreSettingsService().gstNumberSnapshot(),
-      roundOffStep: AppSettings.roundOffStepForRecord,
-      discountOnItems: AppSettings.discountOnItems,
-      shiftId: RestaurantSession.currentShiftId,
-      sessionId: o.sessionId,
-      orderStatus: 'COMPLETED',
-      paymentListJson: o.paymentListJson,
-      isSplitPayment: o.isSplitPayment,
-      totalPaid: o.totalPaid,
-      changeReturn: o.changeReturn,
-      tableNo: o.tableNo,
-      customerId: o.customerId,
-      serviceCharge: o.serviceCharge,
+      currentShiftId: RestaurantSession.currentShiftId,
     );
-    await pastOrderStore.addOrder(pastOrder);
-    await orderStore.deleteOrder(o.id);
-    if (o.tableNo != null && o.tableNo!.isNotEmpty) {
-      await tableStore.updateTableStatus(o.tableNo!, 'Available');
+    try {
+      await OrderClose.moveToPast(pastOrder, orderId: o.id, tableNo: o.tableNo);
+    } on OrderSaveFailedException catch (e) {
+      NotificationService.instance.showError(e.message);
+      return null;
     }
     return pastOrder;
   }
@@ -647,11 +629,20 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
     final staff = RestaurantSession.isAdmin
         ? 'Admin'
         : (RestaurantSession.staffName ?? 'Staff');
+    // Same per-KOT rule as the Active Orders void (KotStatusRule); the record
+    // keeps restored lines marked restocked.
+    final voidPlan = KotLayout.voidPlan(
+      items: o.items,
+      kotNumbers: o.kotNumbers,
+      kotBoundaries: o.kotBoundaries,
+      kotStatuses: o.kotStatuses ?? {},
+      orderStatus: o.status,
+    );
     final voidRecord = PastOrderModel(
       id: o.id,
       customerName: o.customerName,
       totalPrice: o.totalPrice,
-      items: o.items,
+      items: voidPlan.recordItems,
       orderAt: o.timeStamp,
       orderType: o.orderType,
       paymentmode: 'N/A',
@@ -669,19 +660,19 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
       roundOffStep: AppSettings.roundOffStepForRecord,
       discountOnItems: AppSettings.discountOnItems,
     );
-    await pastOrderStore.addOrder(voidRecord);
-    if (o.status == 'Processing') {
-      final itemsToRestock = <CartItem, int>{};
-      for (final item in o.items) {
-        if (item.quantity > 0) itemsToRestock[item] = item.quantity;
+    // Record, removal, table and stock return — exactly once (SALE-4). A
+    // record that was not saved leaves the order untouched.
+    try {
+      final result = await VoidOrderCommit.commit(
+        order: o,
+        record: voidRecord,
+        restores: voidPlan.restores,
+      );
+      if (!result.stockFinished) {
+        NotificationService.instance.showWarning(result.message!);
       }
-      if (itemsToRestock.isNotEmpty) {
-        await InventoryService.restoreStockForRefund(itemsToRestock);
-      }
-    }
-    await orderStore.deleteOrder(o.id);
-    if (o.tableNo != null && o.tableNo!.isNotEmpty) {
-      await tableStore.updateTableStatus(o.tableNo!, 'Available');
+    } on OrderSaveFailedException catch (e) {
+      NotificationService.instance.showError(e.message);
     }
   }
 
@@ -689,6 +680,7 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
   /// Order Details where the existing Refund flow handles it (gating + audit).
   Future<void> _refundOrderAtEod(OrderModel o) async {
     final past = await _completeServiceForOrder(o);
+    if (past == null) return;
     if (mounted) {
       await Navigator.push(
         context,
@@ -1799,8 +1791,10 @@ class _EndDayDrawerState extends State<EndDayDrawer> {
     }
 
     // ── PDF FALLBACK — same SETTLEMENT layout on an 80mm roll ──
-    final font = await PdfGoogleFonts.poppinsRegular();
-    final boldFont = await PdfGoogleFonts.poppinsBold();
+    final font =
+        pw.Font.ttf(await rootBundle.load('assets/fonts/Poppins-Regular.ttf'));
+    final boldFont =
+        pw.Font.ttf(await rootBundle.load('assets/fonts/Poppins-Bold.ttf'));
 
     final fallbackFonts = <pw.Font>[];
     for (final path in const [

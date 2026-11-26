@@ -169,18 +169,20 @@ class RestaurantDamagedItemsReportScreen extends StatelessWidget {
                 r['supplierName'],
                 r['grnNumber'],
                 r['poNumber'],
-                _date(r['receivedDate'] as String),
-                exportQty((r['damagedQty'] as num).toDouble()),
-                ReportExportService.formatCurrency(
-                    (r['costPrice'] as num).toDouble()),
-                ReportExportService.formatCurrency(
-                    (r['damagedValue'] as num).toDouble()),
+                ReportExportService.isoDateCell(r['receivedDate'] as String),
+                exportQty((r['damagedQty'] as num).toDouble()), // quantity
+                ExportMoney((r['costPrice'] as num).toDouble()),
+                ExportMoney((r['damagedValue'] as num).toDouble()),
                 r['handlingDisplay'],
               ],
             )
             .toList(),
         summary: damagedItemsExportSummary(rows),
       ),
+      // Opt-in: All / Current page / Date range by receivedDate — the field
+      // the loader filters on.
+      rangedExport: true,
+      exportRowDate: (r) => DateTime.tryParse(r['receivedDate'] as String),
     );
   }
 }

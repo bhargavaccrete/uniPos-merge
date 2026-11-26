@@ -350,13 +350,15 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
             p.totalShifts,
             p.durationLabel,
             p.totalOrders,
-            p.ordersPerHour.toStringAsFixed(2),
-            p.totalSales,
-            p.avgOrderValue,
-            p.totalDiscounts,
-            p.totalRefunds,
-            p.totalExpenses,
-            p.totalSales - p.totalExpenses,
+            p.ordersPerHour.toStringAsFixed(2), // a rate, not money
+            // Money: real numbers in Excel; the PDF prints them formatted
+            // (was raw doubles such as 1234.5000001).
+            ExportMoney(p.totalSales),
+            ExportMoney(p.avgOrderValue),
+            ExportMoney(p.totalDiscounts),
+            ExportMoney(p.totalRefunds),
+            ExportMoney(p.totalExpenses),
+            ExportMoney(p.totalSales - p.totalExpenses),
           ],
         )
         .toList();

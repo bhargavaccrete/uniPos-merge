@@ -301,16 +301,19 @@ class _FoodCostMarginTab extends StatelessWidget {
         if (rows.isEmpty) {
           return const AppEmptyState(
             icon: Icons.receipt_long_rounded,
-            title: 'No recipes configured yet',
+            title: 'Nothing to cost yet',
             message:
-                'Mark an item Semi-Finished or Recipe-Based and add ingredients to see cost & margin here.',
+                'Add Finished, Semi-Finished or Trade items to see cost & margin here.',
           );
         }
 
         final pricedRows = rows
             .where((r) => r.foodCostPercent != null)
             .toList();
-        final unpricedCount = rows.length - pricedRows.length;
+        final noCostCount = rows.where((r) => r.costPerUnit == null).length;
+        final unpricedCount = rows
+            .where((r) => r.costPerUnit != null && r.foodCostPercent == null)
+            .length;
         final avgFoodCostPercent = pricedRows.isEmpty
             ? null
             : pricedRows
@@ -324,8 +327,8 @@ class _FoodCostMarginTab extends StatelessWidget {
             ReportSummaryRow(
               cards: [
                 ReportSummaryCard(
-                  title: 'Recipes Tracked',
-                  value: rows.length.toString(),
+                  title: 'Items Costed',
+                  value: (rows.length - noCostCount).toString(),
                   icon: Icons.receipt_long_rounded,
                   color: AppColors.primary,
                 ),
@@ -349,6 +352,17 @@ class _FoodCostMarginTab extends StatelessWidget {
                   subtitle: unpricedCount > 0
                       ? 'Set a price to see margin'
                       : 'All priced',
+                ),
+                ReportSummaryCard(
+                  title: 'No Cost',
+                  value: noCostCount.toString(),
+                  icon: Icons.help_outline_rounded,
+                  color: noCostCount > 0
+                      ? AppColors.warning
+                      : AppColors.success,
+                  subtitle: noCostCount > 0
+                      ? 'Add a recipe, purchase or production'
+                      : 'All costed',
                 ),
               ],
             ),
@@ -379,6 +393,21 @@ class _FoodCostCard extends StatelessWidget {
     final Color pillColor = foodCostPercent == null
         ? AppColors.textSecondary
         : colorOf(foodCostPercent);
+    final item = row.item;
+    final String typeLabel = item.isSemiFinished
+        ? 'Semi-Finished'
+        : item.isTradeItem
+            ? 'Trade Item'
+            : item.isMadeToOrder
+                ? 'Finished · Made to order'
+                : 'Finished · Made in advance';
+    final Color typeColor = item.isSemiFinished
+        ? AppColors.info
+        : item.isTradeItem
+            ? AppColors.secondary
+            : item.isMadeToOrder
+                ? AppColors.orange
+                : AppColors.success;
 
     return Container(
       decoration: BoxDecoration(
@@ -409,29 +438,15 @@ class _FoodCostCard extends StatelessWidget {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color:
-                            (row.item.isSemiFinished
-                                    ? AppColors.info
-                                    : (row.item.isRecipeBased
-                                          ? AppColors.orange
-                                          : AppColors.success))
-                                .withValues(alpha: 0.12),
+                        color: typeColor.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
-                        row.item.isSemiFinished
-                            ? 'Semi-Finished'
-                            : (row.item.isRecipeBased
-                                  ? 'Recipe-Based'
-                                  : 'Finished Good'),
+                        typeLabel,
                         style: GoogleFonts.poppins(
                           fontSize: AppResponsive.captionFontSize(context),
                           fontWeight: FontWeight.w700,
-                          color: row.item.isSemiFinished
-                              ? AppColors.info
-                              : (row.item.isRecipeBased
-                                    ? AppColors.orange
-                                    : AppColors.success),
+                          color: typeColor,
                         ),
                       ),
                     ),
@@ -446,10 +461,17 @@ class _FoodCostCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '${row.ingredientCount} ingredient${row.ingredientCount == 1 ? '' : 's'}',
+                      row.missingCostIngredients > 0
+                          ? '${row.missingCostIngredients} of ${row.ingredientCount} ingredients have no cost'
+                          : row.costSource == FoodCostSource.recipe
+                              ? '${row.costSource.label} · ${row.ingredientCount} ingredient${row.ingredientCount == 1 ? '' : 's'}'
+                              : row.costSource.label,
                       style: GoogleFonts.poppins(
                         fontSize: AppResponsive.captionFontSize(context),
-                        color: AppColors.textSecondary,
+                        color: row.missingCostIngredients > 0 ||
+                                row.costPerUnit == null
+                            ? AppColors.warning
+                            : AppColors.textSecondary,
                       ),
                     ),
                   ],
@@ -503,8 +525,12 @@ class _FoodCostCard extends StatelessWidget {
                   child: _statColumn(
                     context,
                     'Cost/Unit',
-                    '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(row.costPerUnit)}',
-                    AppColors.textPrimary,
+                    row.costPerUnit == null
+                        ? 'No cost'
+                        : '${CurrencyHelper.currentSymbol}${DecimalSettings.formatAmount(row.costPerUnit!)}',
+                    row.costPerUnit == null
+                        ? AppColors.warning
+                        : AppColors.textPrimary,
                   ),
                 ),
                 Expanded(

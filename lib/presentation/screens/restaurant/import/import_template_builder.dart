@@ -222,7 +222,7 @@ class ImportTemplateBuilder {
     _setInstruction(s, [
       'Required: item name', 'Optional: unique 4-5 digit code', 'Required: number only', 'Required: pick a category',
       'Required: Veg / Non-Veg / Egg', 'Optional', 'Optional image URL',
-      'Yes/No', 'kg/gm/liter/ml/piece', 'Yes/No', 'Number (0 if not tracked)',
+      'Yes/No', 'By weight: kg/gm/liter/ml · otherwise piece or blank', 'Yes/No', 'Number (0 if not tracked)',
       'Yes/No', 'Low-stock alert level (blank = default)', 'Yes/No',
       'Number 0-100', 'Yes/No', 'Yes/No (pin to Favorites)',
       'Yes/No',

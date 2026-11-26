@@ -126,7 +126,7 @@ class GRNReportScreen extends StatelessWidget {
         ReportTable.column(context, 'PO'),
         ReportTable.column(context, 'Supplier'),
         ReportTable.column(context, 'Date'),
-        ReportTable.column(context, 'Ord', numeric: true),
+        ReportTable.column(context, 'Due', numeric: true),
         ReportTable.column(context, 'Recv', numeric: true),
         ReportTable.column(context, 'Acc', numeric: true),
         ReportTable.column(context, 'Dmg', numeric: true),
@@ -156,6 +156,11 @@ class GRNReportScreen extends StatelessWidget {
           ],
         );
       },
+      // All / Current page / Date range by receivedDate — the field the loader
+      // filters on, so a range only narrows the period already chosen.
+      rangedExport: true,
+      exportRowDate: (r) =>
+          DateTime.tryParse(r['receivedDate'] as String? ?? ''),
       exportData: (rows) => ReportExportData(
         headers: const [
           'GRN Number',
@@ -163,7 +168,7 @@ class GRNReportScreen extends StatelessWidget {
           'Supplier',
           'Received Date',
           'Invoice',
-          'Ordered',
+          'Due at Receipt',
           'Received',
           'Accepted',
           'Damaged',
@@ -175,13 +180,13 @@ class GRNReportScreen extends StatelessWidget {
                 r['grnNumber'],
                 r['poNumber'],
                 r['supplierName'],
-                _date(r['receivedDate'] as String),
+                ReportExportService.isoDateCell(r['receivedDate'] as String),
                 r['invoiceNumber'] ?? '',
                 exportQty((r['orderedQty'] as num).toDouble()),
                 exportQty((r['receivedQty'] as num).toDouble()),
                 exportQty((r['acceptedQty'] as num).toDouble()),
                 exportQty((r['damagedQty'] as num).toDouble()),
-                ReportExportService.formatCurrency(r['totalAmount'] as double),
+                ExportMoney(r['totalAmount'] as double),
               ],
             )
             .toList(),

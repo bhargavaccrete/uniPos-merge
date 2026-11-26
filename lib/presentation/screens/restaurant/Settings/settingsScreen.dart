@@ -1,542 +1,64 @@
+import 'package:flutter/foundation.dart' show kIsWeb, kReleaseMode;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:billberrylite/core/routes/routes_name.dart';
-import 'package:billberrylite/util/color.dart';
-import '../../../../domain/services/common/auto_backup_service.dart';
-import '../../../../domain/services/common/device_id_service.dart';
-import '../../../../domain/services/common/backup_encryption_service.dart';
-import '../../../../util/common/currency_helper.dart';
-import '../../../../util/restaurant/staticswitch.dart';
-import '../../../../util/common/decimal_settings.dart';
-import '../../../../util/restaurant/restaurant_session.dart';
-import '../../../widget/componets/common/app_text_field.dart';
-import '../../../widget/componets/common/app_dialog.dart';
-import '../../../widget/componets/common/dialog_dispose_scope.dart';
-import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
-import '../../../../util/common/app_responsive.dart';
-import '../../../widget/componets/common/primary_app_bar.dart';
-import 'dart:io';
-import 'package:share_plus/share_plus.dart';
-import 'package:billberrylite/domain/services/common/unified_backup_service.dart';
-import 'package:billberrylite/main.dart' as main_app;
-import 'package:billberrylite/core/plan/plan_guard.dart';
+import 'package:billberrylite/core/config/tax_feature.dart';
 import 'package:billberrylite/core/plan/entitlement_keys.dart';
+import 'package:billberrylite/core/plan/plan_guard.dart';
+import 'package:billberrylite/core/routes/routes_name.dart';
+import 'package:billberrylite/presentation/screens/common/backup/backup_restore_dialog.dart';
+import 'package:billberrylite/presentation/screens/common/backup/backup_screen.dart';
+import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
+import 'package:billberrylite/presentation/widget/componets/common/settings/common_setting_tiles.dart';
+import 'package:billberrylite/presentation/widget/componets/common/settings/day_management_settings_group.dart';
+import 'package:billberrylite/presentation/widget/componets/common/settings/settings_components.dart';
+import 'package:billberrylite/util/color.dart';
+import 'package:billberrylite/util/common/app_responsive.dart';
+import 'package:billberrylite/util/restaurant/restaurant_session.dart';
+import 'package:billberrylite/util/restaurant/staticswitch.dart';
 
+/// Restaurant Settings.
+///
+/// Same section order, rows and controls as retail's Settings — both are built
+/// from `componets/common/settings/`. Rows that already live elsewhere (Tax,
+/// Printer, Personalization, Need Help, End of Day) navigate to their existing
+/// routes; nothing is re-implemented here. Each section carries the same
+/// `canAccess` key its destination route checks.
 class Settingsscreen extends StatefulWidget {
   const Settingsscreen({super.key});
   @override
-  _settingsScreenState createState() => _settingsScreenState();
+  State<Settingsscreen> createState() => _SettingsscreenState();
 }
 
-class _settingsScreenState extends State<Settingsscreen> {
-  bool _isDecimalExpanded = false;
-  bool _isCurrencyExpanded = false;
-  bool _isRefundWindowExpanded = false;
-  bool _isTimeoutExpanded = false;
-  bool _isLowStockExpanded = false;
-  bool _isMaxSessionDurationExpanded = false;
-  bool _showCustomThreshold = false;
-  final TextEditingController _customThresholdController =
-      TextEditingController();
+class _SettingsscreenState extends State<Settingsscreen> {
+  bool _can(String key) => RestaurantSession.canAccess(key);
 
-  bool _backupEnabled = false;
-  bool _hasBackupPassword = false;
-  DeviceIdResult? _deviceIdResult;
+  void _push(String route) => Navigator.pushNamed(context, route);
 
-  @override
-  void initState() {
-    super.initState();
-    _loadSettings();
-  }
-
-  @override
-  void dispose() {
-    _customThresholdController.dispose();
-    super.dispose();
-  }
-
-  void _applyCustomThreshold() {
-    final v = double.tryParse(_customThresholdController.text.trim());
-    if (v == null || v <= 0) {
-      NotificationService.instance.showError('Enter a valid number');
+  /// Plan-gated push, matching the dashboard tile / drawer entry for [route].
+  void _pushGated(String route, String entKey, String featureName) {
+    if (!PlanGuard.allowedOr(context, entKey, featureName: featureName)) {
       return;
     }
-    AppSettings.updateLowStockThreshold(v);
-    _customThresholdController.clear();
-    FocusScope.of(context).unfocus();
+    _push(route);
   }
 
-  Future<void> _loadSettings() async {
-    await DecimalSettings.load();
-    final result = await DeviceIdService.getResult();
-    if (mounted) setState(() => _deviceIdResult = result);
-    final backupEnabled = await AutoBackupService.isAutoBackupEnabled();
-    final hasPassword = await BackupEncryptionService.hasPassword();
-    if (!mounted) return;
-    setState(() {
-      _backupEnabled = backupEnabled;
-      _hasBackupPassword = hasPassword;
-    });
-  }
-
-  Future<void> _showSetPasswordDialog({bool isChange = false}) async {
-    final pwdController = TextEditingController();
-    final confirmController = TextEditingController();
-    final pwdFocus = FocusNode();
-    final confirmFocus = FocusNode();
-    bool obscure = true;
-    String? error;
-    await showDialog(
-      context: context,
-      builder: (ctx) => DialogDisposeScope(
-        disposables: [pwdController, confirmController, pwdFocus, confirmFocus],
-        child: StatefulBuilder(
-          builder: (ctx, setDlgState) {
-            Future<void> submit() async {
-              final pwd = pwdController.text.trim();
-              final err = BackupEncryptionService.validatePassword(
-                pwd,
-                confirmController.text.trim(),
-              );
-              if (err != null) {
-                setDlgState(() => error = err);
-                return;
-              }
-              await BackupEncryptionService.setPassword(pwd);
-              if (ctx.mounted) Navigator.pop(ctx);
-              setState(() => _hasBackupPassword = true);
-            }
-
-            return AppDialogShell(
-              title: isChange
-                  ? 'Change Backup Password'
-                  : 'Set Backup Password',
-              subtitle: 'Encrypts and protects your backups',
-              accent: AppColors.primary,
-              icon: Icons.lock_outline_rounded,
-              body: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  AppTextField(
-                    controller: pwdController,
-                    focusNode: pwdFocus,
-                    autofocus: true,
-                    label: 'Password (6 digits)',
-                    hint: 'Enter 6-digit password',
-                    icon: Icons.lock_outline_rounded,
-                    obscureText: obscure,
-                    keyboardType: TextInputType.number,
-                    maxLength: 6,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    textInputAction: TextInputAction.next,
-                    onFieldSubmitted: (_) => confirmFocus.requestFocus(),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        obscure
-                            ? Icons.visibility_off_rounded
-                            : Icons.visibility_rounded,
-                        size: 20,
-                        color: AppColors.textSecondary,
-                      ),
-                      onPressed: () => setDlgState(() => obscure = !obscure),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  AppTextField(
-                    controller: confirmController,
-                    focusNode: confirmFocus,
-                    label: 'Confirm Password',
-                    icon: Icons.lock_outline_rounded,
-                    obscureText: obscure,
-                    keyboardType: TextInputType.number,
-                    maxLength: 6,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    textInputAction: TextInputAction.done,
-                    onFieldSubmitted: (_) => submit(),
-                  ),
-                  const SizedBox(height: 14),
-                  // Warning callout
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: Colors.orange.withValues(alpha: 0.3),
-                      ),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          Icons.warning_amber_rounded,
-                          size: 18,
-                          color: Colors.orange.shade700,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            "Backups can't be recovered without this password. Keep it safe.",
-                            style: GoogleFonts.poppins(
-                              fontSize: AppResponsive.captionFontSize(context),
-                              color: Colors.orange.shade800,
-                              height: 1.4,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (error != null) ...[
-                    const SizedBox(height: 10),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 9,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.red.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: Colors.red.withValues(alpha: 0.25),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.error_outline_rounded,
-                            size: 16,
-                            color: Colors.red.shade700,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              error!,
-                              style: GoogleFonts.poppins(
-                                color: Colors.red.shade700,
-                                fontSize: AppResponsive.smallFontSize(context),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-              actions: [
-                appDialogCancelButton(ctx),
-                const SizedBox(width: 12),
-                appDialogPrimaryButton(
-                  label: isChange ? 'Update' : 'Confirm',
-                  onPressed: submit,
-                ),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-
-  String _getTimeoutLabel(int minutes) {
-    if (minutes < 60) return '$minutes min';
-    return '1 hr';
-  }
-
-  String _getRefundWindowLabel(int minutes) {
-    if (minutes == 0) return 'No Limit';
-    if (minutes < 60) return '$minutes min';
-    if (minutes == 60) return '1 hr';
-    if (minutes % 60 == 0) return '${minutes ~/ 60} hr';
-    return '${(minutes / 60).toStringAsFixed(1)} hr';
-  }
-
-  String _getDecimalFilter(int precision) {
-    switch (precision) {
-      case 0:
-        return 'None';
-      case 1:
-        return '0.0';
-      case 2:
-        return '0.00';
-      case 3:
-        return '0.000';
-      default:
-        return '0.00';
+  Future<void> _openBackup() async {
+    if (!PlanGuard.allowedOr(
+      context,
+      EntKeys.dataBackup,
+      featureName: 'Backup & Restore',
+    )) {
+      return;
     }
-  }
-
-  // ── Helpers ────────────────────────────────────────────────────────────────
-
-  Widget _sectionHeader(BuildContext context, String title, IconData icon) {
-    return Padding(
-      padding: EdgeInsets.only(
-        left: AppResponsive.smallSpacing(context),
-        bottom: AppResponsive.smallSpacing(context),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: EdgeInsets.all(AppResponsive.smallSpacing(context)),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(
-                AppResponsive.smallBorderRadius(context),
-              ),
-            ),
-            child: Icon(
-              icon,
-              size: AppResponsive.smallIconSize(context),
-              color: AppColors.primary,
-            ),
-          ),
-          SizedBox(width: AppResponsive.mediumSpacing(context)),
-          Text(
-            title,
-            style: GoogleFonts.poppins(
-              fontSize: AppResponsive.smallFontSize(context),
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-              letterSpacing: 0.3,
-            ),
-          ),
-        ],
-      ),
+    // BackupScreen lists local files with dart:io — Web gets the dialog.
+    if (kIsWeb) {
+      showBackupRestoreDialog(context);
+      return;
+    }
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const BackupScreen()),
     );
   }
-
-  Widget _sectionCard(BuildContext context, List<Widget> children) {
-    final radius = AppResponsive.borderRadius(context);
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(radius),
-        border: Border.all(color: AppColors.divider),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: AppResponsive.shadowBlurRadius(context),
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(radius),
-        child: Column(children: children),
-      ),
-    );
-  }
-
-  Widget _navTile(
-    BuildContext context,
-    String title,
-    String subtitle,
-    IconData icon,
-    Color color,
-    VoidCallback onTap,
-  ) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: AppResponsive.largeSpacing(context),
-          vertical: AppResponsive.mediumSpacing(context),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(
-                  AppResponsive.borderRadius(context),
-                ),
-              ),
-              child: Icon(
-                icon,
-                size: AppResponsive.iconSize(context),
-                color: color,
-              ),
-            ),
-            SizedBox(width: AppResponsive.mediumSpacing(context)),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: GoogleFonts.poppins(
-                      fontSize: AppResponsive.bodyFontSize(context),
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: GoogleFonts.poppins(
-                      fontSize: AppResponsive.smallFontSize(context),
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Icon(
-              Icons.chevron_right_rounded,
-              size: AppResponsive.iconSize(context),
-              color: AppColors.textSecondary.withValues(alpha: 0.5),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _expandableTile({
-    required BuildContext context,
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required Color color,
-    required bool isExpanded,
-    required VoidCallback onTap,
-    required Widget expandedChild,
-  }) {
-    return Column(
-      children: [
-        InkWell(
-          onTap: onTap,
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: AppResponsive.largeSpacing(context),
-              vertical: AppResponsive.mediumSpacing(context),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(
-                      AppResponsive.borderRadius(context),
-                    ),
-                  ),
-                  child: Icon(
-                    icon,
-                    size: AppResponsive.iconSize(context),
-                    color: color,
-                  ),
-                ),
-                SizedBox(width: AppResponsive.mediumSpacing(context)),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: GoogleFonts.poppins(
-                          fontSize: AppResponsive.bodyFontSize(context),
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle,
-                        style: GoogleFonts.poppins(
-                          fontSize: AppResponsive.smallFontSize(context),
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(
-                  isExpanded
-                      ? Icons.keyboard_arrow_up_rounded
-                      : Icons.keyboard_arrow_down_rounded,
-                  size: AppResponsive.iconSize(context),
-                  color: AppColors.textSecondary,
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (isExpanded) ...[
-          Divider(height: 1, color: AppColors.divider),
-          Padding(
-            padding: EdgeInsets.fromLTRB(
-              AppResponsive.largeSpacing(context),
-              AppResponsive.mediumSpacing(context),
-              AppResponsive.largeSpacing(context),
-              AppResponsive.mediumSpacing(context),
-            ),
-            child: expandedChild,
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _tileDivider() =>
-      Divider(height: 1, color: AppColors.divider, indent: 56);
-
-  /// Modern selectable chip used by the Display/Orders/Staff option pickers.
-  /// Filled in primary when selected, outlined otherwise.
-  Widget _optionChip({
-    required String label,
-    required bool selected,
-    required VoidCallback onTap,
-    IconData? icon,
-  }) {
-    return Material(
-      color: selected ? AppColors.primary : AppColors.surfaceLight,
-      borderRadius: BorderRadius.circular(10),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: selected ? AppColors.primary : AppColors.divider,
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (icon != null) ...[
-                Icon(
-                  icon,
-                  size: 15,
-                  color: selected ? Colors.white : AppColors.textSecondary,
-                ),
-                const SizedBox(width: 5),
-              ],
-              Text(
-                label,
-                style: GoogleFonts.poppins(
-                  fontSize: AppResponsive.bodyFontSize(context),
-                  fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                  color: selected ? Colors.white : AppColors.textPrimary,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ── Build ──────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -561,804 +83,254 @@ class _settingsScreenState extends State<Settingsscreen> {
                 vertical: AppResponsive.largeSpacing(context),
               ),
               children: [
-                // ── 1. Account & Security ───────────────────────────────────
-                _sectionHeader(
-                  context,
-                  'Account & Security',
-                  Icons.security_rounded,
+                SettingsSection(
+                  title: 'Business',
+                  icon: Icons.storefront_rounded,
+                  children: [
+                    if (_can('settings')) ...[
+                      SettingsNavTile(
+                        title: 'Store Information',
+                        subtitle: 'Name, restaurant type, tax, address & logo',
+                        icon: Icons.store_rounded,
+                        color: Colors.deepPurple,
+                        onTap: () => _push(RouteNames.restaurantStoreInfo),
+                      ),
+                      SettingsNavTile(
+                        title: 'License & Subscription',
+                        subtitle:
+                            'Manage license key, plan, and device registration',
+                        icon: Icons.verified_rounded,
+                        color: AppColors.primary,
+                        onTap: () => _push(RouteNames.restaurantLicensing),
+                      ),
+                      SettingsNavTile(
+                        title: 'Usage & Limits',
+                        subtitle: 'How much of each plan limit you have used',
+                        icon: Icons.insights_rounded,
+                        color: Colors.cyan,
+                        onTap: () => _push(RouteNames.restaurantUsageLimit),
+                      ),
+                    ],
+                  ],
                 ),
-                _sectionCard(context, [
-                  _navTile(
-                    context,
-                    'Password Change',
-                    'Update your login password',
-                    Icons.lock_reset_rounded,
-                    Colors.blue,
-                    () => Navigator.pushNamed(
-                      context,
-                      RouteNames.restaurantChangePassword,
-                    ),
-                  ),
-                  _tileDivider(),
 
-                  // Backup Password row
-                  Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: AppResponsive.largeSpacing(context),
-                      vertical: AppResponsive.mediumSpacing(context),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: EdgeInsets.all(
-                            AppResponsive.mediumSpacing(context),
-                          ),
-                          decoration: BoxDecoration(
-                            color:
-                                (_hasBackupPassword
-                                        ? Colors.green
-                                        : Colors.orange)
-                                    .withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(
-                              AppResponsive.borderRadius(context),
-                            ),
-                          ),
-                          child: Icon(
-                            _hasBackupPassword
-                                ? Icons.lock_rounded
-                                : Icons.lock_open_rounded,
-                            size: AppResponsive.iconSize(context),
-                            color: _hasBackupPassword
-                                ? Colors.green
-                                : Colors.orange,
-                          ),
-                        ),
-                        SizedBox(width: AppResponsive.mediumSpacing(context)),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Backup Password',
-                                style: GoogleFonts.poppins(
-                                  fontSize: AppResponsive.bodyFontSize(context),
-                                  fontWeight: FontWeight.w500,
-                                  color: AppColors.textPrimary,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                _hasBackupPassword
-                                    ? 'Backups are password-protected'
-                                    : 'No password — backups are unprotected',
-                                style: GoogleFonts.poppins(
-                                  fontSize: AppResponsive.smallFontSize(
-                                    context,
-                                  ),
-                                  color: _hasBackupPassword
-                                      ? Colors.green.shade700
-                                      : Colors.orange.shade800,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (!_hasBackupPassword)
-                          _actionChip(
-                            context,
-                            'Set',
-                            Colors.green,
-                            () => _showSetPasswordDialog(),
-                          )
-                        else ...[
-                          _actionChip(
-                            context,
-                            'Change',
-                            Colors.orange,
-                            () => _showSetPasswordDialog(isChange: true),
-                          ),
-                          SizedBox(
-                            width: AppResponsive.smallSpacing(context) * 0.5,
-                          ),
-                          InkWell(
-                            onTap: () async {
-                              final confirm = await showAppConfirmDialog(
-                                context: context,
-                                title: 'Remove Backup Password?',
-                                message:
-                                    'Backups will no longer be password-protected. Existing encrypted backups still need their original password to restore.',
-                                confirmLabel: 'Remove',
-                                accent: Colors.red,
-                                icon: Icons.lock_open_rounded,
-                              );
-                              if (!confirm) return;
-                              await BackupEncryptionService.clearPassword();
-                              if (mounted) {
-                                setState(() => _hasBackupPassword = false);
-                              }
-                            },
-                            borderRadius: BorderRadius.circular(
-                              AppResponsive.borderRadius(context),
-                            ),
-                            child: Container(
-                              padding: EdgeInsets.all(
-                                AppResponsive.smallSpacing(context),
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.red.withValues(alpha: 0.08),
-                                borderRadius: BorderRadius.circular(
-                                  AppResponsive.borderRadius(context),
-                                ),
-                              ),
-                              child: Icon(
-                                Icons.delete_outline_rounded,
-                                size: AppResponsive.smallIconSize(context),
-                                color: Colors.red,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ]),
-                SizedBox(height: AppResponsive.largeSpacing(context)),
-
-                // ── 2. Display ──────────────────────────────────────────────
-                _sectionHeader(context, 'Display', Icons.palette_outlined),
-                _sectionCard(context, [
-                  ValueListenableBuilder<String>(
-                    valueListenable: CurrencyHelper.currencyNotifier,
-                    builder: (context, _, __) => _expandableTile(
-                      context: context,
-                      title: 'Currency Symbol',
-                      subtitle:
-                          '${CurrencyHelper.currentSymbol}  ${CurrencyHelper.currentCurrencyCode}',
-                      icon: Icons.currency_exchange_rounded,
-                      color: Colors.green,
-                      isExpanded: _isCurrencyExpanded,
-                      onTap: () => setState(
-                        () => _isCurrencyExpanded = !_isCurrencyExpanded,
-                      ),
-                      expandedChild: Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: CurrencyHelper.currencies.entries.map((e) {
-                          final info = e.value;
-                          return _optionChip(
-                            label: '${info.symbol} ${info.code}',
-                            selected:
-                                info.code == CurrencyHelper.currentCurrencyCode,
-                            onTap: () => CurrencyHelper.setCurrency(info.code),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                  ),
-                  _tileDivider(),
-                  ValueListenableBuilder<int>(
-                    valueListenable: DecimalSettings.precisionNotifier,
-                    builder: (context, prec, __) => _expandableTile(
-                      context: context,
-                      title: 'Decimal Precision',
-                      subtitle: 'Current: ${_getDecimalFilter(prec)}',
-                      icon: Icons.numbers_rounded,
-                      color: Colors.indigo,
-                      isExpanded: _isDecimalExpanded,
-                      onTap: () => setState(
-                        () => _isDecimalExpanded = !_isDecimalExpanded,
-                      ),
-                      expandedChild: Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          _optionChip(
-                            label: 'None',
-                            selected: prec == 0,
-                            onTap: () => DecimalSettings.updatePrecision(0),
-                          ),
-                          _optionChip(
-                            label: '0.0',
-                            selected: prec == 1,
-                            onTap: () => DecimalSettings.updatePrecision(1),
-                          ),
-                          _optionChip(
-                            label: '0.00',
-                            selected: prec == 2,
-                            onTap: () => DecimalSettings.updatePrecision(2),
-                          ),
-                          _optionChip(
-                            label: '0.000',
-                            selected: prec == 3,
-                            onTap: () => DecimalSettings.updatePrecision(3),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ]),
-                SizedBox(height: AppResponsive.largeSpacing(context)),
-
-                // ── 3. Orders & Payments ────────────────────────────────────
-                _sectionHeader(
-                  context,
-                  'Orders & Payments',
-                  Icons.shopping_bag_outlined,
-                ),
-                _sectionCard(context, [
-                  _navTile(
-                    context,
-                    'Payment Methods',
-                    'Manage accepted payment types',
-                    Icons.payment_rounded,
-                    Colors.teal,
-                    () => Navigator.pushNamed(
-                      context,
-                      RouteNames.restaurantPaymentMethods,
-                    ),
-                  ),
-                  _tileDivider(),
-                  _navTile(
-                    context,
-                    'Order Settings',
-                    'Configure order behaviour & notifications',
-                    Icons.receipt_long_rounded,
-                    Colors.orange,
-                    () => Navigator.pushNamed(
-                      context,
-                      RouteNames.restaurantOrderSettings,
-                    ),
-                  ),
-                  _tileDivider(),
-                  ValueListenableBuilder<Map<String, bool>>(
-                    valueListenable: AppSettings.settingsNotifier,
-                    builder: (context, settings, ___) {
-                      final refundsOn = settings["Allow Refunds"] ?? true;
-                      return Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          SwitchListTile(
-                            contentPadding: EdgeInsets.symmetric(
-                              horizontal: AppResponsive.largeSpacing(context),
-                              vertical:
-                                  AppResponsive.smallSpacing(context) * 0.5,
-                            ),
-                            secondary: Container(
-                              padding: EdgeInsets.all(
-                                AppResponsive.mediumSpacing(context),
-                              ),
-                              decoration: BoxDecoration(
-                                color:
-                                    (refundsOn
-                                            ? Colors.deepPurple
-                                            : AppColors.textSecondary)
-                                        .withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(
-                                  AppResponsive.borderRadius(context),
-                                ),
-                              ),
-                              child: Icon(
-                                Icons.undo_rounded,
-                                size: AppResponsive.iconSize(context),
-                                color: refundsOn
-                                    ? Colors.deepPurple
-                                    : AppColors.textSecondary,
-                              ),
-                            ),
-                            title: Text(
-                              'Allow Refunds',
-                              style: GoogleFonts.poppins(
-                                fontSize: AppResponsive.bodyFontSize(context),
-                                fontWeight: FontWeight.w500,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                            subtitle: Text(
-                              refundsOn
-                                  ? 'Refunds allowed within the window below'
-                                  : 'Refunds are off — no refund option appears on orders',
-                              style: GoogleFonts.poppins(
-                                fontSize: AppResponsive.smallFontSize(context),
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                            value: refundsOn,
-                            activeColor: AppColors.primary,
-                            onChanged: (val) =>
-                                AppSettings.updateSetting("Allow Refunds", val),
-                          ),
-                          if (refundsOn) ...[
-                            _tileDivider(),
-                            ValueListenableBuilder<int>(
-                              valueListenable: AppSettings.refundWindowNotifier,
-                              builder: (context, win, __) => _expandableTile(
-                                context: context,
-                                title: 'Refund Window',
-                                subtitle:
-                                    'Current: ${_getRefundWindowLabel(win)}',
-                                icon: Icons.undo_rounded,
-                                color: Colors.deepPurple,
-                                isExpanded: _isRefundWindowExpanded,
-                                onTap: () => setState(
-                                  () => _isRefundWindowExpanded =
-                                      !_isRefundWindowExpanded,
-                                ),
-                                expandedChild: Wrap(
-                                  spacing: 8,
-                                  runSpacing: 8,
-                                  children:
-                                      const <(int, String)>[
-                                            (30, '30 min'),
-                                            (60, '1 hr'),
-                                            (120, '2 hr'),
-                                            (240, '4 hr'),
-                                            (480, '8 hr'),
-                                            (1440, '24 hr'),
-                                            (0, 'No Limit'),
-                                          ]
-                                          .map(
-                                            (o) => _optionChip(
-                                              label: o.$2,
-                                              selected: win == o.$1,
-                                              onTap: () =>
-                                                  AppSettings.updateRefundWindow(
-                                                    o.$1,
-                                                  ),
-                                            ),
-                                          )
-                                          .toList(),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      );
-                    },
-                  ),
-                  _tileDivider(),
-                  ValueListenableBuilder<Map<String, bool>>(
-                    valueListenable: AppSettings.settingsNotifier,
-                    builder: (context, settings, ___) {
-                      final autoServe =
-                          settings["Auto Serve Dine In On Payment"] ?? false;
-                      return SwitchListTile(
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: AppResponsive.largeSpacing(context),
-                          vertical: AppResponsive.smallSpacing(context) * 0.5,
-                        ),
-                        secondary: Container(
-                          padding: EdgeInsets.all(
-                            AppResponsive.mediumSpacing(context),
-                          ),
-                          decoration: BoxDecoration(
-                            color:
-                                (autoServe
-                                        ? AppColors.primary
-                                        : AppColors.textSecondary)
-                                    .withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(
-                              AppResponsive.borderRadius(context),
-                            ),
-                          ),
-                          child: Icon(
-                            Icons.room_service_rounded,
-                            size: AppResponsive.iconSize(context),
-                            color: autoServe
-                                ? AppColors.primary
-                                : AppColors.textSecondary,
-                          ),
-                        ),
-                        title: Text(
-                          'Auto-Serve Dine-In on Payment',
-                          style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.bodyFontSize(context),
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        subtitle: Text(
-                          autoServe
-                              ? 'Paying a dine-in table instantly serves & completes it'
-                              : 'Dine-in stays active after payment until marked Served (default)',
-                          style: GoogleFonts.poppins(
-                            fontSize: AppResponsive.smallFontSize(context),
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                        value: autoServe,
-                        activeColor: AppColors.primary,
-                        onChanged: (val) => AppSettings.updateSetting(
-                          "Auto Serve Dine In On Payment",
-                          val,
-                        ),
-                      );
-                    },
-                  ),
-                  _tileDivider(),
-                  ValueListenableBuilder<double>(
-                    valueListenable: AppSettings.lowStockThresholdNotifier,
-                    builder: (context, threshold, __) {
-                      final label = threshold % 1 == 0
-                          ? threshold.toStringAsFixed(0)
-                          : threshold.toString();
-                      return _expandableTile(
-                        context: context,
-                        title: 'Low Stock Threshold',
-                        subtitle: 'Default alert when stock ≤ $label',
-                        icon: Icons.warning_amber_rounded,
-                        color: Colors.amber.shade800,
-                        isExpanded: _isLowStockExpanded,
-                        onTap: () => setState(
-                          () => _isLowStockExpanded = !_isLowStockExpanded,
-                        ),
-                        expandedChild: Builder(
-                          builder: (context) {
-                            const presets = <double>[3, 5, 10, 15, 20, 25];
-                            final isCustomValue = !presets.contains(threshold);
-                            final showCustom =
-                                _showCustomThreshold || isCustomValue;
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Wrap(
-                                  spacing: 8,
-                                  runSpacing: 8,
-                                  children: [
-                                    ...presets.map(
-                                      (n) => _optionChip(
-                                        label: n.toStringAsFixed(0),
-                                        selected: !showCustom && threshold == n,
-                                        onTap: () {
-                                          setState(
-                                            () => _showCustomThreshold = false,
-                                          );
-                                          AppSettings.updateLowStockThreshold(
-                                            n,
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                    _optionChip(
-                                      label: 'Custom',
-                                      icon: Icons.tune_rounded,
-                                      selected: showCustom,
-                                      onTap: () => setState(
-                                        () => _showCustomThreshold = true,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                // Custom field appears only after tapping "Custom"
-                                // (or when the saved value isn't one of the presets).
-                                if (showCustom) ...[
-                                  const SizedBox(height: 12),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: AppTextField(
-                                          controller:
-                                              _customThresholdController,
-                                          autofocus: true,
-                                          hint: 'Custom value',
-                                          keyboardType:
-                                              const TextInputType.numberWithOptions(
-                                                decimal: true,
-                                              ),
-                                          textInputAction: TextInputAction.done,
-                                          onFieldSubmitted: (_) =>
-                                              _applyCustomThreshold(),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      ElevatedButton(
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: AppColors.primary,
-                                          foregroundColor: Colors.white,
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 18,
-                                            vertical: 14,
-                                          ),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              10,
-                                            ),
-                                          ),
-                                        ),
-                                        onPressed: _applyCustomThreshold,
-                                        child: Text(
-                                          'Set',
-                                          style: GoogleFonts.poppins(
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 8),
-                                  child: Text(
-                                    'Tip: weight-based items (kg/gm) should set their own '
-                                    'threshold on the item — this default suits count-based items.',
-                                    style: GoogleFonts.poppins(
-                                      fontSize: AppResponsive.captionFontSize(
-                                        context,
-                                      ),
-                                      color: AppColors.textSecondary,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            );
-                          },
-                        ),
-                      );
-                    },
-                  ),
-                ]),
-                SizedBox(height: AppResponsive.largeSpacing(context)),
-
-                // ── 4. Staff & Shifts ───────────────────────────────────────
-                _sectionHeader(context, 'Staff & Shifts', Icons.people_rounded),
-                _sectionCard(context, [
-                  ValueListenableBuilder<int>(
-                    valueListenable: RestaurantSession.timeoutMinutesNotifier,
-                    builder: (context, minutes, __) => _expandableTile(
-                      context: context,
-                      title: 'Auto Logout Timeout',
-                      subtitle: 'Current: ${_getTimeoutLabel(minutes)}',
-                      icon: Icons.lock_clock_rounded,
-                      color: Colors.orange,
-                      isExpanded: _isTimeoutExpanded,
-                      onTap: () => setState(
-                        () => _isTimeoutExpanded = !_isTimeoutExpanded,
-                      ),
-                      expandedChild: Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [5, 10, 15, 30, 60].map((min) {
-                          return _optionChip(
-                            label: min < 60 ? '$min min' : '1 hr',
-                            selected: minutes == min,
-                            onTap: () =>
-                                RestaurantSession.setTimeoutMinutes(min),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                  ),
-                  _tileDivider(),
-                  ValueListenableBuilder<Map<String, bool>>(
-                    valueListenable: AppSettings.settingsNotifier,
-                    builder: (context, settings, __) {
-                      final autoCloseOn =
-                          settings["Auto Close Stale Shift"] ?? true;
-                      return Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          SwitchListTile(
-                            contentPadding: EdgeInsets.symmetric(
-                              horizontal: AppResponsive.largeSpacing(context),
-                              vertical:
-                                  AppResponsive.smallSpacing(context) * 0.5,
-                            ),
-                            secondary: Container(
-                              padding: EdgeInsets.all(
-                                AppResponsive.mediumSpacing(context),
-                              ),
-                              decoration: BoxDecoration(
-                                color:
-                                    (autoCloseOn
-                                            ? Colors.blue
-                                            : AppColors.textSecondary)
-                                        .withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(
-                                  AppResponsive.borderRadius(context),
-                                ),
-                              ),
-                              child: Icon(
-                                Icons.history_toggle_off_rounded,
-                                size: AppResponsive.iconSize(context),
-                                color: autoCloseOn
-                                    ? Colors.blue
-                                    : AppColors.textSecondary,
-                              ),
-                            ),
-                            title: Text(
-                              'Auto Close Stale Shift',
-                              style: GoogleFonts.poppins(
-                                fontSize: AppResponsive.bodyFontSize(context),
-                                fontWeight: FontWeight.w500,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                            subtitle: Text(
-                              'Automatically close open shifts and attendance when the daily session exceeds the max duration limit',
-                              style: GoogleFonts.poppins(
-                                fontSize: AppResponsive.smallFontSize(context),
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                            value: autoCloseOn,
-                            activeColor: AppColors.primary,
-                            onChanged: (val) => AppSettings.updateSetting(
-                              "Auto Close Stale Shift",
-                              val,
-                            ),
-                          ),
-                          if (autoCloseOn) ...[
-                            _tileDivider(),
-                            ValueListenableBuilder<int>(
-                              valueListenable:
-                                  AppSettings.maxSessionDurationHoursNotifier,
-                              builder: (context, hours, __) => _expandableTile(
-                                context: context,
-                                title: 'Maximum Session Duration',
-                                subtitle: 'Current: $hours Hours',
-                                icon: Icons.timer_outlined,
-                                color: Colors.blue,
-                                isExpanded: _isMaxSessionDurationExpanded,
-                                onTap: () => setState(
-                                  () => _isMaxSessionDurationExpanded =
-                                      !_isMaxSessionDurationExpanded,
-                                ),
-                                expandedChild: Wrap(
-                                  spacing: 8,
-                                  runSpacing: 8,
-                                  children: [12, 18, 24, 36, 48]
-                                      .map(
-                                        (h) => _optionChip(
-                                          label: '$h Hours',
-                                          selected: hours == h,
-                                          onTap: () =>
-                                              AppSettings.updateMaxSessionDurationHours(
-                                                h,
-                                              ),
-                                        ),
-                                      )
-                                      .toList(),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      );
-                    },
-                  ),
-                ]),
-                SizedBox(height: AppResponsive.largeSpacing(context)),
-
-                // ── 5. Backup ───────────────────────────────────────────────
-                _sectionHeader(context, 'Backup', Icons.backup_rounded),
-                _sectionCard(context, [
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.symmetric(
-                      horizontal: AppResponsive.largeSpacing(context),
-                      vertical: AppResponsive.smallSpacing(context) * 0.5,
-                    ),
-                    secondary: Container(
-                      padding: EdgeInsets.all(
-                        AppResponsive.mediumSpacing(context),
-                      ),
-                      decoration: BoxDecoration(
-                        color:
-                            (_backupEnabled
-                                    ? Colors.green
-                                    : AppColors.textSecondary)
-                                .withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(
-                          AppResponsive.borderRadius(context),
-                        ),
-                      ),
-                      child: Icon(
-                        Icons.backup_rounded,
-                        size: AppResponsive.iconSize(context),
-                        color: _backupEnabled
-                            ? Colors.green
-                            : AppColors.textSecondary,
-                      ),
-                    ),
-                    title: Text(
-                      'Daily Backup Reminder',
-                      style: GoogleFonts.poppins(
-                        fontSize: AppResponsive.bodyFontSize(context),
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    subtitle: Text(
-                      'Show backup prompt at the start of each day',
-                      style: GoogleFonts.poppins(
-                        fontSize: AppResponsive.smallFontSize(context),
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    value: _backupEnabled,
-                    activeColor: Colors.green,
-                    onChanged: (val) async {
-                      await AutoBackupService.setAutoBackupEnabled(val);
-                      setState(() => _backupEnabled = val);
-                    },
-                  ),
-                  _tileDivider(),
-                  _navTile(
-                    context,
-                    'Backup & Restore',
-                    'Import or export your POS backup data',
-                    Icons.import_export_rounded,
-                    Colors.orange,
-                    () {
+                // End of Day follows 'endDay' everywhere — the route's key.
+                if (_can('endDay'))
+                  DayManagementSettingsSection(
+                    onOpenEndOfDay: (ctx) async {
+                      // Visibility follows billing, like the dashboard tile;
+                      // the route itself stays open (it is the close path).
                       if (!PlanGuard.allowedOr(
-                        context,
-                        EntKeys.dataBackup,
-                        featureName: 'Backup & Restore',
+                        ctx,
+                        EntKeys.billing,
+                        featureName: 'End of Day',
                       )) {
                         return;
                       }
-                      _showImportExportDialog(context);
+                      await Navigator.pushNamed(ctx, RouteNames.restaurantEndDay);
                     },
                   ),
-                ]),
-                SizedBox(height: AppResponsive.largeSpacing(context)),
 
-                // ── 6. License & Subscription ───────────────────────────────
-                _sectionHeader(
-                  context,
-                  'License & Subscription',
-                  Icons.verified_outlined,
+                SettingsSection(
+                  title: 'Printing',
+                  icon: Icons.print_outlined,
+                  children: [
+                    if (_can('settings')) ...[
+                      SettingsNavTile(
+                        title: 'Connect Printer',
+                        subtitle: 'Pair a printer — Bluetooth · WiFi · USB',
+                        icon: Icons.print_outlined,
+                        color: AppColors.info,
+                        onTap: () => _push(RouteNames.restaurantPrinterSettings),
+                      ),
+                      SettingsNavTile(
+                        title: 'Receipt Layout',
+                        subtitle: 'Logo, header, footer and print options',
+                        icon: Icons.receipt_outlined,
+                        color: const Color(0xFF673AB7),
+                        onTap: () =>
+                            _push(RouteNames.restaurantPrinterCustomization),
+                      ),
+                    ],
+                  ],
                 ),
-                _sectionCard(context, [
-                  _navTile(
-                    context,
-                    'License Management',
-                    'View status, activate or manage your license key',
-                    Icons.verified_rounded,
-                    AppColors.primary,
-                    () => Navigator.pushNamed(
-                      context,
-                      RouteNames.restaurantLicensing,
-                    ),
-                  ),
-                ]),
-                SizedBox(height: AppResponsive.largeSpacing(context)),
 
-                // ── 7. About / Device ───────────────────────────────────────
-                _sectionHeader(
-                  context,
-                  'About This Device',
-                  Icons.info_outline_rounded,
+                SettingsSection(
+                  title: 'Billing & Payments',
+                  icon: Icons.shopping_bag_outlined,
+                  children: [
+                    if (_can('settings')) ...[
+                      SettingsNavTile(
+                        title: 'Payment Methods',
+                        subtitle: 'Manage accepted payment types',
+                        icon: Icons.payment_rounded,
+                        color: Colors.teal,
+                        onTap: () => _push(RouteNames.restaurantPaymentMethods),
+                      ),
+                      SettingsNavTile(
+                        title: 'Order Settings',
+                        subtitle: 'Configure order behaviour & notifications',
+                        icon: Icons.receipt_long_rounded,
+                        color: Colors.orange,
+                        onTap: () => _push(RouteNames.restaurantOrderSettings),
+                      ),
+                      const RoundOffSettingTile(),
+                      const VisualKeyboardSettingTile(),
+                      const RefundSettingTile(),
+                      const _AutoServeTile(),
+                    ],
+                  ],
                 ),
-                _buildDeviceIdCard(context),
-                SizedBox(height: AppResponsive.largeSpacing(context)),
 
-                // ── 7. Developer ────────────────────────────────────────────
-                _sectionHeader(context, 'Developer', Icons.code_rounded),
-                _sectionCard(context, [
-                  _navTile(
-                    context,
-                    'Performance Test Data Generator',
-                    'Generate sample data for load testing',
-                    Icons.science_rounded,
-                    Colors.purple,
-                    () => Navigator.pushNamed(
-                      context,
-                      RouteNames.restaurantDataGenratorScreen,
+                SettingsSection(
+                  title: 'Tax',
+                  icon: Icons.percent_rounded,
+                  children: [
+                    if (_can('taxSettings') && TaxFeature.enabled)
+                      SettingsNavTile(
+                        title: 'Tax Settings',
+                        subtitle: 'Tax rates, defaults and inclusive pricing',
+                        icon: Icons.receipt_long,
+                        color: AppColors.success,
+                        onTap: () => _pushGated(
+                          RouteNames.restaurantTaxSettings,
+                          EntKeys.settings,
+                          'Tax Settings',
+                        ),
+                      ),
+                  ],
+                ),
+
+                SettingsSection(
+                  title: 'Inventory',
+                  icon: Icons.inventory_2_outlined,
+                  children: [
+                    if (_can('settings'))
+                      ValueListenableBuilder<double>(
+                        valueListenable: AppSettings.lowStockThresholdNotifier,
+                        builder: (context, threshold, _) =>
+                            LowStockThresholdTile(
+                              value: threshold,
+                              presets: const [3, 5, 10, 15, 20, 25],
+                              allowDecimal: true,
+                              onSelected: (v) => AppSettings
+                                  .updateLowStockThreshold(v.toDouble()),
+                              tip:
+                                  'Tip: weight-based items (kg/gm) should set '
+                                  'their own threshold on the item — this '
+                                  'default suits count-based items.',
+                            ),
+                      ),
+                  ],
+                ),
+
+                SettingsSection(
+                  title: 'Display',
+                  icon: Icons.palette_outlined,
+                  children: [
+                    if (_can('settings')) ...[
+                      const CurrencySettingTile(),
+                      const DecimalPrecisionSettingTile(),
+                      SettingsNavTile(
+                        title: 'Personalization',
+                        subtitle: 'Menu layout, KOT and order display options',
+                        icon: Icons.tune_rounded,
+                        color: Colors.pink,
+                        onTap: () => _pushGated(
+                          RouteNames.restaurantCustomizationDrawer,
+                          EntKeys.settings,
+                          'Personalization',
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+
+                SettingsSection(
+                  title: 'Account & Security',
+                  icon: Icons.security_rounded,
+                  children: [
+                    if (_can('settings')) ...[
+                      SettingsNavTile(
+                        title: 'Change Admin PIN',
+                        subtitle: 'Update the PIN used for admin login',
+                        icon: Icons.lock_reset_rounded,
+                        color: Colors.blue,
+                        onTap: () => _push(RouteNames.restaurantChangePassword),
+                      ),
+                      const AutoLogoutSettingTile(),
+                      const StaleShiftSettingTile(),
+                    ],
+                  ],
+                ),
+
+                SettingsSection(
+                  title: 'Backup',
+                  icon: Icons.backup_rounded,
+                  children: [
+                    if (_can('dataBackup')) ...[
+                      // Password + reminder live inside BackupScreen; Web gets
+                      // the dialog instead, so it keeps them here.
+                      if (kIsWeb) ...[
+                        const BackupPasswordSettingTile(),
+                        const DailyBackupReminderTile(),
+                      ],
+                      SettingsNavTile(
+                        title: 'Backup & Restore',
+                        subtitle: 'Backups, backup password and daily reminder',
+                        icon: Icons.import_export_rounded,
+                        color: Colors.orange,
+                        onTap: _openBackup,
+                      ),
+                    ],
+                  ],
+                ),
+
+                // Ungated: support must stay one tap away for every role.
+                SettingsSection(
+                  title: 'Help & Support',
+                  icon: Icons.support_agent_rounded,
+                  children: [
+                    SettingsNavTile(
+                      title: 'Need Help?',
+                      subtitle:
+                          'Call or email support, and browse common questions',
+                      icon: Icons.support_agent_rounded,
+                      color: AppColors.info,
+                      onTap: () => _push(RouteNames.restaurantNeedHelp),
                     ),
+                  ],
+                ),
+
+                const SettingsSection(
+                  title: 'About This Device',
+                  icon: Icons.info_outline_rounded,
+                  children: [DeviceIdTile()],
+                ),
+
+                // Developer tools never ship in a release build.
+                if (!kReleaseMode && _can('settings'))
+                  SettingsSection(
+                    title: 'Developer',
+                    icon: Icons.code_rounded,
+                    children: [
+                      SettingsNavTile(
+                        title: 'Performance Test Data Generator',
+                        subtitle: 'Generate sample data for load testing',
+                        icon: Icons.science_rounded,
+                        color: Colors.purple,
+                        onTap: () =>
+                            _push(RouteNames.restaurantDataGenratorScreen),
+                      ),
+                      SettingsNavTile(
+                        title: 'Animated Splash Preview',
+                        subtitle: 'Preview the animated logo splash screen',
+                        icon: Icons.animation_rounded,
+                        color: Colors.deepPurple,
+                        onTap: () => _push(RouteNames.restaurantSplashPreview),
+                      ),
+                    ],
                   ),
-                  _tileDivider(),
-                  _navTile(
-                    context,
-                    'Animated Splash Preview',
-                    'Preview the animated logo splash screen',
-                    Icons.animation_rounded,
-                    Colors.deepPurple,
-                    () => Navigator.pushNamed(
-                      context,
-                      RouteNames.restaurantSplashPreview,
-                    ),
-                  ),
-                ]),
-                SizedBox(height: AppResponsive.mediumSpacing(context)),
               ],
             ),
           ),
@@ -1366,417 +338,28 @@ class _settingsScreenState extends State<Settingsscreen> {
       ),
     );
   }
+}
 
-  Widget _buildDeviceIdCard(BuildContext context) {
-    final id = _deviceIdResult?.id ?? 'Loading...';
-    return _sectionCard(context, [
-      Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: AppResponsive.largeSpacing(context),
-          vertical: AppResponsive.mediumSpacing(context),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(
-                  AppResponsive.borderRadius(context),
-                ),
-              ),
-              child: Icon(
-                Icons.fingerprint_rounded,
-                color: AppColors.primary,
-                size: AppResponsive.iconSize(context),
-              ),
-            ),
-            SizedBox(width: AppResponsive.mediumSpacing(context)),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Device ID',
-                    style: GoogleFonts.poppins(
-                      fontSize: AppResponsive.smallFontSize(context),
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    id,
-                    style: GoogleFonts.poppins(
-                      fontSize: AppResponsive.smallFontSize(context),
-                      color: AppColors.textSecondary,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            IconButton(
-              icon: Icon(
-                Icons.copy_rounded,
-                size: AppResponsive.smallIconSize(context),
-                color: AppColors.textSecondary,
-              ),
-              tooltip: 'Copy Device ID',
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: id));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Device ID copied'),
-                    duration: Duration(seconds: 2),
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    ]);
-  }
+/// Restaurant-only: pay-to-complete for dine-in tables.
+class _AutoServeTile extends StatelessWidget {
+  const _AutoServeTile();
 
-  Widget _actionChip(
-    BuildContext context,
-    String label,
-    Color color,
-    VoidCallback onTap,
-  ) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
-      child: Container(
-        padding: EdgeInsets.symmetric(
-          horizontal: AppResponsive.mediumSpacing(context),
-          vertical: AppResponsive.smallSpacing(context),
-        ),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(
-            AppResponsive.borderRadius(context),
-          ),
-          border: Border.all(color: color.withValues(alpha: 0.3)),
-        ),
-        child: Text(
-          label,
-          style: GoogleFonts.poppins(
-            fontSize: AppResponsive.smallFontSize(context),
-            fontWeight: FontWeight.w600,
-            color: color,
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showImportExportDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            // AppDialogShell — was a bare AlertDialog with its own inset math,
-            // radius 16 and a centred title. The three buttons stay in the BODY
-            // because they are this dialog's content, not its action row; the
-            // shell already scrolls the body, so the SingleChildScrollView went.
-            return AppDialogShell(
-              title: 'Backup & Restore',
-              subtitle: 'Export your data, or restore from a backup file',
-              accent: AppColors.primary,
-              icon: Icons.backup_rounded,
-              body: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Download to Downloads Button
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      minimumSize: Size(
-                        double.infinity,
-                        AppResponsive.buttonHeight(context),
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    icon: const Icon(Icons.download, color: Colors.white),
-                    label: Text(
-                      'Download Backup',
-                      style: GoogleFonts.poppins(
-                        color: Colors.white,
-                        fontSize: AppResponsive.buttonFontSize(context),
-                      ),
-                    ),
-                    onPressed: () async {
-                      final outerContext = context;
-                      if (!await UnifiedBackupService.ensureBackupPassword(
-                        outerContext,
-                      )) {
-                        return;
-                      }
-                      if (!outerContext.mounted) return;
-                      Navigator.pop(outerContext);
-
-                      final navigatorState = Navigator.of(
-                        outerContext,
-                        rootNavigator: true,
-                      );
-                      final backupHInset = !AppResponsive.isMobile(outerContext)
-                          ? ((AppResponsive.screenWidth(outerContext) -
-                                        AppResponsive.dialogWidth(
-                                          outerContext,
-                                        )) /
-                                    2)
-                                .clamp(40.0, double.infinity)
-                          : 24.0;
-                      showDialog(
-                        context: outerContext,
-                        barrierDismissible: false,
-                        builder: (BuildContext context) {
-                          return PopScope(
-                            canPop: false,
-                            child: AlertDialog(
-                              insetPadding: EdgeInsets.symmetric(
-                                horizontal: backupHInset,
-                                vertical: 24,
-                              ),
-                              content: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const CircularProgressIndicator(),
-                                  AppResponsive.verticalSpace(
-                                    context,
-                                    size: SpacingSize.medium,
-                                  ),
-                                  Text(
-                                    'Creating backup...\nPlease wait',
-                                    textAlign: TextAlign.center,
-                                    style: GoogleFonts.poppins(
-                                      fontSize: AppResponsive.bodyFontSize(
-                                        context,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      );
-
-                      String? filePath;
-                      try {
-                        filePath =
-                            await UnifiedBackupService.exportToDownloads();
-                      } catch (e) {
-                        debugPrint('❌ Backup error: $e');
-                      } finally {
-                        try {
-                          navigatorState.pop();
-                        } catch (e) {
-                          debugPrint('❌ Error closing dialog: $e');
-                        }
-                      }
-
-                      await Future.delayed(const Duration(milliseconds: 300));
-
-                      // NotificationService is global — no context needed.
-                      // outerContext belongs to the dialog popped above, so a
-                      // mounted guard here silently dropped both messages.
-                      if (filePath == null) {
-                        NotificationService.instance.showError(
-                          'Backup failed. Please try again.',
-                          duration: const Duration(seconds: 5),
-                        );
-                        return;
-                      }
-
-                      NotificationService.instance.showSuccess(
-                        'Backup saved successfully\n$filePath',
-                        duration: const Duration(seconds: 5),
-                      );
-                    },
-                  ),
-
-                  AppResponsive.verticalSpace(
-                    context,
-                    size: SpacingSize.medium,
-                  ),
-
-                  // Share Backup Button
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      minimumSize: Size(
-                        double.infinity,
-                        AppResponsive.buttonHeight(context),
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    icon: const Icon(Icons.share, color: Colors.white),
-                    label: Text(
-                      'Share Backup',
-                      style: GoogleFonts.poppins(
-                        color: Colors.white,
-                        fontSize: AppResponsive.buttonFontSize(context),
-                      ),
-                    ),
-                    onPressed: () async {
-                      final outerContext = context;
-                      if (!await UnifiedBackupService.ensureBackupPassword(
-                        outerContext,
-                      )) {
-                        return;
-                      }
-                      if (!outerContext.mounted) return;
-                      Navigator.pop(outerContext);
-
-                      final navigatorState = Navigator.of(
-                        outerContext,
-                        rootNavigator: true,
-                      );
-                      final shareHInset = !AppResponsive.isMobile(outerContext)
-                          ? ((AppResponsive.screenWidth(outerContext) -
-                                        AppResponsive.dialogWidth(
-                                          outerContext,
-                                        )) /
-                                    2)
-                                .clamp(40.0, double.infinity)
-                          : 24.0;
-                      showDialog(
-                        context: outerContext,
-                        barrierDismissible: false,
-                        builder: (BuildContext ctx) {
-                          return PopScope(
-                            canPop: false,
-                            child: AlertDialog(
-                              insetPadding: EdgeInsets.symmetric(
-                                horizontal: shareHInset,
-                                vertical: 24,
-                              ),
-                              content: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const CircularProgressIndicator(),
-                                  AppResponsive.verticalSpace(
-                                    ctx,
-                                    size: SpacingSize.medium,
-                                  ),
-                                  Text(
-                                    'Creating backup...\nPlease wait',
-                                    textAlign: TextAlign.center,
-                                    style: GoogleFonts.poppins(
-                                      fontSize: AppResponsive.bodyFontSize(ctx),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      );
-
-                      String? filePath;
-                      try {
-                        filePath = await UnifiedBackupService.exportToShare();
-                      } catch (e) {
-                        debugPrint('❌ Share backup error: $e');
-                      } finally {
-                        try {
-                          navigatorState.pop();
-                        } catch (e) {
-                          debugPrint('❌ Error closing dialog: $e');
-                        }
-                      }
-
-                      await Future.delayed(const Duration(milliseconds: 300));
-
-                      if (filePath == null) {
-                        final globalContext =
-                            main_app.navigatorKey.currentContext;
-                        if (globalContext != null && globalContext.mounted) {
-                          NotificationService.instance.showError(
-                            'Backup creation failed',
-                          );
-                        }
-                        return;
-                      }
-
-                      await Share.shareXFiles([
-                        XFile(filePath),
-                      ], subject: 'Bill Berry Lite Backup');
-                    },
-                  ),
-
-                  AppResponsive.verticalSpace(
-                    context,
-                    size: SpacingSize.medium,
-                  ),
-                  const Divider(),
-                  AppResponsive.verticalSpace(context, size: SpacingSize.small),
-
-                  // Import Button
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange,
-                      minimumSize: Size(
-                        double.infinity,
-                        AppResponsive.buttonHeight(context),
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    icon: const Icon(Icons.restore, color: Colors.white),
-                    label: Text(
-                      'Import Backup',
-                      style: GoogleFonts.poppins(
-                        color: Colors.white,
-                        fontSize: AppResponsive.buttonFontSize(context),
-                      ),
-                    ),
-                    onPressed: () async {
-                      Navigator.pop(context); // close the backup menu
-
-                      bool importSuccess = false;
-                      try {
-                        importSuccess = await UnifiedBackupService.importData(
-                          context,
-                        );
-                      } catch (e) {
-                        debugPrint('Import error in settings: $e');
-                      }
-
-                      if (importSuccess) {
-                        await Future.delayed(const Duration(milliseconds: 300));
-
-                        final globalContext =
-                            main_app.navigatorKey.currentContext;
-                        if (globalContext != null) {
-                          await showAppInfoDialog(
-                            context: globalContext,
-                            title: 'Import Completed',
-                            message:
-                                'Data imported successfully!\n\nPlease close and restart the app.',
-                            buttonLabel: 'Close App',
-                            accent: AppColors.success,
-                            icon: Icons.check_circle_rounded,
-                          );
-                          exit(0);
-                        }
-                      }
-                    },
-                  ),
-                ],
-              ),
-              actions: [appDialogCancelButton(context, label: 'Close')],
-            );
-          },
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: AppSettings.settingsNotifier,
+      builder: (context, _) {
+        final on = AppSettings.autoServeDineInOnPayment;
+        return SettingsSwitchTile(
+          title: 'Auto-Serve Dine-In on Payment',
+          subtitle: on
+              ? 'Paying a dine-in table instantly serves & completes it'
+              : 'Dine-in stays active after payment until marked Served (default)',
+          icon: Icons.room_service_rounded,
+          color: AppColors.primary,
+          value: on,
+          onChanged: (v) =>
+              AppSettings.updateSetting('Auto Serve Dine In On Payment', v),
         );
       },
     );

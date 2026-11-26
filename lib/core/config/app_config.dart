@@ -1,4 +1,5 @@
 import 'package:hive/hive.dart';
+import 'package:billberrylite/core/init/hive_safe_open.dart';
 
 /// Business mode enum for the app
 enum BusinessMode { none, restaurant, retail }
@@ -37,9 +38,10 @@ class AppConfig {
   /// so `licenseInfo` stays null and retail keeps the same open behaviour it has
   /// today (see `PlanEnforce._bypassed`).
   ///
-  /// **Flip to `false` once the backend serves retail entitlements.** Restaurant
-  /// is unaffected either way — the action is retail-only.
-  static const bool retailLicenseSkipForTesting = true;
+  /// Off: the backend serves retail entitlements (plan GTRTL), so a retail
+  /// device must activate a licence like restaurant does. Restaurant is
+  /// unaffected either way — the action is retail-only.
+  static const bool retailLicenseSkipForTesting = false;
 
   static const String _boxName = 'appConfigBox';
   static const String _businessModeKey = 'businessMode';
@@ -51,7 +53,10 @@ class AppConfig {
 
   /// Initialize AppConfig - MUST be called before accessing any properties
   static Future<void> init() async {
-    _box = await Hive.openBox(_boxName);
+    final box = await HiveSafeOpen.openBox(_boxName);
+    // No business mode without this box: stop before anything reads it.
+    if (box == null) HiveSafeOpen.throwIfBlocked();
+    _box = box;
 
     // Set first launch date if not already set
     if (!_box!.containsKey(_firstLaunchDateKey)) {

@@ -188,13 +188,14 @@ void main() {
       {String? grnId = 'GRN-JAN',
       String? supplierId = 'SUP-A',
       required DateTime recordedAt,
-      double lossValue = 300}) async {
+      double lossValue = 300,
+      String source = 'grn'}) async {
     await Hive.box<InventoryLossModel>(HiveBoxNames.inventoryLosses).put(
       id,
       InventoryLossModel(
         lossId: id,
         lossNumber: id,
-        source: 'grn',
+        source: source,
         grnId: grnId,
         supplierId: supplierId,
         supplierName: 'Acme',
@@ -404,10 +405,35 @@ void main() {
         status: SupplierClaimStatus.rejected,
         resolvedAt: mar(3),
         lossRecorded: true);
-    await seedLoss('LOSS-1', recordedAt: mar(3), lossValue: 500);
+    // The write-off's loss row, as writeOffRejectedClaim creates it.
+    await seedLoss('LOSS-1',
+        recordedAt: mar(3),
+        lossValue: 500,
+        source: InventoryLossSource.claimRejected);
 
     expect(totals(await summaryFor(3)).absorbed, 500.0,
-        reason: 'counted through the loss row only');
+        reason: 'counted once, on the rejection date');
+  });
+
+  test('writing off a rejected claim later never changes the rejection month',
+      () async {
+    await seedGRN('GRN-JAN', at: jan(10));
+    await seedClaim('CLM-1',
+        claimDate: jan(15),
+        totalAmount: 500,
+        status: SupplierClaimStatus.rejected,
+        resolvedAt: feb(3),
+        lossRecorded: true);
+    // Written off a month after the rejection.
+    await seedLoss('LOSS-1',
+        recordedAt: mar(9),
+        lossValue: 500,
+        source: InventoryLossSource.claimRejected);
+
+    expect(totals(await summaryFor(2)).absorbed, 500.0,
+        reason: 'February keeps the rejection it already reported');
+    expect(totals(await summaryFor(3)).absorbed, 0.0,
+        reason: 'the write-off is not a second loss');
   });
 
   // ── Write-offs ─────────────────────────────────────────────────────────

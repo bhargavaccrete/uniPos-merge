@@ -91,12 +91,13 @@ abstract class _ProductStore with Store {
     products.add(product);
   }
 
-  /// Plan gate for adding a product: module + add action allowed, AND under the
-  /// products cap. Mirrors restaurant's `item_store.addItem`
-  /// (`manage_menu.items` + `.add` + `.max`).
+  /// Plan gate for adding a product: module + products submodule + add action
+  /// allowed, AND under the products cap. Mirrors restaurant's
+  /// `item_store.addItem` (`manage_menu.items` + `.add` + `.max`).
   /// No-op (true) until a retail manifest is present — see `PlanEnforce`.
   bool get canAddProduct =>
       PlanEnforce.allows(RetailEntKeys.catalog) &&
+      PlanEnforce.allows(RetailEntKeys.catalogProducts) &&
       PlanEnforce.allows(RetailEntKeys.catalogProductsAdd) &&
       PlanEnforce.withinLimit(RetailEntKeys.catalogProductsMax, products.length);
 

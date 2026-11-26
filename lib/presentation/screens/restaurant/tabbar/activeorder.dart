@@ -13,6 +13,7 @@ import '../../../../domain/services/retail/store_settings_service.dart';
 import '../../../../core/plan/plan_guard.dart';
 import '../../../../core/plan/entitlement_keys.dart';
 import '../../../../util/restaurant/restaurant_session.dart';
+import '../../../../domain/services/restaurant/refund_service.dart';
 import '../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../data/models/restaurant/db/pastordermodel_313.dart';
 import '../../../widget/componets/restaurant/componets/Button.dart';
@@ -23,8 +24,13 @@ import '../../../../services/websocket_client_service.dart';
 import '../../../../server/websocket.dart' as ws;
 import '../util/restaurant_print_helper.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
-import '../../../../domain/services/restaurant/inventory_service.dart';
-import '../../../../data/models/restaurant/db/cartmodel_308.dart';
+import '../../../../domain/services/restaurant/kot_layout.dart';
+import '../../../../domain/services/restaurant/kot_status_rule.dart';
+import '../../../../domain/services/restaurant/active_line_cancel.dart';
+import '../../../../domain/services/restaurant/paid_order_record.dart';
+import '../../../../domain/services/restaurant/order_close.dart';
+import '../../../../domain/services/restaurant/settle_new_order.dart';
+import '../../../../domain/services/restaurant/void_order_commit.dart';
 import '../../../../util/common/app_responsive.dart';
 
 class Activeorder extends StatefulWidget {
@@ -133,6 +139,13 @@ class _ActiveorderState extends State<Activeorder> {
   }
 
   Future<void> _deleteOrder(String orderId) async {
+    // BLK-14: a Waiter may not void. This path writes the void itself (not
+    // through RefundService), so it needs its own role check.
+    if (!RestaurantSession.canAccess(RefundService.voidPermission)) {
+      NotificationService.instance
+          .showError(RefundService.voidNotAllowedMessage);
+      return;
+    }
     // Plan gate — voiding a bill is billing.invoice.void. This path writes the
     // VOID record directly (not via RefundService), so it needs its own check.
     if (!PlanGuard.allowedOr(
@@ -153,15 +166,25 @@ class _ActiveorderState extends State<Activeorder> {
       // payment (method + amount + split) and mark it 'VOIDED' — so the Void
       // report shows it as paid (not "Unpaid") and a refund can be issued.
       // An unpaid order deleted before payment stays 'VOID' with 'N/A'.
-      final bool wasPaid =
-          order.isPaid == true ||
-          (order.paymentStatus?.toLowerCase() == 'paid');
+      // Any money taken counts as paid — a PART-paid order too (SALE-6), the
+      // same rule End of Day uses. Recording it as 'VOID' dropped the
+      // collected money from every record and hid its refund.
+      final bool wasPaid = VoidOrderCommit.wasPaid(order);
+      // Restore only KOTs whose food is not consumed; the record keeps those
+      // lines marked restocked so a later refund cannot restore them again.
+      final voidPlan = KotLayout.voidPlan(
+        items: order.items,
+        kotNumbers: order.kotNumbers,
+        kotBoundaries: order.kotBoundaries,
+        kotStatuses: order.kotStatuses ?? {},
+        orderStatus: order.status,
+      );
       // Save to past orders as VOID/VOIDED so it appears in the Void Order Report
       final voidRecord = PastOrderModel(
         id: order.id,
         customerName: order.customerName ?? '',
         totalPrice: order.totalPrice,
-        items: order.items,
+        items: voidPlan.recordItems,
         orderAt: order.timeStamp ?? DateTime.now(),
         orderType: order.orderType,
         paymentmode: wasPaid ? (order.paymentMethod ?? 'N/A') : 'N/A',
@@ -187,46 +210,26 @@ class _ActiveorderState extends State<Activeorder> {
         roundOffStep: AppSettings.roundOffStepForRecord,
         discountOnItems: AppSettings.discountOnItems,
       );
-      await pastOrderStore.addOrder(voidRecord);
-
-      // Restore stock only for items in KOTs that have NOT been served yet.
-      // Served KOT items were already consumed by the kitchen — don't restore.
-      {
-        final kotNums = order.kotNumbers;
-        final kotBounds = order.kotBoundaries;
-        final kotStatuses = Map<int, String>.from(order.kotStatuses ?? {});
-        final itemsToRestock = <CartItem, int>{};
-
-        int start = 0;
-        for (int i = 0; i < kotNums.length; i++) {
-          final kotNum = kotNums[i];
-          final end = (i < kotBounds.length ? kotBounds[i] : order.items.length)
-              .clamp(start, order.items.length);
-          final kotStatus = kotStatuses[kotNum] ?? order.status;
-
-          if (kotStatus != 'Served') {
-            for (final item in order.items.sublist(start, end)) {
-              if (item.quantity > 0) {
-                itemsToRestock[item] =
-                    (itemsToRestock[item] ?? 0) + item.quantity;
-              }
-            }
-          }
-          start = end;
+      // Record, removal, table and the stock return of KOTs whose food is not
+      // consumed yet — exactly once, even across a stop (SALE-4). A record
+      // that was not saved leaves the order untouched.
+      try {
+        final result = await VoidOrderCommit.commit(
+          order: order,
+          record: voidRecord,
+          restores: voidPlan.restores,
+        );
+        if (!result.stockFinished) {
+          NotificationService.instance.showWarning(result.message!);
         }
-
-        if (itemsToRestock.isNotEmpty) {
-          await InventoryService.restoreStockForRefund(itemsToRestock);
-        }
+      } on OrderSaveFailedException catch (e) {
+        NotificationService.instance.showError(e.message);
       }
+      return;
     }
 
+    // Not in the active list any more: only make sure it is gone.
     await orderStore.deleteOrder(orderId);
-
-    // Reset the table to Available so it no longer shows as occupied
-    if (order?.tableNo != null && order!.tableNo!.isNotEmpty) {
-      await tableStore.updateTableStatus(order.tableNo!, 'Available');
-    }
   }
 
   Future<String?> _showVoidReasonDialog() async {
@@ -1162,7 +1165,9 @@ class _ActiveorderState extends State<Activeorder> {
                                                           TextOverflow.ellipsis,
                                                     ),
                                                   ),
-                                                  if (!isServed)
+                                                  if (!KotStatusRule.isConsumed(
+                                                    currentStatus,
+                                                  ))
                                                     InkWell(
                                                       onTap: () =>
                                                           _cancelKotItem(
@@ -1501,39 +1506,21 @@ class _ActiveorderState extends State<Activeorder> {
     final int billNumber =
         latestOrder.billNumber ?? await orderStore.getNextBillNumber();
 
-    final pastOrder = PastOrderModel(
-      id: latestOrder.id,
-      customerName: latestOrder.customerName,
-      totalPrice: latestOrder.totalPrice,
-      items: latestOrder.items,
-      orderAt: latestOrder.timeStamp,
-      orderType: latestOrder.orderType,
-      paymentmode: latestOrder.paymentMethod ?? 'N/A',
-      subTotal: latestOrder.subTotal,
-      gstAmount: latestOrder.gstAmount,
-      Discount: latestOrder.discount,
-      remark: latestOrder.remark,
-      kotNumbers: latestOrder.kotNumbers,
-      kotBoundaries: latestOrder.kotBoundaries,
+    // Same record as End of Day builds: payment, points, customer, shift.
+    final pastOrder = PaidOrderRecord.toPastOrder(
+      latestOrder,
       billNumber: billNumber,
-      isSplitPayment: latestOrder.isSplitPayment,
-      paymentListJson: latestOrder.paymentListJson,
-      totalPaid: latestOrder.totalPaid,
-      changeReturn: latestOrder.changeReturn,
-      tableNo: latestOrder.tableNo,
-      sessionId: latestOrder.sessionId,
-      serviceCharge: latestOrder.serviceCharge,
-      isTaxInclusive: latestOrder.isTaxInclusive,
-      taxEnabled: TaxFeature.enabled,
       storeGstNumber: await StoreSettingsService().gstNumberSnapshot(),
-      roundOffStep: AppSettings.roundOffStepForRecord,
-      discountOnItems: AppSettings.discountOnItems,
+      currentShiftId: RestaurantSession.currentShiftId,
+      paymentModeFallback: 'N/A',
     );
 
-    await pastOrderStore.addOrder(pastOrder);
-    await orderStore.deleteOrder(latestOrder.id);
-    if (latestOrder.tableNo != null && latestOrder.tableNo!.isNotEmpty) {
-      await tableStore.updateTableStatus(latestOrder.tableNo!, 'Available');
+    // Saved first; a failed save leaves the order active (SALE-4).
+    try {
+      await OrderClose.moveToPast(pastOrder,
+          orderId: latestOrder.id, tableNo: latestOrder.tableNo);
+    } on OrderSaveFailedException catch (e) {
+      NotificationService.instance.showError(e.message);
     }
   }
 
@@ -1556,43 +1543,31 @@ class _ActiveorderState extends State<Activeorder> {
     );
     if (!confirmed) return;
 
-    // 1. Remove item from the list
-    final updatedItems = List<CartItem>.from(order.items)
-      ..removeAt(itemIndexInOrder);
-
-    // 2. Adjust boundaries: every boundary at index >= kotIndex decreases by 1
-    final updatedBoundaries = List<int>.from(order.kotBoundaries);
-    for (int i = kotIndex; i < updatedBoundaries.length; i++) {
-      updatedBoundaries[i] = updatedBoundaries[i] - 1;
+    // 1-6. Remove the whole line, fix the KOT bookkeeping and totals, persist
+    // and return its stock — against the order as SAVED, inside the stock
+    // gate, located by line id rather than screen index.
+    void refuse(String message) {
+      if (dialogContext.mounted) Navigator.pop(dialogContext);
+      NotificationService.instance.showError(message);
     }
 
-    // 3. If this KOT is now empty, remove it from both lists
-    final updatedNumbers = List<int>.from(order.kotNumbers);
-    final updatedStatuses = Map<int, String>.from(order.kotStatuses ?? {});
-    final prevBoundary = kotIndex == 0 ? 0 : updatedBoundaries[kotIndex - 1];
-    if (updatedBoundaries[kotIndex] == prevBoundary) {
-      final removedKotNumber = updatedNumbers[kotIndex];
-      updatedNumbers.removeAt(kotIndex);
-      updatedBoundaries.removeAt(kotIndex);
-      updatedStatuses.remove(removedKotNumber);
+    final ActiveLineCancelResult cancel;
+    try {
+      cancel = await ActiveLineCancel.commit(
+        orderId: order.id,
+        lineId: item.id,
+        whenEmpty: WhenEmpty.refuse,
+      );
+    } on ActiveLineCancelRefused catch (e) {
+      refuse(e.message);
+      return;
+    } catch (e) {
+      refuse('Could not cancel the item: $e');
+      return;
     }
-
-    // 4. Recalculate total
-    final newTotal = order.totalPrice - (item.finalItemPrice * item.quantity);
-
-    // 5. Persist the updated order
-    final updatedOrder = order.copyWith(
-      items: updatedItems,
-      kotNumbers: updatedNumbers,
-      kotBoundaries: updatedBoundaries,
-      kotStatuses: updatedStatuses,
-      totalPrice: newTotal.clamp(0, double.infinity),
-      itemCountAtLastKot: updatedItems.length,
-    );
-    await orderStore.updateOrder(updatedOrder);
-
-    // 6. Restore inventory stock
-    await InventoryService.restoreStockForOrder([item]);
+    if (cancel.stockWarning != null) {
+      NotificationService.instance.showWarning(cancel.stockWarning!);
+    }
 
     // 7. Broadcast cancellation to KDS
     ws.broadcastEvent({
@@ -1928,6 +1903,8 @@ class _ActiveorderState extends State<Activeorder> {
                                     color: _getColorForStatus(order.status),
                                     order: order,
                                     onDelete: _deleteOrder,
+                                    canVoid: RestaurantSession.canAccess(
+                                        RefundService.voidPermission),
                                     onPrintKot: () =>
                                         _showKotPrintSelectionDialog(order),
                                     onPrintBill: () =>
@@ -1991,6 +1968,8 @@ class _ActiveorderState extends State<Activeorder> {
                       color: _getColorForStatus(order.status),
                       order: order,
                       onDelete: _deleteOrder,
+                                    canVoid: RestaurantSession.canAccess(
+                                        RefundService.voidPermission),
                       onPrintKot: () => _showKotPrintSelectionDialog(order),
                       onPrintBill: () =>
                           RestaurantPrintHelper.printBillForActiveOrder(

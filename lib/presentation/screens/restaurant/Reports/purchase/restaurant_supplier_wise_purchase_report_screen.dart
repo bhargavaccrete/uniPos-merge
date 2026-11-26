@@ -170,25 +170,22 @@ class RestaurantSupplierWisePurchaseReportScreen extends StatelessWidget {
             .map(
               (r) => [
                 r['supplierName'],
-                r['receiptCount'],
-                exportQty((r['receivedQty'] as num).toDouble()),
-                ReportExportService.formatCurrency(
-                    (r['billedValue'] as num).toDouble()),
-                ReportExportService.formatCurrency(
-                    (r['acceptedValue'] as num).toDouble()),
-                ReportExportService.formatCurrency(
-                    (r['damagedExpected'] as num).toDouble()),
-                ReportExportService.formatCurrency(
-                    (r['damagedRecovered'] as num).toDouble()),
-                ReportExportService.formatCurrency(
-                    (r['damagedAbsorbed'] as num).toDouble()),
-                ReportExportService.formatCurrency(
-                    (r['netCost'] as num).toDouble()),
+                r['receiptCount'], // count
+                exportQty((r['receivedQty'] as num).toDouble()), // units
+                ExportMoney((r['billedValue'] as num).toDouble()),
+                ExportMoney((r['acceptedValue'] as num).toDouble()),
+                ExportMoney((r['damagedExpected'] as num).toDouble()),
+                ExportMoney((r['damagedRecovered'] as num).toDouble()),
+                ExportMoney((r['damagedAbsorbed'] as num).toDouble()),
+                ExportMoney((r['netCost'] as num).toDouble()),
               ],
             )
             .toList(),
         summary: supplierWiseExportSummary(rows),
       ),
+      // Opt-in: All / Current page. Rows are per-supplier totals, so no
+      // date range (exportRowDate left null).
+      rangedExport: true,
     );
   }
 }

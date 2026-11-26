@@ -122,6 +122,17 @@ class OrderModel extends HiveObject {
   final Map<int, DateTime>? kotTimestamps; // When each KOT was created; add-on
   // KOTs differ from the order's timeStamp. First KOT falls back to timeStamp.
 
+  // Recorded when a payment is taken on an order that stays active (Dine In
+  // paid before served), so the past order keeps them.
+  @HiveField(37)
+  final int? loyaltyPointsUsed; // Loyalty points redeemed at payment
+
+  @HiveField(38)
+  final String? discountAppliedBy; // Staff name/role who applied the discount
+
+  @HiveField(39)
+  final String? shiftId; // Shift that took the payment
+
   OrderModel( {
     required this.id,
     required this.customerName,
@@ -164,6 +175,9 @@ class OrderModel extends HiveObject {
     this.lastModifiedBy,
     this.lastModifiedAt,
     this.kotTimestamps,
+    this.loyaltyPointsUsed,
+    this.discountAppliedBy,
+    this.shiftId,
   }) : assert(kotNumbers.isNotEmpty, 'Order must have at least one KOT number'),
         assert(kotBoundaries.isNotEmpty, 'Order must have at least one KOT boundary'),
         assert(kotNumbers.length == kotBoundaries.length, 'KOT numbers and boundaries must match');
@@ -218,6 +232,9 @@ class OrderModel extends HiveObject {
     String? lastModifiedBy,
     DateTime? lastModifiedAt,
     Map<int, DateTime>? kotTimestamps,
+    int? loyaltyPointsUsed,
+    String? discountAppliedBy,
+    String? shiftId,
   }) {
     return OrderModel(
       id: id ?? this.id,
@@ -257,6 +274,9 @@ class OrderModel extends HiveObject {
       lastModifiedBy: lastModifiedBy ?? this.lastModifiedBy,
       lastModifiedAt: lastModifiedAt ?? this.lastModifiedAt,
       kotTimestamps: kotTimestamps ?? this.kotTimestamps,
+      loyaltyPointsUsed: loyaltyPointsUsed ?? this.loyaltyPointsUsed,
+      discountAppliedBy: discountAppliedBy ?? this.discountAppliedBy,
+      shiftId: shiftId ?? this.shiftId,
     );
   }
 
@@ -337,6 +357,17 @@ class OrderModel extends HiveObject {
       'totalPaid': totalPaid,
       'changeReturn': changeReturn,
       'isTaxInclusive': isTaxInclusive,
+      'loyaltyPointsUsed': loyaltyPointsUsed,
+      'discountAppliedBy': discountAppliedBy,
+      'shiftId': shiftId,
+      // BKP-3: every Hive field travels with the backup. kotTimestamps as
+      // {"<kot number>": ISO time} so it is JSON on every export path.
+      'billNumber': billNumber,
+      'sessionId': sessionId,
+      'lastModifiedBy': lastModifiedBy,
+      'lastModifiedAt': lastModifiedAt?.toIso8601String(),
+      'kotTimestamps': kotTimestamps?.map(
+          (kot, at) => MapEntry(kot.toString(), at.toIso8601String())),
     };
   }
 
@@ -392,6 +423,26 @@ class OrderModel extends HiveObject {
       totalPaid: map['totalPaid'] != null ? (map['totalPaid'] as num).toDouble() : null,
       changeReturn: map['changeReturn'] != null ? (map['changeReturn'] as num).toDouble() : null,
       isTaxInclusive: map['isTaxInclusive'] as bool?,
+      loyaltyPointsUsed: map['loyaltyPointsUsed'] != null
+          ? _toInt(map['loyaltyPointsUsed'])
+          : null,
+      discountAppliedBy: map['discountAppliedBy'] as String?,
+      shiftId: map['shiftId'] as String?,
+      // BKP-3: absent in older backups, which restore them as null. A value
+      // that cannot be read is dropped rather than refusing the restore.
+      billNumber:
+          map['billNumber'] != null ? _toInt(map['billNumber']) : null,
+      sessionId: map['sessionId'] as String?,
+      lastModifiedBy: map['lastModifiedBy'] as String?,
+      lastModifiedAt: map['lastModifiedAt'] != null
+          ? DateTime.tryParse(map['lastModifiedAt'].toString())
+          : null,
+      kotTimestamps: map['kotTimestamps'] is Map
+          ? {
+              for (final e in (map['kotTimestamps'] as Map).entries)
+                _toInt(e.key): ?DateTime.tryParse(e.value.toString()),
+            }
+          : null,
     );
   }
 

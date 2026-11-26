@@ -5,6 +5,7 @@ import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/images.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../util/common/app_responsive.dart';
+import '../../../../util/common/pin_attempt_guard.dart';
 import '../../../../util/restaurant/restaurant_auth_helper.dart';
 import '../../../../util/restaurant/restaurant_session.dart';
 import '../../../widget/componets/restaurant/componets/Button.dart';
@@ -19,7 +20,8 @@ class RestaurantLogin extends StatefulWidget {
   State<RestaurantLogin> createState() => _RestaurantLoginState();
 }
 
-class _RestaurantLoginState extends State<RestaurantLogin> {
+class _RestaurantLoginState extends State<RestaurantLogin>
+    with PinLockoutCountdown {
   final TextEditingController _passwordController = TextEditingController();
   final _formkey = GlobalKey<FormState>();
 
@@ -40,6 +42,7 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
   void initState() {
     super.initState();
     _initializeDefaultCredentials();
+    loadPinLock();
   }
 
   @override
@@ -74,6 +77,7 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
 
   /// PIN-only login. The PIN identifies whoever it is — admin first, then staff.
   Future<void> _handleLogin() async {
+    if (isPinLocked) return;
     if (!_formkey.currentState!.validate()) return;
 
     setState(() {
@@ -82,12 +86,21 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
     });
 
     try {
+      // Locked: refuse without checking the PIN, or a lock would not slow
+      // guessing.
+      final locked = await PinAttemptGuard.remainingLock();
+      if (locked != null) {
+        _showLocked(locked);
+        return;
+      }
+
       final prefs = await SharedPreferences.getInstance();
       final enteredPin = _passwordController.text.trim();
 
       // ── 1. Admin (PIN = stored admin password) ────────────────────────────
       final storedPassword = prefs.getString(_passwordKey) ?? _defaultPassword;
       if (RestaurantAuthHelper.verifyPassword(enteredPin, storedPassword)) {
+        await PinAttemptGuard.recordSuccess();
         await prefs.setBool(_isLoggedInKey, true);
         await RestaurantSession.saveAdminSession();
         await _autoClockIn('Admin', 'Admin');
@@ -108,6 +121,7 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
           .firstOrNull;
 
       if (match != null) {
+        await PinAttemptGuard.recordSuccess();
         await prefs.setBool(_isLoggedInKey, true);
         await RestaurantSession.saveStaffSession(match);
         final name = '${match.firstName} ${match.lastName}'.trim();
@@ -119,16 +133,33 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
       }
 
       // ── 3. No match ───────────────────────────────────────────────────────
+      final lock = await PinAttemptGuard.recordFailure();
+      if (!mounted) return;
+      if (lock != null) {
+        _showLocked(lock);
+        return;
+      }
       setState(() {
         _errorMessage = 'Invalid PIN';
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _errorMessage = 'An error occurred. Please try again.';
         _isLoading = false;
       });
     }
+  }
+
+  void _showLocked(Duration left) {
+    if (!mounted) return;
+    _passwordController.clear();
+    setState(() {
+      _errorMessage = null;
+      _isLoading = false;
+    });
+    startPinLockCountdown(left);
   }
 
   Future<void> _autoClockIn(String staffName, String role) async {
@@ -139,6 +170,10 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
 
   @override
   Widget build(BuildContext context) {
+    final errorText = isPinLocked
+        ? PinAttemptGuard.lockedMessage(pinLockRemaining!)
+        : _errorMessage;
+    final canSubmit = !_isLoading && !isPinLocked;
     return Scaffold(
       backgroundColor: AppColors.white,
       body: SafeArea(
@@ -217,7 +252,7 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
                       SizedBox(height: AppResponsive.height(context, 0.05)),
 
                       // Error Message
-                      if (_errorMessage != null) ...[
+                      if (errorText != null) ...[
                         Container(
                           width: double.infinity,
                           padding: EdgeInsets.all(
@@ -240,7 +275,7 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
-                                  _errorMessage!,
+                                  errorText,
                                   style: GoogleFonts.poppins(
                                     color: Colors.red.shade700,
                                     fontSize: AppResponsive.bodyFontSize(
@@ -259,6 +294,7 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
                       AppTextField(
                         controller: _passwordController,
                         autofocus: true,
+                        enabled: !isPinLocked,
                         label: 'PIN',
                         hint: 'Enter your PIN',
                         icon: Icons.lock_outline_rounded,
@@ -271,7 +307,7 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
                         maxLength: 6,
                         textInputAction: TextInputAction.done,
                         onFieldSubmitted: (_) {
-                          if (!_isLoading) _handleLogin();
+                          if (canSubmit) _handleLogin();
                         },
                         suffixIcon: IconButton(
                           icon: Icon(
@@ -302,10 +338,10 @@ class _RestaurantLoginState extends State<RestaurantLogin> {
                       CommonButton(
                         width: double.infinity,
                         height: AppResponsive.height(context, 0.065),
-                        onTap: _isLoading ? () {} : _handleLogin,
-                        bgcolor: _isLoading
-                            ? AppColors.divider
-                            : AppColors.primary,
+                        onTap: canSubmit ? _handleLogin : () {},
+                        bgcolor: canSubmit
+                            ? AppColors.primary
+                            : AppColors.divider,
                         child: _isLoading
                             ? const SizedBox(
                                 height: 24,

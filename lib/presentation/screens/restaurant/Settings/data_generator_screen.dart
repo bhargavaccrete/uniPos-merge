@@ -5,6 +5,9 @@ import 'package:billberrylite/presentation/widget/componets/common/app_dialog.da
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 
 import '../../../../domain/services/restaurant/comprehensive_data_generator.dart';
+import 'package:billberrylite/domain/services/restaurant/history_data_generator.dart';
+import 'package:billberrylite/domain/services/restaurant/inventory_data_generator.dart';
+import 'package:billberrylite/domain/services/restaurant/setup_data_generator.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
@@ -30,18 +33,19 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
   final TextEditingController _staffController = TextEditingController(
     text: '20',
   );
-  final TextEditingController _taxRatesController = TextEditingController(
-    text: '6',
+  final TextEditingController _customersController = TextEditingController(
+    text: '200',
   );
-  final TextEditingController _activeOrdersController = TextEditingController(
-    text: '100',
-  );
-  final TextEditingController _pastOrdersController = TextEditingController(
-    text: '50000',
-  );
-  final TextEditingController _eodReportsController = TextEditingController(
+  final TextEditingController _historyDaysController = TextEditingController(
     text: '30',
   );
+  final TextEditingController _ordersPerDayController = TextEditingController(
+    text: '60',
+  );
+  final TextEditingController _purchaseOrdersController = TextEditingController(
+    text: '40',
+  );
+  final ValueNotifier<String> _progress = ValueNotifier('');
 
   bool _isGenerating = false;
   bool _isClearing = false;
@@ -50,7 +54,6 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
   Map<String, int> _stats = {};
   Map<String, String> _fileSizes = {};
   Map<String, dynamic>? _lastGenerationResults;
-  int _selectedTabIndex = 0; // 0 = Generator, 1 = Statistics & Reports
 
   @override
   void initState() {
@@ -61,7 +64,10 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
   Future<void> _loadStats() async {
     setState(() => _isLoadingStats = true);
     try {
-      final stats = ComprehensiveDataGenerator.getAllStats();
+      final stats = {
+        ...ComprehensiveDataGenerator.getAllStats(),
+        ...ComprehensiveDataGenerator.getExtraStats(),
+      };
       final sizes = await ComprehensiveDataGenerator.getBoxFileSizes();
       setState(() {
         _stats = stats;
@@ -86,10 +92,11 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
         items: int.tryParse(_itemsController.text) ?? 500,
         tables: int.tryParse(_tablesController.text) ?? 50,
         staff: int.tryParse(_staffController.text) ?? 20,
-        taxRates: int.tryParse(_taxRatesController.text) ?? 6,
-        activeOrders: int.tryParse(_activeOrdersController.text) ?? 100,
-        pastOrders: int.tryParse(_pastOrdersController.text) ?? 50000,
-        eodReports: int.tryParse(_eodReportsController.text) ?? 30,
+        customers: int.tryParse(_customersController.text) ?? 200,
+        historyDays: int.tryParse(_historyDaysController.text) ?? 30,
+        ordersPerDay: int.tryParse(_ordersPerDayController.text) ?? 60,
+        purchaseOrders: int.tryParse(_purchaseOrdersController.text) ?? 40,
+        onProgress: (m) => _progress.value = m,
         withImages: _includeImages,
       );
 
@@ -190,6 +197,20 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
                         color: Colors.black87,
                       ),
                     ),
+                    if (_isGenerating) ...[
+                      const SizedBox(height: 12),
+                      ValueListenableBuilder<String>(
+                        valueListenable: _progress,
+                        builder: (_, msg, _) => Text(
+                          msg,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: AppResponsive.bodyFontSize(context),
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               )
@@ -217,314 +238,6 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
               ),
       ),
     );
-  }
-
-  Widget _buildOverallReportsCard() {
-    final totalOrders =
-        (_stats['activeOrders'] ?? 0) + (_stats['pastOrders'] ?? 0);
-    final totalRecords = _stats.values.fold(0, (sum, count) => sum + count);
-
-    return Card(
-      color: Colors.purple.shade50,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.analytics, color: Colors.purple.shade700),
-                const SizedBox(width: 8),
-                Text(
-                  'Overall Statistics & Reports',
-                  style: TextStyle(
-                    fontSize: AppResponsive.subheadingFontSize(context),
-                    fontWeight: FontWeight.bold,
-                    color: Colors.purple.shade700,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Summary Section
-            _buildReportSection('📋 Data Summary', [
-              _buildReportRow(
-                'Total Records in Database',
-                _formatNumber(totalRecords),
-                icon: Icons.storage,
-              ),
-              _buildReportRow(
-                'Total Orders (Active + Past)',
-                _formatNumber(totalOrders),
-                icon: Icons.shopping_bag,
-              ),
-              _buildReportRow(
-                'Total Past Orders Completed',
-                _formatNumber(_stats['pastOrders'] ?? 0),
-                icon: Icons.check_circle,
-              ),
-              _buildReportRow(
-                'Total Active Orders',
-                _formatNumber(_stats['activeOrders'] ?? 0),
-                icon: Icons.pending,
-              ),
-              _buildReportRow(
-                'Total EOD Reports Generated',
-                _formatNumber(_stats['eodReports'] ?? 0),
-                icon: Icons.assessment,
-              ),
-            ]),
-
-            const Divider(height: 32),
-
-            // Inventory Section
-            _buildReportSection('📦 Inventory & Products', [
-              _buildReportRow(
-                'Total Categories',
-                _formatNumber(_stats['categories'] ?? 0),
-                icon: Icons.category,
-              ),
-              _buildReportRow(
-                'Total Items/Products',
-                _formatNumber(_stats['items'] ?? 0),
-                icon: Icons.restaurant_menu,
-              ),
-              _buildReportRow(
-                'Total Variants (Sizes)',
-                _formatNumber(_stats['variants'] ?? 0),
-                icon: Icons.format_size,
-              ),
-              _buildReportRow(
-                'Total Extras/Toppings',
-                _formatNumber(_stats['extras'] ?? 0),
-                icon: Icons.add_circle,
-              ),
-            ]),
-
-            const Divider(height: 32),
-
-            // Operations Section
-            _buildReportSection('🏢 Operations', [
-              _buildReportRow(
-                'Total Tables',
-                _formatNumber(_stats['tables'] ?? 0),
-                icon: Icons.table_restaurant,
-              ),
-              _buildReportRow(
-                'Total Staff Members',
-                _formatNumber(_stats['staff'] ?? 0),
-                icon: Icons.people,
-              ),
-              _buildReportRow(
-                'Total Tax Rates',
-                _formatNumber(_stats['taxRates'] ?? 0),
-                icon: Icons.percent,
-              ),
-              _buildReportRow(
-                'Items in Cart',
-                _formatNumber(_stats['cart'] ?? 0),
-                icon: Icons.shopping_cart,
-              ),
-            ]),
-
-            const Divider(height: 32),
-
-            // Performance Insights
-            _buildReportSection('⚡ Performance Insights', [
-              _buildReportRow(
-                'Database Health',
-                totalRecords > 0 ? 'Active' : 'Empty',
-                icon: Icons.health_and_safety,
-                valueColor: totalRecords > 0
-                    ? Colors.green
-                    : AppColors.textSecondary,
-              ),
-              _buildReportRow(
-                'Large Dataset Test',
-                (_stats['pastOrders'] ?? 0) >= 50000 ? 'Passed ✓' : 'Pending',
-                icon: Icons.verified,
-                valueColor: (_stats['pastOrders'] ?? 0) >= 50000
-                    ? Colors.green
-                    : Colors.orange,
-              ),
-              _buildReportRow(
-                'Total Storage Used',
-                _getTotalStorageUsed(),
-                icon: Icons.sd_card,
-              ),
-            ]),
-
-            if ((_stats['pastOrders'] ?? 0) > 0) ...[
-              const Divider(height: 32),
-              _buildTestResultsSummary(),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildReportSection(String title, List<Widget> children) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: TextStyle(
-            fontSize: AppResponsive.subheadingFontSize(context),
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 12),
-        ...children,
-      ],
-    );
-  }
-
-  Widget _buildReportRow(
-    String label,
-    String value, {
-    IconData? icon,
-    Color? valueColor,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        children: [
-          if (icon != null) ...[
-            Icon(icon, size: 20, color: AppColors.textSecondary),
-            const SizedBox(width: 8),
-          ],
-          Expanded(
-            child: Text(
-              label,
-              style: TextStyle(fontSize: AppResponsive.bodyFontSize(context)),
-            ),
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: AppResponsive.bodyFontSize(context),
-              fontWeight: FontWeight.bold,
-              color: valueColor,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTestResultsSummary() {
-    final pastOrders = _stats['pastOrders'] ?? 0;
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.green.shade100,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.green.shade300),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.check_circle, color: Colors.green.shade700),
-              const SizedBox(width: 8),
-              Text(
-                'Performance Test Results',
-                style: TextStyle(
-                  fontSize: AppResponsive.subheadingFontSize(context),
-                  fontWeight: FontWeight.bold,
-                  color: Colors.green.shade700,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _buildTestResultRow(
-            '✓ Past orders generated',
-            _formatNumber(pastOrders),
-          ),
-          _buildTestResultRow('✓ Data persistence', 'Verified'),
-          _buildTestResultRow('✓ No corruption detected', 'Passed'),
-          _buildTestResultRow('✓ Query performance', 'Operational'),
-          _buildTestResultRow('✓ File integrity', 'Maintained'),
-          const SizedBox(height: 8),
-          Text(
-            'All $pastOrders records are accessible and queryable.',
-            style: TextStyle(
-              fontSize: AppResponsive.smallFontSize(context),
-              fontStyle: FontStyle.italic,
-              color: Colors.green.shade800,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTestResultRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: TextStyle(fontSize: AppResponsive.bodyFontSize(context)),
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: AppResponsive.bodyFontSize(context),
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _formatNumber(int number) {
-    if (number >= 1000000) {
-      return '${(number / 1000000).toStringAsFixed(2)}M';
-    } else if (number >= 1000) {
-      return '${(number / 1000).toStringAsFixed(1)}K';
-    }
-    return number.toString();
-  }
-
-  String _getTotalStorageUsed() {
-    double totalBytes = 0;
-    for (final size in _fileSizes.values) {
-      try {
-        if (size.endsWith('KB')) {
-          totalBytes += double.parse(size.replaceAll(' KB', '')) * 1024;
-        } else if (size.endsWith('MB')) {
-          totalBytes += double.parse(size.replaceAll(' MB', '')) * 1024 * 1024;
-        } else if (size.endsWith('GB')) {
-          totalBytes +=
-              double.parse(size.replaceAll(' GB', '')) * 1024 * 1024 * 1024;
-        } else if (size.endsWith('B') &&
-            !size.contains('K') &&
-            !size.contains('M')) {
-          totalBytes += double.parse(size.replaceAll(' B', ''));
-        }
-      } catch (e) {
-        // Skip invalid sizes
-      }
-    }
-
-    if (totalBytes < 1024) {
-      return '${totalBytes.toStringAsFixed(0)} B';
-    } else if (totalBytes < 1024 * 1024) {
-      return '${(totalBytes / 1024).toStringAsFixed(2)} KB';
-    } else if (totalBytes < 1024 * 1024 * 1024) {
-      return '${(totalBytes / (1024 * 1024)).toStringAsFixed(2)} MB';
-    } else {
-      return '${(totalBytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
-    }
   }
 
   Widget _buildInfoCard() {
@@ -571,8 +284,7 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
             '• Generate test data for all Hive boxes\n'
             '• Configure the amount of data for each box\n'
             '• Monitor insertion speed and file sizes\n'
-            '• Test performance with large datasets (50,000+ records)\n'
-            '• Verify data integrity and query performance',
+            '• Test performance with large datasets (50,000+ records)',
             style: GoogleFonts.poppins(
               fontSize: AppResponsive.bodyFontSize(context),
               height: 1.5,
@@ -614,22 +326,21 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
           _buildInputField('Items', _itemsController, Icons.restaurant_menu),
           _buildInputField('Tables', _tablesController, Icons.table_restaurant),
           _buildInputField('Staff', _staffController, Icons.people),
-          _buildInputField('Tax Rates', _taxRatesController, Icons.percent),
+          _buildInputField('Customers', _customersController, Icons.person),
           _buildInputField(
-            'Active Orders',
-            _activeOrdersController,
-            Icons.shopping_cart,
-          ),
-          _buildInputField(
-            'Past Orders (50K recommended)',
-            _pastOrdersController,
+            'Sales history (days, up to yesterday)',
+            _historyDaysController,
             Icons.history,
-            highlight: true,
           ),
           _buildInputField(
-            'EOD Reports',
-            _eodReportsController,
-            Icons.assessment,
+            'Orders per day (average)',
+            _ordersPerDayController,
+            Icons.receipt_long,
+          ),
+          _buildInputField(
+            'Purchase orders (suppliers, GRN, recipes; 0 = skip inventory)',
+            _purchaseOrdersController,
+            Icons.inventory_2,
           ),
         ],
       ),
@@ -639,9 +350,8 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
   Widget _buildInputField(
     String label,
     TextEditingController controller,
-    IconData icon, {
-    bool highlight = false,
-  }) {
+    IconData icon,
+  ) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: AppTextField(
@@ -852,17 +562,16 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
                 '⏱️ Total Time',
                 '${results['totalTime']}ms (${(results['totalTime'] / 1000).toStringAsFixed(2)}s)',
               ),
-              _buildResultRow('📁 Categories', '${results['categories']}'),
-              _buildResultRow('📁 Items', '${results['items']}'),
-              _buildResultRow('📁 Tables', '${results['tables']}'),
-              _buildResultRow('📁 Staff', '${results['staff']}'),
-              _buildResultRow('📁 Active Orders', '${results['activeOrders']}'),
-              _buildResultRow(
-                '📁 Past Orders',
-                '${results['pastOrders']}',
-                highlight: true,
-              ),
-              _buildResultRow('📁 EOD Reports', '${results['eodReports']}'),
+              if (results['setup'] is SetupDataResult)
+                ..._buildSetupRows(results['setup'] as SetupDataResult),
+              const Divider(height: 24),
+              if (results['inventory'] is InventoryDataResult) ...[
+                ..._buildInventoryRows(
+                    results['inventory'] as InventoryDataResult),
+                const Divider(height: 24),
+              ],
+              if (results['history'] is HistoryDataResult)
+                ..._buildHistoryRows(results['history'] as HistoryDataResult),
               const Divider(height: 24),
               _buildPerformanceMetrics(results),
             ] else ...[
@@ -875,6 +584,128 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
         ),
       ),
     );
+  }
+
+  static const _setupLabels = {
+    'taxes': 'Taxes',
+    'variants': 'Variants',
+    'choices': 'Choices',
+    'extras': 'Extras',
+    'categories': 'Categories',
+    'items': 'Items',
+    'tables': 'Tables',
+    'staff': 'Staff',
+    'customers': 'Customers',
+  };
+
+  List<Widget> _buildSetupRows(SetupDataResult setup) {
+    final small = TextStyle(
+      fontSize: AppResponsive.smallFontSize(context),
+      color: AppColors.textSecondary,
+    );
+    return [
+      for (final e in _setupLabels.entries)
+        if (setup.counts[e.key] case final c?) ...[
+          _buildResultRow(
+            '📁 ${e.value}',
+            [
+              '${c.added} added',
+              if (c.reused > 0) '${c.reused} reused',
+              if (c.skipped > 0) '${c.skipped} skipped',
+            ].join(' · '),
+          ),
+          if (c.reason != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8, left: 8),
+              child: Text(c.reason!, style: small.copyWith(color: Colors.orange.shade800)),
+            ),
+        ],
+      if (setup.staffLogins.isNotEmpty) ...[
+        const SizedBox(height: 8),
+        Text(
+          'Staff logins',
+          style: TextStyle(
+            fontSize: AppResponsive.bodyFontSize(context),
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 4),
+        for (final login in setup.staffLogins) Text(login, style: small),
+      ],
+    ];
+  }
+
+  List<Widget> _buildInventoryRows(InventoryDataResult inv) {
+    final warn = TextStyle(
+      fontSize: AppResponsive.smallFontSize(context),
+      color: Colors.orange.shade800,
+    );
+    return [
+      _buildResultRow(
+        '🥕 Raw / semi-finished',
+        '${inv.rawMaterials} · ${inv.semiFinished}',
+      ),
+      _buildResultRow('📖 Recipes', '${inv.recipes}'),
+      _buildResultRow('🚚 Suppliers', '${inv.suppliers}'),
+      _buildResultRow(
+        '📦 POs · GRNs',
+        '${inv.purchaseOrders} · ${inv.grns} (${inv.partialGrns} partial)',
+      ),
+      _buildResultRow('⚠️ Damaged lines', '${inv.damagedLines}'),
+      _buildResultRow(
+        '↩️ Credit notes · returns cancelled',
+        '${inv.creditNotes} · ${inv.returnsCancelled}',
+      ),
+      _buildResultRow(
+        '📝 Claims settled · rejected',
+        '${inv.claimsSettled} · ${inv.claimsRejected}',
+      ),
+      _buildResultRow('💳 Supplier payments', '${inv.payments}'),
+      _buildResultRow('🍳 Production batches', '${inv.productions}'),
+      _buildResultRow('🔧 Stock adjustments', '${inv.adjustments}'),
+      _buildResultRow('📋 Stock take lines', '${inv.stockTakeLines}'),
+      for (final w in inv.warnings.take(5)) Text(w, style: warn),
+      if (inv.warnings.length > 5)
+        Text('…and ${inv.warnings.length - 5} more warnings', style: warn),
+    ];
+  }
+
+  List<Widget> _buildHistoryRows(HistoryDataResult h) {
+    final warn = TextStyle(
+      fontSize: AppResponsive.smallFontSize(context),
+      color: Colors.orange.shade800,
+    );
+    return [
+      if (h.skippedReason != null) Text(h.skippedReason!, style: warn),
+      _buildResultRow('📅 Days (sessions + EOD)', '${h.days} · ${h.eodReports} EOD'),
+      _buildResultRow('🧾 Orders', '${h.orders}', highlight: true),
+      _buildResultRow('💰 Net sales', h.grossSales.toStringAsFixed(2)),
+      _buildResultRow(
+        '↩️ Refunds',
+        '${h.fullRefunds} full · ${h.partialRefunds} partial',
+      ),
+      _buildResultRow('🚫 Voided (unpaid)', '${h.voids}'),
+      _buildResultRow('💸 Expenses', '${h.expenses}'),
+      _buildResultRow('💵 Cash movements', '${h.cashMovements}'),
+      _buildResultRow('👤 Shifts', '${h.shifts}'),
+      _buildResultRow('⭐ Customers with visits', '${h.customersUpdated}'),
+      _buildResultRow(
+        '⏱️ EOD generation',
+        h.eodReports > 0
+            ? '${h.eodTimeMs}ms · ${(h.eodTimeMs / h.eodReports).toStringAsFixed(0)}ms/day'
+            : 'N/A',
+      ),
+      if (h.ordersCappedByPlan > 0)
+        Text(
+          '${h.ordersCappedByPlan} orders not created — plan bills-per-day limit',
+          style: warn,
+        ),
+      if (h.eodCashMismatches > 0)
+        Text(
+          '${h.eodCashMismatches} EOD(s) expected cash differs from the generator’s own total — check those days in Day-wise Closing',
+          style: warn,
+        ),
+    ];
   }
 
   Widget _buildResultRow(String label, String value, {bool highlight = false}) {
@@ -903,18 +734,27 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
   }
 
   Widget _buildPerformanceMetrics(Map<String, dynamic> results) {
-    final totalRecords =
-        (results['categories'] ?? 0) +
-        (results['items'] ?? 0) +
-        (results['tables'] ?? 0) +
-        (results['staff'] ?? 0) +
-        (results['activeOrders'] ?? 0) +
-        (results['pastOrders'] ?? 0) +
-        (results['eodReports'] ?? 0);
+    final setup = results['setup'];
+    final int setupRecords = setup is SetupDataResult
+        ? setup.counts.values.fold(0, (sum, c) => sum + c.added)
+        : 0;
+    final history = results['history'];
+    final int totalRecords = setupRecords +
+        (history is HistoryDataResult
+            ? history.orders +
+                history.eodReports +
+                history.expenses +
+                history.cashMovements +
+                history.shifts +
+                history.days
+            : 0);
 
     final timeInSeconds = (results['totalTime'] ?? 0) / 1000;
     final recordsPerSecond = timeInSeconds > 0
         ? (totalRecords / timeInSeconds).toStringAsFixed(0)
+        : 'N/A';
+    final avgPerRecord = totalRecords > 0
+        ? '${(timeInSeconds * 1000 / totalRecords).toStringAsFixed(2)}ms'
         : 'N/A';
 
     return Column(
@@ -929,11 +769,10 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
         ),
         const SizedBox(height: 8),
         _buildResultRow('Total Records', '$totalRecords'),
+        if (results['setupTime'] != null)
+          _buildResultRow('Setup data time', '${results['setupTime']}ms'),
         _buildResultRow('Records/Second', recordsPerSecond),
-        _buildResultRow(
-          'Average per Record',
-          '${(timeInSeconds * 1000 / totalRecords).toStringAsFixed(2)}ms',
-        ),
+        _buildResultRow('Average per Record', avgPerRecord),
       ],
     );
   }
@@ -1093,10 +932,11 @@ class _DataGeneratorScreenState extends State<DataGeneratorScreen> {
     _itemsController.dispose();
     _tablesController.dispose();
     _staffController.dispose();
-    _taxRatesController.dispose();
-    _activeOrdersController.dispose();
-    _pastOrdersController.dispose();
-    _eodReportsController.dispose();
+    _customersController.dispose();
+    _historyDaysController.dispose();
+    _ordersPerDayController.dispose();
+    _purchaseOrdersController.dispose();
+    _progress.dispose();
     super.dispose();
   }
 }

@@ -207,6 +207,8 @@ static Future<void> deleteOrder (String id )async{
     required OrderModel existingOrder,
     required List<CartItem> newItems,
     bool broadcastUpdate = true,
+    // Applied to the combined order before its single save (e.g. totals).
+    OrderModel Function(OrderModel combined)? finalize,
   }) async {
     // Check if we need to reset status (order was Ready or Served)
     bool needsStatusReset = existingOrder.status == 'Ready' || existingOrder.status == 'Served';
@@ -227,7 +229,7 @@ static Future<void> deleteOrder (String id )async{
     updatedKotTimestamps[newKotNumber] = DateTime.now();
 
     // Create updated order
-    final updatedOrder = existingOrder.copyWith(
+    final combinedOrder = existingOrder.copyWith(
       items: combinedItems,
       status: needsStatusReset ? 'Processing' : existingOrder.status,
       kotNumbers: updatedKotNumbers,
@@ -235,6 +237,8 @@ static Future<void> deleteOrder (String id )async{
       kotBoundaries: updatedBoundaries,
       kotTimestamps: updatedKotTimestamps,
     );
+    final updatedOrder =
+        finalize == null ? combinedOrder : finalize(combinedOrder);
 
     // Save to database
     await updateOrder(updatedOrder);

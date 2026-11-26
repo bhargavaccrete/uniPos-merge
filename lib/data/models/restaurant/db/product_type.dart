@@ -21,18 +21,59 @@ class ProductType {
   /// change from how every item worked before this feature existed.
   static const String finishedGood = 'finishedGood';
 
-  /// Composed at time of sale (Burger, Pizza). Has a recipe describing what
-  /// it's made FROM. Not stocked itself — its "stock" is derived live from
-  /// ingredient availability, and selling one cascades a deduction into its
-  /// ingredients instead of decrementing its own stockQuantity.
+  /// LEGACY (pre-Phase 1). Stored on existing items and in old backups; read
+  /// as Finished · made to order ([effective], [effectivePrepMode]). Never
+  /// written by new code.
   static const String recipeBased = 'recipeBased';
 
+  /// Bought and resold as-is (bottled drink, packaged snack). Own stock,
+  /// replenished by PO → GRN; never has a recipe and is never an ingredient.
+  static const String tradeItem = 'tradeItem';
+
+  /// Finished preparation modes (`Items.prepMode`).
+  static const String madeToOrder = 'madeToOrder';
+  static const String madeInAdvance = 'madeInAdvance';
+
+  /// The types a user can choose (Phase 1). Legacy [recipeBased] is read,
+  /// never offered.
   static const List<String> all = [
-    rawMaterial,
-    semiFinished,
     finishedGood,
-    recipeBased,
+    semiFinished,
+    rawMaterial,
+    tradeItem,
   ];
+
+  /// What the item editor / quick add shows for a stored item: the effective
+  /// type and the effective preparation mode, so a legacy 'recipeBased' item
+  /// opens as Finished · made to order and saves back as exactly that.
+  static ({String type, String prepMode, bool makeFresh}) editorView(
+          String? storedType, String? storedPrepMode, bool storedMakeFresh) =>
+      (
+        type: effective(storedType),
+        prepMode: effectivePrepMode(storedType, storedPrepMode),
+        makeFresh: storedMakeFresh,
+      );
+
+  /// The fields the editor writes back. Only Finished carries a preparation
+  /// mode, and only made in advance can "make fresh when out".
+  static ({String productType, String? prepMode, bool makeFreshWhenOut})
+      storedFields(
+          {required String type,
+          required String prepMode,
+          required bool makeFresh}) {
+    final finished = effective(type) == finishedGood;
+    return (
+      productType: effective(type),
+      prepMode: finished ? prepMode : null,
+      makeFreshWhenOut: finished && prepMode == madeInAdvance && makeFresh,
+    );
+  }
+
+  /// The preparation mode an item behaves with. A stored [prepMode] wins;
+  /// otherwise a legacy 'recipeBased' item is made to order and every other
+  /// item made in advance — exactly how each sold before Phase 1.
+  static String effectivePrepMode(String? type, String? prepMode) =>
+      prepMode ?? (type == recipeBased ? madeToOrder : madeInAdvance);
 
   /// True for types that carry a [RecipeModel] (via `Items.recipeId`).
   static bool hasRecipe(String? type) =>
@@ -48,34 +89,47 @@ class ProductType {
         return 'Raw Material';
       case semiFinished:
         return 'Semi-Finished';
-      case recipeBased:
-        return 'Recipe-Based';
+      case tradeItem:
+        return 'Trade Item';
+      case recipeBased: // legacy — reads as Finished (made to order)
       case finishedGood:
       default:
-        return 'Finished Good';
+        return 'Finished';
     }
   }
 
   /// `Items.productType` is nullable so every pre-existing item stays valid
   /// with zero migration — null reads as Finished Good, today's only behavior.
-  static String effective(String? type) => type ?? finishedGood;
+  /// Legacy 'recipeBased' reads as Finished too; its made-to-order behaviour
+  /// comes from [effectivePrepMode].
+  static String effective(String? type) =>
+      (type == null || type == recipeBased) ? finishedGood : type;
 
   /// Menu items (sold on the POS grid) need a category + selling price;
   /// back-of-house types (Raw Material, Semi-Finished) don't. Single source
   /// of truth for both AddItemFormState.validate() and Edit Item's save
   /// validation, so the two screens can't drift on this rule again.
   static bool isMenuType(String? type) =>
-      type == finishedGood || type == recipeBased;
+      type == finishedGood || type == recipeBased || type == tradeItem;
 
   /// The stock fields an item must carry once its type is [type]. Recipe-Based
   /// items derive availability from their recipe (see [isStockDerived]) and
   /// must never carry over stale tracking/quantity from before a type switch.
+  /// Finished (optional recipe) and Semi-Finished can carry a recipe; Raw
+  /// Material and Trade Item never do.
+  static bool canHaveRecipe(String? type) =>
+      type == finishedGood || type == semiFinished || type == recipeBased;
+
+  /// [prepMode] is the Finished preparation mode: made to order owns no
+  /// stock, exactly like the legacy Recipe-Based type.
   static ({bool trackInventory, double stockQuantity}) resolvePhysicalStock(
     String? type, {
+    String? prepMode,
     required bool requestedTrackInventory,
     required double requestedStockQuantity,
   }) {
-    if (isStockDerived(type)) {
+    if (isStockDerived(type) ||
+        (type == finishedGood && prepMode == madeToOrder)) {
       return (trackInventory: false, stockQuantity: 0.0);
     }
     return (

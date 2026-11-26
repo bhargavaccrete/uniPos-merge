@@ -12,7 +12,9 @@ import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_empty_state.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:billberrylite/presentation/widget/componets/common/gradient_hero_header.dart';
-import '../manage menu/tab/edit_item.dart';
+import 'package:billberrylite/data/models/restaurant/db/product_type.dart';
+import 'package:billberrylite/domain/services/restaurant/recipe_catalog.dart';
+import 'recipe_editor_screen.dart';
 
 /// Horizontal inset that centres the grid inside the shared page shell.
 ///
@@ -49,21 +51,69 @@ class _RecipesScreenState extends State<RecipesScreen> {
     }
   }
 
+  /// Recipes live in the repository (not observable): refresh after any
+  /// create / edit / delete.
+  Future<void> _openEditor(Items item) async {
+    final changed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => RecipeEditorScreen(item: item)),
+    );
+    if (changed == true && mounted) setState(() {});
+  }
+
+  /// Create Recipe: pick a Finished or Semi-Finished item without one.
+  Future<void> _createRecipe() async {
+    final candidates = RecipeCatalog.itemsNeedingRecipe(
+      itemStore.items,
+      recipeRepository.getAllRecipes(),
+    );
+    final picked = await showModalBottomSheet<Items>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => _RecipeItemPicker(candidates: candidates),
+    );
+    if (picked != null && mounted) await _openEditor(picked);
+  }
+
+  List<({Items item, RecipeModel recipe})> _entries() => RecipeCatalog.entries(
+        itemStore.items,
+        recipeRepository.getAllRecipes(),
+      );
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
       appBar: buildPrimaryAppBar(title: 'Recipes'),
+      // Empty list → the empty state's own Create Recipe button only.
+      floatingActionButton: Observer(
+        builder: (_) => _entries().isEmpty
+            ? const SizedBox.shrink()
+            : FloatingActionButton.extended(
+                onPressed: _createRecipe,
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                icon: const Icon(Icons.add_rounded),
+                label: Text(
+                  'Create Recipe',
+                  style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+                ),
+              ),
+      ),
       body: Observer(
         builder: (_) {
-          final items =
-              itemStore.items
-                  .where((i) => i.isSemiFinished || i.isRecipeBased)
-                  .toList()
-                ..sort((a, b) => a.name.compareTo(b.name));
+          final entries = _entries();
+          final items = [for (final e in entries) e.item];
 
           final semiCount = items.where((i) => i.isSemiFinished).length;
-          final recipeCount = items.where((i) => i.isRecipeBased).length;
+          final recipeCount = items.where((i) => i.isFinished).length;
 
           final columns = AppResponsive.gridColumns(
             context,
@@ -85,7 +135,7 @@ class _RecipesScreenState extends State<RecipesScreen> {
                     HeroStat(
                       icon: Icons.lunch_dining_rounded,
                       value: '$recipeCount',
-                      label: 'Recipe-Based',
+                      label: 'Finished',
                     ),
                     HeroStat(
                       icon: Icons.soup_kitchen_rounded,
@@ -101,20 +151,36 @@ class _RecipesScreenState extends State<RecipesScreen> {
                 ),
               ),
               if (items.isEmpty)
-                const SliverFillRemaining(
+                SliverFillRemaining(
                   hasScrollBody: false,
                   child: AppEmptyState(
                     icon: Icons.receipt_long_rounded,
                     title: 'No recipes yet',
                     message:
-                        'Mark an item Semi-Finished or Recipe-Based to add one.',
+                        'Create a recipe for a Finished or Semi-Finished item.',
+                    action: ElevatedButton.icon(
+                      onPressed: _createRecipe,
+                      icon: const Icon(Icons.add_rounded),
+                      label: const Text('Create Recipe'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
                   ),
                 )
               else
                 SliverPadding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: _recipesSidePad(context),
-                    vertical: AppResponsive.padding(context).top,
+                  // Bottom inset clears the Create Recipe button.
+                  padding: EdgeInsets.fromLTRB(
+                    _recipesSidePad(context),
+                    AppResponsive.padding(context).top,
+                    _recipesSidePad(context),
+                    AppResponsive.padding(context).top + 80,
                   ),
                   sliver: SliverGrid(
                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
@@ -124,7 +190,10 @@ class _RecipesScreenState extends State<RecipesScreen> {
                       childAspectRatio: 0.78,
                     ),
                     delegate: SliverChildBuilderDelegate(
-                      (context, index) => _RecipeCard(item: items[index]),
+                      (context, index) => _RecipeCard(
+                        item: items[index],
+                        onTap: () => _openEditor(items[index]),
+                      ),
                       childCount: items.length,
                     ),
                   ),
@@ -139,8 +208,9 @@ class _RecipesScreenState extends State<RecipesScreen> {
 
 class _RecipeCard extends StatelessWidget {
   final Items item;
+  final VoidCallback onTap;
 
-  const _RecipeCard({required this.item});
+  const _RecipeCard({required this.item, required this.onTap});
 
   double _costOf(String ingredientItemId) {
     try {
@@ -171,7 +241,9 @@ class _RecipeCard extends StatelessWidget {
     final IconData typeIcon = isSemi
         ? Icons.soup_kitchen_rounded
         : Icons.lunch_dining_rounded;
-    final String typeLabel = isSemi ? 'Semi-Finished' : 'Recipe-Based';
+    final String typeLabel = isSemi
+        ? 'Semi-Finished'
+        : (item.isMadeToOrder ? 'Finished · Made to order' : 'Finished · Made in advance');
 
     final bool isRecipeBased = item.isRecipeBased;
     final double? availableToMake = isRecipeBased
@@ -182,12 +254,7 @@ class _RecipeCard extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => EdititemScreen(items: item)),
-          );
-        },
+        onTap: onTap,
         child: Container(
           decoration: BoxDecoration(
             color: AppColors.white,
@@ -414,6 +481,93 @@ class _RecipeCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Create Recipe's item picker: Finished / Semi-Finished items without a
+/// recipe yet (RecipeCatalog.itemsNeedingRecipe).
+class _RecipeItemPicker extends StatelessWidget {
+  final List<Items> candidates;
+
+  const _RecipeItemPicker({required this.candidates});
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.7,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                AppResponsive.largeSpacing(context),
+                AppResponsive.largeSpacing(context),
+                AppResponsive.largeSpacing(context),
+                AppResponsive.smallSpacing(context),
+              ),
+              child: Text(
+                'Create a recipe for…',
+                style: GoogleFonts.poppins(
+                  fontSize: AppResponsive.headingFontSize(context),
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+            if (candidates.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: AppEmptyState(
+                  icon: Icons.check_circle_outline_rounded,
+                  title: 'Nothing left to add',
+                  message:
+                      'Every Finished and Semi-Finished item already has a recipe.',
+                  dense: true,
+                ),
+              )
+            else
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: candidates.length,
+                  itemBuilder: (_, i) {
+                    final item = candidates[i];
+                    return ListTile(
+                      leading: Icon(
+                        item.isSemiFinished
+                            ? Icons.soup_kitchen_rounded
+                            : Icons.lunch_dining_rounded,
+                        color: item.isSemiFinished
+                            ? AppColors.secondary
+                            : AppColors.accent,
+                      ),
+                      title: Text(
+                        item.name,
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.bodyFontSize(context),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      subtitle: Text(
+                        ProductType.displayName(item.effectiveProductType),
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.smallFontSize(context),
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      onTap: () => Navigator.pop(context, item),
+                    );
+                  },
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

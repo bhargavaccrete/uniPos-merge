@@ -60,9 +60,9 @@ class LineDiscountValidation {
 class LineDiscountService {
   LineDiscountService._();
 
-  /// Admin and Manager may discount a line; a Cashier may not. It moves money
-  /// off a sale, so it gets the same manager-level gate as
-  /// `PriceOverrideService.canOverride` and `StockAdjustmentService.canAdjust`.
+  /// Admin, Manager and Cashier may discount a line (every discount carries a
+  /// mandatory reason). A Cashier does not see the cost price —
+  /// `CatalogPermission.canSeeCost`.
   ///
   /// Resolved from the signed-in staff member's ROLE, not their display name.
   ///
@@ -98,12 +98,16 @@ class LineDiscountService {
   /// cost. Only the soft below-cost warning consults it; every hard block is
   /// pure line arithmetic, so an ad-hoc line is validated exactly as strictly as
   /// a catalogue one — it simply has no cost floor to fall through.
+  ///
+  /// [showCost] false keeps the cost figure out of the below-cost message, for
+  /// a user who may not see cost.
   static LineDiscountValidation validate({
     required VarianteModel? variant,
     required DiscountType type,
     required double value,
     required double chargedUnitPrice,
     required double qty,
+    bool showCost = true,
   }) {
     final gross = chargedUnitPrice * qty;
 
@@ -173,8 +177,11 @@ class LineDiscountService {
         LineDiscountVerdict.belowCost,
         amount,
         effectiveUnit,
-        'This brings the unit price to ${_money(effectiveUnit)}, below the '
-            '${_money(cost)} cost. The line will sell at a loss.',
+        showCost
+            ? 'This brings the unit price to ${_money(effectiveUnit)}, below the '
+                '${_money(cost)} cost. The line will sell at a loss.'
+            : 'This brings the unit price to ${_money(effectiveUnit)}, below '
+                'cost. The line will sell at a loss.',
       );
     }
 

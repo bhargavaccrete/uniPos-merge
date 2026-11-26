@@ -5,6 +5,7 @@ import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/data/models/restaurant/db/expensel_316.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/domain/services/common/report_export_service.dart';
+import 'package:billberrylite/presentation/screens/restaurant/Reports/report_export_rows.dart';
 import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
@@ -193,39 +194,25 @@ class _ExpenseDataViewState extends State<ExpenseDataView> {
       return;
     }
 
-    final headers = [
-      'Date & Time',
-      'Category',
-      'Reason',
-      'Payment Type',
-      'Amount',
-    ];
-
-    final data = _filteredExpenses.map((expense) => [
-      ReportExportService.formatDateTime(expense.dateandTime),
-      _categoryNames[expense.categoryOfExpense] ?? expense.categoryOfExpense ?? 'Uncategorized',
-      expense.reason ?? '-',
-      expense.paymentType ?? '-',
-      ReportExportService.formatCurrency(expense.amount),
-    ]).toList();
-
-    String periodDisplay = _getPeriodDisplayName();
-
-    final summary = {
-      'Report Period': periodDisplay,
-      'Total Expenses Count': _totalCount.toString(),
-      'Total Expenses Amount': ReportExportService.formatCurrency(_totalExpenses),
-      'Average Expense': ReportExportService.formatCurrency(_averageExpense),
-      'Generated': ReportExportService.formatDateTime(DateTime.now()),
-    };
-
-    await ReportExportService.showExportDialog(
+    // All / Current page / Date range over the already-filtered expenses.
+    final periodDisplay = _getPeriodDisplayName();
+    await ReportExportService.showRangedExportDialog<Expense>(
       context: context,
       fileName: 'expenses_${widget.period.name.toLowerCase()}_${DateFormat('yyyyMMdd').format(DateTime.now())}',
       reportTitle: 'Expense Report - $periodDisplay',
-      headers: headers,
-      data: data,
-      summary: summary,
+      headers: RestaurantReportExports.expenseHeaders,
+      items: _filteredExpenses,
+      rowOf: (expense) => RestaurantReportExports.expenseRow(
+          expense,
+          _categoryNames[expense.categoryOfExpense] ??
+              expense.categoryOfExpense ??
+              'Uncategorized'),
+      dateOf: (expense) => expense.dateandTime,
+      summaryOf: (rows) =>
+          RestaurantReportExports.expenseSummary(rows, periodDisplay),
+      currentPage: _currentPage,
+      rowsPerPage: _rowsPerPage,
+      unit: 'expenses',
     );
   }
 

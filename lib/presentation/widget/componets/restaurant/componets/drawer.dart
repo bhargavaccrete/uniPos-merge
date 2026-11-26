@@ -252,7 +252,8 @@ class _DrawerrState extends State<Drawerr> {
                     ),
 
                     // End Day is always reachable (day lifecycle close path).
-                    if (RestaurantSession.canAccess('cashDrawer'))
+                    // Same key as the route ('endDay'), not 'cashDrawer'.
+                    if (RestaurantSession.canAccess('endDay'))
                     _buildDrawerItem(
                       context: context,
                       icon: Icons.sunny_snowing,
@@ -264,20 +265,6 @@ class _DrawerrState extends State<Drawerr> {
                       isTablet: isTablet,
                     ),
                   ],
-
-                  if (RestaurantSession.canAccess('settings'))
-                  _buildDrawerItem(
-                    context: context,
-                    icon: Icons.data_object_rounded,
-                    title: 'Test Data Generator',
-                    onTap: () {
-                      if (!PlanGuard.allowedOr(context, EntKeys.settings, featureName: 'Settings')) return;
-                      Navigator.pop(context);
-                      Navigator.pushNamed(context, RouteNames.restaurantTestData);
-                    },
-                    isTablet: isTablet,
-                    color: Colors.orange,
-                  ),
 
                   _buildDrawerItem(
                     context: context,
@@ -604,11 +591,14 @@ class _DrawerrState extends State<Drawerr> {
               onPressed: () async {
                 if (!formKey.currentState!.validate()) return;
                 await staffStore.loadStaff();
-                final staff = staffStore.staff.where(
-                  (s) => s.isActive && RestaurantAuthHelper.verifyPassword(currentPinCtrl.text.trim(), s.pinNo.trim()),
-                ).firstOrNull;
+                final check = RestaurantAuthHelper.staffForOwnPinChange(
+                  staffId: RestaurantSession.staffId,
+                  staff: staffStore.staff,
+                  currentPin: currentPinCtrl.text,
+                );
+                final staff = check.staff;
                 if (staff == null) {
-                  setState(() => errorMsg = 'Current PIN is incorrect');
+                  setState(() => errorMsg = check.error);
                   return;
                 }
                 final updated = staff.copyWith(pinNo: RestaurantAuthHelper.hashPassword(newPinCtrl.text.trim()));

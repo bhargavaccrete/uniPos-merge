@@ -1,3 +1,4 @@
+import '../constants/retail_store_types.dart';
 import '../di/service_locator.dart';
 
 /// Single source of truth for "what is this country's food-business licence
@@ -69,6 +70,22 @@ class FoodLicenseRule {
 
   /// True only for India — everywhere else the number may contain letters.
   static bool digitsOnlyFor(String? country) => isIndia(country);
+
+  /// Whether the licence field is offered at all.
+  ///
+  /// Restaurants always; retail only for store types that may sell food
+  /// ([RetailStoreType.mayNeedFoodLicense]). An unknown/unpicked store type
+  /// shows it. An already-entered [number] always shows it — it still prints
+  /// on receipts, so it must stay visible and editable.
+  static bool appliesFor({
+    required bool isRestaurant,
+    String? retailStoreType,
+    String? number,
+  }) {
+    if (isRestaurant) return true;
+    if ((number ?? '').trim().isNotEmpty) return true;
+    return RetailStoreTypes.byKey(retailStoreType)?.mayNeedFoodLicense ?? true;
+  }
 
   /// Returns an error message, or null when [value] is acceptable.
   /// Empty is always acceptable: the field is optional in every country.

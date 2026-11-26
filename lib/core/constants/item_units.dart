@@ -4,6 +4,10 @@
 /// DropdownButton's items crashes it).
 const List<String> kItemUnits = ['kg', 'gm', 'liter', 'ml', 'piece'];
 
+/// The units "By Weight" offers — measured quantities only. Counting in
+/// pieces is "By Unit", never By Weight.
+const List<String> kWeightUnits = ['kg', 'gm', 'liter', 'ml'];
+
 /// True for a pound spelling. [normalizeItemUnit] maps these to 'kg' only so a
 /// legacy item's LABEL keeps working — it converts no quantity. Imports must
 /// refuse them instead, or 10 lb of stock would be booked as 10 kg (≈2.2×).

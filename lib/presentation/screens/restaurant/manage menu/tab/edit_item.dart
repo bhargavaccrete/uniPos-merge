@@ -16,7 +16,6 @@ import 'package:billberrylite/data/models/restaurant/db/itemvariantemodel_312.da
 import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/add_category_dialog.dart';
 import 'package:billberrylite/domain/services/restaurant/notification_service.dart';
 import 'package:billberrylite/util/restaurant/audit_trail_helper.dart';
-import 'package:billberrylite/domain/services/restaurant/stock_adjust_service.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
 import 'package:billberrylite/presentation/widget/componets/common/primary_app_bar.dart';
 import 'package:billberrylite/util/common/app_responsive.dart';
@@ -32,6 +31,7 @@ import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sh
 import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/widgets/tax_selector_button.dart';
 import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/widgets/inventory_toggle.dart';
 import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/widgets/product_type_selector.dart';
+import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/widgets/finished_prep_mode_selector.dart';
 import 'package:billberrylite/presentation/widget/componets/restaurant/bottom_sheets/image_picker_sheet.dart';
 import '../../../../../data/models/restaurant/db/choicemodel_306.dart';
 import '../../../../../data/models/restaurant/db/extramodel_303.dart';
@@ -44,7 +44,9 @@ import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../../data/models/restaurant/db/variantmodel_305.dart';
 import '../../../../../data/models/restaurant/db/product_type.dart';
 import '../../../../../data/models/restaurant/db/recipe_model.dart';
-import '../../../../widget/componets/restaurant/recipe_builder_widget.dart';
+import '../../inventory/manage_Inventory.dart';
+import '../../inventory/recipe_editor_screen.dart';
+import 'package:billberrylite/domain/services/restaurant/item_edit_stock.dart';
 
 // Helper class to hold all the data needed for the screen
 class EditScreenData {
@@ -106,6 +108,12 @@ class _EdititemScreenState extends State<EdititemScreen> {
 
   // Product Type + Recipe (BOM) — see docs/inventory_recipe_system_plan.md
   String _productType = ProductType.finishedGood;
+  // Finished only: made to order / made in advance (+ make fresh when out).
+  String _prepMode = ProductType.madeToOrder;
+  bool _makeFreshWhenOut = false;
+  bool get _madeToOrder =>
+      _productType == ProductType.finishedGood &&
+      _prepMode == ProductType.madeToOrder;
   // null = follow the product-type default (Raw Material hidden, rest shown).
   bool? _sellDirectlyAtPos;
   RecipeModel? _currentRecipe;
@@ -179,14 +187,18 @@ class _EdititemScreenState extends State<EdititemScreen> {
     // A back-of-house item saved under the old split UI has a Stock Unit but
     // no isSoldByWeight flag (that picker never set one), so a stored measured
     // unit counts as By Weight — otherwise reopening a kg raw material would
-    // silently re-save it as pieces.
+    // silently re-save it as pieces. A 'piece' unit is always By Unit — an
+    // older "By Weight · piece" item opens (and saves) as By Unit, so its
+    // stock stays counted in pieces.
     final storedUnit = normalizeItemUnit(widget.items.unit);
-    _sellingMethod =
-        (widget.items.isSoldByWeight == true ||
-            (storedUnit != null && storedUnit != 'piece'))
+    final countedInPieces = storedUnit == 'piece';
+    _sellingMethod = !countedInPieces &&
+            (widget.items.isSoldByWeight == true || storedUnit != null)
         ? SellingMethod.byWeight
         : SellingMethod.byUnit;
-    _selectedUnit = storedUnit ?? kItemUnits.first;
+    _selectedUnit = kWeightUnits.contains(storedUnit)
+        ? storedUnit!
+        : kWeightUnits.first;
 
     selectedFilter = widget.items.trackInventory == true ? 'YES' : 'NO';
     allowOutOfStockFilter = widget.items.allowOrderWhenOutOfStock == true
@@ -194,7 +206,13 @@ class _EdititemScreenState extends State<EdititemScreen> {
         : 'NO';
 
     _isEnabled = widget.items.isEnabled;
-    _productType = widget.items.effectiveProductType;
+    // Effective type AND preparation mode, so a legacy Recipe-Based item
+    // opens as Finished · made to order and saves back as exactly that.
+    final view = ProductType.editorView(widget.items.productType,
+        widget.items.prepMode, widget.items.makeFreshWhenOut);
+    _productType = view.type;
+    _prepMode = view.prepMode;
+    _makeFreshWhenOut = view.makeFresh;
     _sellDirectlyAtPos = widget.items.sellDirectlyAtPos;
     _currentRecipe = recipeRepository.getRecipeForItem(widget.items.id);
 
@@ -384,9 +402,9 @@ class _EdititemScreenState extends State<EdititemScreen> {
         finalImageBytes = _selectedImageBytes;
       }
 
-      // Variant stock changes to log as adjustments after the item is saved.
-      final pendingAdjustments = <Map<String, dynamic>>[];
-      Map<String, dynamic>? pendingSimpleAdjustment;
+      // Stock is never edited here: quantities come from the item as stored
+      // NOW, so a sale made while this screen was open is not written back.
+      final live = itemStore.getItemById(widget.items.id) ?? widget.items;
       List<ItemVariante> selectedVariants = [];
       final isRawOrSemi =
           _productType == ProductType.rawMaterial ||
@@ -397,37 +415,15 @@ class _EdititemScreenState extends State<EdititemScreen> {
             final priceText = _variantPriceControllers[i].text.trim();
             final variantId = _allVariants[i].id;
 
-            // ✅ FIX: Preserve existing stock quantities when editing
-            // Find the existing variant with this variantId to preserve stock data
-            final existingVariant = widget.items.variant?.firstWhere(
-              (v) => v.variantId == variantId,
-              orElse: () => ItemVariante(
-                variantId: variantId,
-                price: 0.0,
-                trackInventory: null,
-                stockQuantity: null,
-              ),
-            );
+            // The variant as stored now (keeps its live stock and tracking).
+            final existingVariant = live.variant
+                ?.where((v) => v.variantId == variantId)
+                .firstOrNull;
 
-            // When inventory tracking is on, take the edited per-variant stock;
-            // otherwise keep whatever was there.
-            final newStock = selectedFilter.toLowerCase() == 'yes'
-                ? (double.tryParse(_variantStockControllers[i].text.trim()) ??
-                      existingVariant?.stockQuantity ??
-                      0.0)
-                : existingVariant?.stockQuantity;
-
-            // Log an adjustment if a tracked variant's stock actually changed.
-            if (selectedFilter.toLowerCase() == 'yes' && newStock != null) {
-              final oldStock = existingVariant?.stockQuantity ?? 0.0;
-              if (newStock != oldStock) {
-                pendingAdjustments.add({
-                  'variantId': variantId,
-                  'old': oldStock,
-                  'new': newStock,
-                });
-              }
-            }
+            // A variant added in this edit starts at 0 when tracked; its
+            // stock is then added through Manage Inventory.
+            final newStock = existingVariant?.stockQuantity ??
+                (selectedFilter.toLowerCase() == 'yes' ? 0.0 : null);
 
             selectedVariants.add(
               ItemVariante(
@@ -472,6 +468,11 @@ class _EdititemScreenState extends State<EdititemScreen> {
         }
       }
 
+      final stored = ProductType.storedFields(
+        type: _productType,
+        prepMode: _prepMode,
+        makeFresh: _makeFreshWhenOut,
+      );
       final updateItem = widget.items.copyWith(
         name: trimmedName,
         price: double.tryParse(_itemPriceController.text.trim()),
@@ -503,9 +504,13 @@ class _EdititemScreenState extends State<EdititemScreen> {
                   ? 'piece'
                   : null),
         itemCode: itemCode,
-        productType: _productType,
+        productType: stored.productType,
         isEnabled: _isEnabled,
       );
+      // Set directly (copyWith cannot clear to null): only Finished carries
+      // a preparation mode, only made in advance can make fresh when out.
+      updateItem.prepMode = stored.prepMode;
+      updateItem.makeFreshWhenOut = stored.makeFreshWhenOut;
 
       // Set tax directly (not via copyWith) so selecting "No Tax" (null) actually
       // clears it — copyWith's `?? this.taxRate` would otherwise keep the old rate.
@@ -514,7 +519,7 @@ class _EdititemScreenState extends State<EdititemScreen> {
 
       // recipeId: same "can't clear via copyWith" issue as taxRate above — set
       // directly so switching away from a recipe-having type actually detaches it.
-      updateItem.recipeId = ProductType.hasRecipe(_productType)
+      updateItem.recipeId = ProductType.canHaveRecipe(_productType)
           ? _currentRecipe?.id
           : null;
 
@@ -537,35 +542,25 @@ class _EdititemScreenState extends State<EdititemScreen> {
           ? double.tryParse(_lowStockController.text.trim())
           : null;
 
-      // Item-level stock for SIMPLE items (no variants). Variant items keep the
-      // item-level quantity at 0 and track stock per-variant instead.
-      final requestedStockQuantity = !_variantCheckedList.contains(true)
-          ? (selectedFilter.toLowerCase() == 'yes'
-                ? (double.tryParse(_stockController.text.trim()) ?? 0.0)
-                : 0.0)
-          : 0.0;
+      // Item-level stock for SIMPLE items (no variants) is the live level,
+      // unchanged; variant items keep the item-level quantity at 0 and track
+      // stock per variant. Turning tracking off keeps the number.
+      final requestedStockQuantity =
+          !_variantCheckedList.contains(true) ? live.stockQuantity : 0.0;
       // Recipe-Based items derive availability from their recipe and must never
       // carry over stale tracking/quantity from before a type switch — see
       // ProductType.resolvePhysicalStock. Every other type passes through
       // unchanged.
       final physicalStock = ProductType.resolvePhysicalStock(
         _productType,
+        prepMode: _prepMode,
         requestedTrackInventory: selectedFilter.toLowerCase() == 'yes',
         requestedStockQuantity: requestedStockQuantity,
       );
       updateItem.trackInventory = physicalStock.trackInventory;
       if (!_variantCheckedList.contains(true)) {
-        final oldStock = widget.items.stockQuantity;
         updateItem.stockQuantity = physicalStock.stockQuantity;
-        // Log an adjustment if a tracked item's stock actually changed.
-        if (physicalStock.trackInventory &&
-            physicalStock.stockQuantity != oldStock) {
-          pendingSimpleAdjustment = {
-            'old': oldStock,
-            'new': physicalStock.stockQuantity,
-          };
-        }
-      } else if (ProductType.isStockDerived(_productType)) {
+      } else if (_madeToOrder) {
         // A variant-having item switched to Recipe-Based must not retain stale
         // item-level stock either, even though variants normally govern it.
         updateItem.stockQuantity = 0.0;
@@ -577,35 +572,18 @@ class _EdititemScreenState extends State<EdititemScreen> {
             RestaurantSession.staffName ?? RestaurantSession.effectiveRole,
       );
 
-      await itemStore.updateItem(updateItem);
+      // Re-read right before the write: a sale between the reads above and
+      // here still keeps its stock. Made to order keeps its forced zero.
+      final toSave = _madeToOrder
+          ? updateItem
+          : ItemEditStock.carryLiveStock(
+              edited: updateItem,
+              live: itemStore.getItemById(widget.items.id),
+            );
+      await itemStore.updateItem(toSave);
 
-      // Persist (or drop) the recipe alongside the item — see design doc §4.
-      if (ProductType.hasRecipe(_productType) && _currentRecipe != null) {
-        await recipeRepository.saveRecipe(
-          _currentRecipe!.copyWith(itemId: updateItem.id),
-        );
-      } else {
-        await recipeRepository.deleteRecipeForItem(updateItem.id);
-      }
-
-      // Log any variant stock changes so the history & running balance stay honest.
-      for (final adj in pendingAdjustments) {
-        await StockAdjustService.logAdjustment(
-          item: updateItem,
-          variantId: adj['variantId'] as String,
-          oldStock: adj['old'] as double,
-          newStock: adj['new'] as double,
-        );
-      }
-
-      // Same for a simple (non-variant) item whose stock was edited.
-      if (pendingSimpleAdjustment != null) {
-        await StockAdjustService.logAdjustment(
-          item: updateItem,
-          oldStock: pendingSimpleAdjustment['old'] as double,
-          newStock: pendingSimpleAdjustment['new'] as double,
-        );
-      }
+      // The recipe is not written here: RecipeEditorScreen owns it (Phase
+      // 1.5), and a type change never deletes it.
 
       if (mounted) Navigator.pop(context, true);
     } finally {
@@ -798,19 +776,37 @@ class _EdititemScreenState extends State<EdititemScreen> {
                 selectedType: _productType,
                 onChanged: (type) {
                   setState(() {
+                    // A type change never drops the recipe: it is kept (and
+                    // simply unused by Raw / Trade) until removed explicitly.
                     _productType = type;
-                    // Switching away from a recipe type drops the in-progress
-                    // recipe rather than silently keeping stale ingredients.
-                    if (!ProductType.hasRecipe(type)) _currentRecipe = null;
-                    // Recipe-Based is always stock-governed via its ingredients —
-                    // same "enforce limits by default" policy as enabling
-                    // inventory tracking above, so Add and Edit agree.
-                    if (type == ProductType.recipeBased) {
+                    if (type == ProductType.tradeItem) {
+                      // Bought & resold: stocked like a raw material.
+                      selectedFilter = 'YES';
                       allowOutOfStockFilter = 'NO';
                     }
                   });
                 },
               ),
+              if (_productType == ProductType.finishedGood) ...[
+                SizedBox(height: AppResponsive.largeSpacing(context)),
+                FinishedPrepModeSelector(
+                  prepMode: _prepMode,
+                  makeFreshWhenOut: _makeFreshWhenOut,
+                  onPrepModeChanged: (mode) => setState(() {
+                    _prepMode = mode;
+                    // Made in advance owns prepared stock; enforce its limit
+                    // by default, same policy as enabling tracking.
+                    if (mode == ProductType.madeInAdvance) {
+                      selectedFilter = 'YES';
+                      allowOutOfStockFilter = 'NO';
+                    } else {
+                      _makeFreshWhenOut = false;
+                    }
+                  }),
+                  onMakeFreshChanged: (v) =>
+                      setState(() => _makeFreshWhenOut = v),
+                ),
+              ],
             ],
             // Raw Materials / Semi-Finished are ingredients/prep items, so they stay out of
             // the POS sale grid unless explicitly opted in.
@@ -880,8 +876,7 @@ class _EdititemScreenState extends State<EdititemScreen> {
             // Recipe-Based items have no stock of their own — their availability is
             // derived live from the recipe's ingredients (§7 of the design doc), so
             // this whole module is replaced by an "Available to Make" readout below.
-            if (PlanEnforce.allows(EntKeys.inventory) &&
-                _productType != ProductType.recipeBased) ...[
+            if (PlanEnforce.allows(EntKeys.inventory) && !_madeToOrder) ...[
               _buildSectionHeader(
                 'Inventory Management',
                 Icons.inventory_2_outlined,
@@ -907,8 +902,9 @@ class _EdititemScreenState extends State<EdititemScreen> {
                   _buildCurrentStockField(),
                 ] else ...[
                   SizedBox(height: AppResponsive.smallSpacing(context)),
+                  _buildAdjustStockButton(),
                   Text(
-                    'Stock is set per variant below.',
+                    'Stock per variant is shown below.',
                     style: GoogleFonts.poppins(
                       fontSize: AppResponsive.smallFontSize(context),
                       color: AppColors.textSecondary,
@@ -920,7 +916,7 @@ class _EdititemScreenState extends State<EdititemScreen> {
               ],
               SizedBox(height: AppResponsive.extraLargeSpacing(context)),
             ],
-            if (_productType == ProductType.recipeBased) ...[
+            if (_madeToOrder) ...[
               _buildSectionHeader('Availability', Icons.inventory_2_outlined),
               SizedBox(height: AppResponsive.largeSpacing(context)),
               _buildAvailableToMakeCard(),
@@ -956,17 +952,11 @@ class _EdititemScreenState extends State<EdititemScreen> {
             // Recipe (Bill of Materials) — Semi-Finished items describe what
             // they're prepped FROM; Recipe-Based items describe what they're
             // assembled FROM at sale time. See design doc §3/§4/§8.2.
+            // Recipes are managed in their own editor (Phase 1.5) — here only
+            // a summary and the way in.
             if (PlanEnforce.allows(EntKeys.inventory) &&
-                ProductType.hasRecipe(_productType)) ...[
-              RecipeBuilderWidget(
-                itemId: widget.items.id,
-                allItems: itemStore.items
-                    .where((i) => i.id != widget.items.id)
-                    .toList(),
-                initialRecipe: _currentRecipe,
-                sellingPrice: double.tryParse(_itemPriceController.text.trim()),
-                onChanged: (recipe) => setState(() => _currentRecipe = recipe),
-              ),
+                ProductType.canHaveRecipe(_productType)) ...[
+              _buildRecipeSummary(),
               SizedBox(height: AppResponsive.extraLargeSpacing(context)),
             ],
 
@@ -1129,19 +1119,42 @@ class _EdititemScreenState extends State<EdititemScreen> {
     return _sellingMethod == SellingMethod.byWeight ? _selectedUnit : 'piece';
   }
 
+  /// Stock is shown, never edited here: it moves only through Manage
+  /// Inventory adjustments, purchases, production and sales — each of which
+  /// records why.
   Widget _buildCurrentStockField() {
     final unit = _unitLabel();
-    return AppTextField(
-      controller: _stockController,
-      label: 'Current Stock ($unit)',
-      hint: '0',
-      icon: Icons.inventory_2_rounded,
-      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      inputFormatters: [
-        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AppTextField(
+          controller: _stockController,
+          label: 'Current Stock ($unit)',
+          icon: Icons.inventory_2_rounded,
+          readOnly: true,
+          helperText: 'Change stock from Manage Inventory',
+        ),
+        _buildAdjustStockButton(),
       ],
-      textInputAction: TextInputAction.done,
-      onFieldSubmitted: (_) => FocusScope.of(context).unfocus(),
+    );
+  }
+
+  Widget _buildAdjustStockButton() {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: TextButton.icon(
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ManageInventory(initialSearch: widget.items.name),
+          ),
+        ),
+        icon: const Icon(Icons.tune_rounded, size: 18),
+        label: Text(
+          'Adjust Stock',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+        ),
+      ),
     );
   }
 
@@ -1195,6 +1208,67 @@ class _EdititemScreenState extends State<EdititemScreen> {
           ),
         ],
       ],
+    );
+  }
+
+  /// The item's recipe at a glance, and the way into [RecipeEditorScreen].
+  Widget _buildRecipeSummary() {
+    final recipe = _currentRecipe;
+    final count = recipe?.ingredients.length ?? 0;
+    return Container(
+      padding: EdgeInsets.all(AppResponsive.mediumSpacing(context)),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(AppResponsive.borderRadius(context)),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.menu_book_rounded,
+              color: AppColors.secondary,
+              size: AppResponsive.iconSize(context)),
+          SizedBox(width: AppResponsive.mediumSpacing(context)),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Recipe',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.bodyFontSize(context),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  recipe == null
+                      ? (_productType == ProductType.semiFinished
+                          ? 'None yet — needed to produce batches'
+                          : 'None — optional')
+                      : '$count ingredient${count == 1 ? '' : 's'}',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.smallFontSize(context),
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => RecipeEditorScreen(item: widget.items),
+                ),
+              );
+              if (!mounted) return;
+              setState(() => _currentRecipe =
+                  recipeRepository.getRecipeForItem(widget.items.id));
+            },
+            child: Text(recipe == null ? 'Create recipe' : 'Edit recipe'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1262,7 +1336,7 @@ class _EdititemScreenState extends State<EdititemScreen> {
               children: [
                 Text(
                   available == null
-                      ? 'Add ingredients below to see availability'
+                      ? 'No recipe — sells without a stock limit'
                       : available == double.infinity
                       ? 'Unlimited (no tracked ingredients)'
                       : '${available.toStringAsFixed(0)} can be made right now',
@@ -1560,13 +1634,11 @@ class _EdititemScreenState extends State<EdititemScreen> {
       ],
     );
 
+    // Shown only — variant stock moves through Manage Inventory.
     final stockField = AppTextField(
       controller: _variantStockControllers[index],
       hint: 'Stock',
-      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      inputFormatters: [
-        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
-      ],
+      readOnly: true,
     );
 
     if (!stacked) {

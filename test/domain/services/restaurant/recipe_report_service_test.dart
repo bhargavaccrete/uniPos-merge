@@ -9,67 +9,12 @@ import 'package:billberrylite/data/models/restaurant/db/recipe_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/stock_movement_model.dart';
 import 'package:billberrylite/domain/services/restaurant/recipe_report_service.dart';
 
-/// The Food Cost report replaced per-lookup `firstWhere` scans with an
-/// id → item map. These pin that the pure `*From` entry points return exactly
-/// what the scan-based originals did, including which duplicate id wins.
+/// Usage/wastage: the pure `*From` entry points return exactly what the
+/// scan-based originals did, including which duplicate id wins. Food cost:
+/// the Phase 1.8 per-type cost rules.
 
-// ── Pre-change implementations, verbatim except that `itemStore.items`,
-//    `recipeRepository.getRecipeForItem` and `allMovements()` are parameters.
-
-List<RecipeCostReportRow> legacyFoodCostReport(
-  List<Items> storeItems,
-  RecipeModel? Function(String) getRecipeForItem,
-) {
-  double costOf(String ingredientItemId) {
-    try {
-      final ingredient = storeItems.firstWhere((i) => i.id == ingredientItemId);
-      return ingredient.lastPurchaseCost ?? 0.0;
-    } catch (_) {
-      return 0.0;
-    }
-  }
-
-  final rows = <RecipeCostReportRow>[];
-  for (final item in storeItems) {
-    final isRecipe = item.isSemiFinished || item.isRecipeBased;
-    if (!isRecipe && !item.isFinishedGood) continue;
-
-    if (item.isFinishedGood && item.lastPurchaseCost == null) continue;
-
-    RecipeModel? recipe;
-    int ingredientCount = 0;
-    double costPerUnit = 0.0;
-
-    if (isRecipe) {
-      recipe = getRecipeForItem(item.id);
-      if (recipe == null || !recipe.hasIngredients) continue;
-      costPerUnit = recipe.estimatedCostPerUnit(costOf);
-      ingredientCount = recipe.ingredients.length;
-    } else {
-      costPerUnit = item.lastPurchaseCost ?? 0.0;
-    }
-
-    final sellingPrice = item.price;
-    double? foodCostPercent;
-    double? marginPercent;
-    if (sellingPrice != null && sellingPrice > 0) {
-      foodCostPercent = (costPerUnit / sellingPrice) * 100;
-      marginPercent = 100 - foodCostPercent;
-    }
-
-    rows.add(RecipeCostReportRow(
-      item: item,
-      recipe: recipe,
-      costPerUnit: costPerUnit,
-      sellingPrice: sellingPrice,
-      foodCostPercent: foodCostPercent,
-      marginPercent: marginPercent,
-      ingredientCount: ingredientCount,
-    ));
-  }
-  rows.sort((a, b) => a.item.name.compareTo(b.item.name));
-  return rows;
-}
+// ── Pre-change implementations, verbatim except that `itemStore.items` and
+//    `allMovements()` are parameters.
 
 List<IngredientUsageRow> legacyIngredientUsageReport(
   List<StockMovementModel> allMovements,
@@ -175,19 +120,6 @@ List<WastageRow> legacyWastageReport(
 
 // ── Snapshots (exact doubles, identity for the item/recipe) ─────────────────
 
-List<Object?> foodSnap(List<RecipeCostReportRow> rows) => [
-      for (final r in rows)
-        [
-          identityHashCode(r.item),
-          r.recipe == null ? null : identityHashCode(r.recipe),
-          r.costPerUnit,
-          r.sellingPrice,
-          r.foodCostPercent,
-          r.marginPercent,
-          r.ingredientCount,
-        ],
-    ];
-
 List<Object?> usageSnap(List<IngredientUsageRow> rows) => [
       for (final r in rows)
         [r.itemId, r.itemName, r.unit, r.consumedQty, r.estimatedCost, r.movementCount],
@@ -233,26 +165,183 @@ StockMovementModel movement(
     );
 
 void main() {
+  // Phase 1.8 — cost by product type; a missing cost is unknown, never ₹0.
   group('foodCostReportFrom', () {
-    test('normal recipe cost, food cost % and margin %', () {
-      final potato = item('rm-potato', ProductType.rawMaterial, cost: 50);
-      final vada = item('sf-vada', ProductType.semiFinished, price: 20, name: 'Vada');
-      final recipe = RecipeModel(
-        id: 'r-vada',
-        itemId: 'sf-vada',
-        yieldQty: 10,
-        ingredients: [RecipeIngredientModel(ingredientItemId: 'rm-potato', quantity: 1)],
-      );
-      final items = [potato, vada];
-      RecipeModel? lookup(String id) => id == 'sf-vada' ? recipe : null;
+    final bun = item('rm-bun', ProductType.rawMaterial, cost: 10);
+    final cheese = item('rm-cheese', ProductType.rawMaterial, cost: 400);
+    RecipeModel recipeFor(String itemId,
+            {double yieldQty = 1,
+            List<RecipeIngredientModel>? lines}) =>
+        RecipeModel(
+          id: 'r-$itemId',
+          itemId: itemId,
+          yieldQty: yieldQty,
+          ingredients: lines ??
+              [
+                RecipeIngredientModel(ingredientItemId: 'rm-bun', quantity: 1),
+                RecipeIngredientModel(
+                    ingredientItemId: 'rm-cheese', quantity: 0.05),
+              ],
+        ); // ₹10 + ₹20 = ₹30 per batch
+    Items finished(String id, String prep, {double? cost, double? price}) =>
+        Items(
+          id: id,
+          name: id,
+          productType: ProductType.finishedGood,
+          prepMode: prep,
+          lastPurchaseCost: cost,
+          price: price,
+        );
 
-      final rows = RecipeReportService.foodCostReportFrom(items: items, recipeForItem: lookup);
-      expect(foodSnap(rows), foodSnap(legacyFoodCostReport(items, lookup)));
-      expect(rows, hasLength(1));
-      expect(rows.single.costPerUnit, 5.0);
-      expect(rows.single.foodCostPercent, 25.0);
-      expect(rows.single.marginPercent, 75.0);
-      expect(rows.single.ingredientCount, 1);
+    List<RecipeCostReportRow> report(List<Items> items,
+            [Map<String, RecipeModel> recipes = const {}]) =>
+        RecipeReportService.foodCostReportFrom(
+            items: [bun, cheese, ...items], recipeForItem: (id) => recipes[id]);
+    RecipeCostReportRow rowOf(List<RecipeCostReportRow> rows, String id) =>
+        rows.singleWhere((r) => r.item.id == id);
+
+    test('made-to-order Finished with a recipe: recipe cost', () {
+      final burger = finished('burger', ProductType.madeToOrder, price: 150);
+      final row = rowOf(report([burger], {'burger': recipeFor('burger')}),
+          'burger');
+      expect(row.costPerUnit, 30);
+      expect(row.costSource, FoodCostSource.recipe);
+      expect(row.foodCostPercent, 20);
+      expect(row.marginPercent, 80);
+      expect(row.ingredientCount, 2);
+    });
+
+    test('made-in-advance Finished with a recipe: recipe cost, not its last '
+        'cost', () {
+      final sandwich = finished('sandwich', ProductType.madeInAdvance,
+          cost: 99, price: 100);
+      final row = rowOf(
+          report([sandwich], {'sandwich': recipeFor('sandwich')}), 'sandwich');
+      expect(row.costPerUnit, 30);
+      expect(row.costSource, FoodCostSource.recipe);
+    });
+
+    test('made-in-advance Finished without a recipe: latest production or '
+        'purchase cost', () {
+      final cake =
+          finished('cake', ProductType.madeInAdvance, cost: 12, price: 48);
+      final row = rowOf(report([cake]), 'cake');
+      expect(row.costPerUnit, 12);
+      expect(row.costSource, FoodCostSource.lastCost);
+      expect(row.foodCostPercent, 25);
+    });
+
+    test('legacy Finished (no type stored) without a recipe: same rule', () {
+      final legacy = item('legacy', 'unused', cost: 5, price: 10)
+        ..productType = null;
+      expect(rowOf(report([legacy]), 'legacy').costPerUnit, 5);
+    });
+
+    test('made-in-advance Finished without a recipe or cost: shown as '
+        'unknown, not ₹0', () {
+      final cake = finished('cake', ProductType.madeInAdvance, price: 48);
+      final row = rowOf(report([cake]), 'cake');
+      expect(row.costPerUnit, isNull);
+      expect(row.costSource, FoodCostSource.none);
+      expect(row.foodCostPercent, isNull);
+      expect(row.marginPercent, isNull);
+    });
+
+    test('made-to-order Finished without a recipe: unknown', () {
+      final tea = finished('tea', ProductType.madeToOrder, cost: 3, price: 20);
+      final row = rowOf(report([tea]), 'tea');
+      expect(row.costPerUnit, isNull);
+      expect(row.costSource, FoodCostSource.none);
+    });
+
+    test('Trade Item: latest purchase cost', () {
+      final coke = item('coke', ProductType.tradeItem, cost: 30, price: 60);
+      final row = rowOf(report([coke]), 'coke');
+      expect(row.costPerUnit, 30);
+      expect(row.costSource, FoodCostSource.purchase);
+      expect(row.foodCostPercent, 50);
+    });
+
+    test('Trade Item never bought: unknown', () {
+      final coke = item('coke', ProductType.tradeItem, price: 60);
+      final row = rowOf(report([coke]), 'coke');
+      expect(row.costPerUnit, isNull);
+      expect(row.costSource, FoodCostSource.none);
+    });
+
+    test('Semi-Finished: latest production or purchase cost wins over the '
+        'recipe estimate', () {
+      final dough = item('dough', ProductType.semiFinished, cost: 4);
+      final row =
+          rowOf(report([dough], {'dough': recipeFor('dough')}), 'dough');
+      expect(row.costPerUnit, 4);
+      expect(row.costSource, FoodCostSource.lastCost);
+      expect(row.recipe, isNotNull);
+    });
+
+    test('Semi-Finished never produced or bought: falls back to the recipe '
+        'estimate', () {
+      final dough = item('dough', ProductType.semiFinished);
+      final row = rowOf(
+          report([dough], {'dough': recipeFor('dough', yieldQty: 10)}),
+          'dough');
+      expect(row.costPerUnit, 3);
+      expect(row.costSource, FoodCostSource.recipe);
+    });
+
+    test('Semi-Finished with no cost and no recipe: unknown', () {
+      final dough = item('dough', ProductType.semiFinished);
+      final row = rowOf(report([dough]), 'dough');
+      expect(row.costPerUnit, isNull);
+      expect(row.costSource, FoodCostSource.none);
+    });
+
+    test('an ingredient without a cost makes the recipe cost unknown', () {
+      final salt = item('rm-salt', ProductType.rawMaterial);
+      final burger = finished('burger', ProductType.madeToOrder, price: 150);
+      final recipe = recipeFor('burger', lines: [
+        RecipeIngredientModel(ingredientItemId: 'rm-bun', quantity: 1),
+        RecipeIngredientModel(ingredientItemId: 'rm-salt', quantity: 0.01),
+      ]);
+      final row = rowOf(report([salt, burger], {'burger': recipe}), 'burger');
+      expect(row.costPerUnit, isNull);
+      expect(row.missingCostIngredients, 1);
+      expect(row.costSource, FoodCostSource.recipe);
+      expect(row.foodCostPercent, isNull);
+    });
+
+    test('a deleted ingredient makes the recipe cost unknown', () {
+      final burger = finished('burger', ProductType.madeToOrder, price: 150);
+      final recipe = recipeFor('burger', lines: [
+        RecipeIngredientModel(ingredientItemId: 'gone', quantity: 3),
+      ]);
+      final row = rowOf(report([burger], {'burger': recipe}), 'burger');
+      expect(row.costPerUnit, isNull);
+      expect(row.missingCostIngredients, 1);
+    });
+
+    test('an ingredient recorded at ₹0 is a known cost', () {
+      final water = item('rm-water', ProductType.rawMaterial, cost: 0);
+      final tea = finished('tea', ProductType.madeToOrder, price: 20);
+      final recipe = recipeFor('tea', lines: [
+        RecipeIngredientModel(ingredientItemId: 'rm-water', quantity: 1),
+      ]);
+      final row = rowOf(report([water, tea], {'tea': recipe}), 'tea');
+      expect(row.costPerUnit, 0);
+      expect(row.missingCostIngredients, 0);
+      expect(row.foodCostPercent, 0);
+    });
+
+    test('a recipe with no yield is unknown, not ₹0', () {
+      final burger = finished('burger', ProductType.madeToOrder, price: 150);
+      final row = rowOf(
+          report([burger], {'burger': recipeFor('burger', yieldQty: 0)}),
+          'burger');
+      expect(row.costPerUnit, isNull);
+    });
+
+    test('Raw Materials are never rows', () {
+      expect(report([]), isEmpty);
     });
 
     test('duplicate ingredient id: the FIRST item wins', () {
@@ -264,82 +353,22 @@ void main() {
         itemId: 'rb-dish',
         ingredients: [RecipeIngredientModel(ingredientItemId: 'rm-dup', quantity: 2)],
       );
-      final items = [first, dish, second];
-      RecipeModel? lookup(String id) => id == 'rb-dish' ? recipe : null;
-
-      final rows = RecipeReportService.foodCostReportFrom(items: items, recipeForItem: lookup);
-      expect(foodSnap(rows), foodSnap(legacyFoodCostReport(items, lookup)));
+      final rows = RecipeReportService.foodCostReportFrom(
+          items: [first, dish, second],
+          recipeForItem: (id) => id == 'rb-dish' ? recipe : null);
       expect(rows.single.costPerUnit, 20.0); // 2 × first item's ₹10, not ₹999
     });
 
-    test('missing ingredient costs 0.0; finished good without cost is skipped', () {
-      final dish = item('rb-dish', ProductType.recipeBased, price: 50);
-      final bottled = item('fg-water', ProductType.finishedGood, price: 20);
-      final costed = item('fg-soda', ProductType.finishedGood, cost: 8, price: 20);
-      final recipe = RecipeModel(
-        id: 'r',
-        itemId: 'rb-dish',
-        ingredients: [
-          RecipeIngredientModel(ingredientItemId: 'does-not-exist', quantity: 3),
-        ],
-      );
-      final items = [dish, bottled, costed];
-      RecipeModel? lookup(String id) => id == 'rb-dish' ? recipe : null;
-
-      final rows = RecipeReportService.foodCostReportFrom(items: items, recipeForItem: lookup);
-      expect(foodSnap(rows), foodSnap(legacyFoodCostReport(items, lookup)));
-      expect(rows.map((r) => r.item.id), ['fg-soda', 'rb-dish']);
-      expect(rows.last.costPerUnit, 0.0);
-    });
-
-    test('large mixed catalogue matches the legacy implementation', () {
-      final rnd = Random(11);
-      const types = [
-        ProductType.rawMaterial,
-        ProductType.semiFinished,
-        ProductType.recipeBased,
-        ProductType.finishedGood,
-        'legacyNull',
-      ];
-      final items = <Items>[];
-      for (var i = 0; i < 120; i++) {
-        final t = types[rnd.nextInt(types.length)];
-        items.add(Items(
-          id: 'it-${rnd.nextInt(90)}', // duplicates on purpose
-          name: 'Name ${rnd.nextInt(30)}', // name ties on purpose
-          productType: t == 'legacyNull' ? null : t,
-          lastPurchaseCost: rnd.nextInt(4) == 0 ? null : rnd.nextInt(5000) / 7,
-          price: rnd.nextInt(5) == 0 ? null : (rnd.nextInt(3) == 0 ? 0.0 : rnd.nextInt(9000) / 3),
-        ));
-      }
-      final recipes = <String, RecipeModel>{};
-      for (final it in items) {
-        if (rnd.nextInt(4) == 0) continue;
-        recipes.putIfAbsent(
-          it.id,
-          () => RecipeModel(
-            id: 'r-${it.id}',
-            itemId: it.id,
-            yieldQty: rnd.nextInt(5) == 0 ? 0.0 : (1 + rnd.nextInt(6)).toDouble(),
-            ingredients: [
-              for (var j = 0; j < rnd.nextInt(4); j++)
-                RecipeIngredientModel(
-                  ingredientItemId: 'it-${rnd.nextInt(100)}',
-                  quantity: rnd.nextInt(400) / 13,
-                  wastagePercent: rnd.nextInt(3) * 5.0,
-                ),
-            ],
-          ),
-        );
-      }
-      RecipeModel? lookup(String id) => recipes[id];
-
-      final actual = RecipeReportService.foodCostReportFrom(items: items, recipeForItem: lookup);
-      expect(foodSnap(actual), foodSnap(legacyFoodCostReport(items, lookup)));
-      expect(actual.length, greaterThan(32));
+    test('known costs first, then unknown, each by name', () {
+      final rows = report([
+        item('z-coke', ProductType.tradeItem, cost: 30, name: 'Zed'),
+        item('a-cola', ProductType.tradeItem, name: 'Ace'),
+        item('m-soda', ProductType.tradeItem, cost: 8, name: 'Mid'),
+        item('b-pop', ProductType.tradeItem, name: 'Bee'),
+      ]);
+      expect(rows.map((r) => r.item.name), ['Mid', 'Zed', 'Ace', 'Bee']);
     });
   });
-
   group('ingredientUsageReportFrom / wastageReportFrom', () {
     final from = DateTime(2026, 9, 1);
     final to = DateTime(2026, 9, 10, 23, 59, 59);

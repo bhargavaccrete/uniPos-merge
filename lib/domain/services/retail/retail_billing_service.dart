@@ -241,6 +241,25 @@ class RetailBillingService {
     );
   }
 
+  /// Points a customer can redeem on [billBefore] (the bill WITHOUT
+  /// redemption), 1 point = 1 unit.
+  ///
+  /// The engine applies points to what they can reduce: the pre-tax base in
+  /// exclusive mode (GST then falls with it), the gross in inclusive mode.
+  /// Capping against the grand total including tax let a customer redeem
+  /// points the engine then ignored (R8) — ₹100 + 18% with 118 points took
+  /// all 118 for ₹100 of value.
+  static int redeemablePoints({
+    required RetailBill billBefore,
+    required int available,
+  }) {
+    final reducible = billBefore.isTaxInclusive
+        ? billBefore.taxableAmount + billBefore.totalGst
+        : billBefore.taxableAmount;
+    final cap = reducible > 0 ? reducible.floor() : 0;
+    return available.clamp(0, cap).toInt();
+  }
+
   /// Retail's tax-inclusive flag. Retail stores this under its own
   /// SharedPreferences key via [GstService], separate from the restaurant
   /// `AppSettings` toggle — so it must be passed to [compute] explicitly rather
@@ -269,19 +288,30 @@ class RetailBillingService {
     );
   }
 
+  /// Per-rate rows. Each rate's GST is summed first and split ONCE, so its
+  /// CGST + SGST equals its GST and the halves differ by at most a paisa —
+  /// summing every line's halves piled each line's odd paisa onto CGST.
   static Map<double, GstRateBreakdown> _breakdown(List<RetailBillLine> lines) {
-    final map = <double, GstRateBreakdown>{};
+    final taxable = <double, double>{};
+    final gst = <double, double>{};
     for (final l in lines) {
       final rate = l.gstRatePercent;
-      final existing = map[rate];
-      map[rate] = GstRateBreakdown(
-        gstRate: rate,
-        taxableAmount: (existing?.taxableAmount ?? 0) + l.taxableAmount,
-        cgstAmount: (existing?.cgstAmount ?? 0) + l.cgstAmount,
-        sgstAmount: (existing?.sgstAmount ?? 0) + l.sgstAmount,
-        totalGstAmount: (existing?.totalGstAmount ?? 0) + l.gstAmount,
-      );
+      taxable[rate] = (taxable[rate] ?? 0) + l.taxableAmount;
+      gst[rate] = (gst[rate] ?? 0) + l.gstAmount;
     }
-    return map;
+    return {
+      for (final rate in gst.keys)
+        rate: () {
+          final total = double.parse(gst[rate]!.toStringAsFixed(2));
+          final halves = TaxSplit.halves(total);
+          return GstRateBreakdown(
+            gstRate: rate,
+            taxableAmount: taxable[rate]!,
+            cgstAmount: halves.cgst,
+            sgstAmount: halves.sgst,
+            totalGstAmount: total,
+          );
+        }(),
+    };
   }
 }

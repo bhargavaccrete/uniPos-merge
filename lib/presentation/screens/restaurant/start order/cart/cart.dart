@@ -10,6 +10,7 @@ import '../../../../../data/models/restaurant/db/itemmodel_302.dart';
 import '../../../../../data/models/restaurant/db/ordermodel_309.dart';
 import '../../../../../domain/services/restaurant/notification_service.dart';
 import '../../../../../domain/services/restaurant/inventory_service.dart';
+import '../../../../../domain/services/restaurant/table_merge.dart';
 import '../../../../../util/restaurant/order_settings.dart';
 import '../../../../../core/plan/plan_enforcement.dart';
 import '../../../../../core/plan/entitlement_keys.dart';
@@ -54,6 +55,10 @@ class _CartScreenState extends State<CartScreen>
   Map<String, int> _originalQuantities = {};
   List<int> _currentKotBoundaries = [];
   List<int> _currentKotNumbers = [];
+
+  /// The order as saved by a Merge Table on this screen — it carries the
+  /// merged discount and service charge the totals are priced with.
+  OrderModel? _mergedOrder;
 
   List<CartItemStatus> get _combinedList => [
     ..._activeList.map((item) => CartItemStatus(item, true)),
@@ -311,7 +316,7 @@ class _CartScreenState extends State<CartScreen>
     String? tableNo,
   }) {
     return Takeaway(
-      existingModel: widget.existingOrder,
+      existingModel: _mergedOrder ?? widget.existingOrder,
       tableid: _selectedTableNoForUI ?? '',
       selectedTableNo: tableNo ?? widget.selectedTableNo ?? '',
       isexisting: isExistingOrder,
@@ -1285,60 +1290,45 @@ class _CartScreenState extends State<CartScreen>
 
   Future<void> _mergeTables(OrderModel sourceOrder) async {
     try {
-      // 1. Combine items from both orders
-      final combinedItems = [
-        ...widget.existingOrder!.items,
-        ...sourceOrder.items,
-      ];
-
-      // 2. Merge KOT numbers (keep them separate for tracking)
-      final combinedKotNumbers = [
-        ...widget.existingOrder!.kotNumbers,
-        ...sourceOrder.kotNumbers,
-      ];
-
-      // 3. Calculate boundaries for merged KOTs
-      final combinedBoundaries = [
-        ...widget.existingOrder!.kotBoundaries,
-        ...sourceOrder.kotBoundaries.map(
-          (boundary) => boundary + widget.existingOrder!.items.length,
-        ),
-      ];
-
-      // 4. Calculate new total
-      final newTotal =
-          widget.existingOrder!.totalPrice + sourceOrder.totalPrice;
-
-      // 5. Create merged order
-      final mergedOrder = widget.existingOrder!.copyWith(
-        items: combinedItems,
-        kotNumbers: combinedKotNumbers,
-        kotBoundaries: combinedBoundaries,
-        totalPrice: newTotal,
-        itemCountAtLastKot: combinedItems.length,
-      );
-
-      // 6. Update the main order in database
-      await orderStore.updateOrder(mergedOrder);
-
-      // 7. Delete the source order
-      await orderStore.deleteOrder(sourceOrder.id);
+      // 1-7. Both orders as SAVED, checked, combined and written inside the
+      // stock gate (TableMerge). Refused → nothing written.
+      final OrderModel mergedOrder;
+      try {
+        mergedOrder = await TableMerge.commit(
+          targetId: widget.existingOrder!.id,
+          sourceId: sourceOrder.id,
+        );
+      } on TableMergeRefused catch (e) {
+        NotificationService.instance.showError(e.message);
+        return;
+      }
 
       // 8. Update table statuses in parallel
       await Future.wait([
         tableStore.updateTableStatus(
           widget.existingOrder!.tableNo!,
           'Cooking',
-          total: newTotal,
+          total: mergedOrder.totalPrice,
           orderId: mergedOrder.id,
           orderTime: mergedOrder.timeStamp,
         ),
         tableStore.updateTableStatus(sourceOrder.tableNo!, 'Available'),
       ]);
 
-      // 9. Update local state
+      // 9. Local state: the working list AND the diff baseline become the
+      // merged saved order, so Place Order sees no change in its lines —
+      // nothing deducted again, no duplicate lines or KOT.
+      if (!mounted) return;
       setState(() {
-        _activeList = List.from(combinedItems);
+        _mergedOrder = mergedOrder;
+        _activeList = mergedOrder.items.map((i) => i.copyWith()).toList();
+        _originalActiveList =
+            mergedOrder.items.map((i) => i.copyWith()).toList();
+        _originalQuantities = {
+          for (final item in mergedOrder.items) item.id: item.quantity,
+        };
+        _currentKotBoundaries = List.from(mergedOrder.kotBoundaries);
+        _currentKotNumbers = List.from(mergedOrder.kotNumbers);
       });
 
       // Show success message

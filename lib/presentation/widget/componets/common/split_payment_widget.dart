@@ -91,6 +91,24 @@ class PaymentEntry {
   }
 }
 
+/// What a set of payment entries ALLOCATES to the bill (R7).
+///
+/// Each entry's `amount` is what that method settled; together they can
+/// never be more than the bill — the excess would be change handed straight
+/// back, yet recorded as money taken. Over-tender is expressed only through a
+/// single cash payment's cash received, which never enters `amount`.
+class PaymentAllocation {
+  PaymentAllocation._();
+
+  static const double _tolerance = 0.01;
+
+  static double allocated(List<PaymentEntry> payments) =>
+      payments.fold(0.0, (s, p) => s + p.amount);
+
+  static bool exceedsBill(List<PaymentEntry> payments, double billTotal) =>
+      billTotal > 0 && allocated(payments) > billTotal + _tolerance;
+}
+
 /// Split Payment Widget for checkout
 class SplitPaymentWidget extends StatefulWidget {
   final double billTotal;
@@ -219,6 +237,9 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
     if (widget.billTotal <= 0) return true;
     if (_payments.isEmpty) return false;
     if (_totalPaid < widget.billTotal) return false;
+    // R7: amounts adding up to more than the bill would record money that
+    // was handed straight back as change (e.g. cash 100 + UPI 50 on 120).
+    if (PaymentAllocation.exceedsBill(_payments, widget.billTotal)) return false;
     for (var payment in _payments) {
       if (payment.amount <= 0) return false;
       // For cash payments in single payment mode, validate that sufficient amount is received
@@ -890,7 +911,10 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
   }
 
   Widget _buildCalculationPanel() {
-    final hasError = _totalPaid > 0 && _totalPaid < widget.billTotal;
+    final overAllocated =
+        PaymentAllocation.exceedsBill(_payments, widget.billTotal);
+    final hasError =
+        (_totalPaid > 0 && _totalPaid < widget.billTotal) || overAllocated;
 
     return ValueListenableBuilder<int>(
       valueListenable: DecimalSettings.precisionNotifier,
@@ -947,6 +971,24 @@ class _SplitPaymentWidgetState extends State<SplitPaymentWidget> {
                   valueColor: Colors.orange,
                   isBold: true,
                   fontSize: AppResponsive.subheadingFontSize(context),
+                ),
+              ],
+
+              // R7: the amounts are what each method settled, so together they
+              // cannot be more than the bill. Change comes only from cash
+              // received on a single cash payment.
+              if (overAllocated) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Payment amounts add up to '
+                  '$symbol${PaymentAllocation.allocated(_payments).toStringAsFixed(precision)}'
+                  ' but the bill is '
+                  '$symbol${widget.billTotal.toStringAsFixed(precision)}. '
+                  'Reduce an amount so they match.',
+                  style: GoogleFonts.poppins(
+                    fontSize: AppResponsive.smallFontSize(context),
+                    color: Colors.red,
+                  ),
                 ),
               ],
 

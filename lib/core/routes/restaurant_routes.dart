@@ -23,7 +23,6 @@ import 'package:billberrylite/presentation/screens/common/attendance/staff_atten
 import 'package:billberrylite/presentation/screens/common/attendance/attendance_report_screen.dart';
 import 'package:billberrylite/presentation/screens/restaurant/import/bulk_import_screen.dart';
 import 'package:billberrylite/presentation/screens/restaurant/tabbar/order.dart';
-import 'package:billberrylite/presentation/widget/componets/restaurant/componets/import/test_data_screen.dart';
 
 // Core Screens
 import 'package:billberrylite/presentation/screens/onboarding/splashScreen.dart';
@@ -42,12 +41,11 @@ import 'package:billberrylite/domain/store/restaurant/license_store.dart';
 
 // Restaurant - Home & Dashboard
 import 'package:billberrylite/presentation/screens/restaurant/welcome_Admin.dart';
-import 'package:billberrylite/presentation/screens/restaurant/usage_limit_screen.dart';
+import 'package:billberrylite/presentation/screens/common/plan/usage_limit_screen.dart';
 import 'package:billberrylite/presentation/screens/common/notifications/notifications_screen.dart';
 
 // Restaurant - Orders
 import 'package:billberrylite/presentation/screens/restaurant/start%20order/startorder.dart';
-import 'package:billberrylite/presentation/screens/restaurant/tabbar/activeorder.dart';
 import 'package:billberrylite/presentation/screens/restaurant/tabbar/pastorder.dart';
 import 'package:billberrylite/presentation/screens/restaurant/tabbar/orderDetails.dart';
 
@@ -92,7 +90,7 @@ import 'package:billberrylite/presentation/screens/restaurant/Reports/performanc
 import 'package:billberrylite/presentation/screens/restaurant/Settings/settingsScreen.dart';
 import 'package:billberrylite/presentation/screens/restaurant/Settings/orderSettings.dart';
 import 'package:billberrylite/presentation/screens/restaurant/Settings/paymentsMethods.dart';
-import 'package:billberrylite/presentation/screens/restaurant/Settings/changePassword.dart';
+import 'package:billberrylite/presentation/screens/common/auth/change_admin_pin_screen.dart';
 import 'package:billberrylite/presentation/screens/restaurant/Settings/licensing_screen.dart';
 import 'package:billberrylite/presentation/screens/retail/store_info_settings_screen.dart';
 
@@ -170,8 +168,11 @@ class RestaurantRoutes {
       'startOrder',
       EntKeys.billing,
     ),
+    // Opened from order notifications. The full Start Order screen on its
+    // Orders tab, not the bare Active Orders body (no app bar, no Past Orders,
+    // no Menu/Tables tabs).
     RouteNames.restaurantActiveOrders: _guard(
-      const Activeorder(),
+      const Startorder(initialTab: Startorder.ordersTab),
       'startOrder',
       EntKeys.billing,
     ),
@@ -473,7 +474,7 @@ class RestaurantRoutes {
       EntKeys.settings,
     ),
     RouteNames.restaurantChangePassword: _guard(
-      Changepassword(),
+      const ChangeAdminPinScreen(),
       'settings',
       EntKeys.settings,
     ),
@@ -528,11 +529,13 @@ class RestaurantRoutes {
     // from the license-lock screen, the upgrade blocker, and the setup wizard.
     // Guarding it bounced un-logged-in users to the PIN screen (a dead end).
     RouteNames.restaurantNeedHelp: (_) => const NeedhelpDrawer(),
+    // Entitled like its drawer entry — not a recovery path, so a direct route
+    // must not bypass the plan check the in-app entries apply.
     RouteNames.restaurantCustomizationDrawer: _guard(
       const CustomizationDrawer(),
       'settings',
+      EntKeys.settings,
     ),
-    RouteNames.restaurantTestData: _guard(const TestDataScreen(), 'settings'),
     RouteNames.restaurantBulkImport: _guard(
       const RestaurantBulkImportScreen(),
       'settings',

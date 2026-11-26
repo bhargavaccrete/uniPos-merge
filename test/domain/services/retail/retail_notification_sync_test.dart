@@ -19,6 +19,7 @@ import 'package:billberrylite/data/models/retail/hive_model/product_model_200.da
 import 'package:billberrylite/data/models/retail/hive_model/variante_model_201.dart';
 import 'package:billberrylite/data/repositories/common/notification_repository.dart';
 
+import 'package:billberrylite/domain/services/common/auto_backup_service.dart';
 import 'package:billberrylite/domain/services/retail/report_service.dart';
 import 'package:billberrylite/domain/services/retail/retail_notification_sync_service.dart';
 import 'package:billberrylite/domain/services/common/license_api_service.dart';
@@ -379,6 +380,68 @@ void main() {
       await sync();
       expect(notificationStore.unreadCount, 0);
       expect(active(kLowStock), hasLength(1));
+    });
+  });
+
+  // ==================== F. BACKUP REMINDER (BKP-6 K2) ====================
+
+  group('F. backup overdue reminder (same as Restaurant)', () {
+    Future<void> backupState({required bool enabled, DateTime? last}) async {
+      final box = await Hive.openBox(HiveBoxNames.appState);
+      await box.put('auto_backup_enabled', enabled);
+      if (last == null) {
+        await box.delete('last_backup_date');
+      } else {
+        await box.put(
+            'last_backup_date', last.toIso8601String().substring(0, 10));
+      }
+    }
+
+    List<AppNotificationModel> due() =>
+        notificationStore.activeOf('backup_due', subjectType: 'system');
+
+    test('auto-backup on and no backup for 7+ days: Retail raises it',
+        () async {
+      await backupState(
+          enabled: true,
+          last: DateTime.now().subtract(const Duration(days: 8)));
+      await sync();
+      expect(due(), hasLength(1));
+      await sync();
+      expect(due(), hasLength(1), reason: 'raised once, never duplicated');
+    });
+
+    test('a recent backup resolves it', () async {
+      await backupState(
+          enabled: true,
+          last: DateTime.now().subtract(const Duration(days: 8)));
+      await sync();
+      await backupState(enabled: true, last: DateTime.now());
+      await sync();
+      expect(due(), isEmpty);
+    });
+
+    test('fresh install (switched on, never backed up): no reminder yet',
+        () async {
+      await backupState(enabled: true);
+      await Hive.box(HiveBoxNames.appState)
+          .delete(AutoBackupService.promptSinceKey);
+      await sync();
+      expect(due(), isEmpty, reason: 'the 7 days start when switched on');
+    });
+
+    test('auto-backup off: no reminder (unchanged rule)', () async {
+      await backupState(enabled: false);
+      await sync();
+      expect(due(), isEmpty);
+    });
+
+    test('the stock-write refresh does not run the backup check', () async {
+      await backupState(
+          enabled: true,
+          last: DateTime.now().subtract(const Duration(days: 8)));
+      await RetailNotificationSyncService.runStartupChecks(backupDue: false);
+      expect(due(), isEmpty);
     });
   });
 }

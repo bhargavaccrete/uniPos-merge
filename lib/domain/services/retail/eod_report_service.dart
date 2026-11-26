@@ -1,6 +1,7 @@
 
 
 import 'package:billberrylite/data/models/retail/hive_model/sale_model_203.dart';
+import 'package:billberrylite/util/retail/cash_drawer_ledger.dart';
 import '../../../core/di/service_locator.dart';
 
 /// Cash-refund helpers for the retail End of Day.
@@ -32,12 +33,15 @@ class EODReportService {
   /// payment summaries as a signed movement, so counting it here as well would
   /// subtract the same refund from expected cash twice. Their header is also
   /// the whole returned value, not the cash that actually left the till.
+  ///
+  /// Per return, the SAME rule the Cash Drawer uses
+  /// ([CashDrawerLedger.cashRefundOf]): a return that partly or wholly
+  /// cancelled an unpaid balance counts only its cash leg (BLK-11); a return
+  /// without legs still counts its whole value when refunded in cash.
   static double cashRefundsIn(List<SaleModel> sales) => sales
-      .where((sale) =>
-          sale.isReturn == true &&
-          sale.exchangeGroupId == null &&
-          sale.paymentType.toLowerCase().trim() == 'cash')
-      .fold<double>(0.0, (sum, sale) => sum + sale.totalAmount.abs());
+      .where((sale) => sale.isReturn == true && sale.exchangeGroupId == null)
+      .fold<double>(
+          0.0, (sum, sale) => sum + CashDrawerLedger.cashRefundOf(sale));
 
   /// Cash refunds for a date window — for callers that don't already hold the
   /// day's sales (e.g. the EOD screen, which builds its report via EODService).

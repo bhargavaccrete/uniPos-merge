@@ -65,6 +65,60 @@ void main() {
       expect(bill.sgstAmount, 9);
     });
 
+    test('a rate row splits its GST once: halves add up, ≤ 1 paisa apart', () {
+      // Three 10.20 lines at 5%: each line's GST is 0.51 (0.26 + 0.25).
+      // Summing the line halves gave CGST 0.78 / SGST 0.75.
+      CartItemModel line(String id) => CartItemModel.create(
+            cartItemId: id,
+            variantId: 'v-$id',
+            productId: 'p-$id',
+            productName: 'Item $id',
+            price: 10.20,
+            qty: 1,
+            gstRate: 5,
+          );
+      final bill = RetailBillingService.compute(
+        items: [line('a'), line('b'), line('c')],
+        isTaxInclusive: false,
+      );
+
+      final row = bill.gstBreakdown[5.0]!;
+      expect(row.totalGstAmount, closeTo(1.53, 0.0001));
+      expect(row.cgstAmount, closeTo(0.77, 0.0001));
+      expect(row.sgstAmount, closeTo(0.76, 0.0001));
+      expect(row.taxableAmount, closeTo(30.60, 0.0001));
+    });
+
+    test('every rate row closes on its own GST, mixed rates', () {
+      final bill = RetailBillingService.compute(
+        items: [
+          for (final p in [10.20, 10.30, 33.30, 7.70, 99.90])
+            for (final r in [5.0, 12.0, 18.0])
+              CartItemModel.create(
+                cartItemId: 'c-$p-$r',
+                variantId: 'v-$p-$r',
+                productId: 'p-$p-$r',
+                productName: 'Item $p',
+                price: p,
+                qty: 1,
+                gstRate: r,
+              ),
+        ],
+        isTaxInclusive: false,
+      );
+
+      expect(bill.gstBreakdown.keys.toSet(), {5.0, 12.0, 18.0});
+      for (final row in bill.gstBreakdown.values) {
+        final sum = double.parse(
+            (row.cgstAmount + row.sgstAmount).toStringAsFixed(2));
+        expect(sum, closeTo(row.totalGstAmount, 0.0001),
+            reason: 'rate ${row.gstRate}');
+        expect((row.cgstAmount - row.sgstAmount).abs(),
+            lessThanOrEqualTo(0.0100001),
+            reason: 'rate ${row.gstRate}');
+      }
+    });
+
     test('a zero-rated item adds no tax', () {
       final bill = RetailBillingService.compute(
         items: [item(price: 250, qty: 2)],

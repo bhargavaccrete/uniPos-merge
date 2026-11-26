@@ -225,9 +225,8 @@ abstract class _CustomerStore with Store {
   /// Update customer's purchase data after a sale (retail)
   @action
   Future<void> updateAfterPurchase(String customerId, double amount, int points) async {
-    await _repository.updatePurchaseAmount(customerId, amount);
-    await _repository.addLoyaltyPoints(customerId, points);
-    await _repository.incrementVisitCount(customerId);
+    // One write: checkout recovery must see it either fully applied or not.
+    await _repository.recordPurchase(customerId, amount, points);
     await loadCustomers();
   }
 
@@ -335,9 +334,8 @@ abstract class _CustomerStore with Store {
   /// Update customer after a credit sale
   @action
   Future<void> updateAfterCreditSale(String customerId, double amount) async {
-    await _repository.updateCredit(customerId, amount);
-    await _repository.updatePurchaseAmount(customerId, amount);
-    await _repository.incrementVisitCount(customerId);
+    // One write: checkout recovery must see it either fully applied or not.
+    await _repository.recordCreditSale(customerId, amount);
     await loadCustomers();
   }
 
@@ -376,6 +374,17 @@ abstract class _CustomerStore with Store {
   @action
   Future<void> reduceCredit(String customerId, double amount) async {
     await _repository.updateCredit(customerId, -amount);
+    await loadCustomers();
+  }
+
+  /// Add to the customer's credit balance ONLY — no purchase total, no visit.
+  ///
+  /// For the unpaid part of a part-paid sale: the sale's purchase and visit
+  /// are recorded once by [updateAfterPurchase]; [updateAfterCreditSale] would
+  /// count them a second time.
+  @action
+  Future<void> addCredit(String customerId, double amount) async {
+    await _repository.updateCredit(customerId, amount);
     await loadCustomers();
   }
 }

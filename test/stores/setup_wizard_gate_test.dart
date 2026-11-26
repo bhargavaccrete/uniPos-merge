@@ -89,14 +89,36 @@ void main() {
       expect(store.canProceedFromStoreDetails, isFalse);
     });
 
-    test('restaurant needs no store type at either step', () {
+    test('restaurant never needs a retail store type', () {
+      final store = newStore();
+      store.selectedBusinessTypeId = 'restaurant';
+
+      expect(store.needsRetailStoreType, isFalse);
+      expect(store.canProceedFromBusinessType, isTrue);
+    });
+
+    test('restaurant is blocked until a restaurant store type is picked', () {
       final store = newStore();
       store.selectedBusinessTypeId = 'restaurant';
       fillStoreDetails(store);
 
-      expect(store.needsRetailStoreType, isFalse);
-      expect(store.canProceedFromBusinessType, isTrue);
+      expect(store.needsRestaurantStoreType, isTrue);
+      expect(store.canProceedFromStoreDetails, isFalse);
+
+      store.selectRestaurantStoreType('cafe');
+
+      expect(store.hasRestaurantStoreType, isTrue);
       expect(store.canProceedFromStoreDetails, isTrue);
+    });
+
+    test('an unknown restaurant store type does NOT satisfy the gate', () {
+      final store = newStore();
+      store.selectedBusinessTypeId = 'restaurant';
+      fillStoreDetails(store);
+
+      store.selectRestaurantStoreType('not_a_type');
+      expect(store.selectedRestaurantStoreType, isNull);
+      expect(store.canProceedFromStoreDetails, isFalse);
     });
   });
 }

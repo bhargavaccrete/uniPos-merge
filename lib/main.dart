@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show PlatformDispatcher;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -6,25 +7,26 @@ import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/core/di/service_locator.dart';
 import 'package:billberrylite/core/config/app_config.dart';
 import 'package:billberrylite/core/init/hive_init.dart';
+import 'package:billberrylite/core/init/hive_safe_open.dart';
+import 'package:billberrylite/core/init/mode_services.dart';
+import 'package:billberrylite/core/init/release_logging.dart';
+import 'package:billberrylite/core/init/crash_reporting.dart';
+import 'package:billberrylite/core/plan/plan_gate.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:billberrylite/data/repositories/business_type_repository.dart';
+import 'package:billberrylite/presentation/screens/common/recovery/startup_recovery_screen.dart';
 import 'package:billberrylite/core/routes/app_routes.dart';
 import 'package:billberrylite/core/routes/routes_name.dart';
 
-import 'package:billberrylite/server/server.dart';
-import 'package:billberrylite/util/common/currency_helper.dart';
 
 import 'domain/store/restaurant/appStore.dart';
 import 'domain/store/restaurant/license_store.dart';
 import 'domain/services/common/notification_service.dart';
-import 'util/common/decimal_settings.dart';
-import 'util/restaurant/staticswitch.dart';
 import 'util/restaurant/restaurant_session.dart';
-import 'util/restaurant/print_settings.dart';
-import 'util/restaurant/order_settings.dart';
-import 'domain/services/retail/retail_printer_settings_service.dart';
-import 'domain/services/restaurant/auto_backup_service.dart';
+import 'domain/services/retail/retail_checkout_commit.dart';
+import 'domain/services/restaurant/stock_journal.dart';
+import 'domain/services/restaurant/void_order_commit.dart';
 import 'domain/services/common/local_notification_service.dart';
-import 'domain/services/common/firebase_messaging_service.dart';
-import 'domain/services/common/notification_sync.dart';
 import 'package:billberrylite/presentation/screens/retail/login_screen.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 final appStore = AppStore();
@@ -32,17 +34,34 @@ final appStore = AppStore();
 final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-void main() async {
+void main() {
+  // AND-34: no app logs in release builds. The outer zone also covers the
+  // error handlers below (runZonedGuarded's onError runs in this zone).
+  silenceDebugPrintInRelease();
+  runZoned(_main, zoneSpecification: releaseLogZone());
+}
+
+void _main() async {
   // 🔴 CRITICAL: Catch ALL errors to prevent white screen
   FlutterError.onError = (FlutterErrorDetails details) {
     print('🔴🔴🔴 FLUTTER ERROR CAUGHT 🔴🔴🔴');
     print('Exception: ${details.exception}');
     print('Stack trace: ${details.stack}');
     FlutterError.presentError(details);
+    CrashReporting.recordFlutterError(details);
   };
 
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
+
+    // Crashlytics before Hive, so a startup failure is reported too. Release
+    // builds on Android/iOS only; local, no network wait; never throws.
+    await CrashReporting.init();
+    // Async errors outside this zone. `false` keeps the default handling.
+    PlatformDispatcher.instance.onError = (error, stack) {
+      CrashReporting.recordError(error, stack, fatal: true);
+      return false;
+    };
 
     // Poppins is bundled locally (assets/fonts/, registered in pubspec.yaml)
     // so GoogleFonts.poppins() must never try to fetch it over the network —
@@ -53,11 +72,27 @@ void main() async {
     WakelockPlus.enable();
 
     try {
-      await _initializeApp();
+      await _openData();
+      await _startServices();
+    } on HiveStartupBlocked catch (blocked) {
+      // M4: a box could not be opened safely. Nothing has started; the
+      // Recovery screen continues startup only once every box opens.
+      runApp(StartupRecoveryApp(
+        blocked: blocked,
+        onRecovered: _startAfterRecovery,
+        navigatorKey: navigatorKey,
+        scaffoldMessengerKey: rootScaffoldMessengerKey,
+      ));
+      // Reported after the Recovery screen is up (non-fatal).
+      CrashReporting.recordError(blocked, StackTrace.current,
+          fatal: false, reason: 'hive_startup_blocked');
+      return;
     } catch (e, stackTrace) {
       print('🔴🔴🔴 INITIALIZATION ERROR 🔴🔴🔴');
       print('Error: $e');
       print('Stack trace: $stackTrace');
+      CrashReporting.recordError(e, stackTrace,
+          fatal: false, reason: 'startup_init_failed');
       runApp(ErrorApp(error: e.toString()));
       return;
     }
@@ -74,6 +109,7 @@ void main() async {
     print('🔴🔴🔴 ZONE ERROR CAUGHT 🔴🔴🔴');
     print('Error: $error');
     print('Stack trace: $stackTrace');
+    CrashReporting.recordError(error, stackTrace, fatal: true);
   });
 }
 
@@ -108,7 +144,25 @@ class _NotificationPermissionRequester with WidgetsBindingObserver {
   }
 }
 
-Future<void> _initializeApp() async {
+/// Recovery succeeded (every box is open): normal startup from the service
+/// locator on. A failed restore attempt may already have built the locator.
+Future<void> _startAfterRecovery() async {
+  try {
+    if (locator.isRegistered<BusinessTypeRepository>()) {
+      await resetServiceLocator();
+    }
+    await _startServices();
+  } catch (e, stackTrace) {
+    CrashReporting.recordError(e, stackTrace,
+        fatal: false, reason: 'startup_after_recovery_failed');
+    runApp(ErrorApp(error: e.toString()));
+    return;
+  }
+  runApp(const BillBerryApp());
+  _NotificationPermissionRequester.scheduleOnResume();
+}
+
+Future<void> _openData() async {
   print('🚀 Starting app initialization...');
 
   // Initialize Hive with Flutter and register common adapters
@@ -123,24 +177,35 @@ Future<void> _initializeApp() async {
 
 
 
-  // Initialize Hive FIRST, then AppConfig
-  print('📦 Step 1/7: Initializing Hive...');
-  await HiveInit.init();
-  print('✅ Hive initialized');
+  // Steps 1-4: Hive, AppConfig, common boxes, business boxes. Throws
+  // HiveStartupBlocked (shown by ErrorApp) if any box could not be opened
+  // safely — so nothing below can run with a missing box. Damaged originals
+  // are preserved, never repaired or deleted.
+  print('📦 Steps 1-4/7: Opening data...');
+  await HiveInit.openStartupBoxes();
+  print('✅ Data opened - Mode: ${AppConfig.businessMode.name}');
+  for (final r in HiveSafeOpen.repairs) {
+    print('🛟 ${r.boxName}: unfinished last write dropped; original kept at '
+        '${r.preserved.path}');
+  }
+}
 
-  print('⚙️  Step 2/7: Initializing AppConfig...');
-  await AppConfig.init();
-  print('✅ AppConfig initialized - Mode: ${AppConfig.businessMode.name}');
+/// Safe metadata on crash reports: business mode, plan label and app version
+/// only (see [CrashReporting.setContext]). Never blocks startup.
+Future<void> _attachCrashContext() async {
+  if (!CrashReporting.isCollecting) return;
+  try {
+    final info = await PackageInfo.fromPlatform();
+    await CrashReporting.setContext(
+      businessMode: AppConfig.businessMode.name,
+      plan: PlanGate.planLabel,
+      appVersion: '${info.version}+${info.buildNumber}',
+    );
+  } catch (_) {}
+}
 
-  // Initialize business-specific boxes if business mode is already set
-  // (This handles the case where app is restarted after initial setup)
-  print('📦 Step 3/7: Opening common boxes...');
-  await HiveInit.openCommonBoxes();
-  print('✅ Common boxes opened');
-
-  print('📦 Step 4/7: Initializing business boxes...');
-  await HiveInit.initializeBusinessBoxes();
-  print('✅ Business boxes initialized');
+/// Everything after the data is open. Never runs while a box is missing.
+Future<void> _startServices() async {
 
   // Setup GetIt dependency injection
   // IMPORTANT: This must be called AFTER boxes are initialized
@@ -151,104 +216,53 @@ Future<void> _initializeApp() async {
   // Pre-load license cache so RestaurantGuard can check synchronously.
   await locator<LicenseStore>().loadCachedLicense();
   print('🔑 License cache loaded');
+  unawaited(_attachCrashContext());
+
+  // Finish any Settle stock work a crash or force-close left unfinished,
+  // before the first sale can touch the same items. Never throws; an entry
+  // that still fails stays for the next Settle or start.
+  if (AppConfig.isRestaurant) {
+    final pending = await StockJournal.recoverAll();
+    if (pending.isNotEmpty) {
+      debugPrint('⚠️ Stock journal: ${pending.length} entry(ies) still pending');
+    }
+    // A void a stop left part-way: its record decides whether the stock return
+    // is finished or the void never happened. Never throws.
+    final voids = await VoidOrderCommit.recoverAll();
+    if (voids.isNotEmpty) {
+      debugPrint('⚠️ Void recovery: ${voids.length} entry(ies) still pending');
+    }
+    // An item cancel (POS or Captain) a stop left part-way: the saved order
+    // decides whether its stock return is owed. Never throws.
+    final cancels = await StockJournal.recoverCancels();
+    if (cancels.isNotEmpty) {
+      debugPrint('⚠️ Cancel recovery: ${cancels.length} entry(ies) still pending');
+    }
+    // Same for a goods receipt a stop left as a draft (S-06) — before any
+    // sale can move the stock its interrupted lines are judged by.
+    final receipts = await restaurantPurchaseOrderStore.resumeInterruptedReceipts();
+    if (receipts > 0) debugPrint('📦 Finished $receipts interrupted goods receipt(s)');
+  }
+
+  // Finish any Retail sale a crash left saved but unfinished, before the first
+  // sale can bill its cart again. Never throws; a failed entry stays for the
+  // next start.
+  if (AppConfig.isRetail) {
+    final pending = await RetailCheckoutCommit.recoverAll();
+    if (pending.isNotEmpty) {
+      debugPrint('⚠️ Retail checkout: ${pending.length} sale(s) still pending');
+    }
+  }
 
   // Fire server validation in background — does not block startup.
   // The RestaurantGuard Observer reacts automatically if status changes.
   locator<LicenseStore>().checkStatusInBackground();
 
 
-  // Load restaurant customization settings from SharedPreferences
-  print('⚙️  Step 6/7: Loading app settings...');
-  if (AppConfig.isRestaurant) {
-    print('   Loading restaurant settings...');
-    // await AppSettings.load();
-    // print('⚙️  Restaurant settings loaded');
-    //
-    // // Load print customization settings
-    // await PrintSettings.load();
-    // print('🖨️  Print settings loaded');
-    //
-    // // Load decimal precision settings
-    // await DecimalSettings.load();
-    // print('💰 Decimal precision loaded: ${DecimalSettings.precision} places');
-    //
-    // // Load order settings
-    // await OrderSettings.load();
-    // print('📋 Order settings loaded');
-    //
-    // // Load currency settings
-    // await CurrencyHelper.load();
-    // print('💰 Currency loaded: ${CurrencyHelper.currentCurrencyCode}');
-
-
-    await Future.wait([
-      AppSettings.load(),
-      PrintSettings.load(),
-      DecimalSettings.load(),
-      OrderSettings.load(),
-      CurrencyHelper.load(),
-      RestaurantSession.load(),
-    ]);
-    RestaurantSession.initLifecycle(); // pause/resume handling for auto-logout
-    print('   ✅ Restaurant settings loaded');
-
-    // Start auto-backup timer (runs hourly, triggers daily backups)
-    AutoBackupService.initialize();
-    print('   ✅ Auto-backup service initialized');
-
-    // Start local server FIRST — captain/KDS clients connect to :9090 on launch,
-    // so it must bind before anything slower (notifications) runs. Fire-and-forget.
-    print('🌐 Starting local server (background)...');
-    startServer().then((_) {
-      print('   ✅ Bill Berry Lite Local Server Started Successfully');
-    }).catchError((e) {
-      print('   ⚠️  Failed to start Bill Berry Lite Local Server: $e');
-    });
-
-  } else if (AppConfig.isRetail) {
-    print('   Loading retail settings...');
-    await Future.wait([
-      RetailPrinterSettingsService().initialize(),
-      DecimalSettings.load(),
-      CurrencyHelper.load()
-    ]);
-    print('   ✅ Retail settings loaded');
-  } else {
-    print('   ⚠️  No business mode set - running in setup mode');
-  }
-
-  // ==================== NOTIFICATIONS (both modes) ====================
-  // Shared by restaurant and retail: one Hive box, one store, one screen.
-  // `NotificationSync` picks which startup checks to run for the active mode.
-  //
-  // Deliberately placed AFTER the mode branches so restaurant keeps its
-  // original ordering — the local server is already binding by now, and
-  // notifications are slow enough that they must not delay it.
-  //
-  // Both blocks are wrapped so a failure (exact-alarm permission denied on
-  // Android 13/14, a missing Firebase config) can never break or block
-  // startup. Permission is requested AFTER the first frame (see main()),
-  // because the Android 13+ prompt needs a resumed activity.
-  if (AppConfig.isBusinessModeSet) {
-    try {
-      await LocalNotificationService.instance.init();
-      await notificationStore.load();
-      await NotificationSync.runStartupChecks();
-      print('   ✅ Local notifications ready');
-    } catch (e) {
-      print('   ⚠️  Local notifications init failed (non-fatal): $e');
-    }
-
-    // Firebase Cloud Messaging (push). Runs after local notifications because
-    // foreground pushes are rendered through that plugin's channels. No-op on
-    // desktop/web (no google-services config for those platforms here).
-    try {
-      await FirebaseMessagingService.instance.init();
-      print('   ✅ Firebase push notifications ready');
-    } catch (e) {
-      print('   ⚠️  Firebase messaging init failed (non-fatal): $e');
-    }
-  }
+  // Per-mode startup (settings, Restaurant session lifecycle, auto-backup,
+  // LAN server, notifications) — same steps and order as before, now shared
+  // with the setup wizard and guarded to run once per process (WF-6).
+  await ModeServices.start();
 
   // Debug: Print initialization status
   print('');
@@ -270,7 +284,8 @@ class ErrorApp extends StatelessWidget {
       home: Scaffold(
         backgroundColor: Colors.red[50],
         body: SafeArea(
-          child: Padding(
+          // Scrolls: a blocked start lists every affected box and its copy.
+          child: SingleChildScrollView(
             padding: const EdgeInsets.all(24.0),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -474,12 +489,16 @@ class _SessionActivityWrapperState extends State<_SessionActivityWrapper> {
   }
 }
 
-/// App-wide back-button protection:
-///   • If popping navigates back inside the app (`Navigator.canPop()` is true),
-///     it pops the top screen immediately without showing any message.
-///   • If popping would exit/close the app (`Navigator.canPop()` is false), it
-///     intercepts the back press, shows a floating SnackBar ("Press back again
-///     to exit"), and requires a second back press within 2 seconds to exit.
+/// App-wide back-button protection: on a root screen, the first back press
+/// shows "Press back again to exit"; a second within 2 seconds exits.
+///
+/// This is a [WidgetsBindingObserver], not a `PopScope`: `MaterialApp.builder`
+/// sits ABOVE the Navigator, outside any route, where a PopScope never fires.
+/// `WidgetsBinding.handlePopRoute` asks observers in registration order, and
+/// WidgetsApp's own observer (registered first) runs `navigator.maybePop()`.
+/// So [didPopRoute] is reached only when no screen popped or blocked the press
+/// — i.e. exactly when the app would otherwise close. Screens with their own
+/// `PopScope(canPop: false)` keep handling back themselves.
 class _GlobalBackProtection extends StatefulWidget {
   final Widget child;
   const _GlobalBackProtection({required this.child});
@@ -488,58 +507,68 @@ class _GlobalBackProtection extends StatefulWidget {
   State<_GlobalBackProtection> createState() => _GlobalBackProtectionState();
 }
 
-class _GlobalBackProtectionState extends State<_GlobalBackProtection> {
+class _GlobalBackProtectionState extends State<_GlobalBackProtection>
+    with WidgetsBindingObserver {
   DateTime? _lastBackPress;
 
   @override
-  Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, _) {
-        if (didPop) return;
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
 
-        // If popping navigates back to a previous screen inside the app, pop normally.
-        final nav = navigatorKey.currentState;
-        if (nav != null && nav.canPop()) {
-          nav.pop();
-          return;
-        }
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
 
-        // Navigator cannot pop further — popping would exit/close the app.
-        // Prompt for double-press before exiting.
-        final now = DateTime.now();
-        if (_lastBackPress != null &&
-            now.difference(_lastBackPress!) < const Duration(seconds: 2)) {
-          SystemNavigator.pop();
-          return;
-        }
-        _lastBackPress = now;
+  @override
+  Future<bool> didPopRoute() async {
+    final now = DateTime.now();
+    if (_lastBackPress != null &&
+        now.difference(_lastBackPress!) < const Duration(seconds: 2)) {
+      SystemNavigator.pop();
+      return true;
+    }
+    _lastBackPress = now;
+    _showExitHint();
+    return true;
+  }
 
-        rootScaffoldMessengerKey.currentState?.clearSnackBars();
-        rootScaffoldMessengerKey.currentState?.showSnackBar(
-          SnackBar(
-            content: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.exit_to_app_rounded, color: Colors.white, size: 20),
-                const SizedBox(width: 10),
-                Text(
-                  'Press back again to exit',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.poppins(fontSize: 13, fontWeight: FontWeight.w500),
-                ),
-              ],
+  void _showExitHint() {
+    rootScaffoldMessengerKey.currentState?.clearSnackBars();
+    rootScaffoldMessengerKey.currentState?.showSnackBar(
+      SnackBar(
+        content: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.exit_to_app_rounded,
+              color: Colors.white,
+              size: 20,
             ),
-            duration: const Duration(seconds: 2),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: AppColors.primary,
-            margin: const EdgeInsets.only(bottom: 24, left: 24, right: 24),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-        );
-      },
-      child: widget.child,
+            const SizedBox(width: 10),
+            Text(
+              'Press back again to exit',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.poppins(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: AppColors.primary,
+        margin: const EdgeInsets.only(bottom: 24, left: 24, right: 24),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
     );
   }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

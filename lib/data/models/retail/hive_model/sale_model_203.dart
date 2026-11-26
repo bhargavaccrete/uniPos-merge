@@ -665,7 +665,10 @@ class SaleModel extends HiveObject {
       'totalCgstAmount': totalCgstAmount,
       'totalSgstAmount': totalSgstAmount,
       'grandTotal': grandTotal,
+      // BKP-1: the legs as a list (read by older backups' readers) AND the
+      // stored field itself, null included, which a restore reads exactly.
       'paymentList': paymentList,
+      'paymentListJson': paymentListJson,
       'changeReturn': changeReturn ?? 0,
       'totalPaid': totalPaid ?? totalAmount,
       'isSplitPayment': isSplitPayment ?? false,
@@ -687,6 +690,21 @@ class SaleModel extends HiveObject {
       'taxEnabled': taxEnabled,
       'storeGstNumber': storeGstNumber,
     };
+  }
+
+  /// BKP-1: the payment legs of a backed-up sale. A backup that carries
+  /// `paymentListJson` (written since BKP-1) is taken exactly, null
+  /// included. An older one only has the decoded `paymentList`, which is
+  /// encoded back; anything unreadable there restores as null (single leg).
+  static String? _restoredPaymentListJson(Map<String, dynamic> map) {
+    if (map.containsKey('paymentListJson')) {
+      return map['paymentListJson'] as String?;
+    }
+    final legs = map['paymentList'];
+    if (legs is! List || legs.isEmpty || legs.any((l) => l is! Map)) {
+      return null;
+    }
+    return jsonEncode([for (final l in legs) Map<String, dynamic>.from(l)]);
   }
 
   // Create from Map (for backup restore)
@@ -721,7 +739,7 @@ class SaleModel extends HiveObject {
       totalCgstAmount: (map['totalCgstAmount'] as num?)?.toDouble(),
       totalSgstAmount: (map['totalSgstAmount'] as num?)?.toDouble(),
       grandTotal: (map['grandTotal'] as num?)?.toDouble(),
-      paymentListJson: map['paymentListJson'] as String?,
+      paymentListJson: _restoredPaymentListJson(map),
       changeReturn: (map['changeReturn'] as num?)?.toDouble(),
       totalPaid: (map['totalPaid'] as num?)?.toDouble(),
       isSplitPayment: (map['isSplitPayment'] as bool?) ?? false,

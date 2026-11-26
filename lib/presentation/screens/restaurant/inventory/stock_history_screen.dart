@@ -183,16 +183,20 @@ class _StockHistoryScreenState extends State<StockHistoryScreen> {
                   ),
                 ],
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      m.reason,
-                      style: GoogleFonts.poppins(
-                        fontSize: AppResponsive.bodyFontSize(context),
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
+                    // A long reason wraps; the quantity keeps its place.
+                    Expanded(
+                      child: Text(
+                        m.reason,
+                        style: GoogleFonts.poppins(
+                          fontSize: AppResponsive.bodyFontSize(context),
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
                       ),
                     ),
+                    const SizedBox(width: 8),
                     Text(
                       '${isIn ? '+' : '−'}${_qty(m.quantity)} ${widget.unit}',
                       style: GoogleFonts.poppins(

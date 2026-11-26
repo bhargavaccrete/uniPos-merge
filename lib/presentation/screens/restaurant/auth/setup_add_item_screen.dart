@@ -1581,6 +1581,11 @@ class _SetupAddItemScreenState extends State<SetupAddItemScreen> {
   }
 
   Future<void> _handleNext() async {
+    // Drop focus BEFORE any confirm dialog: a closing dialog hands focus back
+    // to the field that had it, which would reopen the keyboard on the next
+    // step after the wizard's own unfocus has already run.
+    FocusManager.instance.primaryFocus?.unfocus();
+
     final hasUnsavedInput =
         _itemNameController.text.isNotEmpty ||
         _priceController.text.isNotEmpty ||

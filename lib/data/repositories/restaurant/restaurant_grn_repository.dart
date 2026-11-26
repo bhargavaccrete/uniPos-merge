@@ -64,9 +64,19 @@ class RestaurantGRNItemRepository {
     await _box.put(item.grnItemId, item);
   }
 
+  /// Received qty for one PO line across CONFIRMED GRNs only — the per-line
+  /// figure PO completion is decided on (BLK-17), and the receiving screen's
+  /// "remaining". Damaged units count as received (they go to the return /
+  /// claim / write-off flow), as in retail.
+  ///
+  /// Confirmed only: `confirmGRN` saves the lines before the header, so lines
+  /// whose header is missing (an interrupted receipt) or cancelled are not
+  /// goods the order actually got.
   double getTotalReceivedQtyForPOItem(String poItemId) {
+    final grns = Hive.box<RestaurantGRNModel>(HiveBoxNames.restaurantGrns);
     return _box.values
-        .where((i) => i.poItemId == poItemId)
+        .where((i) =>
+            i.poItemId == poItemId && (grns.get(i.grnId)?.isConfirmed ?? false))
         .fold(0.0, (sum, i) => sum + i.receivedQty);
   }
 }

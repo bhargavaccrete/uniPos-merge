@@ -571,7 +571,6 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
   // Excel and PDF, consistent with every other report.
 
   Future<void> _exportReport() async {
-    final fmt = DateFormat('dd MMM yyyy  HH:mm');
     final dateFmt = DateFormat('dd MMM yyyy');
 
     final headers = [
@@ -587,16 +586,15 @@ class _CashDrawerHistoryScreenState extends State<CashDrawerHistoryScreen> {
     final data = _filteredRows
         .map(
           (r) => [
-            fmt.format(r.timestamp),
+            // Real date-time cell; the PDF prints the same 24-hour text.
+            ExportDateTime(r.timestamp,
+                hour24: true, pdfPattern: 'dd MMM yyyy  HH:mm'),
             r.typeName,
             r.staffName,
-            r.inAmount > 0
-                ? ReportExportService.formatCurrency(r.inAmount)
-                : '—',
-            r.outAmount > 0
-                ? ReportExportService.formatCurrency(r.outAmount)
-                : '—',
-            ReportExportService.formatCurrency(r.runningBalance),
+            r.inAmount > 0 ? ExportMoney(r.inAmount) : '—',
+            r.outAmount > 0 ? ExportMoney(r.outAmount) : '—',
+            // The same precomputed running balance — only the cell type changes.
+            ExportMoney(r.runningBalance),
             (r.note != null && r.note!.isNotEmpty)
                 ? '${r.reason} — ${r.note}'
                 : r.reason,

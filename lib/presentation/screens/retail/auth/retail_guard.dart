@@ -49,13 +49,10 @@ class RetailGuard extends StatelessWidget {
       builder: (_) {
         final lic = locator<LicenseStore>();
 
-        // Licence gate — but ONLY for a device that has actually been licensed.
-        // Retail that never activated has `licenseInfo == null` and stays fully
-        // open, which is the pre-backend behaviour we must not regress. Once a
-        // licence exists, an expiry/suspension/revoke locks instead of silently
-        // reopening the app (see PlanEnforce._bypassed).
-        if (lic.licenseInfo != null &&
-            (!lic.isLicensed || !lic.hasVerifiedManifest)) {
+        // Licence gate. A device with no licence record (never activated, or
+        // wiped by a device mismatch) locks too — retail no longer has an
+        // unlicensed mode outside the setup wizard.
+        if (!lic.isLicensed || !lic.hasVerifiedManifest) {
           // Recovery comes from this Observer re-rendering once the store
           // updates, so the callback has nothing to do — same as RestaurantGuard.
           return LicenseLockScreen(onActivated: () {});

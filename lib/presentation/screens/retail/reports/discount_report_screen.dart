@@ -36,6 +36,12 @@ class DiscountReportScreen extends StatelessWidget {
     return d == null ? iso : DateFormat('dd MMM yyyy, hh:mm a').format(d);
   }
 
+  /// Real 12-hour date-time cell; the PDF prints the same text as [_date].
+  Object _dateCell(String iso) {
+    final d = DateTime.tryParse(iso);
+    return d == null ? iso : ExportDateTime(d);
+  }
+
   double _sum(List<Map<String, dynamic>> rows, String key) =>
       rows.fold<double>(0, (s, r) => s + ((r[key] as num?) ?? 0).toDouble());
 
@@ -242,6 +248,10 @@ class DiscountReportScreen extends StatelessWidget {
           DataCell(Text('${(row['giveawayPct'] as num).toStringAsFixed(1)}%')),
         ],
       ),
+      // All / Current page / Date range by the sale's createdAt (the loader's
+      // filter).
+      rangedExport: true,
+      exportRowDate: (r) => DateTime.tryParse(r['date'] as String? ?? ''),
       exportData: (rows) => ReportExportData(
         headers: const [
           'Date',
@@ -267,26 +277,22 @@ class DiscountReportScreen extends StatelessWidget {
         rows: rows
             .map(
               (r) => [
-                _date(r['date'] as String),
+                _dateCell(r['date'] as String),
                 r['saleId'],
                 r['customerName'],
                 r['paymentType'],
                 (r['isReturn'] as bool) ? 'Return' : 'Sale',
-                ReportExportService.formatCurrency(r['listValue'] as double),
-                ReportExportService.formatCurrency(r['billDiscount'] as double),
-                ReportExportService.formatCurrency(r['lineDiscount'] as double),
-                ReportExportService.formatCurrency(
-                  r['discountTotal'] as double,
-                ),
-                ReportExportService.formatCurrency(
-                  r['overrideDelta'] as double,
-                ),
+                // Return legs keep their negative amounts.
+                ExportMoney(r['listValue'] as double),
+                ExportMoney(r['billDiscount'] as double),
+                ExportMoney(r['lineDiscount'] as double),
+                ExportMoney(r['discountTotal'] as double),
+                ExportMoney(r['overrideDelta'] as double),
                 r['loyaltyPointsUsed'],
-                ReportExportService.formatCurrency(r['loyaltyValue'] as double),
-                ReportExportService.formatCurrency(
-                  r['totalGivenAway'] as double,
-                ),
-                ReportExportService.formatCurrency(r['netTotal'] as double),
+                ExportMoney(r['loyaltyValue'] as double),
+                ExportMoney(r['totalGivenAway'] as double),
+                ExportMoney(r['netTotal'] as double),
+                // A percentage, not money: stays text as before.
                 '${(r['giveawayPct'] as num).toStringAsFixed(1)}%',
                 r['discountReason'] ?? '',
                 r['lineDiscountReasons'] ?? '',

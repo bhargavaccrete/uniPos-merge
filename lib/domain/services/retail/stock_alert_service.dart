@@ -19,6 +19,13 @@ class StockAlertService {
   /// (`[5,10,15,20,25,50]` vs `[5,10,15,20]`) for the same stored value.
   static const List<int> thresholdOptions = [5, 10, 15, 20, 25, 50];
 
+  /// [thresholdOptions] plus [current] when it is a custom value, sorted — so
+  /// a list of choices can always show the stored threshold as selected.
+  static List<int> optionsIncluding(int current) {
+    if (thresholdOptions.contains(current)) return thresholdOptions;
+    return [...thresholdOptions, current]..sort();
+  }
+
   /// Get the current stock alert threshold from preferences
   Future<int> getThreshold() async {
     final prefs = await SharedPreferences.getInstance();

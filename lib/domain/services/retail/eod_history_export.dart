@@ -52,16 +52,16 @@ class EodHistoryExport {
       rows: reports.map((r) {
         final session = r.sessionId;
         return <dynamic>[
-          ReportExportService.formatDate(r.date),
+          ExportDate(r.date),
           DateFormat('hh:mm a').format(r.date),
           session == null || session.isEmpty ? '' : shortRef(session),
           r.cashReconciliation.reconciliationStatus,
-          ReportExportService.formatCurrency(r.totalSales),
+          ExportMoney(r.totalSales),
           r.totalOrderCount,
-          ReportExportService.formatCurrency(
-              r.cashReconciliation.systemExpectedCash),
-          ReportExportService.formatCurrency(r.cashReconciliation.actualCash),
-          ReportExportService.formatCurrency(r.cashReconciliation.difference),
+          ExportMoney(r.cashReconciliation.systemExpectedCash),
+          ExportMoney(r.cashReconciliation.actualCash),
+          // Signed: a shortage stays negative.
+          ExportMoney(r.cashReconciliation.difference),
         ];
       }).toList(),
       summary: {
@@ -97,9 +97,10 @@ class EodHistoryExport {
     void add(String section, String item, Object amount) =>
         rows.add(<dynamic>[section, item, amount]);
 
-    String money(double v) => ReportExportService.formatCurrency(v);
+    // Amount rows are numeric ₹ cells; count and status rows stay as they are.
+    ExportMoney money(double v) => ExportMoney(v);
 
-    add('Close', 'Date', ReportExportService.formatDateTime(report.date));
+    add('Close', 'Date', ExportDateTime(report.date));
     final session = report.sessionId;
     if (session != null && session.isNotEmpty) {
       add('Close', 'Session', shortRef(session));
@@ -152,6 +153,11 @@ class EodHistoryExport {
           money(report.totalSales - report.totalTax));
       add('Profit', 'Cost of Goods', money(report.totalCost));
       add('Profit', 'Gross Profit', money(report.grossProfit));
+      if (report.unknownCostLines > 0) {
+        add('Profit', 'No Cost Price Lines', report.unknownCostLines);
+        add('Profit', 'No Cost Price Revenue (ex-tax)',
+            money(report.unknownCostRevenue));
+      }
     }
 
     if (report.customersWithDue > 0 || report.totalOutstanding > 0) {
@@ -170,7 +176,7 @@ class EodHistoryExport {
       rows: rows,
       summary: {
         'Close': ReportExportService.formatDateTime(report.date),
-        'Total Sales': money(report.totalSales),
+        'Total Sales': ReportExportService.formatCurrency(report.totalSales),
         'Status': recon.reconciliationStatus,
       },
     );

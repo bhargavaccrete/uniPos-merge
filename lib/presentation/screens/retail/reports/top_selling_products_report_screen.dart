@@ -103,7 +103,7 @@ class TopSellingProductsReportScreen extends StatelessWidget {
                 r['__rank'],
                 r['productName'],
                 exportQty((r['totalQuantity'] as num).toDouble()),
-                ReportExportService.formatCurrency(r['totalRevenue'] as double),
+                ExportMoney(r['totalRevenue'] as double),
               ],
             )
             .toList(),

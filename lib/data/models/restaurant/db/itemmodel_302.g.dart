@@ -50,13 +50,15 @@ class ItemsAdapter extends TypeAdapter<Items> {
       recipeId: fields[29] as String?,
       lastPurchaseCost: fields[30] as double?,
       sellDirectlyAtPos: fields[31] as bool?,
+      prepMode: fields[32] as String?,
+      makeFreshWhenOut: fields[33] == null ? false : fields[33] as bool,
     );
   }
 
   @override
   void write(BinaryWriter writer, Items obj) {
     writer
-      ..writeByte(32)
+      ..writeByte(34)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -120,7 +122,11 @@ class ItemsAdapter extends TypeAdapter<Items> {
       ..writeByte(30)
       ..write(obj.lastPurchaseCost)
       ..writeByte(31)
-      ..write(obj.sellDirectlyAtPos);
+      ..write(obj.sellDirectlyAtPos)
+      ..writeByte(32)
+      ..write(obj.prepMode)
+      ..writeByte(33)
+      ..write(obj.makeFreshWhenOut);
   }
 
   @override

@@ -33,7 +33,8 @@ import 'package:billberrylite/domain/store/common/customer_store.dart';
 import 'package:billberrylite/domain/store/restaurant/cash_movement_store.dart';
 import 'package:billberrylite/domain/store/retail/product_store.dart';
 import 'package:billberrylite/domain/store/retail/sale_store.dart';
-import 'package:billberrylite/util/restaurant/restaurant_auth_helper.dart';
+import 'package:billberrylite/util/restaurant/restaurant_auth_helper.dart';
+import '../../../helpers/open_retail_day_fixture.dart';
 
 /// THE INVARIANT: an exchange never rewrites how the original sale was paid.
 ///
@@ -80,6 +81,8 @@ void main() {
         HiveBoxNames.restaurantStockMovements);
     await Hive.openBox<BusinessDetails>(HiveBoxNames.businessDetailsBox);
     await Hive.openBox(HiveBoxNames.dayManagementBox);
+    // BLK-16: returns, exchanges and collections need an open day.
+    await openRetailDayForTest();
     await Hive.openBox(HiveBoxNames.appCounters);
 
     locator.registerLazySingleton<SaleStore>(() => SaleStore());
@@ -355,9 +358,12 @@ void main() {
   });
 
   // ==========================================================================
-  // 4. Original CREDIT → due reduction first, excess refund only
-  group('original CREDIT, due written down before any money moves', () {
-    test('the return offsets the due and pays out nothing', () async {
+  // 4. Original CREDIT with a balance still owed → the exchange is REFUSED.
+  //
+  // BLK-10: the return value would be written off the due AND pay for the
+  // replacement — spent twice. Collect the balance first, or do a return.
+  group('original CREDIT with a balance owed, exchange refused', () {
+    Future<void> seedDebtor({required double owed}) async {
       await seedCatalogue(soldPrice: 1000, replacementPrice: 1000);
       await Hive.box<Customer>(HiveBoxNames.customer).put(
         'C1',
@@ -365,9 +371,67 @@ void main() {
           customerId: 'C1',
           name: 'Debtor',
           phone: '9999999999',
-          creditBalance: 1000,
+          creditBalance: owed,
           createdAt: DateTime.now().toIso8601String(),
         ),
+      );
+    }
+
+    /// Nothing anywhere moved: the original (balance, payment history,
+    /// timestamp), the customer, credit rows, documents, stock, cash.
+    void expectNothingWritten(SaleModel before, {required double owed}) {
+      final after = readSale('S1');
+      expect(after.dueAmount, closeTo(before.dueAmount, 0.001));
+      expect(after.paidAmount, closeTo(before.paidAmount, 0.001));
+      expect(after.status, before.status);
+      expect(after.updatedAt, before.updatedAt);
+      expectPaymentHistoryIntact(before);
+      expect(
+        Hive.box<Customer>(HiveBoxNames.customer).get('C1')!.creditBalance,
+        closeTo(owed, 0.001),
+      );
+      expect(Hive.box<CreditPaymentModel>(HiveBoxNames.creditPayments).values,
+          isEmpty);
+      expect(allSales().map((s) => s.saleId), ['S1'],
+          reason: 'no return and no replacement document');
+      final variants = Hive.box<VarianteModel>(HiveBoxNames.variants);
+      expect(variants.get('v1')!.stockQty, 9);
+      expect(variants.get('v2')!.stockQty, 5);
+      expect(
+          Hive.box<StockMovementModel>(HiveBoxNames.restaurantStockMovements)
+              .values,
+          isEmpty);
+      expect(
+          Hive.box<CashMovementModel>(HiveBoxNames.restaurantCashMovements)
+              .values,
+          isEmpty);
+    }
+
+    test('an unpaid invoice: refused, nothing written', () async {
+      await seedDebtor(owed: 1000);
+      final before = await seedSale(
+        price: 1000,
+        paymentType: 'credit',
+        customerId: 'C1',
+        paidAmount: 0,
+        dueAmount: 1000,
+        status: SaleStatus.due,
+      );
+
+      final r = await exchange('cash');
+
+      expect(r.success, isFalse);
+      expect(r.error, ExchangeService.unpaidBalanceMessage);
+      expectNothingWritten(before, owed: 1000);
+    });
+
+    test('a cheaper replacement is refused too — no cash paid out', () async {
+      await seedDebtor(owed: 1000);
+      await Hive.box<VarianteModel>(HiveBoxNames.variants).put(
+        'v2',
+        Hive.box<VarianteModel>(HiveBoxNames.variants)
+            .get('v2')!
+            .copyWith(sellingPrice: 700),
       );
       final before = await seedSale(
         price: 1000,
@@ -379,70 +443,15 @@ void main() {
       );
 
       final r = await exchange('cash');
-      expect(r.success, isTrue, reason: r.error);
 
-      final after = readSale('S1');
-      // Balance state moved…
-      expect(after.dueAmount, closeTo(0, 0.01));
-      // …but paidAmount did NOT: a credit note is not a payment.
-      expect(after.paidAmount, closeTo(0, 0.001));
-      // …and the payment identity is untouched.
-      expect(after.paymentType, before.paymentType);
-      expect(after.paymentListJson, before.paymentListJson);
-      expect(after.totalAmount, closeTo(before.totalAmount, 0.001));
+      expect(r.success, isFalse);
+      expect(netFor('cash'), 0);
+      expectNothingWritten(before, owed: 1000);
     });
 
-    test('the write-down leaves a return_adjustment audit row', () async {
-      await seedCatalogue(soldPrice: 1000, replacementPrice: 1000);
-      await Hive.box<Customer>(HiveBoxNames.customer).put(
-        'C1',
-        Customer(
-          customerId: 'C1',
-          name: 'Debtor',
-          phone: '9999999999',
-          creditBalance: 1000,
-          createdAt: DateTime.now().toIso8601String(),
-        ),
-      );
-      await seedSale(
-        price: 1000,
-        paymentType: 'credit',
-        customerId: 'C1',
-        paidAmount: 0,
-        dueAmount: 1000,
-        status: SaleStatus.due,
-      );
-
-      await exchange('cash');
-
-      final rows = Hive.box<CreditPaymentModel>(HiveBoxNames.creditPayments)
-          .values
-          .toList();
-      expect(rows.single.paymentMode, ReturnService.returnAdjustmentMode);
-      expect(rows.single.amount, closeTo(1000, 0.01));
-      expect(rows.single.balanceBefore, closeTo(1000, 0.01));
-      expect(rows.single.balanceAfter, closeTo(0, 0.01));
-      // The customer's balance really moved.
-      expect(
-        Hive.box<Customer>(HiveBoxNames.customer).get('C1')!.creditBalance,
-        closeTo(0, 0.01),
-      );
-    });
-
-    test('a partly-paid credit sale only writes down what is still owed',
-        () async {
-      await seedCatalogue(soldPrice: 1000, replacementPrice: 1000);
-      await Hive.box<Customer>(HiveBoxNames.customer).put(
-        'C1',
-        Customer(
-          customerId: 'C1',
-          name: 'Debtor',
-          phone: '9999999999',
-          creditBalance: 400,
-          createdAt: DateTime.now().toIso8601String(),
-        ),
-      );
-      await seedSale(
+    test('a partly-paid invoice: refused, nothing written', () async {
+      await seedDebtor(owed: 400);
+      final before = await seedSale(
         price: 1000,
         paymentType: 'credit',
         customerId: 'C1',
@@ -451,7 +460,89 @@ void main() {
         status: SaleStatus.partiallyPaid,
       );
 
-      await exchange('cash');
+      final r = await exchange('cash');
+
+      expect(r.success, isFalse);
+      expect(r.error, ExchangeService.unpaidBalanceMessage);
+      expectNothingWritten(before, owed: 400);
+    });
+  });
+
+  // ==========================================================================
+  // 4b. A PLAIN return on a credit invoice still writes the due down first —
+  // the route the refusal above points the cashier to.
+  group('plain return on a credit invoice, due written down first', () {
+    Future<SaleModel> seedDebtor({
+      required double owed,
+      required double paid,
+      required String status,
+    }) async {
+      await seedCatalogue(soldPrice: 1000, replacementPrice: 1000);
+      await Hive.box<Customer>(HiveBoxNames.customer).put(
+        'C1',
+        Customer(
+          customerId: 'C1',
+          name: 'Debtor',
+          phone: '9999999999',
+          creditBalance: owed,
+          createdAt: DateTime.now().toIso8601String(),
+        ),
+      );
+      return seedSale(
+        price: 1000,
+        paymentType: 'credit',
+        customerId: 'C1',
+        paidAmount: paid,
+        dueAmount: owed,
+        status: status,
+      );
+    }
+
+    Future<void> plainReturn() => ReturnService().processPartialReturn(
+          originalSaleId: 'S1',
+          itemsToReturn: {'v1': 1},
+          refundMethod: 'cash',
+        );
+
+    test('the return offsets the due; payment identity untouched', () async {
+      final before =
+          await seedDebtor(owed: 1000, paid: 0, status: SaleStatus.due);
+
+      await plainReturn();
+
+      final after = readSale('S1');
+      expect(after.dueAmount, closeTo(0, 0.01));
+      // paidAmount did NOT move: a credit note is not a payment.
+      expect(after.paidAmount, closeTo(0, 0.001));
+      expect(after.paymentType, before.paymentType);
+      expect(after.paymentListJson, before.paymentListJson);
+      expect(after.totalAmount, closeTo(before.totalAmount, 0.001));
+    });
+
+    test('the write-down leaves a return_adjustment audit row', () async {
+      await seedDebtor(owed: 1000, paid: 0, status: SaleStatus.due);
+
+      await plainReturn();
+
+      final rows = Hive.box<CreditPaymentModel>(HiveBoxNames.creditPayments)
+          .values
+          .toList();
+      expect(rows.single.paymentMode, ReturnService.returnAdjustmentMode);
+      expect(rows.single.amount, closeTo(1000, 0.01));
+      expect(rows.single.balanceBefore, closeTo(1000, 0.01));
+      expect(rows.single.balanceAfter, closeTo(0, 0.01));
+      expect(
+        Hive.box<Customer>(HiveBoxNames.customer).get('C1')!.creditBalance,
+        closeTo(0, 0.01),
+      );
+    });
+
+    test('a partly-paid credit sale only writes down what is still owed',
+        () async {
+      await seedDebtor(
+          owed: 400, paid: 600, status: SaleStatus.partiallyPaid);
+
+      await plainReturn();
 
       final after = readSale('S1');
       expect(after.dueAmount, closeTo(0, 0.01));
@@ -493,7 +584,13 @@ void main() {
 
     test('the row is flagged as an adjustment, not a collection', () async {
       await seedDebtor();
-      await exchange('cash');
+      // A plain return: an exchange on an invoice with a balance is refused
+      // (BLK-10), and the write-down this checks belongs to ReturnService.
+      await ReturnService().processPartialReturn(
+        originalSaleId: 'S1',
+        itemsToReturn: {'v1': 1},
+        refundMethod: 'cash',
+      );
 
       final row = Hive.box<CreditPaymentModel>(HiveBoxNames.creditPayments)
           .values
@@ -504,7 +601,13 @@ void main() {
 
     test('collections stay at zero — no money actually came in', () async {
       await seedDebtor();
-      await exchange('cash');
+      // A plain return: an exchange on an invoice with a balance is refused
+      // (BLK-10), and the write-down this checks belongs to ReturnService.
+      await ReturnService().processPartialReturn(
+        originalSaleId: 'S1',
+        itemsToReturn: {'v1': 1},
+        refundMethod: 'cash',
+      );
 
       final now = DateTime.now();
       final collections = await creditPaymentRepository

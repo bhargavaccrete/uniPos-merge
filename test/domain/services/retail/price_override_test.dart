@@ -148,6 +148,21 @@ void main() {
       expect(r.isAllowed, isTrue);
       expect(r.isBlocked, isFalse);
       expect(r.message, contains('below cost'));
+      expect(r.message, contains('600'), reason: 'cost shown by default');
+    });
+
+    test('below cost without showCost keeps the warning but hides the figure',
+        () {
+      final r = PriceOverrideService.validate(
+        variant: _variant(),
+        newPrice: 500,
+        currentPrice: 900,
+        showCost: false,
+      );
+      expect(r.verdict, PriceOverrideVerdict.belowCost);
+      expect(r.needsConfirmation, isTrue);
+      expect(r.message, contains('below cost'));
+      expect(r.message, isNot(contains('600')));
     });
 
     test('same as the current charged price is a no-op, blocked', () {

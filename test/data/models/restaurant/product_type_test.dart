@@ -7,11 +7,14 @@ void main() {
       expect(ProductType.displayName(ProductType.semiFinished), 'Semi-Finished');
     });
 
+    // Phase 1 renamed the types (approved): Finished Good → "Finished", and
+    // legacy Recipe-Based now reads as Finished (made to order).
     test('other types unaffected', () {
       expect(ProductType.displayName(ProductType.rawMaterial), 'Raw Material');
-      expect(ProductType.displayName(ProductType.recipeBased), 'Recipe-Based');
-      expect(ProductType.displayName(ProductType.finishedGood), 'Finished Good');
-      expect(ProductType.displayName(null), 'Finished Good');
+      expect(ProductType.displayName(ProductType.recipeBased), 'Finished');
+      expect(ProductType.displayName(ProductType.finishedGood), 'Finished');
+      expect(ProductType.displayName(null), 'Finished');
+      expect(ProductType.displayName(ProductType.tradeItem), 'Trade Item');
     });
   });
 

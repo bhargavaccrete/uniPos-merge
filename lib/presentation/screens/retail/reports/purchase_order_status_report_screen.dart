@@ -184,6 +184,10 @@ class PurchaseOrderStatusReportScreen extends StatelessWidget {
           ),
         ],
       ),
+      // All / Current page / Date range by createdAt on EVERY tab — the Retail
+      // loader filters Pending, Partial and Completed by createdAt alike.
+      rangedExport: true,
+      exportRowDate: (r) => DateTime.tryParse(r['createdAt'] as String? ?? ''),
       exportData: (rows) {
         return ReportExportData(
           headers: const [
@@ -202,17 +206,15 @@ class PurchaseOrderStatusReportScreen extends StatelessWidget {
                 (r) => [
                   r['poNumber'],
                   r['supplierName'],
-                  _date(r['createdAt'] as String),
-                  _date(r['expectedDeliveryDate'] as String),
+                  ReportExportService.isoDateCell(r['createdAt'] as String),
+                  ReportExportService.isoDateCell(
+                    r['expectedDeliveryDate'] as String,
+                  ),
                   exportQty((r['orderedQty'] as num).toDouble()),
                   exportQty((r['receivedQty'] as num).toDouble()),
                   exportQty((r['remainingQty'] as num).toDouble()),
-                  ReportExportService.formatCurrency(
-                    r['estimatedTotal'] as double,
-                  ),
-                  ReportExportService.formatCurrency(
-                    r['receivedValue'] as double,
-                  ),
+                  ExportMoney(r['estimatedTotal'] as double),
+                  ExportMoney(r['receivedValue'] as double),
                 ],
               )
               .toList(),

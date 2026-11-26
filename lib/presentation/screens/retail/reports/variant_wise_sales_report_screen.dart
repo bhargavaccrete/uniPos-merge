@@ -73,6 +73,8 @@ class VariantWiseSalesReportScreen extends StatelessWidget {
           DataCell(Text(formatMoney(row['totalRevenue'] as double))),
         ],
       ),
+      // All / Current page only: grouped per variant, so no row date.
+      rangedExport: true,
       exportData: (rows) => ReportExportData(
         headers: const [
           'Product',
@@ -88,11 +90,9 @@ class VariantWiseSalesReportScreen extends StatelessWidget {
                 r['productName'] ?? 'Unknown',
                 r['variantLabel'] ?? '',
                 exportQty((r['totalQuantity'] as num).toDouble()),
-                ReportExportService.formatCurrency(
-                  r['totalDiscount'] as double,
-                ),
-                ReportExportService.formatCurrency(r['totalTax'] as double),
-                ReportExportService.formatCurrency(r['totalRevenue'] as double),
+                ExportMoney(r['totalDiscount'] as double),
+                ExportMoney(r['totalTax'] as double),
+                ExportMoney(r['totalRevenue'] as double),
               ],
             )
             .toList(),

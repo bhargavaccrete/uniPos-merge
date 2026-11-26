@@ -491,6 +491,17 @@ void main() {
       expect(report.taxSummaries.first.taxAmount, closeTo(90, 0.001));
     });
 
+    test('India: CGST and SGST each carry the WHOLE taxable value', () async {
+      await setCountry('India');
+      await seedSale('S-1', total: 1180, tax: 180);
+
+      final report = await generate();
+      // Each component is levied on the full base, as on the bill — not half.
+      for (final row in report.taxSummaries) {
+        expect(row.taxableAmount, closeTo(1000, 0.001), reason: row.taxName);
+      }
+    });
+
     test('the UK stores ONE row named VAT — never CGST or SGST', () async {
       await setCountry('United Kingdom');
       await seedSale('S-1', total: 1200, tax: 200);

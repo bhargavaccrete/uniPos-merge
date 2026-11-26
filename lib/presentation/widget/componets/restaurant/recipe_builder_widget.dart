@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:uuid/uuid.dart';
+import 'package:billberrylite/core/constants/item_units.dart';
 import 'package:billberrylite/data/models/restaurant/db/itemmodel_302.dart';
 import 'package:billberrylite/data/models/restaurant/db/recipe_model.dart';
 import 'package:billberrylite/data/models/restaurant/db/recipe_ingredient_model.dart';
@@ -9,6 +10,7 @@ import 'package:billberrylite/util/color.dart';
 import 'package:billberrylite/util/common/currency_helper.dart';
 import 'package:billberrylite/util/common/decimal_settings.dart';
 import 'package:billberrylite/presentation/widget/componets/common/app_text_field.dart';
+import 'package:billberrylite/domain/services/restaurant/recipe_catalog.dart';
 
 /// Embeddable Recipe (Bill of Materials) builder — reused by the Add/Edit
 /// Item screen (wired in a later step) for Semi-Finished and Recipe-Based
@@ -76,7 +78,6 @@ class _IngredientRow {
 class _RecipeBuilderWidgetState extends State<RecipeBuilderWidget> {
   late final String _recipeId;
   late final TextEditingController _yieldQtyController;
-  late final TextEditingController _yieldUnitController;
   final List<_IngredientRow> _rows = [];
   bool _expanded = true;
 
@@ -87,8 +88,6 @@ class _RecipeBuilderWidgetState extends State<RecipeBuilderWidget> {
     _yieldQtyController = TextEditingController(
       text: _trimNum(widget.initialRecipe?.yieldQty ?? 1.0),
     );
-    _yieldUnitController =
-        TextEditingController(text: widget.initialRecipe?.yieldUnit ?? '');
 
     final existing = widget.initialRecipe?.ingredients ?? const [];
     for (final line in existing) {
@@ -108,7 +107,6 @@ class _RecipeBuilderWidgetState extends State<RecipeBuilderWidget> {
   @override
   void dispose() {
     _yieldQtyController.dispose();
-    _yieldUnitController.dispose();
     for (final row in _rows) {
       row.dispose();
     }
@@ -124,6 +122,11 @@ class _RecipeBuilderWidgetState extends State<RecipeBuilderWidget> {
       {for (final i in widget.allItems) i.id: i};
 
   Items? _ingredientFor(String id) => _itemsById[id];
+
+  /// What one batch is counted in: the recipe item's own stock unit, so the
+  /// yield and the stock it adds can never disagree. No unit = pieces.
+  String get _yieldUnit =>
+      normalizeItemUnit(_itemsById[widget.itemId]?.unit) ?? 'piece';
 
   /// Whether this row's typed [_IngredientRow.unitController] text differs
   /// from the selected ingredient item's own stock unit — the trigger for
@@ -184,9 +187,7 @@ class _RecipeBuilderWidgetState extends State<RecipeBuilderWidget> {
       id: _recipeId,
       itemId: widget.itemId,
       yieldQty: yieldQty <= 0 ? 1.0 : yieldQty,
-      yieldUnit: _yieldUnitController.text.trim().isEmpty
-          ? null
-          : _yieldUnitController.text.trim(),
+      yieldUnit: _yieldUnit,
       ingredients: ingredients,
       prepInstructions: widget.initialRecipe?.prepInstructions,
       createdTime: widget.initialRecipe?.createdTime ?? DateTime.now(),
@@ -233,11 +234,12 @@ class _RecipeBuilderWidgetState extends State<RecipeBuilderWidget> {
   }
 
   Future<Items?> _showIngredientPicker() {
-    final candidates = widget.allItems
-        .where((i) =>
-            (i.isRawMaterial || i.isSemiFinished) && i.id != widget.itemId)
-        .toList()
-      ..sort((a, b) => a.name.compareTo(b.name));
+    // Raw Materials + Semi-Finished only (never a Trade / Finished item) —
+    // the rule that keeps the sale cascade one level deep.
+    final candidates = RecipeCatalog.ingredientCandidates(
+      widget.allItems,
+      forItemId: widget.itemId,
+    );
 
     return showModalBottomSheet<Items>(
       context: context,
@@ -351,33 +353,17 @@ class _RecipeBuilderWidgetState extends State<RecipeBuilderWidget> {
   }
 
   Widget _buildYieldRow() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: AppTextField(
-            controller: _yieldQtyController,
-            label: 'This recipe makes',
-            hint: '1',
-            icon: Icons.numbers_rounded,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-            ],
-            onChanged: (_) => _onFieldChanged(),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: AppTextField(
-            controller: _yieldUnitController,
-            label: 'Yield unit',
-            hint: 'e.g. plate, kg',
-            icon: Icons.straighten_rounded,
-            onChanged: (_) => _onFieldChanged(),
-          ),
-        ),
+    return AppTextField(
+      controller: _yieldQtyController,
+      label: 'One batch makes ($_yieldUnit)',
+      hint: 'e.g. 10',
+      helperText: 'How many $_yieldUnit these ingredients make',
+      icon: Icons.numbers_rounded,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      inputFormatters: [
+        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
       ],
+      onChanged: (_) => _onFieldChanged(),
     );
   }
 

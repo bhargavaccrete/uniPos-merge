@@ -279,12 +279,14 @@ mixin _$ItemStore on _ItemStore, Store {
       {required String itemId,
       String? variantId,
       required double delta,
-      double? lastPurchaseCost}) {
+      double? lastPurchaseCost,
+      StockWriteHook? beforePersist}) {
     return _$applyStockDeltaAsyncAction.run(() => super.applyStockDelta(
         itemId: itemId,
         variantId: variantId,
         delta: delta,
-        lastPurchaseCost: lastPurchaseCost));
+        lastPurchaseCost: lastPurchaseCost,
+        beforePersist: beforePersist));
   }
 
   late final _$refreshAsyncAction =
